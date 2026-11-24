@@ -99,7 +99,10 @@ export function NavGroups({ nav, badges = {}, onNavigate }) {
     <nav aria-label="Console">
       {nav.map((group) => (
         <SidebarGroup key={group.label} className="py-1">
-          <SidebarGroupLabel className="text-xs font-medium text-muted-foreground">{group.label}</SidebarGroupLabel>
+          {/* a one-item group named like its item (Orders, Catalog) shows no label: "Orders / Orders" is noise */}
+          {!(group.items.length === 1 && group.items[0].label === group.label) && (
+            <SidebarGroupLabel className="text-xs font-medium text-muted-foreground">{group.label}</SidebarGroupLabel>
+          )}
           <SidebarGroupContent>
             <SidebarMenu>
               {group.items.map((item) => {

@@ -38,7 +38,7 @@ export function AccountMenu({ actor, account }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" data-shell-control="account" aria-label="Account" className="rounded-full">
+        <Button variant="ghost" size="icon" data-shell-control="account" aria-label="Open account menu" className="rounded-full">
           <Avatar className="size-8">
             <AvatarFallback className="text-xs font-medium">{initials(account?.name || account?.email || text[0]?.text)}</AvatarFallback>
           </Avatar>
@@ -47,13 +47,13 @@ export function AccountMenu({ actor, account }) {
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel className="flex flex-col gap-0.5 py-2 text-sm font-normal text-foreground">
           {text.map((r, i) => (
-            <span key={r.id} data-account={r.id} className={i === 0 ? "truncate font-medium" : "truncate text-xs text-muted-foreground"}>
-              {r.text}
+            <span key={r.id} data-account={r.id} title={r.id === "email" ? r.text : undefined} className={i === 0 ? "truncate font-medium" : "truncate text-xs text-muted-foreground"}>
+              {r.id === "role" ? `Role: ${r.text}` : r.text}
             </span>
           ))}
         </DropdownMenuLabel>
         {note && (
-          <p data-account="read-only" className="px-1.5 pb-2 text-xs text-muted-foreground">
+          <p data-account="read-only" className="mx-1.5 mb-2 rounded-md bg-sidebar px-2 py-1.5 text-xs text-muted-foreground">
             {note.text}
           </p>
         )}

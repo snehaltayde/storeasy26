@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Menu } from "lucide-react";
+import { Eye, Menu } from "lucide-react";
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -77,12 +77,14 @@ function TopBar({ actor, account, stores, storeName, storeId }) {
   const label = readOnlyLabel(actor);
   return (
     <header data-shell="topbar" className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-4 md:px-6">
-      <SidebarTrigger data-shell-control="toggle" aria-label="Toggle navigation" className="-ml-1" />
+      <SidebarTrigger data-shell-control="toggle" aria-label="Show or hide navigation" aria-keyshortcuts="Meta+B Control+B" className="-ml-1" />
       <StoreSwitcher stores={stores} current={{ id: storeId, name: storeName }} />
       <div className="flex-1" />
+      {/* support's standing reminder: a quiet pill, icon-only on phones (the account menu says it in full) */}
       {label && (
-        <p data-shell="read-only" className="hidden truncate text-xs font-medium text-muted-foreground sm:block">
-          {label}
+        <p data-shell="read-only" className="flex h-6 min-w-0 shrink items-center gap-1 rounded-full border border-border bg-sidebar px-2 text-xs font-medium text-muted-foreground">
+          <Eye aria-hidden className="size-3.5 shrink-0" />
+          <span className="sr-only truncate sm:not-sr-only">{label}</span>
         </p>
       )}
       <AccountMenu actor={actor} account={account} />

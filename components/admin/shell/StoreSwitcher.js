@@ -25,7 +25,7 @@ export function StoreSwitcher({ stores, current }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" data-shell-control="switcher" className="h-9 max-w-64 gap-2 px-2 text-sm font-medium" aria-label={`Store: ${here.name}. Switch store`}>
+        <Button variant="ghost" size="sm" data-shell-control="switcher" className="h-9 max-w-64 gap-2 px-2 text-sm font-medium" aria-label={`Store: ${here.name}. Switch store`} title={here.name}>
           <span className="truncate">{here.name}</span>
           <ChevronsUpDown aria-hidden className="text-muted-foreground" />
         </Button>
@@ -41,7 +41,7 @@ export function StoreSwitcher({ stores, current }) {
         >
           {storeRows.map((s) => (
             <DropdownMenuRadioItem key={s.id} value={s.id} data-store={s.id} className="flex-col items-start gap-0">
-              <span className="truncate font-medium">{s.name}</span>
+              <span className="w-full truncate font-medium" title={s.name}>{s.name}</span>
               {s.role && <span className="text-xs text-muted-foreground">{s.role}</span>}
             </DropdownMenuRadioItem>
           ))}
@@ -51,6 +51,7 @@ export function StoreSwitcher({ stores, current }) {
           <a href={link.href} target="_blank" rel="noreferrer" data-switcher-link="storefront">
             <ExternalLink aria-hidden />
             {link.text}
+            <span className="sr-only"> (opens another tab)</span>
           </a>
         </DropdownMenuItem>
       </DropdownMenuContent>
