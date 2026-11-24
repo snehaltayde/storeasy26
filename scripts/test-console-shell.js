@@ -420,12 +420,19 @@ await t("every old region carries data-legacy (className contents); the editor p
   const WRAPPED = {
     "components/admin/shell/AdminShell.js": /<div data-legacy className="contents">/,
     "app/(console)/admin/(auth)/layout.js": /<div data-legacy className="contents">/,
-    "app/(console)/platform/layout.js": /<div data-legacy className="contents">/,
+    // Phase 1 line 8: the old operator screens carry their own region (the
+    // layout is a pass-through, so /platform/onboarding is new UI outside it)
+    "app/(console)/platform/page.js": /<div data-legacy className="contents">[\s\S]*<div data-legacy className="contents">[\s\S]*<PlatformAdmin \/> : <PlatformLogin \/>/,
+    "app/(console)/platform/loading.js": /^\s{4}<div data-legacy className="contents">/m,
+    "app/(console)/platform/error.js": /^\s{4}<div data-legacy className="contents">/m,
     "app/(console)/error.js": /^\s{4}<div data-legacy className="contents">/m,
     "app/(console)/not-found.js": /^\s{4}<div data-legacy className="contents">/m,
     "components/console/Toast.js": /<div data-legacy className="contents">\s*<div aria-live="polite"/,
   };
   for (const [f, re] of Object.entries(WRAPPED)) ok(re.test(read(f)), `${f} has the wrapper:`);
+  const platformLayout = read("app/(console)/platform/layout.js").replace(/^\s*\/\/.*$/gm, "");
+  ok(/return children;/.test(platformLayout) && !platformLayout.includes("data-legacy"), "the platform layout is a pass-through:");
+  for (const f of ["app/(console)/platform/onboarding/page.js", "app/(console)/platform/onboarding/loading.js", "components/platform/onboarding/OnboardingOps.js", "components/platform/onboarding/OnboardingTable.js", "components/platform/onboarding/SubjectSheet.js"]) ok(!read(f).replace(/^\s*\/\/.*$/gm, "").includes("data-legacy"), `${f} is new UI, never in a data-legacy region:`);
   const de = read("components/admin/editor/DocumentEditor.js");
   eq((de.match(/lg:sticky lg:top-18 lg:self-start/g) || []).length, 2, "DocumentEditor preview at lg:top-18 (twice):");
   ok(!de.includes("lg:top-4"), "no lg:top-4 left:");
