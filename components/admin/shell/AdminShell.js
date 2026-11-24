@@ -1,9 +1,9 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { IconButton } from "@/components/console/Button";
@@ -49,6 +49,18 @@ export function ConsolePageFrame({ children }) {
   );
 }
 
+// The phone sheet is opened by the top bar's toggle, not a Radix trigger, so
+// Radix has nowhere to return focus when it closes (Esc, a link): back to the toggle.
+function SheetFocusReturn() {
+  const { isMobile, openMobile } = useSidebar();
+  const was = useRef(false);
+  useEffect(() => {
+    if (was.current && !openMobile && isMobile) document.querySelector('[data-shell-control="toggle"]')?.focus();
+    was.current = openMobile;
+  }, [openMobile, isMobile]);
+  return null;
+}
+
 function SkipLink() {
   return (
     <a
@@ -85,6 +97,12 @@ export function AdminShell({ nav, badges = {}, actor, account = null, stores = [
   const pathname = usePathname();
   const editor = isEditorRoute(pathname);
   const [sheet, setSheet] = useState(false);
+  // the editor's sheet returns focus to whatever opened it (the editor's own menu button)
+  const opener = useRef(null);
+  const openNav = () => {
+    opener.current = document.activeElement;
+    setSheet(true);
+  };
   const content = (
     <div data-legacy className="contents">
       {notices && <div className="mb-6">{notices}</div>}
@@ -94,12 +112,19 @@ export function AdminShell({ nav, badges = {}, actor, account = null, stores = [
 
   if (editor) {
     return (
-      <ConsoleNavContext.Provider value={{ openNav: () => setSheet(true), editor: true, storeName }}>
+      <ConsoleNavContext.Provider value={{ openNav, editor: true, storeName }}>
         <TooltipProvider delayDuration={0}>
           <SidebarProvider defaultOpen={defaultOpen} cookiePath="/admin" className="bg-background text-sm text-foreground">
             <SkipLink />
             <Sheet open={sheet} onOpenChange={setSheet}>
-              <SheetContent side="left" className="w-72 gap-0 bg-sidebar p-0 text-sidebar-foreground">
+              <SheetContent
+                side="left"
+                className="w-72 gap-0 bg-sidebar p-0 text-sidebar-foreground"
+                onCloseAutoFocus={(e) => {
+                  e.preventDefault();
+                  opener.current?.focus?.();
+                }}
+              >
                 <SheetHeader className="h-14 flex-row items-center gap-2 border-b border-sidebar-border px-3 py-0">
                   <StoreasyMark />
                   <SheetTitle className="text-base">Storeasy</SheetTitle>
@@ -123,6 +148,7 @@ export function AdminShell({ nav, badges = {}, actor, account = null, stores = [
     <TooltipProvider delayDuration={0}>
       <SidebarProvider defaultOpen={defaultOpen} cookiePath="/admin" className="bg-background text-sm text-foreground">
         <SkipLink />
+        <SheetFocusReturn />
         <AdminNav nav={nav} badges={badges} />
         <div className="flex min-w-0 flex-1 flex-col">
           <TopBar actor={actor} account={account} stores={stores} storeName={storeName} storeId={storeId} />

@@ -297,10 +297,12 @@ const realWarm = (c, say) =>
 
 const node = process.execPath;
 
-// Seeds this worktree's roles store (dev-roles.js seed), starts it, runs fn()
-// while it answers, then stops it (its own handle only). → fn's exit code.
+// Seeds this worktree's roles store fresh (dev-roles.js seed --reset: only the
+// worktree's own .design-data-roles, so a drill run a second time after a
+// broken build starts clean too), starts it, runs fn() while it answers, then
+// stops it (its own handle only). → fn's exit code.
 export async function withRolesStore(c, fn, { start = startChild, up = waitUp } = {}) {
-  const seeded = await c.node(["scripts/dev-roles.js", "seed"]);
+  const seeded = await c.node(["scripts/dev-roles.js", "seed", "--reset"]);
   if (seeded !== 0) return seeded;
   const server = start(node, ["scripts/dev-roles.js"], { cwd: c.worktree, env: c.env, log: c.log });
   try {

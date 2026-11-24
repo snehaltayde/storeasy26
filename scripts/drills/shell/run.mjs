@@ -183,13 +183,14 @@ async function supportMenus(drill, page) {
   const label = await page.locator('[data-shell="read-only"]').innerText().catch(() => "");
   drill.check(label === "Read-only access", "support: the top bar says Read-only access", label);
   await page.locator('[data-shell-control="account"]').click();
-  const menu = page.locator('[data-slot="dropdown-menu-content"]');
+  const menu = page.locator('[data-slot="dropdown-menu-content"][data-state="open"]');
   await menu.waitFor({ timeout: 5000 });
   const text = await menu.innerText();
   drill.check([s.name, s.email, "Support"].every((x) => text.includes(x)) && (await menu.locator('[data-account="read-only"]').count()) === 1, "support: the account menu shows name, email, Support and the read-only note", text);
   const items = await menu.locator('[role="menuitem"]').allInnerTexts();
   drill.check(items.length === 1 && /Sign out/.test(items[0]), "support: Sign out is the account menu's only action", items);
   await page.keyboard.press("Escape");
+  await waitFor(page, () => !document.querySelector('[data-slot="dropdown-menu-content"]'));
   await page.locator('[data-shell-control="switcher"]').click();
   await menu.waitFor({ timeout: 5000 });
   const sw = await menu.innerText();
@@ -204,7 +205,7 @@ async function ownerFlows(drill, page) {
   await settle(page);
   // the switcher
   await page.locator('[data-shell-control="switcher"]').click();
-  const menu = page.locator('[data-slot="dropdown-menu-content"]');
+  const menu = page.locator('[data-slot="dropdown-menu-content"][data-state="open"]');
   await menu.waitFor({ timeout: 5000 });
   const radios = await menu.locator('[role="menuitemradio"]').evaluateAll((els) => els.map((e) => ({ text: e.innerText.replace(/\s+/g, " ").trim(), checked: e.getAttribute("aria-checked") })));
   drill.check(radios.length === 2 && /Roles Annex Admin/.test(radios.map((r) => r.text).join("|")) && radios.some((r) => /Roles Demo Co Owner/.test(r.text) && r.checked === "true"), "owner: the switcher lists Roles Demo Co (Owner, checked) and Roles Annex (Admin)", radios);

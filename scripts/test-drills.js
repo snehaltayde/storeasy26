@@ -553,7 +553,7 @@ await t("console-styles: the runner entry seeds and starts the roles store, then
   const c = { worktree: "/w", env: { A: "1" }, ports: { rolesNext: 6101 }, log: [], headed: [], node: async (args, opts = {}) => (calls.push(`${args.join(" ")}${opts.env?.SF_STYLES_SET ? ` [${opts.env.SF_STYLES_SET}]` : ""}`), 0) };
   const fakeStart = () => ({ child: {}, stop: async () => stopped.push("roles") });
   eq(await R.withRolesStore(c, () => c.node(["x"]), { start: fakeStart, up: async (url) => (calls.push(url), true) }), 0, "exit:");
-  eq(calls.join(" | "), "scripts/dev-roles.js seed | http://roles.localhost:6101/api/health | x", "seed, wait, run:");
+  eq(calls.join(" | "), "scripts/dev-roles.js seed --reset | http://roles.localhost:6101/api/health | x", "seed, wait, run:");
   eq(stopped.join(","), "roles", "the roles store is stopped after:");
   const src = readFileSync(join(ROOT, "scripts/drills/run-isolated.mjs"), "utf8");
   ok(/"console-styles":[^\n]*withRolesStore[^\n]*sf-styles\/run\.mjs[^\n]*SF_STYLES_SET: "console"/.test(src), "console-styles runs run.mjs with SF_STYLES_SET=console inside withRolesStore:");
