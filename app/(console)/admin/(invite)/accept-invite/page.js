@@ -7,16 +7,13 @@ export const metadata = { title: "Accept invitation", robots: { index: false } }
 
 export default async function AcceptInvitePage({ searchParams }) {
   const { token } = await searchParams;
-  const storeName = await tfetch(() => siteName());
+  const storeName = await tfetch(() => siteName()).catch(() => null);
   if (!token) {
     return (
-      <div>
-        <h1 className="text-base font-semibold text-fg">Invitation link incomplete</h1>
-        <p className="mt-2 text-sm text-fg-muted">
-          This page needs the invitation token from your email link. Ask for a new invitation if the link
-          was cut off.
-        </p>
-      </div>
+      <section data-invite="incomplete" className="space-y-3">
+        <h1 className="text-[1.75rem] leading-tight font-semibold tracking-[-0.01em]">This invitation link is incomplete</h1>
+        <p className="text-muted-foreground">The link from your email was cut off. Open it again from the email, or ask whoever invited you to send a new one.</p>
+      </section>
     );
   }
   return <AcceptInviteForm token={token} storeName={storeName} />;

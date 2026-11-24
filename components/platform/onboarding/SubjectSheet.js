@@ -6,7 +6,7 @@
 // ever shows a token or a sign-in link: help goes out by email to an address
 // on file.
 import { useCallback, useEffect, useState } from "react";
-import { ExternalLink } from "lucide-react";
+import { Ban, ExternalLink } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogMedia,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { statusWords, when, ACTOR_KIND_WORDS, MAIL_KIND_WORDS, MAIL_STATUS_WORDS, PROVISION_STEP_WORDS, ROLE_WORDS, RUN_STEP_WORDS, STEP_STATE_WORDS } from "./onboardingWords";
@@ -288,12 +289,13 @@ export default function SubjectSheet({ subject, onClose, onChanged }) {
                 )}
 
                 {a.cancel && (
-                  <div className="flex flex-col gap-2 rounded-card border border-destructive/30 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                    <p className="text-[0.8125rem] text-muted-foreground sm:max-w-[34ch]">
-                      Storeasy created this store and its setup isn&apos;t running. Cancelling frees its address and Shopify store.
-                    </p>
+                  <div data-sheet-cancel className="flex flex-col gap-3 rounded-card border border-destructive/30 bg-destructive/5 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                    <div className="space-y-1 sm:max-w-[36ch]">
+                      <p className="text-[0.8125rem] font-medium">Stop this store before the founder joins</p>
+                      <p className="text-[0.8125rem] text-muted-foreground">Storeasy created it and its setup isn&apos;t running. Cancelling frees its address and Shopify store for another store.</p>
+                    </div>
                     <Button variant="destructive" disabled={busy != null} onClick={() => setCancelOpen(true)} className="shrink-0">
-                      Cancel this store setup
+                      <Ban aria-hidden /> Cancel this store setup
                     </Button>
                   </div>
                 )}
@@ -497,13 +499,30 @@ export default function SubjectSheet({ subject, onClose, onChanged }) {
         </AlertDialogContent>
       </AlertDialog>
       <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent data-cancel-dialog className="sm:max-w-md">
           <AlertDialogHeader>
+            <AlertDialogMedia className="bg-destructive/10 text-destructive">
+              <Ban aria-hidden />
+            </AlertDialogMedia>
             <AlertDialogTitle>Cancel setting up {d?.signup?.storeName}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Its address and Shopify store become free, the Shopify app&apos;s secret is deleted, and this setup can&apos;t be resumed. Any database already made stays at the hosting provider.
-            </AlertDialogDescription>
+            <AlertDialogDescription>The founder hasn&apos;t been invited yet, and won&apos;t be. This setup can&apos;t be resumed: to set the store up later, create it again with New store.</AlertDialogDescription>
           </AlertDialogHeader>
+          <ul className="space-y-2 text-[0.8125rem]" aria-label="What cancelling does">
+            <li className="flex gap-2">
+              <span aria-hidden className="mt-[7px] size-1 shrink-0 rounded-full bg-muted-foreground" />
+              <span>
+                The address <span className="font-mono break-all">{d?.signup?.address}</span> and the Shopify store become free for another store.
+              </span>
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden className="mt-[7px] size-1 shrink-0 rounded-full bg-muted-foreground" />
+              <span>The Shopify app&apos;s client secret is deleted.</span>
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden className="mt-[7px] size-1 shrink-0 rounded-full bg-muted-foreground" />
+              <span className="text-muted-foreground">A database already made stays at the hosting provider. Remove it there if you need to.</span>
+            </li>
+          </ul>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep the setup</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={() => act("cancel_store", {}, () => "Store setup cancelled. Its address and Shopify store are free.")}>

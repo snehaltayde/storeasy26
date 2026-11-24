@@ -20,6 +20,10 @@
 //      step 1 says Storeasy's team is preparing the connection
 //   5. the first shop typed again is refused by the live check
 //   6. signed out, /platform/stores/new goes to /platform; the API answers 401
+//   7. (UI polish) the accept page at 375 and 1280 for a new account, an
+//      existing account (store 1's founder invited to store 2) and a bad link;
+//      an operator-made setup that stopped: the sheet's "Cancel this store
+//      setup" opens its dialog (375 and 1280), Esc keeps it, confirming frees it
 // Results: docs/cms-reviews/drills/OPS-CREATE-STORE/results-main.json and screenshots.
 import { createHash, randomBytes } from "node:crypto";
 import { runDrill, settle, startOwned } from "../p3/lib.mjs";
@@ -85,6 +89,19 @@ async function makeOperator() {
   return { id, token };
 }
 
+// an invite row as createInvite makes one (lib/platform/identity.js) -> its token
+async function plantInvite(email, tenantId) {
+  const token = randomBytes(32).toString("hex");
+  const now = Date.now();
+  await platformSql([
+    {
+      sql: "INSERT INTO invitations (id, token_hash, kind, email, tenant_id, role, invited_by, created_at, expires_at) VALUES (?, ?, 'invite', ?, ?, 'admin', 'drill', ?, ?)",
+      args: [`i_${randomBytes(8).toString("hex")}`, sha(token), email, tenantId, new Date(now).toISOString(), new Date(now + 3600_000).toISOString()],
+    },
+  ]);
+  return token;
+}
+
 // Fill the New store form and press Create store -> the signup id from the URL
 async function createStore(drill, page, s, { app = null, label }) {
   await page.goto(at(CONSOLE, "/platform/stores/new"), { waitUntil: "load" });
@@ -119,6 +136,13 @@ async function acceptAs(drill, s, token, { label }) {
   await page.locator("#inv-pw").fill(s.password);
   await page.locator("#inv-pw2").fill(s.password);
   await drill.screenshot(page, `${label}-accept`);
+  if (label === "03-founder-1") {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const sideways = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    drill.check(!sideways, `${label}: the accept page has no sideways scroll at 375`, null);
+    await drill.screenshot(page, `${label}-accept-375`);
+    await page.setViewportSize({ width: 1280, height: 900 });
+  }
   await page.getByRole("button", { name: "Accept invitation" }).click();
   const landed = await until(async () => new URL(page.url()).pathname === "/admin/onboarding", 60_000, 250);
   drill.check(Boolean(landed), `${label}: accepting lands on /admin/onboarding`, page.url());
@@ -207,6 +231,67 @@ async function opsCreateStore(drill) {
   const sideways = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   drill.check(!sideways, "phone width: no sideways scroll", null);
   await drill.screenshot(page, "09-phone");
+
+  // 7a. the accept page: an existing account, and a link that can't be used
+  {
+    const { ctx: c2, page: p2 } = await newPage(drill);
+    const tok = await plantInvite(ONE.email, TWO.slug);
+    await p2.goto(at(storeOrigin(TWO.slug), `/admin/accept-invite?token=${tok}`), { waitUntil: "load" });
+    const mode = await p2.locator('[data-invite="existing"]').waitFor({ timeout: 60_000 }).then(() => true, () => false);
+    const body = await text(p2);
+    drill.check(mode && body.includes(ONE.email) && /Forgot password/.test(body) && (await p2.locator("#inv-pw2").count()) === 0, "existing account: asks only for the current password, with the forgot-password hint", body.slice(0, 300));
+    await drill.screenshot(p2, "10-accept-existing");
+    await p2.setViewportSize({ width: 375, height: 812 });
+    await drill.screenshot(p2, "10-accept-existing-375");
+    await p2.locator("#inv-pw").fill("not-the-password");
+    await p2.getByRole("button", { name: "Accept invitation" }).click();
+    const wrong = await p2.locator("#inv-pw-error").waitFor({ timeout: 30_000 }).then(() => true, () => false);
+    drill.check(wrong && new URL(p2.url()).pathname === "/admin/accept-invite", "a wrong password says so under the field and stays on the page", await p2.locator("#inv-pw-error").innerText().catch(() => ""));
+    await drill.screenshot(p2, "11-accept-wrong-password-375");
+    await p2.setViewportSize({ width: 1280, height: 900 });
+    await p2.goto(at(storeOrigin(TWO.slug), `/admin/accept-invite?token=${"0".repeat(64)}`), { waitUntil: "load" });
+    const bad = await p2.locator('[data-invite="unusable"]').waitFor({ timeout: 30_000 }).then(() => true, () => false);
+    drill.check(bad, "a used or bad link says it can't be used, with the way to sign in", null);
+    await drill.screenshot(p2, "12-accept-unusable");
+    await c2.close();
+  }
+
+  // 7b. an operator-made setup that stopped: Cancel this store setup
+  {
+    const id = `sgn_${randomBytes(8).toString("hex")}`;
+    const t = new Date().toISOString();
+    await platformSql([
+      {
+        sql: `INSERT INTO signups (id, email, name, store_name, slug, password_hash, browser_hash, code_attempts, sends, status, ip, created_at, updated_at, verified_at, expires_at, source, created_by, shop_domain, failure_kind, error)
+              VALUES (?, 'stopped-founder@ops-create.test', 'Ravi Nair', 'Drill Stopped Store', 'drill-stopped-store', NULL, ?, 0, 0, 'failed', NULL, ?, ?, ?, '9999-12-31T00:00:00.000Z', 'operator', ?, 'drill-stopped-shop.myshopify.com', 'needs_operator', 'The hosting provider refused the database name.')`,
+        args: [id, sha(randomBytes(16).toString("hex")), t, t, t, operator.id],
+      },
+    ]);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(at(CONSOLE, `/platform/onboarding?view=all&s=${encodeURIComponent(`signup:${id}`)}`), { waitUntil: "load" });
+    const btn = page.getByRole("button", { name: "Cancel this store setup" });
+    const shown = await btn.waitFor({ timeout: 30_000 }).then(() => true, () => false);
+    drill.check(shown, "the sheet of a stopped operator-made setup offers Cancel this store setup", null);
+    await drill.screenshot(page, "13-sheet-cancel");
+    await btn.click();
+    const dialog = page.getByRole("alertdialog");
+    await dialog.waitFor();
+    const words = await dialog.innerText();
+    drill.check(/drill-stopped-store/.test(words) && /can.t be resumed/.test(words) && /secret is deleted/.test(words), "the dialog names the address and says plainly what cancelling does", words.slice(0, 400));
+    await drill.screenshot(page, "14-cancel-dialog");
+    await page.keyboard.press("Escape");
+    const closed = await dialog.waitFor({ state: "hidden", timeout: 10_000 }).then(() => true, () => false);
+    drill.check(closed && (await one("SELECT status FROM signups WHERE id = ?", [id]))?.status === "failed", "Esc closes the dialog and keeps the setup", null);
+    await page.setViewportSize({ width: 375, height: 812 });
+    await btn.click();
+    await dialog.waitFor();
+    await drill.screenshot(page, "14-cancel-dialog-375");
+    await dialog.getByRole("button", { name: "Cancel the setup" }).click();
+    const freed = await page.locator('[role="status"]', { hasText: "Store setup cancelled" }).waitFor({ timeout: 30_000 }).then(() => true, () => false);
+    drill.check(freed && (await one("SELECT status FROM signups WHERE id = ?", [id]))?.status === "released", "confirming cancels the setup (the row is released)", null);
+    await drill.screenshot(page, "15-cancelled-375");
+    await page.setViewportSize({ width: 1280, height: 900 });
+  }
   await ctx.close();
 
   // 6. signed out

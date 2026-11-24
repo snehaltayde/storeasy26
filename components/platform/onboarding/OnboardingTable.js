@@ -148,7 +148,7 @@ export default function OnboardingTable({ rows, busy, onOpen, selected }) {
                   <Who who={r.who} />
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1">
                     <Badge variant={s.tone}>{s.label}</Badge>
                     {sourceLabel(r.source) && <Badge variant="muted">{sourceLabel(r.source)}</Badge>}
                     {r.supportUntil && <Marker icon={Eye} words={`Support access open until ${when(r.supportUntil)}`} className="text-info" />}

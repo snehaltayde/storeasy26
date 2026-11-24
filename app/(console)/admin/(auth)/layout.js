@@ -3,7 +3,7 @@ import { tfetch } from "@/lib/console-request";
 import { consoleNotices } from "@/lib/admin/notices";
 import { ConsoleNotices } from "@/components/admin/shell/ConsoleNotices";
 
-// Auth shell (S50): login / reset / accept-invite render as a centered
+// Auth shell (S50): login and reset render as a centered
 // card — store context above, no sidebar, no storefront chrome. Phase 0
 // line 8: an old screen, so it sits in a [data-legacy] region (the old
 // tokens, app/console.css); the support-access and incident notices show

@@ -7,7 +7,8 @@
 // shows the invite, the address, the app, the redirect URL and Resend invite
 // (line 8's owner_invite action). Nothing here ever holds a token or a link.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, Circle, Loader2, RotateCw, X } from "lucide-react";
+import { ArrowLeft, Check, CircleAlert, Circle, Copy, Globe, LoaderCircle, Mail, RotateCw, Store, X } from "lucide-react";
+import { cn } from "@/components/ui/utils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PROGRESS, LABELS, failureWords, inviteWords, inviteSent, appWords } from "./createStoreWords";
@@ -15,20 +16,71 @@ import { PROGRESS, LABELS, failureWords, inviteWords, inviteSent, appWords } fro
 const POLL_MS = 1500;
 const HIDDEN_POLL_MS = 6000;
 
-function StepIcon({ state }) {
-  if (state === "done") return <Check className="size-4 text-success" aria-hidden />;
-  if (state === "working") return <Loader2 className="size-4 animate-spin text-info motion-reduce:animate-none" aria-hidden />;
-  if (state === "failed") return <X className="size-4 text-destructive" aria-hidden />;
-  return <Circle className="size-4 text-muted-foreground" aria-hidden />;
+// one setup step: a ringed icon, its name, and its state in words
+function Step({ step }) {
+  const { state, label } = step;
+  const ring = state === "done" ? "border-success/30 bg-success/10 text-success" : state === "working" ? "border-info/30 bg-info/10 text-info" : state === "failed" ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-border bg-muted text-muted-foreground";
+  const Icon = state === "done" ? Check : state === "working" ? LoaderCircle : state === "failed" ? X : Circle;
+  return (
+    <li data-state={state} className="relative flex items-center gap-3 py-2 text-sm">
+      <span className={cn("relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full border", ring)}>
+        <Icon aria-hidden className={cn("size-3.5", state === "working" && "motion-safe:animate-spin", state === "waiting" && "size-2 fill-current")} />
+      </span>
+      <span className={cn("min-w-0 flex-1", state === "waiting" && "text-muted-foreground", state === "failed" && "font-medium")}>{label}</span>
+      <span className={cn("shrink-0 text-[0.8125rem]", state === "failed" ? "text-destructive" : "text-muted-foreground")}>{PROGRESS.stepWords[state] || state}</span>
+    </li>
+  );
 }
 
 const STATE_WORDS = { done: "done", working: "in progress", failed: "failed", waiting: "waiting" };
 
-function Fact({ label, children }) {
+function Fact({ icon: Icon, tone = "muted", label, children }) {
+  const color = tone === "success" ? "text-success" : tone === "warning" ? "text-warning" : "text-muted-foreground";
   return (
-    <div className="grid gap-1 py-3 md:grid-cols-[200px_1fr] md:gap-4">
-      <dt className="text-[0.8125rem] font-medium text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 text-sm">{children}</dd>
+    <div className="flex gap-3 py-4">
+      <Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", color)} />
+      <div className="min-w-0 flex-1">
+        <dt className="text-[0.8125rem] font-medium text-muted-foreground">{label}</dt>
+        <dd className="mt-1 text-sm">{children}</dd>
+      </div>
+    </div>
+  );
+}
+
+// the redirect URL, whole, with a Copy button (falls back to selecting it)
+function CopyField({ value }) {
+  const [state, setState] = useState("idle"); // idle | copied | failed
+  const ref = useRef(null);
+  const reset = useRef(null);
+  useEffect(() => () => clearTimeout(reset.current), []);
+  async function copy() {
+    clearTimeout(reset.current);
+    try {
+      await navigator.clipboard.writeText(value);
+      setState("copied");
+    } catch {
+      const r = document.createRange();
+      r.selectNodeContents(ref.current);
+      window.getSelection()?.removeAllRanges();
+      window.getSelection()?.addRange(r);
+      setState("failed");
+    }
+    reset.current = setTimeout(() => setState("idle"), 2500);
+  }
+  return (
+    <div>
+      <div className="flex items-stretch overflow-hidden rounded-md border border-border bg-muted">
+        <code ref={ref} className="min-w-0 flex-1 px-2.5 py-2 font-mono text-[0.8125rem] break-all select-all">
+          {value}
+        </code>
+        <Button type="button" variant="ghost" onClick={copy} className="h-auto shrink-0 rounded-none border-l border-border px-3" aria-label={state === "copied" ? PROGRESS.copied : `${PROGRESS.copy} the redirect URL`}>
+          {state === "copied" ? <Check aria-hidden className="text-success" /> : <Copy aria-hidden />}
+          <span aria-hidden>{state === "copied" ? PROGRESS.copied : PROGRESS.copy}</span>
+        </Button>
+      </div>
+      <p role="status" className={cn("mt-1.5 text-[0.8125rem]", state === "failed" ? "text-destructive" : "text-muted-foreground")}>
+        {state === "failed" ? PROGRESS.copyFailed : state === "copied" ? <span className="sr-only">{PROGRESS.copied}</span> : null}
+      </p>
     </div>
   );
 }
@@ -109,89 +161,120 @@ export default function CreateStoreProgress({ signup }) {
   const name = data?.storeName || "the store";
   const title = !data ? PROGRESS.title("the store") : data.status === "done" ? PROGRESS.doneTitle(name) : data.status === "failed" ? PROGRESS.failedTitle : PROGRESS.title(name);
   const live = data ? data.steps.map((s) => `${s.label}: ${STATE_WORDS[s.state] || s.state}`).join(". ") : "";
+  const done = data?.status === "done";
+  const failed = data?.status === "failed";
+  const sent = done && inviteSent(data.done);
 
   return (
-    <div className="mx-auto max-w-[640px] px-4 py-6 md:px-6">
+    <div className="mx-auto max-w-[640px] px-4 py-6 md:px-6 md:py-8">
       <a href="/platform" className="inline-flex items-center gap-1 rounded-md text-[0.8125rem] text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
         <ArrowLeft className="size-3.5" aria-hidden /> {LABELS.back}
       </a>
-      <h1 className="mt-2 truncate text-[1.375rem] font-semibold" title={title}>
-        {title}
-      </h1>
+      <div className="mt-2 flex items-center gap-2.5">
+        {done && (
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-success/10 text-success">
+            <Check aria-hidden className="size-4" />
+          </span>
+        )}
+        {failed && (
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+            <CircleAlert aria-hidden className="size-4" />
+          </span>
+        )}
+        <h1 className="min-w-0 truncate text-[1.375rem] font-semibold" title={title}>
+          {title}
+        </h1>
+      </div>
       {data?.status === "provisioning" && <p className="mt-1 text-sm text-muted-foreground">{PROGRESS.working}</p>}
+      {done && <p className="mt-1 text-sm text-muted-foreground">{PROGRESS.doneIntro}</p>}
 
       <div className="mt-6 rounded-card border border-border bg-card p-4 shadow-card md:p-6">
         <p className="sr-only" aria-live="polite">
           {live}
         </p>
         {!data && !error && (
-          <div aria-busy="true" aria-label="Loading the setup" className="space-y-3">
+          <div aria-busy="true" aria-label="Loading the setup" className="space-y-4">
             {[0, 1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-5 w-3/4" />
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="size-7 rounded-full" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
             ))}
           </div>
         )}
         {error && (
-          <div role="alert" className="space-y-3">
-            <p className="text-sm text-destructive">{error}</p>
+          <div role="alert" className="space-y-4">
+            <div className="flex items-start gap-2 text-sm text-destructive">
+              <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+              <p className="min-w-0">{error}</p>
+            </div>
             <div className="flex flex-wrap gap-2">
               {error !== PROGRESS.lost && (
-                <Button variant="outline" size="sm" onClick={load}>
-                  <RotateCw className="size-3.5" aria-hidden /> {PROGRESS.tryAgain}
+                <Button variant="outline" onClick={load}>
+                  <RotateCw aria-hidden /> {PROGRESS.tryAgain}
                 </Button>
               )}
-              <Button variant="outline" size="sm" asChild>
+              <Button variant={error === PROGRESS.lost ? "default" : "ghost"} asChild>
                 <a href="/platform/onboarding">{LABELS.onboarding}</a>
               </Button>
             </div>
           </div>
         )}
         {data && (
-          <ol className="space-y-2.5" data-status={data.status}>
+          // the steps, joined by a thin line behind their icons
+          <ol data-status={data.status} className="relative before:absolute before:top-5 before:bottom-5 before:left-3.5 before:w-px before:bg-border">
             {data.steps.map((s) => (
-              <li key={s.label} data-state={s.state} className="flex items-center gap-2.5 text-sm">
-                <StepIcon state={s.state} />
-                <span className={s.state === "waiting" ? "text-muted-foreground" : ""}>{s.label}</span>
-              </li>
+              <Step key={s.label} step={s} />
             ))}
           </ol>
         )}
-        {data?.note && <p className="mt-4 text-sm text-warning-text">{data.note}</p>}
+        {data?.note && <p className="mt-4 rounded-md bg-warning/10 px-3 py-2 text-[0.8125rem] text-warning-text">{data.note}</p>}
 
-        {data?.status === "failed" && (
-          <div className="mt-5 space-y-3">
+        {failed && (
+          <div className="mt-5 space-y-4 border-t border-border pt-5">
             <p className="text-sm">{failureWords(data.failureKind)}</p>
-            <Button onClick={tryAgain} disabled={acting}>
-              {acting ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <RotateCw className="size-4" aria-hidden />}
-              {acting ? PROGRESS.retrying : PROGRESS.tryAgain}
-            </Button>
-          </div>
-        )}
-
-        {data?.status === "done" && (
-          <>
-            <dl className="mt-5 divide-y divide-border border-t border-border">
-              <Fact label={PROGRESS.invite}>
-                <span className={inviteSent(data.done) ? "" : "text-warning-text"}>{inviteWords(data.done)}</span>
-              </Fact>
-              <Fact label={PROGRESS.address}>
-                <span className="font-mono text-[0.8125rem]">{data.address}</span>
-              </Fact>
-              <Fact label={PROGRESS.app}>{appWords(data.done)}</Fact>
-              <Fact label={PROGRESS.redirect}>
-                <code className="block font-mono text-[0.8125rem] break-all select-all">
-                  {data.done.redirectUrl}
-                </code>
-                <p className="mt-1 text-xs text-muted-foreground">{PROGRESS.redirectHint}</p>
-              </Fact>
-            </dl>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={tryAgain} disabled={acting} size="lg" className="h-10 px-4">
+                {acting ? <LoaderCircle className="motion-safe:animate-spin" aria-hidden /> : <RotateCw aria-hidden />}
+                {acting ? PROGRESS.retrying : PROGRESS.tryAgain}
+              </Button>
+              <Button variant="ghost" size="lg" className="h-10 px-4" asChild>
+                <a href={`/platform/onboarding?view=all&s=${encodeURIComponent(`signup:${signup}`)}`}>{PROGRESS.openRow}</a>
+              </Button>
+            </div>
             {actionNote && (
-              <p role="status" className={`mt-4 text-sm ${actionNote.tone === "danger" ? "text-destructive" : "text-success"}`}>
+              <p role="status" className="text-sm text-destructive">
                 {actionNote.words}
               </p>
             )}
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Button variant={inviteSent(data.done) ? "outline" : "default"} onClick={resend} disabled={acting}>
+          </div>
+        )}
+
+        {done && (
+          <>
+            <dl className="mt-4 divide-y divide-border border-t border-border">
+              <Fact icon={Mail} tone={sent ? "success" : "warning"} label={PROGRESS.invite}>
+                <span className={sent ? "" : "text-warning-text"}>{inviteWords(data.done)}</span>
+              </Fact>
+              <Fact icon={Globe} label={PROGRESS.address}>
+                <span className="font-mono text-[0.8125rem] break-all">{data.address}</span>
+              </Fact>
+              <Fact icon={Store} tone={data.done.appReady ? "success" : "warning"} label={PROGRESS.app}>
+                {appWords(data.done)}
+              </Fact>
+              <Fact icon={Copy} label={PROGRESS.redirect}>
+                <CopyField value={data.done.redirectUrl} />
+                <p className="mt-1 text-[0.8125rem] text-muted-foreground">{PROGRESS.redirectHint}</p>
+              </Fact>
+            </dl>
+            {actionNote && (
+              <p role="status" className={cn("mt-2 rounded-md px-3 py-2 text-[0.8125rem]", actionNote.tone === "danger" ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success")}>
+                {actionNote.words}
+              </p>
+            )}
+            <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-5">
+              <Button variant={sent ? "outline" : "default"} onClick={resend} disabled={acting}>
+                {acting ? <LoaderCircle className="motion-safe:animate-spin" aria-hidden /> : <Mail aria-hidden />}
                 {acting ? PROGRESS.resending : PROGRESS.resend}
               </Button>
               <Button variant="outline" asChild>
@@ -202,11 +285,6 @@ export default function CreateStoreProgress({ signup }) {
               </Button>
             </div>
           </>
-        )}
-        {data?.status === "failed" && actionNote && (
-          <p role="status" className="mt-3 text-sm text-destructive">
-            {actionNote.words}
-          </p>
         )}
       </div>
     </div>

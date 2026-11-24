@@ -1,16 +1,20 @@
 // Phase 1 line 9: the words of the operator's "New store" screen. Pure (no
 // React, no node:*), so scripts/test-operator-create-store.js checks them.
 
-export const FIELD_ORDER = Object.freeze(["storeName", "email", "founderName", "shop", "slug", "app"]);
+// the order the form shows them in: founder, store, Shopify app
+export const FIELD_ORDER = Object.freeze(["email", "founderName", "storeName", "slug", "shop", "app"]);
 
 export const LABELS = Object.freeze({
   title: "New store",
   intro: "Create a store for a founder. We set it up in the background, then email them an invite to finish onboarding.",
-  storeName: "Store name",
+  founderTitle: "Founder",
+  founderHint: "They become the store's owner.",
   email: "Owner's email",
-  emailHint: "They get the invite here and become the store's owner.",
+  emailHint: "The invite goes here.",
   founderName: "Founder's name (optional)",
   founderNameHint: "Used to greet them in the invite.",
+  storeTitle: "Store",
+  storeName: "Store name",
   shop: "Shopify store",
   shopPlaceholder: "their-store.myshopify.com",
   shopHint: "Their .myshopify.com address, or paste their Shopify admin's address.",
@@ -22,9 +26,10 @@ export const LABELS = Object.freeze({
   clientSecret: "Client secret",
   submit: "Create store",
   submitting: "Creating store…",
+  summary: (address, email) => `Creates ${address}${email ? ` and emails the invite to ${email}` : ""}. The founder's Shopify store isn't changed.`,
   checking: "Checking…",
   available: "Available",
-  back: "Back to the platform console",
+  back: "Platform operations",
   onboarding: "Signups & onboarding",
 });
 
@@ -41,6 +46,11 @@ export const PROGRESS = Object.freeze({
   app: "Shopify app",
   redirect: "Redirect URL for the store's Shopify app",
   redirectHint: "Add this to the app's allowed redirection URLs in the Shopify Partner dashboard.",
+  copy: "Copy",
+  copied: "Copied",
+  copyFailed: "Couldn't copy. Select the address and copy it yourself.",
+  doneIntro: "The founder finishes onboarding from the invite. Nothing else is needed from you unless the app isn't set up.",
+  stepWords: Object.freeze({ done: "Done", working: "In progress", failed: "Stopped", waiting: "Waiting" }),
   resend: "Resend invite",
   resending: "Sending…",
   openRow: "Open the store's row",

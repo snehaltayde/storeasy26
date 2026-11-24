@@ -88,7 +88,7 @@ export default function ProvisionRunsPanel() {
                 <StatusBadge status={r.status} />
                 {r.signup && (
                   <span data-provision-signup={r.signup.status}>
-                    <Badge tone="info" title={`${r.signup.source === "operator" ? "Store setup" : "Signup"} ${r.signup.status}`}>
+                    <Badge tone="neutral" title={`${r.signup.source === "operator" ? "Store setup" : "Signup"} status: ${r.signup.status}`}>
                       {r.signup.source === "operator" ? "Created by Storeasy" : "Self-serve signup"}
                     </Badge>
                   </span>

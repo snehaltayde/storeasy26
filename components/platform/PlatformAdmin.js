@@ -270,7 +270,7 @@ export default function PlatformAdmin() {
           <div className="flex flex-wrap items-center justify-between gap-3 pt-3">
             <h1 className="text-lg font-semibold tracking-tight text-fg">Platform operations</h1>
             <div className="flex items-center gap-2">
-<a href="/platform/stores/new" className="inline-flex items-center gap-1.5 rounded-ctl bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-fg focus-ring hover:bg-primary-hover">
+              <a href="/platform/stores/new" className="inline-flex items-center gap-1.5 rounded-ctl bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-fg focus-ring hover:bg-primary-hover">
                 <Plus size={13} aria-hidden /> New store
               </a>
               <Button size="sm" icon={<LogOut size={13} aria-hidden />} onClick={logout}>
