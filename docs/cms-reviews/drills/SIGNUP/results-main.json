@@ -2,10 +2,10 @@
   "id": "SIGNUP",
   "part": "main",
   "title": "SIGNUP — a founder signs up on their own",
-  "ranAt": "2026-11-24T06:53:17.194Z",
+  "ranAt": "2026-11-24T13:29:34.143Z",
   "harness": "http://localhost:6100",
   "chrome": "158.0.8127.37",
-  "passed": 38,
+  "passed": 51,
   "failed": 0,
   "knownFailures": 0,
   "checks": [
@@ -21,7 +21,7 @@
       "ok": true,
       "label": "flag on: the signup API, the /signup page and pricing open (the flag cache expires)",
       "detail": {
-        "seconds": 29
+        "seconds": 30
       }
     },
     {
@@ -111,13 +111,52 @@
       "ok": true,
       "label": "a code was mailed (the mock mail row)",
       "detail": {
-        "id": "pml_8176175e2153209e"
+        "id": "pml_34336e90a23e608c"
       }
     },
     {
       "ok": true,
-      "label": "verify lands on drill-signup-shop.localhost /admin/onboarding",
-      "detail": "http://drill-signup-shop.localhost:6100/admin/onboarding"
+      "label": "verify answers at once: \"Setting up your store…\" with the four steps",
+      "detail": [
+        "Creating your store's database\n(working on it)",
+        "Preparing your store\n(not yet)",
+        "Registering your store address\n(not yet)",
+        "Creating your account\n(not yet)"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the steps' progress is announced (one aria-live area)",
+      "detail": 1
+    },
+    {
+      "ok": true,
+      "label": "the retry note: the provider is slow, when the next try is, which try",
+      "detail": "Our hosting provider is slow to answer. Trying again in 4 seconds (try 1 of 5)"
+    },
+    {
+      "ok": true,
+      "label": "after the retries: done, and on to drill-signup-shop.localhost /admin/onboarding",
+      "detail": {
+        "url": "http://drill-signup-shop.localhost:6100/admin/onboarding",
+        "seconds": 25
+      }
+    },
+    {
+      "ok": true,
+      "label": "the stand-in saw two 503s, then one database made",
+      "detail": [
+        503,
+        503,
+        200
+      ]
+    },
+    {
+      "ok": true,
+      "label": "one database: storeasy-t-drill-signup-shop",
+      "detail": [
+        "storeasy-t-drill-signup-shop"
+      ]
     },
     {
       "ok": true,
@@ -195,8 +234,8 @@
       "ok": true,
       "label": "and no new code is mailed for it",
       "detail": {
-        "before": "pml_8176175e2153209e",
-        "after": "pml_8176175e2153209e"
+        "before": "pml_34336e90a23e608c",
+        "after": "pml_34336e90a23e608c"
       }
     },
     {
@@ -238,12 +277,65 @@
       "ok": true,
       "label": "/api/signup on a store host is 404",
       "detail": 404
+    },
+    {
+      "ok": true,
+      "label": "the storefront at drill-signup-shop.localhost says \"Opening soon\"",
+      "detail": {
+        "status": 200,
+        "body": "Drill Signup Shop\n\nOpening soon\n\nWe're getting the shop ready. Check back soon."
+      }
+    },
+    {
+      "ok": true,
+      "label": "402 from the provider: the needs-operator words",
+      "detail": "Something on our side needs fixing. We've been told. Press Try again in a while."
+    },
+    {
+      "ok": true,
+      "label": "and Try again is offered",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the step it stopped at is marked",
+      "detail": [
+        "Creating your store's database\n(stopped here)"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "a 402 is not retried on its own (one call)",
+      "detail": [
+        402
+      ]
+    },
+    {
+      "ok": true,
+      "label": "fault cleared, Try again → done, on to drill-second-founder.localhost /admin/onboarding",
+      "detail": "http://drill-second-founder.localhost:6100/admin/onboarding"
+    },
+    {
+      "ok": true,
+      "label": "the second store's Welcome page",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the same run made one database: storeasy-t-drill-second-founder",
+      "detail": {
+        "all2": [
+          402,
+          200
+        ],
+        "databases": [
+          "storeasy-t-drill-signup-shop",
+          "storeasy-t-drill-second-founder"
+        ]
+      }
     }
   ],
-  "notes": [
-    "the store was made too fast for \"Setting up your store…\" to show (under 1.2 s)",
-    "the new store's storefront was not visited: the Edge runtime cannot open its file: database (plan risk 1)"
-  ],
+  "notes": [],
   "screenshots": [
     {
       "name": "01-closed",
@@ -275,7 +367,7 @@
     {
       "name": "03b-form-375",
       "file": "docs/cms-reviews/drills/SIGNUP/03b-form-375.png",
-      "bytes": 21547,
+      "bytes": 21491,
       "width": 375,
       "height": 900,
       "viewport": 375,
@@ -284,7 +376,7 @@
     {
       "name": "03c-form-wide",
       "file": "docs/cms-reviews/drills/SIGNUP/03c-form-wide.png",
-      "bytes": 13692,
+      "bytes": 13738,
       "width": 720,
       "height": 386,
       "viewport": 1680,
@@ -294,6 +386,15 @@
       "name": "04-code",
       "file": "docs/cms-reviews/drills/SIGNUP/04-code.png",
       "bytes": 14415,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/signup"
+    },
+    {
+      "name": "05a-working-retry",
+      "file": "docs/cms-reviews/drills/SIGNUP/05a-working-retry.png",
+      "bytes": 14559,
       "width": 720,
       "height": 506,
       "viewport": 1280,
@@ -334,6 +435,24 @@
       "height": 506,
       "viewport": 1280,
       "path": "/admin/handoff"
+    },
+    {
+      "name": "09-storefront-opening-soon",
+      "file": "docs/cms-reviews/drills/SIGNUP/09-storefront-opening-soon.png",
+      "bytes": 7633,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/"
+    },
+    {
+      "name": "10-needs-operator",
+      "file": "docs/cms-reviews/drills/SIGNUP/10-needs-operator.png",
+      "bytes": 14341,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/signup"
     }
   ]
 }
