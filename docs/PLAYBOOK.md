@@ -30,6 +30,7 @@ orchestrating a phase. Keep it under about 80 lines: merge, reword or delete bef
   a drill run: uncommitted code is not what it tests.
 - The drill guard (`DRILL_ISOLATED_ROOT`) only stops accidents: anyone can set it by hand, and then a
   drill or `seed-design-documents.js` wipes that checkout's `.design-data`. Always use `pnpm drill:<name>`.
+- Keep the main checkout on `main` whenever the owner may start their own server: a branch that changes the harness is worked in its own worktree, or the session switches back to `main` before handing over (2026-11-24: the owner's own `dev:design` ran phase1/provision's new harness and made `.design-data/fake-turso/`). `runHarness` also refuses any root other than `DRILL_ISOLATED_ROOT` when that is set.
 
 ## Migrations
 

@@ -23,7 +23,7 @@
 // the next start); never by name or port. Seed mode never starts it.
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, join, resolve } from "node:path";
@@ -551,7 +551,20 @@ const runChild = (cmd, args, opts) =>
 export const FIXTURES = FIXTURE_NAMES;
 // profile: DESIGN_PROFILE unless given (see above). reset: only with a
 // keepData profile, the seed deletes that profile's own data folder first.
+const realOr = (p) => {
+  try {
+    return realpathSync(p);
+  } catch {
+    return resolve(p);
+  }
+};
+
 export async function runHarness({ mode, root = ROOT, env = process.env, log = console.log, nextCmd, seedCmd, repoint = pointTenantAtThisRun, script = process.argv[1], fixture = null, profile = DESIGN_PROFILE, reset = false } = {}) {
+  // A drill child (DRILL_ISOLATED_ROOT names its throwaway worktree) never runs
+  // a harness anywhere else: refused before any folder, file or process is made.
+  if (env.DRILL_ISOLATED_ROOT && realOr(env.DRILL_ISOLATED_ROOT) !== realOr(root)) {
+    throw new HarnessError(`This run is a drill in ${env.DRILL_ISOLATED_ROOT}, so it won't start a harness in ${root}. Nothing was touched.`);
+  }
   if (mode !== "seed" && mode !== "dev") throw new HarnessError(`Unknown harness mode "${mode}". Use seed or dev.`);
   if (fixture != null && !FIXTURES.includes(fixture)) throw new HarnessError(`There is no "${fixture}" fixture. The fixtures are: ${FIXTURES.join(", ")}.`);
   if (reset && !profile.keepData) throw new HarnessError(`reset only applies to a harness that keeps its data; ${profile.commands.rebuild} always starts fresh.`);

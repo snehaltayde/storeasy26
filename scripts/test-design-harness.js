@@ -211,6 +211,32 @@ writeFileSync(${JSON.stringify(out)}, JSON.stringify({ env: { url: env.TURSO_API
   }
 });
 
+await t("a drill child (DRILL_ISOLATED_ROOT set) is refused a harness in any other root, both modes, before anything is made", async () => {
+  const root = mkdtempSync(join(tmpdir(), "storeasy-harness-guard-"));
+  const worktree = mkdtempSync(join(tmpdir(), "storeasy-harness-wt-"));
+  try {
+    for (const mode of ["dev", "seed"]) {
+      let started = false;
+      const cmd = [process.execPath, ["-e", ""]];
+      const err = await H.runHarness({
+        mode,
+        root,
+        env: { ...process.env, DRILL_ISOLATED_ROOT: worktree, SQLD_BIN: "/nonexistent/sqld" },
+        log: () => {},
+        seedCmd: cmd,
+        nextCmd: cmd,
+        repoint: async () => (started = true),
+      }).then(() => null, (e) => e);
+      ok(err instanceof H.HarnessError && /is a drill in/.test(err.message), `${mode}: ${err?.message}`);
+      ok(!started, `${mode}: nothing started`);
+      ok(!existsSync(join(root, ".design-data")) && !existsSync(join(root, ".design-env")), `${mode}: no folder or file made in the other root`);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(worktree, { recursive: true, force: true });
+  }
+});
+
 await t("no call left this machine", () => {
   eq(guard.blocked.length, 0, guard.blocked.join(", "));
 });
