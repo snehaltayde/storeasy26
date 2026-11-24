@@ -277,6 +277,19 @@ await t("Phase 1 line 2: provision_store is a long job (only budgeted callers le
   eq(ran.join(), "prov", "with a budget: run");
 });
 
+await t("Phase 1 line 8: onboarding_sweep is a long job with a handler (only budgeted callers lease it)", async () => {
+  ok(W.LONG_JOB_TYPES.includes("onboarding_sweep"), "long");
+  eq(typeof W.HANDLERS.onboarding_sweep, "function", "handler");
+  await C.platformDb().execute("UPDATE jobs SET status = 'done' WHERE status IN ('pending','leased')");
+  await J.enqueueJob({ type: "onboarding_sweep", idempotencyKey: "k-sweep" });
+  const ran = [];
+  const handlers = { onboarding_sweep: async (_p, ctx) => ran.push(ctx.deadline != null) };
+  await W.runDueJobs({ limit: 10, handlers });
+  eq(ran.length, 0, "no budget: not leased");
+  await W.runDueJobs({ limit: 10, handlers, budgetMs: 50_000 });
+  eq(ran.join(), "true", "with a budget: run, given the deadline");
+});
+
 await t("a job leased but not reached before the deadline is handed back with its attempt", async () => {
   await C.platformDb().execute("UPDATE jobs SET status = 'done' WHERE status IN ('pending','leased')");
   await J.enqueueJob({ type: "probe", idempotencyKey: "k-slow" });

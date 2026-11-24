@@ -3,6 +3,7 @@ import { cronAuthorized } from "@/lib/cron-auth";
 import { runDueJobs, TICK_BUDGET_MS } from "@/lib/platform/worker";
 import { queueStats, pruneQueues } from "@/lib/platform/jobs";
 import { platformConfigured } from "@/lib/platform/control";
+import { queueOnboardingSweep } from "@/lib/onboarding/snapshot";
 
 // Queue tick (S29 / BE14): leases and executes due jobs — the durability
 // backstop behind the after() fast paths. Vercel Hobby crons only run daily,
@@ -20,6 +21,8 @@ async function tick(request) {
   if (!platformConfigured()) {
     return NextResponse.json({ ok: true, skipped: "no control plane (legacy mode — sweeps own retries)" });
   }
+  // line 8: one onboarding snapshot sweep per 10 minutes (deduplicated by key)
+  await queueOnboardingSweep().catch(() => {});
   const limit = Number(request.nextUrl.searchParams.get("limit") || 25);
   // GEN-02: a budget inside maxDuration, so long jobs (catalog sync slices)
   // run too — last, and only as long as the tick has time left.
