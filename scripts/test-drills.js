@@ -30,6 +30,14 @@
 //   9. console-styles (Phase 0 line 8): its runner entry (roles store first,
 //      the console set), outside drill:all; the comparator's ignoreProps and
 //      ignoreBoxes options
+//  11. server logs: a drill's harness writes Next and sqld logs to
+//      DRILL_LOG_DIR; the runner keeps them as .drill-results/<stamp>/<drill>/server.log
+//      before the worktree goes, and prints the tail when the drill failed
+//  12. the install lock: one pnpm install at a time; a stale lock (dead pid) is
+//      taken over; a live one is waited for, then times out plainly
+//  13. bootBuilt: a harness boot whose build failed on next/font/google is
+//      stopped and booted again (up to 3), any other 500 is left to the drill;
+//      connectHarness (every drill's design harness) and withRolesStore use it
 //  10. shell (Phase 0 line 8): its runner entry (roles store, the annex, then
 //      the drill), in drill:all
 import { spawnSync } from "node:child_process";
@@ -662,6 +670,170 @@ await t("shell: drill:shell runs the roles store, adds the annex, then the drill
     return annex !== 0 ? annex : c.node(["scripts/drills/shell/run.mjs"]);
   }), 3, "a failed annex fails the drill:");
   ok(!calls.includes("scripts/drills/shell/run.mjs"), "and the drill is not run:");
+});
+
+// What a harness does under a drill: writes its Next and sqld logs to DRILL_LOG_DIR.
+const SERVERLOG = `const fs=require("fs"),p=require("path");const d=process.env.DRILL_LOG_DIR;if(!d||!d.startsWith(fs.realpathSync(process.cwd())))process.exit(8);fs.mkdirSync(d,{recursive:true});fs.writeFileSync(p.join(d,"design-data-next.log"),"GET /admin/login 500 in 61s\\n");fs.writeFileSync(p.join(d,"design-data-tenant.log"),"sqld up\\n");process.exit(Number(process.env.EXIT_CODE||0));`;
+
+await t("server logs: the drill's DRILL_LOG_DIR is in its worktree; Next and sqld logs land in .drill-results/<stamp>/<drill>/server.log (Next last) after the worktree is removed; a failure prints the tail", async () => {
+  const root = standInRepo();
+  const base = realpathSync(mkdtempSync(join(tmpdir(), "drills-wt-")));
+  try {
+    const said = [];
+    const drills = { pass: { id: null, run: (c) => c.node(["-e", SERVERLOG], { echo: false }) }, boom: { id: null, run: (c) => c.node(["-e", SERVERLOG], { echo: false, env: { ...c.env, EXIT_CODE: "1" } }) } };
+    const s = await R.runIsolated({ root, names: ["pass", "boom"], drills, install: null, ports: PORTS, base, say: (m) => said.push(String(m)), gone: async () => ({ ok: true }) });
+    eq(s.rows.map((r) => r.exit).join(","), "0,1", "exits (8 = no DRILL_LOG_DIR in the worktree):");
+    eq(worktrees(root), 1, "worktree removed:");
+    for (const r of s.rows) {
+      eq(r.serverLog, join(root, ".drill-results", s.ranAt, r.drill, "server.log"), `${r.drill} server.log path:`);
+      const text = readFileSync(r.serverLog, "utf8");
+      ok(text.indexOf("##### design-data-tenant.log") < text.indexOf("##### design-data-next.log") && text.includes("GET /admin/login 500"), `${r.drill}: sqld then Next: ${text}`);
+    }
+    const tails = said.filter((m) => m.includes("the last lines of"));
+    eq(tails.length, 1, "only the failed drill prints a tail:");
+    ok(tails[0].includes("boom") && tails[0].includes("GET /admin/login 500"), `the tail: ${tails[0]}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+await t("server logs: keepServerLog joins the log folder and the Turso stand-in's store logs, and returns null when nothing was written", async () => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "drills-log-")));
+  try {
+    eq(R.keepServerLog(join(dir, "none"), join(dir, "out", "server.log"), dir), null, "nothing:");
+    mkdirSync(join(dir, "logs"));
+    mkdirSync(join(dir, ".design-data", "fake-turso"), { recursive: true });
+    writeFileSync(join(dir, "logs", "design-data-next.log"), "next\n");
+    writeFileSync(join(dir, ".design-data", "fake-turso", "storeasy-t-x.log"), "store sqld\n");
+    writeFileSync(join(dir, ".design-data", "fake-turso", "storeasy-t-x.sqld"), "not a log");
+    const out = R.keepServerLog(join(dir, "logs"), join(dir, "out", "server.log"), dir);
+    const text = readFileSync(out, "utf8");
+    ok(text.includes("##### design-data-next.log\nnext") && text.includes("##### storeasy-t-x.log\nstore sqld") && !text.includes("not a log"), text);
+    eq(R.tailLines("a\nb\nc\n", 2), "b\nc", "tailLines:");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+await t("server logs: the harness tees Next into DRILL_LOG_DIR and puts sqld logs there (design-harness.js)", async () => {
+  const H = await import("./design-harness.js");
+  const src = readFileSync(join(ROOT, "scripts/design-harness.js"), "utf8");
+  ok(/const logDir = env\.DRILL_LOG_DIR \|\| null/.test(src) && /startSqld\(\{[^}]*logDir \}\)/.test(src) && /if \(logDir\) teeNext\(/.test(src), "runHarness wires DRILL_LOG_DIR:");
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "drills-tee-")));
+  try {
+    const { spawn } = await import("node:child_process");
+    const child = spawn(process.execPath, ["-e", "console.log('ready');console.error('⨯ boom')"], { stdio: ["ignore", "pipe", "pipe"] });
+    const seen = [];
+    const sink = { write: (c) => seen.push(String(c)) };
+    H.teeNext(child, join(dir, "design-data-next.log"), 6100, { out: sink, err: sink });
+    await new Promise((r) => child.once("close", r));
+    const text = readFileSync(join(dir, "design-data-next.log"), "utf8");
+    ok(/^\n=== .* next dev on 6100 \(pid \d+\)\n/.test(text) && text.includes("ready") && text.includes("⨯ boom"), `file: ${text}`);
+    ok(seen.join("").includes("ready") && seen.join("").includes("⨯ boom"), "still passed through:");
+    ok(/logDir \? join\(logDir, `\$\{basename\(dataDir\)/.test(H.startSqld.toString()), "sqld log named after the data folder in logDir:");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+await t("install lock: one install at a time; the second waits for the first; a dead owner's lock is taken over; a live one times out plainly", async () => {
+  const dir = join(realpathSync(mkdtempSync(join(tmpdir(), "drills-lock-"))), "install.lock");
+  try {
+    const order = [];
+    const job = (n, ms) => async () => {
+      order.push(`${n}+`);
+      ok(readFileSync(join(dir, "pid"), "utf8") === String(process.pid), "the lock names its owner:");
+      await new Promise((r) => setTimeout(r, ms));
+      order.push(`${n}-`);
+      return n;
+    };
+    const said = [];
+    const [a, b] = await Promise.all([R.withInstallLock(job("a", 150), { dir, stepMs: 20 }), new Promise((r) => setTimeout(r, 20)).then(() => R.withInstallLock(job("b", 10), { dir, stepMs: 20, say: (m) => said.push(m) }))]);
+    eq(`${a}${b} ${order.join(" ")}`, "ab a+ a- b+ b-", "serialized:");
+    ok(said.length === 1 && /waiting for another drill run's pnpm install/.test(said[0]), `said: ${said}`);
+    ok(!existsSync(dir), "released:");
+    // stale: a lock left by a process that is gone
+    mkdirSync(dir);
+    writeFileSync(join(dir, "pid"), "424242");
+    eq(await R.withInstallLock(async () => "took", { dir, stepMs: 10, alive: () => false }), "took", "stale lock taken over:");
+    // a failing install still releases the lock
+    await R.withInstallLock(async () => {
+      throw new Error("install failed");
+    }, { dir }).catch(() => {});
+    ok(!existsSync(dir), "released after a failure:");
+    // live owner: waits, then a plain RunnerError
+    mkdirSync(dir);
+    writeFileSync(join(dir, "pid"), "424242");
+    let err = null;
+    await R.withInstallLock(async () => "never", { dir, stepMs: 10, timeoutMs: 50, alive: () => true }).catch((e) => (err = e));
+    ok(err instanceof R.RunnerError && /pid 424242/.test(err.message) && /Nothing was stopped/.test(err.message), String(err?.message));
+    ok(existsSync(dir), "a live owner's lock is never removed:");
+    ok(R.INSTALL_LOCK.startsWith(tmpdir()), "the real lock is under the temp folder:");
+    const src = readFileSync(join(ROOT, "scripts/drills/run-isolated.mjs"), "utf8");
+    ok(/withInstallLock\(\(\) => runChild\(install\[0\], install\[1\]/.test(src), "runIsolated installs under the lock:");
+  } finally {
+    rmSync(dirname(dir), { recursive: true, force: true });
+  }
+});
+
+await t("bootBuilt: a boot whose Turbopack build failed on next/font/google is stopped and booted again; a plain app 500 is not; three broken boots fail plainly", async () => {
+  const H = await import("./design-harness.js");
+  const FONT = `Module not found: Can't resolve '@vercel/${H.FONT_BUILD_ERROR}/font'`;
+  const run = async (plan) => {
+    const boots = [];
+    const said = [];
+    let n = -1;
+    const boot = async () => {
+      n++;
+      const b = { n, stopped: false, output: () => plan[n].output || "", stop: async () => (b.stopped = true) };
+      boots.push(b);
+      return b;
+    };
+    const fetched = [];
+    const fetchPage = async (url) => (fetched.push(url), { status: plan[n].status ?? 200, body: plan[n].body ?? "<html>" });
+    let res;
+    let err = null;
+    try {
+      res = await H.bootBuilt({ boot, baseUrl: "http://x", paths: ["/", "/admin/login"], say: (m) => said.push(m), fetchPage });
+    } catch (e) {
+      err = e;
+    }
+    return { boots, said, res, err, fetched };
+  };
+  const a = await run([{ status: 500, body: FONT }, {}]);
+  eq(a.res?.n, 1, "the second boot is returned:");
+  ok(a.boots[0].stopped && !a.boots[1].stopped, "the broken boot was stopped, the good one kept:");
+  ok(a.said.length === 1 && /boot 1\/3: Turbopack's build failed on next\/font\/google \(\/ 500, \/admin\/login 500\)/.test(a.said[0]), a.said[0]);
+  eq(a.fetched.slice(-2).join(" "), "http://x/ http://x/admin/login", "the drills' first routes are loaded (compiled) before use:");
+  const b = await run([{ output: `⨯ ${FONT}` }, {}]);
+  eq(b.res?.n, 1, "the error in the harness output alone also boots again:");
+  const c = await run([{ status: 500, body: "" }]);
+  ok(c.res?.n === 0 && c.boots.length === 1 && !c.said.length, "an app 500 without the build error is not retried (the drill sees it):");
+  const d = await run([{ body: FONT }, { body: FONT }, { body: FONT }, {}]);
+  ok(d.err instanceof H.HarnessError && /in 3 boots in a row/.test(d.err.message) && d.boots.length === 3 && d.boots.every((x) => x.stopped), String(d.err?.message));
+  const drillSrc = readFileSync(join(ROOT, "scripts/drill.js"), "utf8");
+  ok(/bootBuilt\(\{ boot, baseUrl, paths: BOOT_PATHS/.test(drillSrc) && /BOOT_PATHS = \["\/", "\/admin\/login"\]/.test(drillSrc), "connectHarness boots through bootBuilt on / and /admin/login:");
+});
+
+await t("withRolesStore: a roles boot that failed on next/font/google is stopped and started again before the drill runs", async () => {
+  const H = await import("./design-harness.js");
+  const started = [];
+  const c = { worktree: "/w", env: {}, ports: { rolesNext: 6101 }, log: [], node: async () => 0 };
+  const start = (_cmd, _args, { log }) => {
+    const i = started.length;
+    if (i === 0) log.push(`⨯ Can't resolve '@vercel/${H.FONT_BUILD_ERROR}/font'\n`);
+    const s = { i, stopped: false, child: {}, stop: async () => (s.stopped = true) };
+    started.push(s);
+    return s;
+  };
+  const built = (o) => H.bootBuilt({ ...o, fetchPage: async () => ({ status: 200, body: "ok" }) });
+  let ranOn = null;
+  const code = await R.withRolesStore(c, async () => ((ranOn = started.filter((s) => !s.stopped).map((s) => s.i)), 0), { start, up: async () => true, built });
+  eq(code, 0, "exit:");
+  eq(JSON.stringify(ranOn), "[1]", "the drill ran on the second boot only:");
+  ok(started.every((s) => s.stopped), "both boots stopped by their own handles:");
+  ok(c.log.join("").includes("boot 1/3"), "said in the drill's log:");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

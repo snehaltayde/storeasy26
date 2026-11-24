@@ -52,7 +52,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync,
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BLANKED_ENV, ROOT, isPortBusy, runningHarness } from "../design-harness.js";
+import { BLANKED_ENV, FONT_BUILD_ERROR, HarnessError, ROOT, bootBuilt, isPortBusy, runningHarness } from "../design-harness.js";
 
 export const OWNER_PORTS = Object.freeze([3017, 3018, 18017, 18018, 18019, 18027, 18028, 18029]);
 const HANDS_OFF = new Set(["docs/CMS_CLAUDE_DIRECTION_BRIEF.md", "docs/CMS_ENTERPRISE_AUDIT_2026-10-29.md", "docs/CMS_SESSION_HANDOFF.md"]);
@@ -320,7 +320,7 @@ async function waitUp(url, child, ms = 240_000) {
 // When the warm-up sees it, it stops its own harness, deletes the worktree's
 // .next and boots again, up to 2 times; then the run fails plainly. A drill
 // never runs silently against that broken build.
-export const FONT_BUILD_ERROR = "turbopack-next/internal/font/google";
+export { FONT_BUILD_ERROR };
 export const FONT_FAIL = "Google Fonts could not be fetched; check the network";
 const WARM_PATHS = ["/", "/admin/login"];
 
@@ -384,15 +384,31 @@ const node = process.execPath;
 // worktree's own .design-data-roles, so a drill run a second time after a
 // broken build starts clean too), starts it, runs fn() while it answers, then
 // stops it (its own handle only). → fn's exit code.
-export async function withRolesStore(c, fn, { start = startChild, up = waitUp } = {}) {
+export async function withRolesStore(c, fn, { start = startChild, up = waitUp, built = bootBuilt } = {}) {
   const seeded = await c.node(["scripts/dev-roles.js", "seed", "--reset"]);
   if (seeded !== 0) return seeded;
-  const server = start(node, ["scripts/dev-roles.js"], { cwd: c.worktree, env: c.env, log: c.log });
-  try {
-    if (!(await up(`http://roles.localhost:${c.ports.rolesNext}/api/health`, server.child))) {
-      c.log.push("✗ the roles store did not come up\n");
-      return 1;
+  const base = `http://roles.localhost:${c.ports.rolesNext}`;
+  // each boot's own output (also kept in the drill's log), checked for the
+  // next/font/google build failure before the drill runs (bootBuilt)
+  const boot = async () => {
+    const own = [];
+    const log = { push: (x) => (own.push(x), c.log.push(x)) };
+    const server = start(node, ["scripts/dev-roles.js"], { cwd: c.worktree, env: c.env, log });
+    if (!(await up(`${base}/api/health`, server.child))) {
+      await server.stop();
+      throw new HarnessError("the roles store did not come up");
     }
+    return { output: () => own.join(""), stop: server.stop };
+  };
+  let server;
+  try {
+    server = await built({ boot, baseUrl: base, paths: ["/admin/login"], say: (m) => c.log.push(`${m}\n`) });
+  } catch (e) {
+    if (!(e instanceof HarnessError)) throw e;
+    c.log.push(`✗ ${e.message}\n`);
+    return 1;
+  }
+  try {
     return await fn();
   } finally {
     await server.stop();

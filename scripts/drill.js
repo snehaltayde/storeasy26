@@ -24,7 +24,7 @@ import { spawn } from "node:child_process";
 import { mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { DATA_DIR_NAME, harnessPorts, readCredentials, ROOT, HarnessError, runningHarness } from "./design-harness.js";
+import { DATA_DIR_NAME, bootBuilt, harnessPorts, readCredentials, ROOT, HarnessError, runningHarness } from "./design-harness.js";
 
 export const WIDTHS = [375, 768, 1440];
 const HEIGHTS = { 375: 812, 768: 1024, 1440: 900 };
@@ -122,24 +122,35 @@ export async function connectHarness({ start = false, env = process.env, root = 
     );
   }
   log(`• starting the design harness on ${baseUrl}`);
-  const child = spawn(process.execPath, [join(root, "scripts/dev-design.js")], { cwd: root, env, stdio: ["ignore", "pipe", "pipe"] });
-  let output = "";
-  child.stdout.on("data", (c) => (output = (output + c).slice(-4000)));
-  child.stderr.on("data", (c) => (output = (output + c).slice(-4000)));
-  const stop = () =>
-    new Promise((done) => {
-      if (child.exitCode !== null) return done();
-      child.once("exit", done);
-      child.kill("SIGTERM");
-    });
-  for (let i = 0; i < 360; i++) {
-    if (child.exitCode !== null) throw new DrillError(`The harness stopped while starting:\n${output.trim().split("\n").slice(-8).join("\n")}`);
-    if (await isUp(baseUrl)) return { baseUrl, port: next, creds: readCredentials(root), started: true, stop };
-    await new Promise((r) => setTimeout(r, 500));
+  const boot = async () => {
+    const child = spawn(process.execPath, [join(root, "scripts/dev-design.js")], { cwd: root, env, stdio: ["ignore", "pipe", "pipe"] });
+    let output = "";
+    child.stdout.on("data", (c) => (output = (output + c).slice(-20_000)));
+    child.stderr.on("data", (c) => (output = (output + c).slice(-20_000)));
+    const stop = () =>
+      new Promise((done) => {
+        if (child.exitCode !== null) return done();
+        child.once("exit", done);
+        child.kill("SIGTERM");
+      });
+    for (let i = 0; i < 360; i++) {
+      if (child.exitCode !== null) throw new DrillError(`The harness stopped while starting:\n${output.trim().split("\n").slice(-8).join("\n")}`);
+      if (await isUp(baseUrl)) return { output: () => output, stop };
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    await stop();
+    throw new DrillError(`The harness didn't come up at ${baseUrl} within 3 minutes.`);
+  };
+  // the storefront and the console sign-in: built (not the next/font/google
+  // build failure) and compiled before the drill's browser asks for them
+  try {
+    const h = await bootBuilt({ boot, baseUrl, paths: BOOT_PATHS, say: (m) => console.error(m) });
+    return { baseUrl, port: next, creds: readCredentials(root), started: true, stop: h.stop };
+  } catch (e) {
+    throw e instanceof HarnessError ? new DrillError(e.message) : e;
   }
-  await stop();
-  throw new DrillError(`The harness didn't come up at ${baseUrl} within 3 minutes.`);
 }
+export const BOOT_PATHS = ["/", "/admin/login"];
 
 // Scale a screenshot down until it fits MAX_SHOT_BYTES.
 export async function compressShot(buf, { maxBytes = MAX_SHOT_BYTES } = {}) {
