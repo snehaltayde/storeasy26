@@ -72,3 +72,15 @@ export function when(isoString) {
   const d = new Date(isoString);
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
+
+// the sheet's lists: setup-run step states, mail delivery, team roles and who
+// did an audited thing, in words (unknown codes fall back to the code)
+export const RUN_STEP_WORDS = Object.freeze({
+  done: { label: "Done", tone: "success" },
+  failed: { label: "Failed", tone: "danger" },
+  running: { label: "Running", tone: "info" },
+  pending: { label: "Waiting", tone: "muted" },
+});
+export const MAIL_STATUS_WORDS = Object.freeze({ sent: "Sent", queued: "Sending", mock: "Logged only (no mail provider)", failed: "Not sent" });
+export const ROLE_WORDS = Object.freeze({ owner: "Owner", admin: "Admin", staff: "Staff", support: "Support" });
+export const ACTOR_KIND_WORDS = Object.freeze({ operator: "Operator", member: "Member", system: "System", bootstrap: "Setup" });

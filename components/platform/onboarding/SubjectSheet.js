@@ -25,15 +25,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { statusWords, when, MAIL_KIND_WORDS, PROVISION_STEP_WORDS, STEP_STATE_WORDS } from "./onboardingWords";
+import { statusWords, when, ACTOR_KIND_WORDS, MAIL_KIND_WORDS, MAIL_STATUS_WORDS, PROVISION_STEP_WORDS, ROLE_WORDS, RUN_STEP_WORDS, STEP_STATE_WORDS } from "./onboardingWords";
 
 const selectClass =
-  "h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  "h-8 w-full min-w-0 rounded-md border border-input bg-muted px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 function Section({ title, children }) {
   return (
-    <section className="space-y-2">
-      <h3 className="text-sm font-semibold">{title}</h3>
+    <section className="space-y-3">
+      <h3 className="text-base font-semibold">{title}</h3>
       {children}
     </section>
   );
@@ -51,6 +51,16 @@ function Facts({ items }) {
           </div>
         ))}
     </dl>
+  );
+}
+
+// one help action: what it does on the left, the button on the right
+function Action({ hint, children }) {
+  return (
+    <div className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+      <p className="text-[0.8125rem] text-muted-foreground sm:max-w-[34ch]">{hint}</p>
+      <div className="flex shrink-0 flex-wrap gap-2">{children}</div>
+    </div>
   );
 }
 
@@ -108,6 +118,10 @@ export default function SubjectSheet({ subject, onClose, onChanged }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, subject, ...payload }),
       });
+      if (res.status === 401) {
+        setNotice({ error: true, text: "Your operator sign-in has ended. Sign in again at /platform, then reopen this sheet." });
+        return null;
+      }
       const body = await res.json().catch(() => null);
       if (!res.ok || !body?.ok) {
         setNotice({ error: true, text: body?.error || "That didn't work. Try again." });
@@ -160,107 +174,119 @@ export default function SubjectSheet({ subject, onClose, onChanged }) {
 
           {d && (
             <>
-              <Notice notice={notice} />
-
               <Section title="Help">
-                <div className="space-y-3">
-                  {a.resume && (
-                    <Button disabled={busy != null} onClick={() => act("resume", {}, "Provisioning resumed. It runs in the background; refresh in a minute.")}>
-                      Resume provisioning
-                    </Button>
-                  )}
-                  {a.resendCode && (
-                    <div>
-                      <Button variant="outline" disabled={busy != null} onClick={() => act("resend_code", {}, (b) => b.note)}>
-                        Resend the email code
-                      </Button>
-                      <p className="mt-1 text-xs text-muted-foreground">The code works only in the browser the founder signed up in.</p>
-                    </div>
-                  )}
-                  {a.signinHelp && (
-                    <form
-                      className="space-y-1.5"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        act("signin_help", { email: ownerEmail }, (b) => `Sign-in help sent to ${b.sentTo}.`);
-                      }}
-                    >
-                      <Label htmlFor="help-owner" className="text-[0.8125rem]">
-                        Email sign-in help to
-                      </Label>
-                      <div className="flex gap-2">
-                        <select id="help-owner" className={selectClass} value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)}>
-                          {(a.ownerEmails || []).map((e) => (
-                            <option key={e} value={e}>
-                              {e}
-                            </option>
-                          ))}
-                        </select>
-                        <Button type="submit" variant="outline" disabled={busy != null}>
-                          Send sign-in help
+                <Notice notice={notice} />
+                {(a.resume || a.resendCode || a.signinHelp || a.ownerInvite) && (
+                  <div className="divide-y divide-border rounded-card border border-border px-3 py-3">
+                    {a.resume && (
+                      <Action hint="Runs the store's setup again from the step that failed. It carries on in the background.">
+                        <Button disabled={busy != null} onClick={() => act("resume", {}, "Provisioning resumed. It runs in the background; refresh in a minute.")}>
+                          Resume provisioning
                         </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">They get the store&apos;s sign-in address and a one-hour, single-use link to set a new password.</p>
-                    </form>
-                  )}
-                  {a.ownerInvite && (
-                    <div>
-                      <Button variant="outline" disabled={busy != null} onClick={() => act("owner_invite", {}, (b) => `Owner invite sent to ${b.sentTo}.`)}>
-                        Email an owner invite
-                      </Button>
-                      <p className="mt-1 text-xs text-muted-foreground">A 7-day invite to {a.inviteEmail}, the email on file. Any earlier unused owner invite stops working.</p>
-                    </div>
-                  )}
-                  {a.release && (
-                    <Button variant="destructive" disabled={busy != null} onClick={() => setReleaseOpen(true)}>
+                      </Action>
+                    )}
+                    {a.resendCode && (
+                      <Action hint="A fresh code by email. It works only in the browser the founder signed up in.">
+                        <Button variant="outline" disabled={busy != null} onClick={() => act("resend_code", {}, (b) => b.note)}>
+                          Resend the email code
+                        </Button>
+                      </Action>
+                    )}
+                    {a.signinHelp && (
+                      <form
+                        className="space-y-2 py-3 first:pt-0 last:pb-0"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          act("signin_help", { email: ownerEmail }, (b) => `Sign-in help sent to ${b.sentTo}.`);
+                        }}
+                      >
+                        <Label htmlFor="help-owner" className="text-[0.8125rem]">
+                          Email sign-in help to
+                        </Label>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <select id="help-owner" className={selectClass} value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)}>
+                            {(a.ownerEmails || []).map((e) => (
+                              <option key={e} value={e}>
+                                {e}
+                              </option>
+                            ))}
+                          </select>
+                          <Button type="submit" variant="outline" disabled={busy != null}>
+                            Send sign-in help
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">They get the store&apos;s sign-in address and a one-hour, single-use link to set a new password.</p>
+                      </form>
+                    )}
+                    {a.ownerInvite && (
+                      <Action hint={`A 7-day invite to ${a.inviteEmail}, the email on file. Any earlier unused owner invite stops working.`}>
+                        <Button variant="outline" disabled={busy != null} onClick={() => act("owner_invite", {}, (b) => `Owner invite sent to ${b.sentTo}.`)}>
+                          Email an owner invite
+                        </Button>
+                      </Action>
+                    )}
+                  </div>
+                )}
+
+                {d.kind === "tenant" && a.supportAccess && (
+                  <div className="space-y-3 rounded-card border border-border p-3">
+                    <h4 className="text-sm font-medium">Support access (read-only)</h4>
+                    {a.activeGrant ? (
+                      <>
+                        <p className="text-[0.8125rem]">Open until {when(a.activeGrant.until)}. The founder sees a banner while it is open.</p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button asChild variant="outline">
+                            <a href={a.consoleUrl} target="_blank" rel="noopener noreferrer">
+                              Open store console (read-only) <ExternalLink className="size-3.5" aria-hidden />
+                            </a>
+                          </Button>
+                          <Button variant="ghost" disabled={busy != null} onClick={() => act("support_revoke", { grant: a.activeGrant.id }, "Support access closed.")}>
+                            Close support access
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <form
+                        className="space-y-3"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          act("support_open", { reason, hours: Number(hours) }, "Support access is open.").then((b) => b && setReason(""));
+                        }}
+                      >
+                        <div className="space-y-1.5">
+                          <Label htmlFor="sg-reason" className="text-[0.8125rem]">
+                            Why you need to look
+                          </Label>
+                          <Textarea id="sg-reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="The founder sees this in their console" minLength={5} maxLength={500} required />
+                        </div>
+                        <div className="flex flex-wrap items-end justify-between gap-2">
+                          <div className="space-y-1.5">
+                            <Label htmlFor="sg-hours" className="text-[0.8125rem]">
+                              For how many hours (1–72)
+                            </Label>
+                            <Input id="sg-hours" type="number" min={1} max={72} value={hours} onChange={(e) => setHours(e.target.value)} className="w-24 font-mono tabular-nums" />
+                          </div>
+                          <Button type="submit" variant="outline" disabled={busy != null || reason.trim().length < 5}>
+                            Open support access
+                          </Button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+                )}
+
+                {a.release && (
+                  <div className="flex flex-col gap-2 rounded-card border border-destructive/30 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                    <p className="text-[0.8125rem] text-muted-foreground sm:max-w-[34ch]">
+                      This signup has lapsed. Freeing its address lets anyone sign up with it, and the signup can&apos;t be resumed.
+                    </p>
+                    <Button variant="destructive" disabled={busy != null} onClick={() => setReleaseOpen(true)} className="shrink-0">
                       Free this address
                     </Button>
-                  )}
-                  {d.kind === "tenant" && a.supportAccess && (
-                    <div className="space-y-2 rounded-md border border-border p-3">
-                      {a.activeGrant ? (
-                        <>
-                          <p className="text-[0.8125rem]">Support access open until {when(a.activeGrant.until)}.</p>
-                          <div className="flex flex-wrap gap-2">
-                            <Button asChild variant="outline">
-                              <a href={a.consoleUrl} target="_blank" rel="noopener noreferrer">
-                                Open store console (read-only) <ExternalLink className="size-3.5" aria-hidden />
-                              </a>
-                            </Button>
-                            <Button variant="ghost" disabled={busy != null} onClick={() => act("support_revoke", { grant: a.activeGrant.id }, "Support access closed.")}>
-                              Close support access
-                            </Button>
-                          </div>
-                        </>
-                      ) : (
-                        <form
-                          className="space-y-2"
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            act("support_open", { reason, hours: Number(hours) }, "Support access is open.").then((b) => b && setReason(""));
-                          }}
-                        >
-                          <Label htmlFor="sg-reason" className="text-[0.8125rem]">
-                            Open support access (read-only)
-                          </Label>
-                          <Textarea id="sg-reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why you need to look (the founder sees this)" minLength={5} maxLength={500} required />
-                          <div className="flex items-end gap-2">
-                            <div>
-                              <Label htmlFor="sg-hours" className="mb-1 text-xs">
-                                Hours (1–72)
-                              </Label>
-                              <Input id="sg-hours" type="number" min={1} max={72} value={hours} onChange={(e) => setHours(e.target.value)} className="w-24" />
-                            </div>
-                            <Button type="submit" variant="outline" disabled={busy != null || reason.trim().length < 5}>
-                              Open support access
-                            </Button>
-                          </div>
-                        </form>
-                      )}
-                    </div>
-                  )}
-                  {!a.resume && !a.resendCode && !a.signinHelp && !a.ownerInvite && !a.release && !(d.kind === "tenant" && a.supportAccess) && <Empty>Nothing to help with here right now. Add a note below.</Empty>}
-                </div>
+                  </div>
+                )}
+
+                {!a.resume && !a.resendCode && !a.signinHelp && !a.ownerInvite && !a.release && !(d.kind === "tenant" && a.supportAccess) && <Empty>Nothing to help with here right now. Add a note below.</Empty>}
               </Section>
 
               <Separator />
@@ -290,7 +316,7 @@ export default function SubjectSheet({ subject, onClose, onChanged }) {
                   <ol className="space-y-1 text-[0.8125rem]">
                     {d.run.steps.map((s) => (
                       <li key={s.name} className="flex flex-wrap items-baseline gap-2">
-                        <Badge variant={s.status === "done" ? "success" : s.status === "failed" ? "danger" : "muted"}>{s.status}</Badge>
+                        <Badge variant={(RUN_STEP_WORDS[s.status] || {}).tone || "muted"}>{(RUN_STEP_WORDS[s.status] || {}).label || s.status}</Badge>
                         <span>{PROVISION_STEP_WORDS[s.name] || s.name}</span>
                         {s.error && <span className="w-full text-xs text-destructive">{s.error}</span>}
                       </li>
@@ -330,8 +356,8 @@ export default function SubjectSheet({ subject, onClose, onChanged }) {
                     <ul className="space-y-1 text-[0.8125rem]">
                       {d.members.map((m) => (
                         <li key={`${m.email}-${m.role}`} className="flex justify-between gap-2">
-                          <span className="truncate">{m.name ? `${m.name} · ` : ""}{m.email}</span>
-                          <span className="text-muted-foreground">{m.role}</span>
+                          <span className="min-w-0 truncate" title={m.email}>{m.name ? `${m.name}, ` : ""}{m.email}</span>
+                          <span className="shrink-0 text-muted-foreground">{ROLE_WORDS[m.role] || m.role}</span>
                         </li>
                       ))}
                     </ul>
@@ -342,7 +368,7 @@ export default function SubjectSheet({ subject, onClose, onChanged }) {
                     <ul className="space-y-1 text-xs text-muted-foreground">
                       {d.invites.map((i) => (
                         <li key={`${i.email}-${i.expiresAt}`}>
-                          Invited {i.email} as {i.role}, until {when(i.expiresAt)}
+                          Invited {i.email} as {(ROLE_WORDS[i.role] || i.role).toLowerCase()}, until {when(i.expiresAt)}
                         </li>
                       ))}
                     </ul>
@@ -358,8 +384,8 @@ export default function SubjectSheet({ subject, onClose, onChanged }) {
                         <span>
                           {MAIL_KIND_WORDS[m.kind] || m.kind} to <span className="break-all">{m.recipient}</span>
                         </span>
-                        <span className="text-muted-foreground">
-                          {m.status} · {when(m.at)}
+                        <span className={m.status === "failed" ? "text-destructive" : "text-muted-foreground"}>
+                          {MAIL_STATUS_WORDS[m.status] || m.status}, {when(m.at)}
                         </span>
                       </li>
                     ))}
@@ -423,7 +449,7 @@ export default function SubjectSheet({ subject, onClose, onChanged }) {
                       <li key={i} className="flex flex-wrap justify-between gap-2">
                         <span className="font-mono">{x.action}</span>
                         <span className="text-muted-foreground">
-                          {x.actorKind} {x.actor} · {when(x.at)}
+                          {ACTOR_KIND_WORDS[x.actorKind] || x.actorKind} {x.actor}, {when(x.at)}
                         </span>
                       </li>
                     ))}

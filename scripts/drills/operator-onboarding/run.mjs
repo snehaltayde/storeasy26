@@ -301,6 +301,21 @@ async function opsOnboarding(drill) {
     drill.check(api === 401, "signed out: the API answers 401", api);
     await anon.ctx.close();
   }
+  // the list at tablet, laptop and wide widths, the sheet at wide, and the
+  // empty state of a search with no match
+  for (const [w, name] of [[768, "08-tablet-768"], [1280, "09-laptop-1280"], [1440, "10-wide-1440"]]) {
+    await page.setViewportSize({ width: w, height: 900 });
+    await page.goto(at(CONSOLE, "/platform/onboarding?view=all"), { waitUntil: "load" });
+    await page.locator("[data-subject]").first().waitFor();
+    await drill.screenshot(page, name);
+  }
+  await openRow(page, `tenant:${SLUG}`);
+  await drill.screenshot(page, "11-store-sheet-1440");
+  await closeSheet(page);
+  await page.goto(at(CONSOLE, "/platform/onboarding?view=all&q=no-such-store-anywhere"), { waitUntil: "load" });
+  const empty = await page.locator("[data-empty]").waitFor({ timeout: 30_000 }).then(() => true, () => false);
+  drill.check(empty && /Nothing matches/.test(await text(page)), "a search with no match shows the empty state with a way back", null);
+  await drill.screenshot(page, "12-empty-search");
   // the phone width: no sideways scroll on the list
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto(at(CONSOLE, "/platform/onboarding?view=all"), { waitUntil: "load" });
