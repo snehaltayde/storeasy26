@@ -15,8 +15,8 @@ export const metadata = { title: "Create your store · Storeasy", robots: { inde
 
 function Frame({ children }) {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-[640px] flex-col px-4 py-12 text-sm text-foreground md:px-6">
-      <p className="mb-8 text-base font-semibold">
+    <main className="mx-auto flex min-h-screen w-full max-w-[640px] flex-col px-4 pt-8 pb-16 text-sm text-foreground md:px-6 md:pt-16">
+      <p className="mb-12 text-base font-semibold tracking-[-0.01em]">
         Store<span className="text-primary">asy</span>
       </p>
       {children}
@@ -30,8 +30,8 @@ export default async function SignupPage() {
   if (closed) {
     return (
       <Frame>
-        <div data-signup="closed" className="space-y-3 rounded-card border border-border bg-card p-6 text-card-foreground shadow-card">
-          <h1 className="text-[1.375rem] font-semibold">{closed.body.code === "SIGNUPS_CLOSED" ? "Signups are closed right now" : "Signups are unavailable right now"}</h1>
+        <div data-signup="closed" className="space-y-4">
+          <h1 className="text-[1.75rem] leading-tight font-semibold tracking-[-0.01em]">{closed.body.code === "SIGNUPS_CLOSED" ? "Signups are closed right now" : "Signups are unavailable right now"}</h1>
           <p className="text-muted-foreground">{closed.body.error}</p>
           {closed.body.contact && (
             <Link href={closed.body.contact} className="inline-block font-medium text-primary underline-offset-4 hover:underline">

@@ -147,6 +147,10 @@ async function signup(drill) {
   await until(async () => (await page.locator("[data-field-error]").count()) >= 4, 30_000);
   const fieldErrors = await page.locator("[data-field-error]").evaluateAll((els) => els.map((e) => e.getAttribute("data-field-error")));
   drill.check(["signup-name", "signup-email", "signup-password", "signup-store"].every((f) => fieldErrors.includes(f)), "an empty submit: an error under each field", fieldErrors);
+  const focused = await page.evaluate(() => document.activeElement?.id);
+  drill.check(focused === "signup-name", "focus moves to the first field to fix", focused);
+  const pwDescribed = (await page.locator("#signup-password").getAttribute("aria-describedby")) || "";
+  drill.check(pwDescribed.includes("signup-password-error") && pwDescribed.includes("signup-password-hint"), "the password's error and its rules are both tied to it (aria-describedby)", pwDescribed);
   await drill.screenshot(page, "02-field-errors");
 
   await fillForm(page, { name: "Drill Founder", email: EMAIL, password: PASSWORD, storeName: STORE_NAME });
@@ -155,6 +159,27 @@ async function signup(drill) {
   drill.check(shownSlug === SLUG && hint.includes(`${SLUG}.localhost`), "the address follows the store name and shows the full address", { shownSlug, hint });
   drill.check((await page.locator("#signup-name").inputValue()) === "Drill Founder", "nothing typed was lost after the errors", null);
   await drill.screenshot(page, "03-form");
+  // show / hide the password, by keyboard
+  await page.locator("#signup-password").focus();
+  await page.keyboard.press("Tab");
+  const toggle = await page.evaluate(() => document.activeElement?.getAttribute("aria-controls"));
+  await page.keyboard.press("Enter");
+  const shown = await page.locator("#signup-password").getAttribute("type");
+  await page.keyboard.press("Enter");
+  const hidden = await page.locator("#signup-password").getAttribute("type");
+  drill.check(toggle === "signup-password" && shown === "text" && hidden === "password", "Tab reaches Show password; Enter shows and hides it", { toggle, shown, hidden });
+  for (const [width, name] of [[375, "03b-form-375"], [1680, "03c-form-wide"]]) {
+    const v = await newPage(drill, width);
+    await v.page.goto(at(SITE, "/signup"), { waitUntil: "load" });
+    await v.page.locator('[data-signup="form"]').waitFor();
+    await fillForm(v.page, { name: "Drill Founder", email: "view@signup-drill.test", password: "short", storeName: "A Rather Long Store Name For Wrapping" });
+    await until(async () => (await v.page.locator("#signup-slug").inputValue()) === "a-rather-long-store-name-for-wrapping", 30_000);
+    await until(async () => !/Checking/.test(await v.page.locator("#signup-slug-hint").innerText()), 10_000);
+    const fits = await v.page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+    drill.check(fits, `${width}px: the form has no sideways scroll`, null);
+    await drill.screenshot(v.page, name);
+    await v.ctx.close();
+  }
   await page.getByRole("button", { name: "Email me a code" }).click();
   await page.locator('[data-signup="code"]').waitFor();
   const codeBody = await text(page);
@@ -163,6 +188,8 @@ async function signup(drill) {
   await new Promise((r) => setTimeout(r, 2500));
   const n2 = Number((await page.locator("[data-signup-countdown]").innerText().catch(() => "")).match(/(\d+)/)?.[1]);
   drill.check(n1 > 0 && n2 < n1 && (await page.locator("[data-signup-resend]").isDisabled()), "the resend countdown counts down and the button waits", { n1, n2 });
+  const codeFocus = await page.evaluate(() => ({ id: document.activeElement?.id, mode: document.activeElement?.inputMode, ac: document.activeElement?.autocomplete }));
+  drill.check(codeFocus.id === "signup-code" && codeFocus.mode === "numeric" && codeFocus.ac === "one-time-code", "the code field takes focus, numeric keypad, one-time-code autofill", codeFocus);
   await drill.screenshot(page, "04-code");
 
   const mail = await until(() => latestSignupCode({ platformUrl, email: EMAIL }), 30_000);
@@ -215,7 +242,7 @@ async function signup(drill) {
 
   // 8. the same email again, in a new browser: the same screen, no code; a wrong code
   {
-    const { ctx: c2, page: p2 } = await newPage(drill);
+    const { ctx: c2, page: p2 } = await newPage(drill, 375);
     await p2.goto(at(SITE, "/signup"), { waitUntil: "load" });
     await p2.locator('[data-signup="form"]').waitFor();
     await fillForm(p2, { name: "Someone Else", email: EMAIL, password: "another-pass-22", storeName: "Drill Second Shop" });
@@ -227,8 +254,15 @@ async function signup(drill) {
     await new Promise((r) => setTimeout(r, 1500));
     const latest = await latestSignupCode({ platformUrl, email: EMAIL });
     drill.check(latest?.id === mail?.id, "and no new code is mailed for it", { before: mail?.id, after: latest?.id });
-    await p2.locator("#signup-code").fill("000000");
-    await p2.getByRole("button", { name: "Verify and create my store" }).click();
+    // a pasted code with words and spaces around it keeps only its 6 digits; Enter submits
+    await p2.locator("#signup-code").focus();
+    await p2.evaluate(() => {
+      const dt = new DataTransfer();
+      dt.setData("text/plain", "Your code: 000 000");
+      document.activeElement.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+    });
+    drill.check((await p2.locator("#signup-code").inputValue()) === "000000", "pasting \"Your code: 000 000\" fills 000000", null);
+    await p2.keyboard.press("Enter");
     const err = await until(async () => p2.locator("#signup-code-error").innerText(), 30_000);
     drill.check(err === CODE_FAILED, "a wrong code gets the generic words", err);
     drill.check((await p2.locator("#signup-code").inputValue()) === "000000", "the typed code stays", null);

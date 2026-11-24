@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 // The signup handoff (Phase 1 line 1). Reads the token from the fragment,
@@ -8,11 +9,12 @@ import { Button } from "@/components/ui/button";
 // goes where the answer says (/admin/onboarding). States: signing in; refused
 // (expired, used, wrong store: sign in with email and password instead); no
 // connection (Try again, with the same token: a request that never arrived
-// spent nothing).
+// spent nothing). The heading takes focus when the answer is a problem.
 const LOGIN = "/admin/login";
 
 export default function HandoffSignIn() {
   const token = useRef(null);
+  const headingRef = useRef(null);
   const [state, setState] = useState({ phase: "working", error: null });
 
   const send = useCallback(async () => {
@@ -50,26 +52,40 @@ export default function HandoffSignIn() {
     send();
   }, [send]);
 
+  useEffect(() => {
+    if (state.phase !== "working") headingRef.current?.focus();
+  }, [state.phase]);
+
   if (state.phase === "working") {
     return (
-      <div data-handoff="working" role="status" aria-live="polite" className="space-y-2 text-center">
-        <p className="text-base font-semibold text-fg">Signing you in…</p>
-        <p className="text-sm text-fg-muted">This takes a moment.</p>
-      </div>
+      <section data-handoff="working" role="status" aria-live="polite" className="space-y-3">
+        <h1 className="flex items-center gap-3 text-[1.75rem] leading-tight font-semibold tracking-[-0.01em]">
+          Signing you in…
+          <LoaderCircle aria-hidden className="size-5 text-muted-foreground motion-safe:animate-spin" />
+        </h1>
+        <p className="text-muted-foreground">Your store is ready. This takes a moment.</p>
+      </section>
     );
   }
+  const offline = state.phase === "offline";
   return (
-    <div data-handoff={state.phase} className="space-y-4">
-      <div role="alert" className="space-y-1">
-        <p className="text-base font-semibold text-fg">{state.phase === "offline" ? "We couldn't sign you in yet" : "This sign-in link didn't work"}</p>
-        <p className="text-sm text-fg-muted">{state.error}</p>
+    <section data-handoff={state.phase} className="space-y-6">
+      <div role="alert" className="space-y-3">
+        <h1 ref={headingRef} tabIndex={-1} className="text-[1.75rem] leading-tight font-semibold tracking-[-0.01em] outline-none">
+          {offline ? "We couldn't sign you in yet" : "This sign-in link didn't work"}
+        </h1>
+        <p className="text-muted-foreground">{state.error}</p>
       </div>
       <div className="flex flex-wrap gap-2">
-        {state.phase === "offline" && <Button onClick={send}>Try again</Button>}
-        <Button asChild variant={state.phase === "offline" ? "outline" : "default"}>
+        {offline && (
+          <Button size="lg" onClick={send} className="h-10 px-4">
+            Try again
+          </Button>
+        )}
+        <Button asChild size="lg" variant={offline ? "outline" : "default"} className="h-10 px-4">
           <a href={LOGIN}>Sign in with email and password</a>
         </Button>
       </div>
-    </div>
+    </section>
   );
 }
