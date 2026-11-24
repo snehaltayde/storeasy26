@@ -132,7 +132,7 @@ export default function SubjectSheet({ subject, onClose, onChanged }) {
 
   return (
     <Sheet open={Boolean(subject)} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl" data-subject-sheet={subject || undefined}>
         <SheetHeader>
           <SheetTitle className="truncate pr-8">{title}</SheetTitle>
           <SheetDescription className="flex flex-wrap items-center gap-2">

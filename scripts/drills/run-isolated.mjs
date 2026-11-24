@@ -4,7 +4,7 @@
 // and its data are never touched: a drill seeds and wipes only the worktree's
 // own folders, and this runner fails if the owner's seed files change anyway.
 //
-//   node scripts/drills/run-isolated.mjs <p5|p6|smoke|agency-gone|shell|signup|sf-styles|console-styles|all> [stage,…] [--keep] [--headed]
+//   node scripts/drills/run-isolated.mjs <p5|p6|smoke|agency-gone|shell|signup|connect|operator-onboarding|sf-styles|console-styles|all> [stage,…] [--keep] [--headed]
 //   (pnpm drill:p5, drill:p6, drill:smoke, drill:agency-gone, drill:shell, drill:signup, drill:sf-styles,
 //   drill:console-styles, drill:all; sf-styles and console-styles are not in all)
 //
@@ -388,8 +388,18 @@ export const DRILLS = {
       });
     },
   },
+  // the operator's Signups & onboarding screen (Phase 1 line 8 §5 item 16), on
+  // the --p3 design store like signup
+  "operator-onboarding": {
+    id: "OPS-ONBOARDING",
+    warm: true,
+    async run(c) {
+      const seeded = await c.node(["scripts/seed-design-documents.js", "--p3"]);
+      return seeded !== 0 ? seeded : c.node(["scripts/drills/operator-onboarding/run.mjs", ...c.headed]);
+    },
+  },
 };
-export const ALL = ["smoke", "p5", "p6", "agency-gone", "shell", "signup", "connect"];
+export const ALL = ["smoke", "p5", "p6", "agency-gone", "shell", "signup", "connect", "operator-onboarding"];
 
 const git = (root, args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
 

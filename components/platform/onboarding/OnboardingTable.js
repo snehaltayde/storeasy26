@@ -79,7 +79,7 @@ export default function OnboardingTable({ rows, busy, onOpen, selected }) {
             const s = statusWords(r.status);
             const stuck = ["open", "suspended", "address_freed", "superseded", "expired"].includes(r.status) ? null : stuckLabel(r);
             return (
-              <TableRow key={r.subject} data-state={selected === r.subject ? "selected" : undefined} className="h-10 pointer-coarse:h-12">
+              <TableRow key={r.subject} data-subject={r.subject} data-status={r.status} data-state={selected === r.subject ? "selected" : undefined} className="h-10 pointer-coarse:h-12">
                 <TableCell className="max-w-60">
                   <button type="button" onClick={() => onOpen(r.subject)} className="block max-w-full rounded-sm text-left font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
                     <span className="block truncate" title={r.store.name}>
