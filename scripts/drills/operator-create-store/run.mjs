@@ -163,6 +163,7 @@ async function opsCreateStore(drill) {
   drill.check((await link.count()) > 0 && !/New tenant/.test(await text(page)), "/platform links to New store; the old New tenant form is gone", null);
   await link.click();
   await page.waitForURL((u) => u.pathname === "/platform/stores/new");
+  await page.locator("#cs-email").waitFor();
   drill.check(!ERROR_TEXT.test(await text(page)), "the New store page renders without an error", null);
   await drill.screenshot(page, "01-new-store-form");
 

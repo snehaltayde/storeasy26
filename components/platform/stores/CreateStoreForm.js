@@ -56,7 +56,7 @@ function FieldRow({ id, label, hint, error, check, children }) {
 // one group of the form: a title, one line on what it is for, its fields
 function Group({ title, hint, children, first = false }) {
   return (
-    <fieldset className={cn("space-y-5", !first && "border-t border-border pt-6")}>
+    <fieldset className={cn("min-w-0 space-y-5", !first && "border-t border-border pt-6")}>
       <div>
         <legend className="text-base font-semibold">{title}</legend>
         {hint && <p className="mt-1 text-[0.8125rem] text-muted-foreground">{hint}</p>}

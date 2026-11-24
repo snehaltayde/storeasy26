@@ -289,12 +289,12 @@ export default function SubjectSheet({ subject, onClose, onChanged }) {
                 )}
 
                 {a.cancel && (
-                  <div data-sheet-cancel className="flex flex-col gap-3 rounded-card border border-destructive/30 bg-destructive/5 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                    <div className="space-y-1 sm:max-w-[36ch]">
+                  <div data-sheet-cancel className="flex flex-col items-start gap-3 rounded-card border border-destructive/30 bg-destructive/5 p-3">
+                    <div className="space-y-1">
                       <p className="text-[0.8125rem] font-medium">Stop this store before the founder joins</p>
                       <p className="text-[0.8125rem] text-muted-foreground">Storeasy created it and its setup isn&apos;t running. Cancelling frees its address and Shopify store for another store.</p>
                     </div>
-                    <Button variant="destructive" disabled={busy != null} onClick={() => setCancelOpen(true)} className="shrink-0">
+                    <Button variant="destructive" disabled={busy != null} onClick={() => setCancelOpen(true)}>
                       <Ban aria-hidden /> Cancel this store setup
                     </Button>
                   </div>
