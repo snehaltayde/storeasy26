@@ -144,16 +144,20 @@ export async function onboardingStage(drill) {
   await waitFor(async () => ["done", "refused", "error", "blocked", "conflict"].includes(await page.locator("[data-publish][data-phase]").first().getAttribute("data-phase").catch(() => "")), 90_000, 400);
   await sleep(800);
   drill.check((await liveRelease()) != null, "the store is open (a live release)", null);
-  await page.goto(p6Url(drill, "/admin"), { waitUntil: "load", timeout: 120_000 });
-  drill.check(new URL(page.url()).pathname === "/admin/dashboard", "an open store: /admin goes to the dashboard", page.url());
-  const badge = await page.locator('[data-badge="onboarding"]').count();
-  drill.check(badge === 0, "the nav has no onboarding badge once the store is open", badge);
-  await goStep(drill, page);
-  v = await readPage(page);
-  const status = clean(await page.locator('[data-onboarding="status"]').innerText().catch(() => ""));
+  // a fresh tab: the editor may still be finishing its own navigation after Open
+  const after = await ctx.newPage();
+  await after.goto(p6Url(drill, "/admin"), { waitUntil: "load", timeout: 120_000 });
+  await settle(after);
+  drill.check(new URL(after.url()).pathname === "/admin/dashboard", "an open store: /admin goes to the dashboard", after.url());
+  const nav = await after.locator('[data-slot="sidebar-container"] a[data-nav-item]').count();
+  const badge = await after.locator('[data-badge="onboarding"]').count();
+  drill.check(nav > 0 && badge === 0, "the dashboard's nav has no onboarding badge once the store is open", { nav, badge });
+  await goStep(drill, after);
+  v = await readPage(after);
+  const status = clean(await after.locator('[data-onboarding="status"]').innerText().catch(() => ""));
   drill.check(Object.values(v.states).length === 4 && Object.values(v.states).every((s) => s === "done") && v.progress.includes("4 of 4") && status.toLowerCase() === "open", "onboarding: every step Done, '4 of 4', the Open badge", { states: v.states, progress: v.progress, status });
   drill.check(v.step === "open" && v.text.includes("Your store is open."), "it opens on 'Open your store': 'Your store is open.'", v.text.slice(0, 200));
-  await drill.screenshot(page, "h-onboarding-all-done-1440");
+  await drill.screenshot(after, "h-onboarding-all-done-1440");
 
   drill.check(errors.length === 0, "no page errors", errors);
   await ctx.close();
