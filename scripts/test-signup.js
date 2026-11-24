@@ -132,7 +132,7 @@ await t("provisioner: the file driver makes <STORE_DB_DIR>/storeasy-t-<slug>.db 
   const c = createClient({ url: r.dbUrl });
   await c.execute("SELECT 1");
   c.close();
-  eq((await PV.createStoreDatabase("pv-one", "file")).created, false, "a second call adopts the file");
+  eq((await PV.createStoreDatabase("pv-one", "file", { resumeUrl: r.dbUrl })).created, false, "its own run resuming adopts the file");
 });
 
 await t("provisioner: the file driver refuses NODE_ENV=production, VERCEL and a URL-like STORE_DB_DIR; unknown drivers and bad slugs are refused", async () => {
@@ -652,6 +652,193 @@ await t("guard tables: the signup routes and the handoff exemption are registere
   const { EXEMPT_ROUTES } = await import("./support/admin-routes.js");
   for (const [path, cls] of [["signup", "collector"], ["signup/verify", "token"], ["signup/resend", "token"]]) eq(SHOPPER_ROUTES.find((r) => r.path === path)?.class, cls, path);
   ok(EXEMPT_ROUTES.some((r) => r.path === "handoff" && r.method === "POST" && r.kind === "token"), "handoff exempt");
+});
+
+// --- review fixes (Line 1 review) ------------------------------------------------------
+
+const count = async (sql, args = []) => Number((await one(sql, args)).n);
+
+await t("migration 0011: signups has indexes on created_at and (status, expires_at)", async () => {
+  for (const name of ["idx_signups_created", "idx_signups_status_expires"]) ok(await one("SELECT name FROM sqlite_master WHERE type='index' AND name = ?", [name]), name);
+  const live = await one("SELECT sql FROM sqlite_master WHERE type='index' AND name = 'idx_signups_slug_live'");
+  ok(/'existing'/.test(live.sql), "the live-slug index holds 'existing' too");
+});
+
+await t("least-trusted (fix 1): an existing-email signup holds its address exactly like a new-email signup", async () => {
+  const fresh = await start({ storeName: "Hold New Label" });
+  const probe = await start({ email: `owner@${b.id}.test`, storeName: "Hold Old Label" });
+  eq(fresh.res.status, 200, "new: started");
+  eq(probe.res.status, 200, "existing: started");
+  eq((await rowFor(`owner@${b.id}.test`)).status, "existing", "the probe row is 'existing'");
+  const g1 = await api("signup", "GET", { query: "slug=hold-new-label" });
+  const g2 = await api("signup", "GET", { query: "slug=hold-old-label" });
+  const strip = (x) => JSON.stringify({ ...x.body, slug: 0, address: 0 });
+  eq(g1.body.available, false, "new: held");
+  eq(strip(g2), strip(g1), "GET ?slug= answers the same");
+  const s1 = await start({ storeName: "Hold New Label" });
+  const s2 = await start({ storeName: "Hold Old Label" });
+  eq(s1.res.status, 422, "new: a second signup is refused");
+  eq(s2.res.status, s1.res.status, "existing: the same status");
+  eq(JSON.stringify(s2.res.body), JSON.stringify(s1.res.body), "the same answer");
+});
+
+await t("fix 2: two verifies with the right code at once make exactly one store, one user and one owner membership", async () => {
+  const s = await start({ storeName: "Twin Click Co" });
+  const code = await codeFor(s.f.email);
+  const rs = await Promise.all([1, 2].map(() => api("signup/verify", "POST", { body: { code }, cookie: s.cookie })));
+  eq(rs.filter((r) => r.body?.status === "done").length, 1, `one done: ${rs.map((r) => r.text).join(" | ")}`);
+  eq(await count("SELECT COUNT(*) AS n FROM tenants WHERE id = 'twin-click-co'"), 1, "one store");
+  eq(await count("SELECT COUNT(*) AS n FROM users WHERE email = ?", [s.f.email]), 1, "one user");
+  eq(await count("SELECT COUNT(*) AS n FROM memberships WHERE tenant_id = 'twin-click-co' AND role = 'owner'"), 1, "one owner");
+  eq(await count("SELECT COUNT(*) AS n FROM provision_runs WHERE tenant_id = 'twin-click-co'"), 1, "one run");
+});
+
+await t("fix 2: a failure during account creation (after the store is made), then Try again: one user, one membership, done", async () => {
+  const s = await start({ storeName: "Fault Line Goods" });
+  const code = await codeFor(s.f.email);
+  await db.execute("CREATE TRIGGER sgn_fault BEFORE INSERT ON memberships WHEN NEW.tenant_id = 'fault-line-goods' BEGIN SELECT RAISE(ABORT, 'injected'); END");
+  let r;
+  try {
+    r = await api("signup/verify", "POST", { body: { code }, cookie: s.cookie });
+  } finally {
+    await db.execute("DROP TRIGGER IF EXISTS sgn_fault");
+  }
+  eq(r.body.status, "failed", r.text);
+  ok(await C.getTenant("fault-line-goods", { fresh: true }), "the store was made");
+  eq(await count("SELECT COUNT(*) AS n FROM memberships WHERE tenant_id = 'fault-line-goods'"), 0, "no membership yet");
+  const again = await api("signup/verify", "POST", { body: { retry: true }, cookie: s.cookie });
+  eq(again.body.status, "done", again.text);
+  eq(await count("SELECT COUNT(*) AS n FROM users WHERE email = ?", [s.f.email]), 1, "one user");
+  eq(await count("SELECT COUNT(*) AS n FROM memberships WHERE tenant_id = 'fault-line-goods' AND role = 'owner'"), 1, "one owner membership");
+  eq((await rowFor(s.f.email)).status, "done", "signup done");
+});
+
+await t("fix 3: after 10 failed code tries in a day for an email, new signups, resends and verifies answer the same and send nothing", async () => {
+  const email = "capped@sgn.test";
+  for (let i = 0; i < 2; i++) {
+    const s = await start({ email });
+    for (let k = 0; k < 5; k++) eq((await api("signup/verify", "POST", { body: { code: "000000" }, cookie: s.cookie })).body.error, S.CODE_FAILED, "wrong code");
+  }
+  const mails = await count("SELECT COUNT(*) AS n FROM platform_mail WHERE recipient = ?", [email]);
+  const capped = await start({ email });
+  const normal = await start();
+  eq(capped.res.status, normal.res.status, "start: the same status");
+  eq(JSON.stringify(Object.keys(capped.res.body).sort()), JSON.stringify(Object.keys(normal.res.body).sort()), "start: the same keys");
+  ok(capped.cookie, "start: a cookie too");
+  eq(await count("SELECT COUNT(*) AS n FROM platform_mail WHERE recipient = ?", [email]), mails, "start: nothing sent");
+  eq((await rowFor(email)).code_hash, null, "no code stored");
+  const v = await api("signup/verify", "POST", { body: { code: "123456" }, cookie: capped.cookie });
+  eq(v.status, 400, "verify: status");
+  eq(v.body.error, S.CODE_FAILED, "verify: the generic words");
+  await db.execute({ sql: "UPDATE signups SET last_sent_at = ? WHERE email IN (?, ?)", args: [new Date(Date.now() - 120_000).toISOString(), email, normal.f.email] });
+  const rc = await api("signup/resend", "POST", { cookie: capped.cookie });
+  const rn = await api("signup/resend", "POST", { cookie: normal.cookie });
+  eq(rc.status, rn.status, "resend: the same status");
+  eq(JSON.stringify(Object.keys(rc.body).sort()), JSON.stringify(Object.keys(rn.body).sort()), "resend: the same keys");
+  eq(await count("SELECT COUNT(*) AS n FROM platform_mail WHERE recipient = ?", [email]), mails, "resend: nothing sent");
+  // a right code on an email that reaches the cap stops working too
+  const late = await start();
+  const code = await codeFor(late.f.email);
+  for (let k = 0; k < 10; k++) await I.loginThrottle(S.codeFailKey(late.f.email), S.LIMITS.codeFailsPerEmail);
+  eq((await api("signup/verify", "POST", { body: { code }, cookie: late.cookie })).body.error, S.CODE_FAILED, "a capped email's right code fails generically");
+  eq(await I.findUserByEmail(late.f.email), null, "no user");
+});
+
+await t("fix 4: in production with mail not configured, signups are closed and no code is stored or printed", async () => {
+  const keepEnv = process.env.NODE_ENV;
+  const keepLog = console.log;
+  const logs = [];
+  process.env.NODE_ENV = "production";
+  process.env.RESEND_API_KEY = "";
+  console.log = (...a) => logs.push(a.join(" "));
+  try {
+    const f = form();
+    const r = await api("signup", "POST", { body: f });
+    eq(r.status, 403, r.text);
+    eq(r.body.code, "SIGNUPS_CLOSED", "closed");
+    eq((await api("signup", "GET", { query: "slug=prod-closed" })).body.code, "SIGNUPS_CLOSED", "GET closed too");
+    eq(await rowFor(f.email), null, "no signup row");
+    eq(await mailFor(f.email), null, "no mail row");
+    const m = await sendPlatformMail({ kind: "signup_code", to: "prod@sgn.test", subject: "s", text: "code 112233", ref: "sgn_p" });
+    eq(m.status, "failed", "not a mock in production");
+    eq((await one("SELECT body FROM platform_mail WHERE id = ?", [m.id])).body, null, "no body kept");
+    const { sendMail } = await import("../lib/mail.js");
+    eq((await sendMail({ to: "prod@sgn.test", subject: "s", text: "code 445566" })).ok, false, "sendMail refuses");
+    ok(!logs.join("\n").includes("112233") && !logs.join("\n").includes("445566"), "no code printed");
+  } finally {
+    console.log = keepLog;
+    if (keepEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = keepEnv;
+  }
+});
+
+await t("fix 4: the body is stored only once the send is known to be a mock (none while a real send is in flight)", async () => {
+  const realFetch = globalThis.fetch;
+  process.env.RESEND_API_KEY = "re_test_stand_in";
+  let during = "unset";
+  try {
+    globalThis.fetch = async () => {
+      during = (await one("SELECT body FROM platform_mail WHERE recipient = 'during@sgn.test'"))?.body;
+      return new Response(JSON.stringify({ id: "re_9" }), { status: 200, headers: { "content-type": "application/json" } });
+    };
+    await sendPlatformMail({ kind: "signup_code", to: "during@sgn.test", subject: "s", text: "code 778899", ref: "sgn_d" });
+  } finally {
+    globalThis.fetch = realFetch;
+    process.env.RESEND_API_KEY = "";
+  }
+  eq(during, null, "no body at rest during the send");
+});
+
+await t("fix 5: pruning deletes only done, expired and superseded rows older than 7 days", async () => {
+  const old = new Date(Date.now() - 8 * 24 * 3600_000).toISOString();
+  const statuses = ["done", "expired", "superseded", "failed", "verified", "provisioning"];
+  for (const st of statuses) {
+    await db.execute({
+      sql: "INSERT INTO signups (id, email, name, store_name, slug, browser_hash, status, created_at, updated_at, expires_at) VALUES (?, 'prune@sgn.test', 'P', 'P', ?, 'x', ?, ?, ?, ?)",
+      args: [`sgn_prune_${st}`, `prune-${st}`, st, old, old, old],
+    });
+  }
+  await start();
+  const left = (await q("SELECT status FROM signups WHERE id LIKE 'sgn_prune_%'")).map((r) => r.status).sort();
+  eq(JSON.stringify(left), JSON.stringify(["failed", "provisioning", "verified"]), "kept");
+});
+
+await t("fix 5: the file driver refuses a leftover database file unless the run is resuming its own", async () => {
+  const r1 = await PV.createStoreDatabase("pv-left", "file");
+  await writeFile(r1.dbUrl.slice(5), "");
+  let err = null;
+  await PV.createStoreDatabase("pv-left", "file").catch((e) => (err = e));
+  ok(err && /already/i.test(err.message), `refused: ${err?.message}`);
+  eq((await PV.createStoreDatabase("pv-left", "file", { resumeUrl: r1.dbUrl })).created, false, "its own run adopts it");
+  // through signup: a leftover file for the address fails the setup instead of being reused
+  await writeFile(join(STORE_DIR, "storeasy-t-leftover-loft.db"), "");
+  const s = await start({ storeName: "Leftover Loft" });
+  const v = await api("signup/verify", "POST", { body: { code: await codeFor(s.f.email) }, cookie: s.cookie });
+  eq(v.body.status, "failed", v.text);
+  eq(await C.getTenant("leftover-loft", { fresh: true }), null, "no store on the leftover file");
+});
+
+await t("fix 6: a failed, verified or provisioning signup a day past its expiry loses its password hash, and Try again says start again", async () => {
+  const s = await start({ storeName: "Stale Studio" });
+  const recent = await start({ storeName: "Recent Studio" });
+  const at = (h) => new Date(Date.now() - h * 3600_000).toISOString();
+  await db.execute({ sql: "UPDATE signups SET status = 'failed', expires_at = ? WHERE email = ?", args: [at(25), s.f.email] });
+  await db.execute({ sql: "UPDATE signups SET status = 'failed', expires_at = ? WHERE email = ?", args: [at(1), recent.f.email] });
+  await start();
+  eq((await rowFor(s.f.email)).password_hash, null, "cleared a day past expiry");
+  ok((await rowFor(recent.f.email)).password_hash, "kept inside the day");
+  const r = await api("signup/verify", "POST", { body: { retry: true }, cookie: s.cookie });
+  eq(r.status, 400, r.text);
+  eq(r.body.error, S.SIGNUP_LAPSED, "start-again words");
+  eq(await I.findUserByEmail(s.f.email), null, "no user");
+});
+
+await t("fix 7: addresses can't start with xn-- or hold --, and the new reserved words are reserved", async () => {
+  for (const s of ["xn--abc", "ab--cd", "a--b"]) eq((await S.slugAvailable(s)).reason, "format", s);
+  ok(S.validateSignup({ ...form(), slug: "xn--shop" }).errors.slug, "validation refuses xn--");
+  for (const w of ["login", "billing", "support", "security", "account", "accounts", "checkout", "cdn", "assets", "static", "docs", "blog", "shop", "store", "stores"]) {
+    eq((await S.slugAvailable(w)).reason, "reserved", w);
+  }
 });
 
 await t("no network: nothing reached fetch()", () => {

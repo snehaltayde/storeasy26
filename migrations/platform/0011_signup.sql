@@ -1,5 +1,5 @@
 -- Phase 1 line 1: a founder signs up on their own (docs/plans/phase-1.md).
--- Nothing destructive: one added column, two new tables.
+-- Nothing destructive: one added column, two new tables and their indexes.
 
 -- When a signup proved the address (null for every account made before).
 ALTER TABLE users ADD COLUMN email_verified_at TEXT;
@@ -18,17 +18,20 @@ CREATE TABLE IF NOT EXISTS signups (
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, verified_at TEXT, expires_at TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_signups_slug_live ON signups(slug)
-  WHERE status IN ('pending','verified','provisioning','failed');
+  WHERE status IN ('pending','existing','verified','provisioning','failed');
 CREATE INDEX IF NOT EXISTS idx_signups_email ON signups(email, created_at);
+CREATE INDEX IF NOT EXISTS idx_signups_created ON signups(created_at);
+CREATE INDEX IF NOT EXISTS idx_signups_status_expires ON signups(status, expires_at);
 CREATE INDEX IF NOT EXISTS idx_signups_browser ON signups(browser_hash);
 
--- Mail the platform itself sends (signup codes). The body is kept only when
--- mail is mocked (local and tests read the code from it); a real send nulls it.
+-- Mail the platform itself sends (signup codes). The body is written only once
+-- a send is known to be a mock (never in production): local and tests read the
+-- code from it; a real or failed send never stores it.
 CREATE TABLE IF NOT EXISTS platform_mail (
   id TEXT PRIMARY KEY,               -- pml_<16hex>
   kind TEXT NOT NULL,                -- signup_code | signup_existing
   recipient TEXT NOT NULL, subject TEXT NOT NULL,
-  body TEXT,                         -- kept only when mail is mocked; null after a real send
+  body TEXT,                         -- set only for a mock send; null otherwise
   status TEXT NOT NULL,              -- sent | mock | failed
   provider_id TEXT, error TEXT, ref TEXT,  -- ref = signup id
   created_at TEXT NOT NULL, sent_at TEXT
