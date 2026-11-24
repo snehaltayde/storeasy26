@@ -27,7 +27,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - [x] One command seeds a local store with an owner, admin, staff and support member, an operator, a shopper with an order, and a synced catalog (`pnpm seed:roles`; `test:seed-roles`)
 - [x] The browser drills run on today's code: drills that tested the retired legacy CMS are removed, and `pnpm drill:p6` and the p5 drill pass (`pnpm drill:all`, each in a throwaway worktree; known flake below)
 - [x] shadcn/ui is set up for the consoles only (tokens from `docs/UI.md`, `components/ui/`), and the storefront's styles are unchanged (a storefront render comparison proves it) (`test:console-ui`; `pnpm drill:sf-styles`, evidence in `docs/cms-reviews/drills/SF-STYLES/compare.json`)
-- [ ] A signed-in merchant lands in a new console shell (sidebar, top bar, store switcher) that shows only the sections their role can use; support sees no write actions
+- [x] A signed-in merchant lands in a new console shell (sidebar, top bar, store switcher) that shows only the sections their role can use; support sees no write actions (in the shell and nav; the 46 write controls support still sees inside old screens are listed in `docs/cms-reviews/drills/SHELL/support-write-controls.json` for Phase 2) (`test:console-shell`, `pnpm drill:shell`)
 
 ## Phase 1: simple onboarding
 
@@ -111,6 +111,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - Preview tokens in `lib/releases.js` still fall back to `"dev-only-secret"`; make them fail closed in production like order links.
 - `/api/track` accepts any `transaction_id` as a purchase order id (analytics integrity).
 - **Known flake:** in drill runs the console sign-in page sometimes fails to load right after a harness restart (a 404 "1 Issue" page, or `#login-email` never appearing); seen in about 1 run in 4, never twice in a row. Find the cause before relying on drills as a merge gate.
+- The "operator has support access" banner (operator id and reason) also shows to signed-out visitors on `/admin/login`; show it only to signed-in members.
 - The storefront and console fonts come from `next/font/google`, so every cold build fetches Google Fonts over the network; a failed fetch breaks the whole dev build. Self-host the font files (`next/font/local`) so builds don't depend on the network.
 - `requireAdmin`'s origin check passes a write with no Origin header; add a `Sec-Fetch-Site: cross-site` refusal as a second layer.
 
