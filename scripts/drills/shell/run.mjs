@@ -97,7 +97,8 @@ async function signInForm(drill, ctx, creds) {
   await page.locator("#login-email").fill(creds.email);
   await page.locator("#login-password").fill(creds.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.waitForURL(/\/admin\/dashboard$/, { timeout: 60_000 });
+  // sign-in goes to /admin, which sends a closed store to its onboarding (Phase 1 line 3)
+  await page.waitForURL(/\/admin\/onboarding$/, { timeout: 60_000 });
   return page;
 }
 
