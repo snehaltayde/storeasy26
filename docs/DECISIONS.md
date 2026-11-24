@@ -3,6 +3,14 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-24 Parallel slices and three heavy-job slots
+
+- **Decision:** up to five slices are built at once, each in its own worktree under `../storeasy26-wt/`, merged into `main` one at a time by the session. Heavy commands (full suites, builds, browser drills) run through `~/.claude/bin/heavy`, which allows three at once on this Mac (15 cores, 24 GB) instead of one. The main checkout stays on `main` so the owner's own server always runs finished code.
+- **Why:** owner: "too slow"; the single slot made parallel builders queue for hours.
+- **Instead of:** one heavy job at a time (the earlier rule); five at once (risks memory pressure with five browser drills).
+- **Decided by:** owner (3 slots); worktree layout on the owner's behalf
+- **Slice:** build process
+
 ## 2026-11-24 Browser drills run without Turbopack's saved dev cache (on the owner's behalf)
 
 - **Decision:** every drill sets `STOREASY_TURBOPACK_DEV_CACHE=off`, which turns off Next's `turbopackFileSystemCacheForDev` for that run only (`next.config.mjs`). The owner's own `pnpm dev:design` keeps the cache.

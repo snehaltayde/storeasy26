@@ -107,8 +107,10 @@ project's own rules above win where they say something different.
 - Model split: the session model plans and reviews; `opus` writes server, permission,
   security and hard UI code; `sonnet` does docs, seed data and simple packages.
 - Never two writers in one checkout. Independent feature blocks may run side by side, each in
-  its own git worktree, branch and database. Heavy commands (test suites, builds) run through
-  `steelthread-lock` so only one runs at a time on the machine.
+  its own git worktree, branch and database. Heavy commands (test suites, builds, browser drills)
+  run through `~/.claude/bin/heavy` (wraps `steelthread-lock` with 3 machine-wide slots; owner
+  decision 2026-11-24), so at most three run at once. Build worktrees live under
+  `../storeasy26-wt/`; the main checkout stays on `main` for the owner's own server.
 - Keep usage low: briefs name exact files; agents do not read large docs whole; one plan file
   per phase (`docs/plans/phase-<n>.md`) instead of a fresh plan per agent; about 150 tool
   calls per agent; reports of about ten lines.
