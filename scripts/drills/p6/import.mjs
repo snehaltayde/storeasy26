@@ -20,7 +20,9 @@ const iso = (msFromNow) => new Date(Date.now() + msFromNow).toISOString();
 const LEASE = () => ({ owner: "drill", until: iso(3600_000) });
 
 async function plant(fields) {
-  await p6Sql([{ sql: "DELETE FROM sync_runs WHERE id = ?", args: [RUN] }]);
+  // the seed's own complete sync ran moments ago: move it back so the planted
+  // run is the latest (it still counts as an earlier complete run)
+  await p6Sql([{ sql: "DELETE FROM sync_runs WHERE id = ?", args: [RUN] }, { sql: "UPDATE sync_runs SET started_at = ?, finished_at = COALESCE(finished_at, ?) WHERE id != ?", args: ["2026-01-01T00:00:00.000Z", "2026-01-01T00:05:00.000Z", RUN] }]);
   const row = { id: RUN, kind: "full", status: "running", phase: "products", source: "injected", started_by: "p6-drill", started_at: iso(-4 * 60_000), updated_at: iso(0), products_fetched: 120, products_total: 480, pages_done: 4, lease_owner: LEASE().owner, lease_until: LEASE().until, ...fields };
   const cols = Object.keys(row);
   await p6Sql([{ sql: `INSERT INTO sync_runs (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`, args: cols.map((c) => row[c]) }]);
