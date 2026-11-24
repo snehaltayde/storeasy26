@@ -3,6 +3,13 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Drill harness: reboot a broken Turbopack font build, serialize installs (on the owner's behalf)
+
+- **Decision:** every harness boot a drill starts first loads `/` and `/admin/login`; only Turbopack's `next/font/google` "Can't resolve ... internal/font/google/font" build error stops and reboots it (up to 3 times, then a plain failure); any other 500 still reaches the drill. Fonts are not mocked, since that would change how pages render. `pnpm install` in drill worktrees runs one at a time under a machine-wide lock folder (dead owner taken over, live owner waited for, never killed) rather than a shared `node_modules`. Each drill keeps its Next and sqld logs in `.drill-results/<stamp>/<drill>/server.log`.
+- **Why:** concurrent full checks showed one boot in ~20 getting a broken font build that served 500 on every page until restarted; the install race (`ERR_MODULE_NOT_FOUND @libsql/client`) was suspected but not reproduced.
+- **Decided by:** Claude
+- **Slice:** Phase 1, drill flake under load
+
 ## 2026-11-25 Removing legacy code (on the owner's behalf; scope by the owner)
 
 - **Decision:** no migration and no table changes; the 11 legacy tables stay, and only a short list of read-only helpers may name them (enforced by `test:no-dead-code`). `documents` is the only content mode: any other stored value is a 5xx `STORE_MODE_INVALID`, never a fallback. A media delete whose usage read fails is refused (no legacy scan). The 12 legacy redirect pages plus `/admin/start` and `/admin/setup` are deleted, not moved to config redirects (nothing is hosted, so no outside links exist; supersedes keeping start/setup as redirects). `lib/cms/*` and `lib/registry/legacy.js` keep their names (live code). A manual tool stays only if `package.json` names it (`scripts/real-checks/**` is the one allowlisted owner root). Superseded docs are deleted once their still-true parts move to `docs/operations.md` (`CMS_*.md`, `cms-reviews/**`, `plans/**` stay). Code only tests reach counts as dead. The `publish_release` job handler goes.
