@@ -3,6 +3,20 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-24 How shadcn/ui is set up for the consoles (on the owner's behalf)
+
+- **Decision:**
+  - One Tailwind pipeline: all shadcn console CSS goes in `app/console.css` (already imported by `globals.css`); every new rule is scoped to `.console`, the theme only adds names the storefront never uses, and there are no unscoped base rules. `--color-primary`/`--color-ring` go through `--primary`/`--ring`, with `[data-console]` keeping the legacy console's values.
+  - `.console` goes on the console `<body>` (so menus and sheets rendered outside the page tree get the tokens); line 8 applies it. Dark mode is class-based (`.console.dark`) and storefront files may not use `dark:`.
+  - No shadcn radius scale: 6px controls are `rounded-md`, 10px surfaces `rounded-card`.
+  - The shadcn CLI runs only in a scratch project (`pnpm dlx shadcn@4.23.0`), because it writes global `:root` variables; components are copied in as plain `.js`, restyled, with `components.json` committed as the record. Radix primitives (`radix-ui`), `cn` in `components/ui/utils.js`.
+  - Only what this line and the console shell need is installed now, pinned exactly: `radix-ui` 1.8.1, `class-variance-authority` 0.7.1, `clsx` 2.1.1, `tailwind-merge` 3.7.1, `tw-animate-css` 1.4.0. Sonner, react-hook-form, zod, `@hookform/resolvers` and `cmdk` come with their lines. The store switcher uses a dropdown menu; the ⌘K command menu comes later.
+  - The proof that the storefront is unchanged is a before/after capture of every element's computed styles and size on storefront pages at three widths (screenshots as a second signal), with a repeatability check and a check that a deliberate change is caught.
+- **Why:** shadcn's default setup writes global variables and base styles that would change the storefront, which must keep each store's own brand design.
+- **Instead of:** a separate console stylesheet now (possible later if the storefront CSS grows too much); running the shadcn CLI in the repo; installing every component up front.
+- **Decided by:** Claude, on the owner's behalf (shadcn itself by the owner)
+- **Slice:** Phase 0, shadcn setup
+
 ## 2026-11-24 Browser drills run only in a throwaway copy of the code (on the owner's behalf)
 
 - **Decision:**

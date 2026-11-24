@@ -478,3 +478,98 @@ Then the session runs typecheck, `pnpm test`, schema-compat, `pnpm drill:p5`, `p
 3. The owner's harness keeps running; ports skipped, never freed; a fully busy block stops the runner with a message.
 4. Drills see committed code only.
 5. Lost browser coverage of the documents editor's rich text and design panel (deleted p3 drills): consider a browser spec in the console-shell line.
+
+## Line 7: shadcn/ui for the consoles only; the storefront is unchanged
+
+**Fit:** Phase 0 line 7; line 8 (console shell) uses all of it. `app/console.css` already exists and is imported by `app/globals.css:2` (one Tailwind compile for every page); its legacy tokens are scoped to `[data-console]` on the console `<html>`. Keep the single pipeline; change only `console.css`; `globals.css` unchanged. No routes, tables, events or new reads.
+
+### 1. Feature list
+
+1. New packages installed with exact versions (§2).
+2. `components.json` committed (radix base, `tsx:false`, `rsc:true`, aliases to `@/components/ui`).
+3. `console.css` gains: the `docs/UI.md` light and dark tokens under `.console` / `.console.dark`; the full shadcn variable set (incl. `sidebar-*`) mapped onto them; `tw-animate-css`; a `dark` variant matching only inside `.console.dark`.
+4. `cn` in `components/ui/utils.js` using `extendTailwindMerge` so `rounded-ctl`/`rounded-card` and `shadow-card`/`shadow-overlay` merge.
+5. Components restyled to UI.md: `button` (all variants/sizes), `input`, `separator`, `skeleton`, `tooltip`, `sheet`, `dropdown-menu`, `avatar`, `sidebar`, plus `use-mobile`. 6px controls (`rounded-md`), 10px cards/popovers/sheets (`rounded-card`), accent focus ring, weights 500/600, no raw colours, `data-slot` on each part, Esc closes the sheet, `motion-reduce:animate-none` on overlays.
+6. `components/ui/README.md`: generate in a scratch project, copy in, restyle checklist, never run the CLI in this repo.
+7. `scripts/test-console-ui.js` (`test:console-ui`) and the `drill:sf-styles` capture/compare drill (also checks `/admin/login`, the legacy console, is unchanged).
+8. Docs: `docs/UI.md` (class-based dark, `.console` on `<body>`, Command deferred, radius mapping), `docs/platform-guide.md` token note.
+
+Out of scope: `.console` on a live page (line 8); Command/cmdk, Sonner, Form (react-hook-form + zod), Dialog, Table, others; a dark-mode toggle.
+
+### 2. Dependencies
+
+| Package | Pin | Section | Why |
+|---|---|---|---|
+| `radix-ui` | 1.8.1 | dependencies | Primitives behind tooltip, sheet, dropdown-menu, avatar, separator, slot |
+| `class-variance-authority` | 0.7.1 | dependencies | Button and sidebar variants |
+| `clsx` | 2.1.1 | dependencies | `cn` |
+| `tailwind-merge` | 3.7.1 | dependencies | `cn` (3.x supports Tailwind 4) |
+| `tw-animate-css` | 1.4.0 | devDependencies | Open/close animations; CSS only (`@property`, `@theme inline`, `@utility`; keyframes enter, exit, accordion, collapsible, caret — no storefront collisions) |
+
+shadcn CLI 4.23.0 runs via `pnpm dlx` in a scratch project only, never as a dependency. Deferred: `sonner`, `react-hook-form`, `zod`; also needed later and to be recorded then: `@hookform/resolvers`, `cmdk`.
+
+### 3. CSS scoping
+
+1. `.console { …UI.md --c-* light…; --background: var(--c-bg); --card: var(--c-surface); --primary: var(--c-accent); --ring: var(--c-accent); --sidebar: var(--c-sunken); … }` and `.console.dark { …dark… }`.
+2. `.console` goes on the console root `<body>` (Radix portals mount into body), not `<html>` (`:root` in `globals.css` comes later and would override `--background`).
+3. `@theme inline` adds only names no storefront file uses (grepped: `card`, `popover`, `secondary`, `muted`, bare `accent`, `destructive`, `border`, `input`, `sidebar-*` — no storefront hits). `--color-background`/`--color-foreground` already map to `var(--background)`/`var(--foreground)`.
+4. `--color-primary` and `--color-ring` re-pointed to `var(--primary)`/`var(--ring)`, with `[data-console] { --primary: var(--c-primary); --ring: var(--c-ring) }` keeping the legacy console identical.
+5. No `--radius-*`, `--shadow-*`, `--font-*`, `--text-*` overrides; use `rounded-md`, `rounded-card`, `shadow-card`, `shadow-overlay`.
+6. Scoped base only: `@layer base { .console, .console *, .console ::before, .console ::after { border-color: var(--border) } .console { background: var(--background); color: var(--foreground) } }`.
+7. `@custom-variant dark (&:where(.console.dark, .console.dark *));` (nothing uses `dark:` today).
+8. The storefront CSS file gains unused console utilities: bytes only, not rendering (risk 1).
+
+### 4. File plan (one branch, two packages in order; A committed and baseline captured before B)
+
+**Package A: render-comparison tool**
+1. `scripts/drills/sf-styles/compare.js`: pure serialise, hash, diff.
+2. `scripts/drills/sf-styles/run.mjs`: capture, compare, "bite" mode.
+3. `scripts/drills/run-isolated.mjs`: `"sf-styles"` entry (`id: "SF-STYLES"`, `warm: true`), not in `ALL`.
+4. `package.json`: `drill:sf-styles`.
+5. `scripts/test-drills.js`: comparator cases (synthetic diff found; identical → none) and the runner entry.
+6. Commit; baseline twice (§5).
+
+**Package B: shadcn setup**
+7. `package.json`, `pnpm-lock.yaml`: §2.
+8. `components.json`.
+9. `app/console.css`: §3; `@import "tw-animate-css"` first; legacy hex block unchanged (`test-search-effective.js:876` reads it).
+10. `components/ui/utils.js`, `components/ui/use-mobile.js`.
+11. `components/ui/{button,input,separator,skeleton,tooltip,sheet,dropdown-menu,avatar,sidebar}.js`, `README.md`.
+12. `scripts/test-console-ui.js` + `test:console-ui`, asserting:
+    - nothing reachable from `app/(storefront)/**` or `proxy.js` resolves into `components/ui/`, `radix-ui`, `class-variance-authority`, `tailwind-merge`;
+    - every `console.css` rule outside `@theme`, `@utility`, `@property`, `@custom-variant`, `@keyframes` is scoped to `[data-console]` or `.console` (no `:root`, `*`, `html`, `body`);
+    - the theme adds no default Tailwind key, only the two documented re-mappings;
+    - no storefront file uses the new utility names, `dark:`, or class `console`;
+    - `.console`/`.console.dark` values equal the UI.md table;
+    - `components/ui` has no hex, `oklch(`, `rgb(` or palette utilities;
+    - `cn` merge cases;
+    - components render server-side through the swc loader (`scripts/support/page-harness.js`) with their `data-slot`s.
+13. Commit; run the compare.
+
+**Package C: docs** — `docs/UI.md`, `docs/platform-guide.md` (session writes DECISIONS and ticks FEATURES).
+
+### 5. Render comparison
+
+- Pages: `/`, a product page, a collection, the cart drawer open, the closed page (or the maintenance curtain if the harness can't serve it), plus `/admin/login`. Widths 375, 768, 1280.
+- Recorded: every element and its `::before`/`::after` — full `getComputedStyle` plus bounding box rounded to 0.5px; a full-page screenshot.
+- Held fixed: reduced motion, animations/transitions off via injected rule, `document.fonts.ready`, images complete, service worker blocked, fixed cookies.
+- Saved: per-element hashes and dumps under `.drill-results/<stamp>/SF-STYLES/`; the compare run takes `SF_STYLES_BASELINE=<abs dir>` and writes `compare.json` to `docs/cms-reviews/drills/SF-STYLES/` (committed evidence).
+- Runs: baseline twice at package A's commit (second vs first must be zero diff); `SF_STYLES_BITE=1` adds 0.01em letter-spacing and must be caught; compare after package B.
+- Pass: zero computed-style and box differences. Screenshot differences are reported, and fail only if the baseline-vs-baseline screenshots were identical. Log CSS file sizes before and after.
+- Reusable tool, not a permanent golden.
+
+### 6. Checks first
+
+- `npm view <pkg>@<ver> time --json` for each package: published on or before 2026-11-10; `npm view radix-ui@1.8.1 peerDependencies` accepts React 19.
+- In a scratch Next app outside the repo: `pnpm dlx shadcn@4.23.0 init --help`, then `init -b radix`; copy its `style` value into our `components.json`.
+- `grep -n drill-results .gitignore`
+- `node scripts/test-drills.js` and `node scripts/test-search-effective.js` pass before any change.
+- `node -p "require('tailwindcss/package.json').version"` (lockfile says 4.3.1).
+
+### 7. Risks
+
+1. Storefront CSS grows (estimate 5–15 KB); log sizes; line 8 may split a console stylesheet.
+2. UI.md token names `--c-surface`, `-border`, `-accent`, `-success`, `-warning`, `-danger`, `-info` are already used by legacy components, so `.console` on `<body>` (line 8) re-skins legacy screens; line 8 must alias them. UI.md's warning colour as text is likely below 4.5:1 on white (estimate ~2.9:1, unmeasured).
+3. The capture may not repeat (random ids, experiments, consent banner, font flake): fall back to computed styles only and report text-driven box differences.
+4. shadcn 4.x output may differ from these assumptions; the scratch-project check settles it.
+5. Without `extendTailwindMerge`, `cn` keeps conflicting `rounded-*`/`shadow-*`; unit cases catch it.
