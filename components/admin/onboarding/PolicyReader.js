@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { CircleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -18,7 +19,8 @@ import { call } from "@/components/admin/editor/documentsApi";
 export const READER_WORDS = Object.freeze({
   lead: "This is the draft we started from a template. Read it to the end, change what you need in the editor, then mark it read.",
   loading: "Loading the page…",
-  failed: "We couldn't load this page. Close this and try again.",
+  failed: "This page didn't load. Try again, or close this and open it from the list.",
+  tryAgain: "Try again",
   notLegalAdvice: "These are starting points, not legal advice.",
   edit: "Edit in the editor",
   close: "Close",
@@ -48,6 +50,7 @@ export function plainText(body) {
 export default function PolicyReader({ reading, onClose, onMarkRead, busy = false }) {
   const [doc, setDoc] = useState(null);
   const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const id = reading?.fix?.docId || null;
 
   useEffect(() => {
@@ -63,33 +66,44 @@ export default function PolicyReader({ reading, onClose, onMarkRead, busy = fals
     return () => {
       live = false;
     };
-  }, [id]);
+  }, [id, attempt]);
 
   const fix = reading?.fix;
   const parts = doc ? plainText(doc.body) : [];
   return (
     <Sheet open={Boolean(reading)} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full sm:max-w-lg" data-onboarding="policy-reader">
-        <SheetHeader>
+        <SheetHeader className="pr-12">
           <SheetTitle>{doc?.label || reading?.title || ""}</SheetTitle>
           <SheetDescription>{READER_WORDS.lead}</SheetDescription>
         </SheetHeader>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4" data-onboarding="policy-text">
           {!doc && !failed && (
-            <div className="space-y-3" aria-label={READER_WORDS.loading}>
+            <div role="status" className="space-y-3">
+              <span className="sr-only">{READER_WORDS.loading}</span>
               <Skeleton className="h-4 w-1/2" />
               <Skeleton className="h-3 w-full" />
               <Skeleton className="h-3 w-5/6" />
             </div>
           )}
-          {failed && <p role="alert" className="text-sm text-danger">{READER_WORDS.failed}</p>}
+          {failed && (
+            <div role="alert" className="space-y-3">
+              <p className="flex items-start gap-2 rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+                <span className="min-w-0">{READER_WORDS.failed}</span>
+              </p>
+              <Button size="sm" variant="outline" onClick={() => setAttempt((n) => n + 1)}>
+                {READER_WORDS.tryAgain}
+              </Button>
+            </div>
+          )}
           {doc && (
-            <article className="space-y-4 text-sm text-foreground">
+            <article className="max-w-prose space-y-5 text-sm leading-relaxed text-foreground">
               {parts.map((p, i) => (
-                <section key={i} className="space-y-1">
-                  {p.title && <h3 className="font-semibold">{p.title}</h3>}
+                <section key={i} className="space-y-1.5">
+                  {p.title && <h3 className="text-sm font-semibold">{p.title}</h3>}
                   {p.paragraphs.map((t, j) => (
-                    <p key={j} className="text-muted-foreground">{t}</p>
+                    <p key={j}>{t}</p>
                   ))}
                 </section>
               ))}

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CircleAlert, CircleCheck } from "lucide-react";
+import { Circle, CircleAlert, CircleCheck, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/components/ui/utils";
@@ -30,6 +30,10 @@ export const ONBOARDING_URL = "/api/admin/onboarding";
 export const OPEN_PANEL_WORDS = Object.freeze({
   needed: "Needed",
   check: "Worth checking",
+  neededLead: "Your store can't open until these are done.",
+  checkLead: "Your store can open without these, but they're worth a look first.",
+  liveTitle: "Goes live with your store",
+  liveLead: "Ready. Nothing to do here unless you want to look.",
   notLegalAdvice: "These are starting points, not legal advice.",
   failed: "That didn't work, so nothing changed. Try again in a minute.",
   notAllowed: "Your role can't do that, so nothing changed.",
@@ -138,45 +142,50 @@ function ContactForm({ fix, busy, onSave }) {
   );
 }
 
-function Fix({ fix, item, busy, run, onRead, onGoStep }) {
+// The one primary control while something is needed: the first fix of the
+// first "Needed" item. Everything else is outline, so the eye lands there.
+const PRIMARY_KINDS = new Set(["cod_on", "policy_start", "policy_read", "step", "link"]);
+
+function Fix({ fix, item, busy, run, onRead, onGoStep, primary }) {
   const id = `reason-${item.id}-${fix.kind}`;
   const off = busy !== null;
+  const variant = primary ? "default" : "outline";
   switch (fix.kind) {
     case "link":
       return (
-        <Control gate={fix} href={fix.href} reasonId={id} size="sm" variant="outline">
+        <Control gate={fix} href={fix.href} reasonId={id} size="sm" variant={variant}>
           {fix.label}
         </Control>
       );
     case "cod_on":
       return (
-        <Control gate={fix} reasonId={id} size="sm" disabled={off} aria-busy={busy === "cod_on" || undefined} onClick={() => run("cod_on", () => send(SETTINGS_URL, "PUT", { commerce: { checkout_mode: "direct" } }), OPEN_PANEL_WORDS.checkoutOn)}>
+        <Control gate={fix} reasonId={id} size="sm" variant={variant} disabled={off} aria-busy={busy === "cod_on" || undefined} onClick={() => run("cod_on", item.id, () => send(SETTINGS_URL, "PUT", { commerce: { checkout_mode: "direct" } }), OPEN_PANEL_WORDS.checkoutOn)}>
           {fix.label}
         </Control>
       );
     case "policy_start":
       return (
-        <Control gate={fix} reasonId={id} size="sm" disabled={off} aria-busy={busy === item.id || undefined} onClick={() => run(item.id, () => send(POLICY_START_URL, "POST", { kind: fix.policyKind }))}>
+        <Control gate={fix} reasonId={id} size="sm" variant={variant} disabled={off} aria-busy={busy === item.id || undefined} onClick={() => run(item.id, item.id, () => send(POLICY_START_URL, "POST", { kind: fix.policyKind }))}>
           {fix.label}
         </Control>
       );
     case "policy_read":
       return (
-        <Control gate={fix} reasonId={id} size="sm" disabled={off} onClick={() => onRead({ fix, title: item.title })}>
+        <Control gate={fix} reasonId={id} size="sm" variant={variant} disabled={off} onClick={() => onRead({ fix, title: item.title, itemId: item.id })}>
           {fix.label}
         </Control>
       );
     case "contact_form":
-      return <ContactForm fix={fix} busy={busy === "contact"} onSave={(identity) => run("contact", () => send(SETTINGS_URL, "PUT", { identity }), OPEN_PANEL_WORDS.contactSaved)} />;
+      return <ContactForm fix={fix} busy={busy === "contact"} onSave={(identity) => run("contact", item.id, () => send(SETTINGS_URL, "PUT", { identity }), OPEN_PANEL_WORDS.contactSaved)} />;
     case "test_order":
       return (
-        <Control gate={fix} reasonId={id} size="sm" variant={fix.marked ? "ghost" : "outline"} disabled={off} aria-busy={busy === "test_order" || undefined} onClick={() => run("test_order", () => send(ONBOARDING_URL, "POST", { step: "test_order", done: !fix.marked }))}>
+        <Control gate={fix} reasonId={id} size="sm" variant={fix.marked ? "ghost" : "outline"} disabled={off} aria-busy={busy === "test_order" || undefined} onClick={() => run("test_order", item.id, () => send(ONBOARDING_URL, "POST", { step: "test_order", done: !fix.marked }))}>
           {fix.marked ? OPEN_PANEL_WORDS.testOrderUndo : OPEN_PANEL_WORDS.testOrderMark}
         </Control>
       );
     case "step":
       return (
-        <Button size="sm" onClick={() => onGoStep?.(fix.step)}>
+        <Button size="sm" variant={variant} onClick={() => onGoStep?.(fix.step)}>
           {fix.label}
         </Button>
       );
@@ -187,46 +196,87 @@ function Fix({ fix, item, busy, run, onRead, onGoStep }) {
   }
 }
 
-function Item({ item, ...rest }) {
+function Item({ item, feedback, primaryFix = -1, compact = false, ...rest }) {
   const fixes = item.fixes || [];
   const marked = fixes.find((f) => f.kind === "test_order")?.marked === true;
   const done = item.level === "ok";
+  const here = feedback?.at === item.id ? feedback : null;
   return (
-    <li className="space-y-2 py-3" data-opening-item={item.id} data-level={item.level}>
+    <li className={cn("space-y-2", compact ? "py-3" : "py-4")} data-opening-item={item.id} data-level={item.level}>
       <div className="flex items-start gap-2">
-        {done && <CircleCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-success" />}
-        <p className="min-w-0 flex-1 text-sm font-medium text-foreground">{item.title}</p>
-        {item.level === "block" && <span className="shrink-0 rounded-full bg-danger/10 px-2 py-0.5 text-xs font-medium text-danger">{OPEN_PANEL_WORDS.needed}</span>}
-        {item.level === "warn" && <span className="shrink-0 rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-text">{OPEN_PANEL_WORDS.check}</span>}
+        {compact && (done ? <CircleCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-success" /> : <Circle aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />)}
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="text-sm font-medium text-foreground">{item.title}</p>
+          {item.message && <p className="text-[0.8125rem] text-muted-foreground">{item.message}</p>}
+          {marked && <p className="text-[0.8125rem] text-success">{OPEN_PANEL_WORDS.testOrderMarked}</p>}
+        </div>
       </div>
-      {item.message && <p className="text-[0.8125rem] text-muted-foreground">{item.message}</p>}
-      {marked && <p className="text-[0.8125rem] text-success">{OPEN_PANEL_WORDS.testOrderMarked}</p>}
       {fixes.length > 0 && (
-        <div className="flex flex-wrap items-start gap-2">
+        <div className={cn("flex flex-wrap items-start gap-2", compact && "pl-6")}>
           {fixes.map((f, i) => (
-            <Fix key={`${f.kind}-${i}`} fix={f} item={item} {...rest} />
+            <Fix key={`${f.kind}-${i}`} fix={f} item={item} primary={i === primaryFix} {...rest} />
           ))}
         </div>
       )}
-      {item.legalNote && <p className="text-xs text-muted-foreground">{OPEN_PANEL_WORDS.notLegalAdvice}</p>}
+      {here && (
+        <div className={cn(compact && "pl-6")}>
+          <Notice tone={here.tone}>{here.words}</Notice>
+        </div>
+      )}
+      {item.legalNote && <p className={cn("text-xs text-muted-foreground", compact && "pl-6")}>{OPEN_PANEL_WORDS.notLegalAdvice}</p>}
     </li>
+  );
+}
+
+const TONES = {
+  block: { Icon: CircleAlert, title: "text-danger", rule: "border-danger/40" },
+  warn: { Icon: CircleAlert, title: "text-warning-text", rule: "border-warning/50" },
+  live: { Icon: CircleCheck, title: "text-foreground", rule: "border-border" },
+};
+
+function Group({ tone, title, lead, items, compact, primaryFirst, ...rest }) {
+  if (!items.length) return null;
+  const { Icon, title: titleClass, rule } = TONES[tone];
+  const headingId = `opening-group-${tone}`;
+  return (
+    <section aria-labelledby={headingId} data-opening-group={tone} className="space-y-1">
+      <h3 id={headingId} className={cn("flex items-center gap-2 text-sm font-medium", titleClass)}>
+        <Icon aria-hidden className={cn("size-4 shrink-0", tone === "warn" && "text-warning", tone === "live" && "text-success")} />
+        {title}
+      </h3>
+      <p className="pl-6 text-xs text-muted-foreground">{lead}</p>
+      <ul className={cn("ml-2 divide-y divide-border border-l-2 pl-4", rule)}>
+        {items.map((i, n) => {
+          const first = primaryFirst && n === 0 ? (i.fixes || []).findIndex((f) => PRIMARY_KINDS.has(f.kind) && f.allowed !== false) : -1;
+          return <Item key={i.id} item={i} compact={compact} primaryFix={first} {...rest} />;
+        })}
+      </ul>
+    </section>
   );
 }
 
 function Done({ facts }) {
   return (
-    <section className="space-y-2" data-onboarding="open-done" aria-label={OPEN_PANEL_WORDS.doneTitle}>
-      <p className="flex items-center gap-2 text-base font-medium text-foreground">
-        <CircleCheck aria-hidden className="size-5 text-success" />
-        {OPEN_PANEL_WORDS.doneTitle}
-      </p>
-      <p className="text-sm text-muted-foreground">{OPEN_PANEL_WORDS.doneWords}</p>
+    <section className="space-y-4" data-onboarding="open-done" aria-label={OPEN_PANEL_WORDS.doneTitle}>
+      <div className="flex items-start gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-success/10 text-success motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-50 motion-safe:duration-300">
+          <CircleCheck aria-hidden className="size-5" />
+        </span>
+        <div className="min-w-0 space-y-1 pt-0.5">
+          <p className="text-[1.125rem] leading-snug font-semibold text-foreground">{OPEN_PANEL_WORDS.doneTitle}</p>
+          <p className="text-sm text-muted-foreground">{OPEN_PANEL_WORDS.doneWords}</p>
+        </div>
+      </div>
       {facts?.liveUrl && (
-        <p className="text-sm">
-          <a href={facts.liveUrl} data-onboarding="live-link" className="font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [overflow-wrap:anywhere]">
-            {facts.storeAddress || OPEN_PANEL_WORDS.visit}
-          </a>
-        </p>
+        <a
+          href={facts.liveUrl}
+          data-onboarding="live-link"
+          className="group flex min-w-0 items-center gap-3 rounded-md border border-border bg-muted/40 px-3 py-2.5 text-sm outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none"
+        >
+          <Globe aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 flex-1 font-mono text-foreground [overflow-wrap:anywhere]">{facts.storeAddress || OPEN_PANEL_WORDS.visit}</span>
+          {facts.storeAddress && <span className="shrink-0 font-medium text-primary underline-offset-4 group-hover:underline">{OPEN_PANEL_WORDS.visit}</span>}
+        </a>
       )}
     </section>
   );
@@ -234,8 +284,8 @@ function Done({ facts }) {
 
 export default function OpenStepPanel({ step, onChange, onModel, onGoStep }) {
   const [busy, setBusy] = useState(null);
-  const [error, setError] = useState(null);
-  const [note, setNote] = useState(null);
+  // { at: item id | null, tone, words }: shown on the item it is about
+  const [feedback, setFeedback] = useState(null);
   const [reading, setReading] = useState(null);
   const [dialog, setDialog] = useState(false);
   const [opened, setOpened] = useState(false);
@@ -243,17 +293,17 @@ export default function OpenStepPanel({ step, onChange, onModel, onGoStep }) {
   if (step.state === "done") return <Done facts={step.facts} />;
   if (opened) return <Done facts={{ liveUrl: null }} />;
 
-  async function run(key, request, okWords = null) {
+  async function run(key, at, request, okWords = null) {
     setBusy(key);
-    setError(null);
-    setNote(null);
+    setFeedback(null);
     const r = await request();
     if (r.ok) {
-      setNote(okWords || (typeof r.body?.message === "string" && r.body.message) || null);
+      const words = okWords || (typeof r.body?.message === "string" && r.body.message) || null;
+      setFeedback(words ? { at, tone: "success", words } : null);
       if (isObj(r.body) && Array.isArray(r.body.steps)) onModel?.(r.body);
       else await onChange?.();
     } else {
-      setError(errorWords(r));
+      setFeedback({ at, tone: "danger", words: errorWords(r) });
       if (r.status === 409) await onChange?.();
     }
     setBusy(null);
@@ -261,22 +311,27 @@ export default function OpenStepPanel({ step, onChange, onModel, onGoStep }) {
   }
 
   const items = step.facts?.items || [];
+  const needed = items.filter((i) => i.level === "block");
+  const worth = items.filter((i) => i.level === "warn");
+  const live = items.filter((i) => i.level !== "block" && i.level !== "warn");
+  // feedback about an item no longer on the list shows above it
+  const loose = feedback && !items.some((i) => i.id === feedback.at) ? feedback : null;
   const open = step.actions?.find((a) => a.id === "open_store") || { allowed: false, reason: step.problem || OPEN_PANEL_WORDS.failed };
+  const shared = { feedback, busy, run, onRead: setReading, onGoStep };
   return (
-    <div className="space-y-4">
-      {error && <Notice>{error}</Notice>}
-      {note && <Notice tone="success">{note}</Notice>}
+    <div className="space-y-6">
+      {loose && <Notice tone={loose.tone}>{loose.words}</Notice>}
       {items.length > 0 && (
-        <ul className="-mt-3 divide-y divide-border border-b border-border" data-onboarding="opening-items">
-          {items.map((i) => (
-            <Item key={i.id} item={i} busy={busy} run={run} onRead={setReading} onGoStep={onGoStep} />
-          ))}
-        </ul>
+        <div className="space-y-6" data-onboarding="opening-items">
+          <Group tone="block" title={OPEN_PANEL_WORDS.needed} lead={OPEN_PANEL_WORDS.neededLead} items={needed} primaryFirst {...shared} />
+          <Group tone="warn" title={OPEN_PANEL_WORDS.check} lead={OPEN_PANEL_WORDS.checkLead} items={worth} {...shared} />
+          <Group tone="live" title={OPEN_PANEL_WORDS.liveTitle} lead={OPEN_PANEL_WORDS.liveLead} items={live} compact {...shared} />
+        </div>
       )}
 
-      <section className="space-y-3" data-onboarding="open-store" aria-label={OPEN_PANEL_WORDS.openTitle}>
-        <p className="text-sm text-muted-foreground">{OPEN_PANEL_WORDS.openLead}</p>
-        <Control gate={open} reasonId="open-reason" size="lg" className="h-10 px-4" disabled={busy !== null} onClick={() => setDialog(true)}>
+      <section className={cn("space-y-3", items.length > 0 && "border-t border-border pt-6")} data-onboarding="open-store" aria-label={OPEN_PANEL_WORDS.openTitle}>
+        <p className="max-w-prose text-sm text-muted-foreground">{OPEN_PANEL_WORDS.openLead}</p>
+        <Control gate={open} reasonId="open-reason" size="lg" className="h-10 px-4" variant={open.allowed ? "default" : "outline"} disabled={busy !== null} onClick={() => setDialog(true)}>
           {OPEN_PANEL_WORDS.openButton}
         </Control>
       </section>
@@ -285,7 +340,7 @@ export default function OpenStepPanel({ step, onChange, onModel, onGoStep }) {
         reading={reading}
         onClose={() => setReading(null)}
         onMarkRead={async (id, revision) => {
-          const r = await run(`read:${id}`, () => send(POLICY_START_URL, "POST", { markRead: { id, revision } }));
+          const r = await run(`read:${id}`, reading?.itemId ?? null, () => send(POLICY_START_URL, "POST", { markRead: { id, revision } }));
           if (r.ok) setReading(null);
           return r;
         }}

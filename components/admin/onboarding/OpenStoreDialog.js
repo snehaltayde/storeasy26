@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CircleAlert } from "lucide-react";
+import { CircleAlert, FilePen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/components/ui/utils";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { call } from "@/components/admin/editor/documentsApi";
 import { createPublishFlow, openingWarns, WORDS as PUBLISH_WORDS } from "@/components/admin/editor/publish/publishModel";
@@ -58,6 +59,38 @@ function Problem({ title, words }) {
         {title && <p className="font-medium">{title}</p>}
         {words && <p>{words}</p>}
       </div>
+    </div>
+  );
+}
+
+// what the founder should look at: Needed (danger) or Worth checking (warning)
+function Checklist({ tone, title, items, ...props }) {
+  return (
+    <div className={cn("space-y-1 rounded-md px-3 py-2", tone === "danger" ? "bg-danger/10" : "bg-warning/10")} {...props}>
+      <p className={cn("flex items-center gap-2 text-sm font-medium", tone === "danger" ? "text-danger" : "text-warning-text")}>
+        <CircleAlert aria-hidden className={cn("size-4 shrink-0", tone === "warning" && "text-warning")} />
+        {title}
+      </p>
+      <ul className="list-disc space-y-0.5 pl-10 text-[0.8125rem] text-foreground">
+        {items.map((i) => (
+          <li key={i.id}>{i.title}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// before the flow has its list: rows shaped like the list
+function GoingLiveLoading() {
+  return (
+    <div role="status" className="divide-y divide-border rounded-md border border-border">
+      <span className="sr-only">{DIALOG_WORDS.starting}</span>
+      {[0, 1, 2].map((n) => (
+        <div key={n} aria-hidden className="flex items-center justify-between gap-3 px-3 py-2.5">
+          <Skeleton className="h-3.5 w-28" />
+          <Skeleton className="h-3 w-16" />
+        </div>
+      ))}
     </div>
   );
 }
@@ -124,29 +157,20 @@ export default function OpenStoreDialog({ open, onOpenChange, onOpened, onChange
         </DialogHeader>
 
         <div className="space-y-4" aria-live="polite">
-          {(phase === "closed" || phase === "review") && !state.order.length && <p className="text-sm text-muted-foreground">{DIALOG_WORDS.starting}</p>}
-          {(phase === "opening" || phase === "offer" || phase === "review") && state.order.length > 0 && <GoingLive state={state} />}
-          {phase === "opening" && blocks.length > 0 && (
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-danger">{DIALOG_WORDS.blocks}</p>
-              <ul className="list-disc space-y-1 pl-5 text-[0.8125rem] text-muted-foreground">
-                {blocks.map((i) => (
-                  <li key={i.id}>{i.title}</li>
-                ))}
-              </ul>
+          {(phase === "closed" || phase === "review") && !state.order.length && <GoingLiveLoading />}
+          {(phase === "opening" || phase === "offer" || phase === "review") && state.order.length > 0 && (
+            <div className="space-y-2">
+              <GoingLive state={state} />
+              {phase !== "review" && (
+                <p className="flex items-start gap-2 text-[0.8125rem] text-muted-foreground" data-onboarding="other-drafts">
+                  <FilePen aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+                  <span className="min-w-0">{DIALOG_WORDS.otherDrafts}</span>
+                </p>
+              )}
             </div>
           )}
-          {phase === "opening" && warns.length > 0 && (
-            <div className="space-y-1" data-onboarding="worth-checking">
-              <p className="text-sm font-medium text-warning-text">{DIALOG_WORDS.worth}</p>
-              <ul className="list-disc space-y-1 pl-5 text-[0.8125rem] text-muted-foreground">
-                {warns.map((i) => (
-                  <li key={i.id}>{i.title}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {(phase === "opening" || phase === "offer") && <p className="text-[0.8125rem] text-muted-foreground">{DIALOG_WORDS.otherDrafts}</p>}
+          {phase === "opening" && blocks.length > 0 && <Checklist tone="danger" title={DIALOG_WORDS.blocks} items={blocks} />}
+          {phase === "opening" && warns.length > 0 && <Checklist tone="warning" title={DIALOG_WORDS.worth} items={warns} data-onboarding="worth-checking" />}
           {phase === "cannotOpen" && <Problem words={o.message || PUBLISH_WORDS.openingCannot} />}
           {failedPhase && <Problem title={o.title || null} words={failedWords} />}
           {(phase === "checking" || phase === "checked") && <p className="text-sm text-muted-foreground">{o.words}</p>}
