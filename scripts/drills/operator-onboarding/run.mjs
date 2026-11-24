@@ -281,7 +281,10 @@ async function opsOnboarding(drill) {
   {
     const anon = await newPage(drill);
     await anon.page.goto(at(CONSOLE, "/platform/onboarding"), { waitUntil: "load" });
-    drill.check(new URL(anon.page.url()).pathname === "/platform", "signed out: /platform/onboarding goes to /platform", anon.page.url());
+    // with loading.js the page streams, so the redirect lands in the browser
+    const moved = await until(async () => new URL(anon.page.url()).pathname === "/platform", 30_000, 250);
+    const body = await text(anon.page);
+    drill.check(Boolean(moved) && !body.includes("Signups & onboarding"), "signed out: /platform/onboarding goes to /platform and shows nothing of the list", { url: anon.page.url(), body: body.slice(0, 160) });
     const api = await fetch(at(CONSOLE, "/api/platform/onboarding")).then((r) => r.status);
     drill.check(api === 401, "signed out: the API answers 401", api);
     await anon.ctx.close();
