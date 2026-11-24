@@ -3,6 +3,20 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-24 The new console shell (on the owner's behalf)
+
+- **Decision:**
+  - No schema changes. The shell reads only the caller's own name and email and their own store memberships, on the server; the full user row never reaches the browser.
+  - The nav has one source of truth, `lib/admin/nav.js`: one read action per item, filtered on the server by role. A section the role can't open is hidden, not shown disabled. Setup stays admin-only in the nav (it needs settings access), as today. Owner and admin see 16 sections; staff and support see 11.
+  - For this line, "support sees no write actions" covers the shell itself (sidebar, top bar, switcher, account menu) and the nav. The write buttons inside each existing screen become read-only for support with that screen's Phase 2 line; the shell drill lists which ones support can still see.
+  - Old screens keep their exact look inside the new frame through a temporary `data-legacy` wrapper that restores their colours, instead of renaming tokens across about 60 files; Phase 2 removes it. One deliberate change: the editor preview sits lower so it clears the new sticky top bar.
+  - The store switcher is a dropdown built on the server (shared with `/api/admin/stores`), always shown, and switching opens the other store's own address. Notice banners move into the shell's content area; the sidebar's open/closed state is a cookie read on the server.
+  - The old `cmsMode` prop goes (documents is the only mode). New drills: `drill:shell` joins `pnpm drill:all`; `drill:console-styles` is a comparison tool outside it; the switcher test uses a drill-only second store.
+- **Why:** one frame for every screen now, so Phase 2 can rebuild screens one by one without changing how they look before their turn.
+- **Instead of:** disabled nav items with reasons; renaming the old tokens; rebuilding screens in this line.
+- **Decided by:** Claude, on the owner's behalf
+- **Slice:** Phase 0, console shell
+
 ## 2026-11-24 How shadcn/ui is set up for the consoles (on the owner's behalf)
 
 - **Decision:**

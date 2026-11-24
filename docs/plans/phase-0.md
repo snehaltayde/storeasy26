@@ -573,3 +573,117 @@ shadcn CLI 4.23.0 runs via `pnpm dlx` in a scratch project only, never as a depe
 3. The capture may not repeat (random ids, experiments, consent banner, font flake): fall back to computed styles only and report text-driven box differences.
 4. shadcn 4.x output may differ from these assumptions; the scratch-project check settles it.
 5. Without `extendTailwindMerge`, `cn` keeps conflicting `rounded-*`/`shadow-*`; unit cases catch it.
+
+## Line 8: the new console shell
+
+**Fit:** last line of Phase 0. Uses line 7's `components/ui/*`, line 5's roles store and line 2's page table (`scripts/support/admin-pages.js`). No schema, migration, event, audit or new API route. It replaces the frame around today's screens; Phase 2 rebuilds the screens.
+
+### 1. Feature list
+
+1. Sign-in lands at `/admin` → `/admin/dashboard` inside the new shell, built from `components/ui` only: the sidebar (`components/ui/sidebar.js`, `cookiePath="/admin"`), a 56px sticky top bar, a "Skip to content" link, content capped at 1200px with 24px side padding (16px below 768px).
+2. Sidebar: Storeasy mark in the header; nav groups Overview, Orders, Catalog, Storefront, Growth, Store; each item has an icon, label and a badge where one applies (returns on Orders, setup progress on Setup, the publish dot on Publishing). Current item gets `aria-current="page"` by longest path prefix (`/admin/orders/ord_1` lights Orders, `/admin/editor/templates` lights Editor). 240px from 1024px up; icons with tooltips at 768–1023px; a sheet below 768px. ⌘B toggles, state in the `sidebar_state` cookie read on the server for `defaultOpen`; `localStorage` `console.nav` retired. Tapping a link closes the phone sheet.
+3. Only usable sections: the server filters the nav by `roleAllows`; hidden items never reach the browser; badges computed only for visible items.
+4. Top bar: sidebar toggle, store switcher, a read-only label for support ("Read-only access", or "Platform support access · read-only" for an operator), account menu.
+5. Store switcher (DropdownMenu radio group): the caller's own active memberships with name and role; current checked; shown even with one store; an "Open storefront" link; choosing another store does a full `location.assign` to that store's `/admin`; bootstrap and operator-support sessions see only the current store.
+6. Account menu: name, email, role in plain words, a read-only note for support; Sign out posts to `/api/admin/logout` and goes to `/admin/login`, as today; bootstrap shows "Store setup login"; an operator sees only their own id.
+7. Keyboard: Tab reaches every control; focus ring `--c-accent`; Esc closes menus and the sheet and returns focus to the trigger; ⌘B ignored while typing.
+8. Notices: the support-access and incident banners move to the top of the content area; the sign-in pages keep them too.
+9. Editor routes keep "the shell steps aside" mode: the nav goes into the sheet; `useConsoleNav` and `ConsolePageFrame` keep working.
+10. Old screens render inside the frame with their old look, proven by a style comparison (§3).
+11. Out of scope: the operator console beyond a token-scope wrapper (Phase 3); ⌘K/Command; a dark-mode toggle; each screen's own write buttons (each Phase 2 line).
+
+### 2. Nav and permission model, and the test
+
+`lib/admin/nav.js` (plain data, no JSX): `NAV` = groups → items `{ id, label, href, page, action, badgeKey? }`, plus `navFor(role)` and `activeItem(pathname, items)`; icons mapped by id in the component. Hidden, not disabled. `ADMIN_PAGES` stays the page→data-action table; the test joins the two.
+
+| Item | Action | owner / admin | staff | support |
+|---|---|---|---|---|
+| Dashboard, Catalog, Editor, Logo and colours, Media, Publishing, Experiments, Insights | `storefront.read` | yes | yes | yes |
+| Analytics, Orders | `orders.read` | yes | yes | yes |
+| Offers | `offers.read` | yes | yes | yes |
+| Setup, Automations, Integrations, Billing, Settings | `settings.read` | yes | hidden | hidden |
+
+Owner/admin see 16 items; staff/support 11. Operator under support access = `support`; bootstrap = `owner`. Setup's nav action (`settings.read`) is stricter than its page action (`storefront.read`), keeping today's admin-only visibility.
+
+**"Support sees no write actions" in this line:** the shell has no write control for any role; every nav action is a read; every nav target for a role is a page whose action the role holds. The screens' own write buttons are Phase 2; the drill records which ones support still sees as that phase's to-do list.
+
+`scripts/test-console-shell.js` (`test:console-shell`):
+- Nav model: every action in `ACTIONS` and not `isWriteAction`; every `href` has an `ADMIN_PAGES` row; for each role every item passes `roleAllows` on nav and page action; exact expected sets and order per role.
+- Layout via `page-harness` with stubs, for owner, admin, staff, support, operator-support, bootstrap: shell `nav` equals `navFor(role)`; props JSON has no hidden `href`, no `password` or hash, no other member's email; setup badge absent for staff/support even when the stub returns one; `getUser` not called for operator-support or bootstrap.
+- `listMyStores` on an in-memory control plane: only the caller's rows, active only, URL from `domains[0]`, current marked; operator-support and bootstrap get `[]`.
+- Support's shell rendered on the server: outside `[data-legacy]` the only interactive elements are nav links and allowlisted `data-shell-control` values (`skip`, `toggle`, `switcher`, `account`); the read-only label is present; children render inside `[data-legacy]`.
+- `accountItems()` and `switcherItems()` contain no write item.
+- CSS and wrapper guards (§3).
+
+Changes to existing suites: `scripts/test-editor-routes.js` section 3 (~468–559) points at the new shell and `nav.js`, keeping its checks (editor link, Logo and colours after Editor, staff filtering, badge, the sheet); the `cmsMode` layout test goes with the prop.
+
+### 3. Old-token plan and proof
+
+Problem: `.console` on `<body>` overrides the old screens' `--c-surface`, `--c-border`, `--c-accent`, the four status colours, `--primary` and `--ring` (today's `bg-primary` buttons would turn green), and the base rule recolours bare `border` elements.
+
+Fix — a `data-legacy` wrapper (`className="contents"`) marks every old region:
+1. `app/console.css`: the old block's selector becomes `[data-console], .console [data-legacy] { …unchanged… }` (one source of the old values, incl. `--primary: var(--c-primary)` and `--ring`).
+2. Add `.console [data-legacy] { --background: #ffffff; --foreground: #0a0a0b }` (the old `:root` values in `globals.css`; a test asserts they stay equal).
+3. The base border rule becomes descendants only (`.console :is(*, ::before, ::after)`); add `.console [data-legacy], .console [data-legacy] :is(*, ::before, ::after) { border-color: currentcolor }` inside `@layer base`.
+4. Wrapper placed on: the shell's `<main>` content area; `admin/(auth)/layout.js`; a new `platform/layout.js`; the roots of `app/(console)/error.js` and `not-found.js`; the Toast viewport in `components/console/Toast.js`. A grep check asserts each.
+5. `<body>` keeps `bg-surface-muted text-fg` and gains `console`; the shell root sets `bg-background text-foreground text-sm`.
+6. One deliberate old-screen change: `DocumentEditor.js` preview `lg:top-4` → `lg:top-18` (clears the sticky top bar).
+7. The wrapper is removed by the Phase 2 line that retires the old screens.
+
+Proof: the `sf-styles` tool with `SF_STYLES_SET=console` and runner entry `console-styles` on the roles store. Signs in through the API as owner and support. Pages: dashboard, orders, `orders/$order`, offers, catalog, media, releases, editor, settings (owner only). Region: descendants of `[data-legacy]` (or `main` before this line), keyed relative to that root; `/admin/login` and `/platform` as whole documents. Widths 375, 768, 1280. Pass: zero computed-style differences, ignoring layout-derived properties (`width`, `height`, `inline-size`, `block-size`, `top`/`right`/`bottom`/`left`, `transform-origin`, `perspective-origin`); box differences reported and expected; the only allowed style difference is the `DocumentEditor` preview `top`. Runs: baseline twice at package A's commit (must match), `SF_STYLES_BITE=1` caught, compare after B; evidence `docs/cms-reviews/drills/CONSOLE-STYLES/compare.json`. The storefront `drill:sf-styles` compare runs again too.
+
+### 4. File plan (A committed and baseline taken before B)
+
+**Package A: proof tool**
+1. `scripts/drills/sf-styles/compare.js`: `ignoreProps`, `ignoreBoxes` options.
+2. `scripts/drills/sf-styles/run.mjs`: console set (API sign-in, region root, relative keys).
+3. `scripts/drills/run-isolated.mjs`: pull the roles-store start out of `agency-gone` into a shared helper; `console-styles` entry (`CONSOLE-STYLES`, not in `ALL`).
+4. `package.json`: `drill:console-styles`.
+5. `scripts/test-drills.js`: comparator ignore cases and the entry.
+6. Commit; baseline twice; bite.
+
+**Package B: shell**
+7. `lib/admin/nav.js`.
+8. `lib/admin/stores.js`: `listMyStores(actor)` moved out of `app/api/admin/stores/route.js`, which calls it (same response).
+9. `lib/admin/notices.js`: `consoleNotices()` moved from `app/(console)/admin/layout.js`.
+10. `app/console.css` (§3); `app/(console)/layout.js` (body `console`).
+11. `components/admin/shell/AdminShell.js`: provider, sidebar, inset, top bar, skip link, `main > [data-legacy]`, editor mode, `ConsolePageFrame`, `useConsoleNav`.
+12. `components/admin/shell/AdminNav.js`, `StoreSwitcher.js`, `AccountMenu.js`, `ConsoleNotices.js` (server, uses the old `Banner`).
+13. `app/(console)/admin/(authed)/layout.js`: actor → `navFor`; badges for visible items only; `getUser` reduced to `{name, email}` (merchant only); `listMyStores`; notices; the sidebar cookie; drop `cmsMode`.
+14. Delete `app/(console)/admin/layout.js`; `app/(console)/admin/(auth)/layout.js` gets the wrapper and notices.
+15. `app/(console)/admin/(authed)/error.js`, `loading.js` import from the new shell.
+16. New `app/(console)/platform/layout.js`; `app/(console)/error.js`, `not-found.js`, `components/console/Toast.js` get the wrapper.
+17. `components/admin/editor/DocumentEditor.js` (lines ~412, ~433: `lg:top-18`).
+18. Delete `components/console/nav/ConsoleShell.js`, `components/console/nav/SidebarNav.js`, `components/admin/StoreSwitcher.js`.
+19. `scripts/test-console-shell.js` + `test:console-shell`; update `scripts/test-editor-routes.js` (section 3) and `scripts/test-console-ui.js` (`ruleBody` prelude ~259, wrapper and restore checks, scope test accepting `.console [data-legacy]`).
+20. `scripts/dev-roles.js annex`: adds a "Roles Annex" store (`annex.localhost:<rolesNext>`) with owner→admin and support→support memberships via the identity helpers; seed shape unchanged.
+21. `scripts/drills/shell/run.mjs`, `shell` entry (`SHELL`, in `ALL`), `drill:shell` in `package.json`, `scripts/test-drills.js`.
+22. Commit; console-styles compare and storefront `drill:sf-styles` compare.
+
+**Package C: docs** — `docs/UI.md` (shell section, wrapper rule, rewrite "Legacy names"), `docs/platform-guide.md`, `components/console/README.md`, `docs/ARCHITECTURE.md` if it names `ConsoleShell`.
+
+### 5. `drill:shell`
+
+- Setup: seed the roles store, `dev-roles.js annex`, start it.
+- Owner signs in through the real form once (known-flake rule: on a 404/"1 Issue" page or no `#login-email` after 15s, reload once and log it; assertions never retried); admin, staff, support via `POST /api/admin/login` in the context.
+- Each role at 1280, 900, 375: lands on `/admin/dashboard` with the sidebar and a 56px top bar; nav `href`s equal `navFor(role)`; each item opens with 200, no error boundary, non-empty `[data-legacy]`, `aria-current` on that item; at 900 the sidebar is icon width and a tooltip shows on focus; at 375 the trigger opens the sheet, Esc closes it with focus returned, a link click closes it.
+- Support: outside `[data-legacy]` only allowlisted controls; account menu shows name, email, "Support", the read-only note, and Sign out as the only action; no create items in the switcher; the write buttons support still sees in the content are written to `docs/cms-reviews/drills/SHELL/support-write-controls.json` (evidence, not a failure).
+- Owner: switcher lists Roles store and Roles Annex with roles, current checked; choosing Annex requests `http://annex.localhost:<port>/admin`; ⌘B collapses and survives a reload; Esc on the account menu returns focus to its trigger; Tab from the top reaches the skip link first; Sign out lands on `/admin/login` and back to `/admin/dashboard` redirects to sign-in.
+- Results: `docs/cms-reviews/drills/SHELL/result.json`.
+
+### 6. Checks first
+
+- Baselines: `node scripts/test-editor-routes.js`, `test-console-ui.js`, `test-support-reads.js`, `test-search-effective.js`, `test-drills.js`.
+- `grep -rn "api/admin/stores\|ConsoleShell\|SidebarNav\|StoreSwitcher\|data-legacy" scripts app components lib docs/ARCHITECTURE.md`.
+- `grep -n "styleOf\|getPropertyValue" scripts/drills/sf-styles/run.mjs` (do captures include custom properties?).
+- Read `app/api/admin/logout/route.js` (operator-support sign-out, kept as is).
+- Through `page-harness`, server-render a closed `DropdownMenu` and `SidebarProvider`: trigger only? does `useIsCompact` render expanded on the server?
+- `grep -n "createMembership\|addMember\|export async function" lib/platform/identity.js`.
+
+### 7. Risks
+
+1. An old region outside the wrapper (a portal or a missed layout) gets re-styled; grep guard and console-styles compare cover the listed pages only.
+2. The sign-in flake: API sign-in for three roles, one logged reload for the form; a second failure in a row is a real fault — report it.
+3. Sidebar width can snap at 768–1023px on first load (server renders before `useIsCompact`); if the drill catches it, add a CSS rule for that range.
+4. The line's wording: the tick says in brackets that only the shell is guaranteed.
+5. Noisy compares (relative times, badges): baseline-vs-baseline must be zero, or the ignore set grows, each addition recorded.
