@@ -175,7 +175,19 @@ async function opsOnboarding(drill) {
   await sheet(page).getByRole("button", { name: "Resume provisioning" }).click();
   const resumedWords = await until(async () => notice(page).innerText(), 30_000);
   drill.check(/Provisioning resumed/.test(resumedWords || ""), "Resume provisioning: the sheet says it is running", resumedWords);
-  const done = await until(async () => (await one("SELECT status FROM signups WHERE id = ?", [signup.id]))?.status === "done", 180_000, 1000);
+  // the after() run is the fast path; in production the minute tick is the
+  // backstop for a run that requeued itself. Nothing ticks in the harness, so
+  // a signup still provisioning after 45 s gets Resume pressed again (it makes
+  // the same job due now), and the drill says so.
+  let done = null;
+  for (let round = 0; round < 4 && !done; round++) {
+    done = await until(async () => (await one("SELECT status FROM signups WHERE id = ?", [signup.id]))?.status === "done", 45_000, 1000);
+    if (done) break;
+    const st = await one("SELECT status, provision_attempts, next_attempt_at FROM signups WHERE id = ?", [signup.id]);
+    drill.note(`still ${st?.status} after ${(round + 1) * 45} s (tries ${st?.provision_attempts}, next ${st?.next_attempt_at}); pressing Resume again`);
+    const again = sheet(page).getByRole("button", { name: "Resume provisioning" });
+    if (await again.count()) await again.click();
+  }
   drill.check(Boolean(done), "the signup is done: its store is made", null);
   await closeSheet(page);
   await page.goto(at(CONSOLE, `/platform/onboarding?view=all&q=${SLUG}`), { waitUntil: "load" });
