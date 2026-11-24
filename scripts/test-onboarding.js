@@ -163,13 +163,13 @@ await t("brand: done when the brand step is recorded (or the design has a brand/
 await t("open: done on a live release (and then every step is done); blocked by any opening item at level block, the reasons are their titles; ready when nothing blocks; open is not gated on steps 1-3", async () => {
   const blocked = step(base(), "open");
   eq(blocked.state, "blocked", "policies missing:");
-  eq(blocked.facts.blocking, [{ id: "privacy", title: "Privacy page" }, { id: "returns", title: "Returns page" }], "the blocking items:");
-  ok(blocked.words.includes("Privacy page, Returns page"), `the reasons in the words: ${blocked.words}`);
-  const ready = step(base({ opening: OK_OPENING }), "open");
+  eq(blocked.facts.blocking, [{ id: "home", title: "Home page" }, { id: "privacy", title: "Privacy page" }, { id: "returns", title: "Returns page" }], "the blocking items (no home page yet, line 7):");
+  ok(blocked.words.includes("Home page, Privacy page, Returns page"), `the reasons in the words: ${blocked.words}`);
+  const ready = step(base({ opening: OK_OPENING, hasHome: true }), "open");
   eq(ready.state, "ready", "nothing blocks (steps 1-3 not done):");
-  const m = S.deriveSteps(base({ opening: OK_OPENING }), "owner");
-  eq(m.steps.map((s) => s.state), ["ready", "blocked", "ready", "ready"], "open not gated on 1-3:");
-  eq(ready.facts.items, OK_OPENING.items, "the opening items are the step's facts:");
+  const m = S.deriveSteps(base({ opening: OK_OPENING, hasHome: true }), "owner");
+  eq(m.steps.map((s) => s.state), ["ready", "blocked", "in_progress", "ready"], "open not gated on 1-3:");
+  eq(ready.facts.items.map((i) => [i.id, i.level, i.title]), [["home", "ok", "Home page"], ...OK_OPENING.items.map((i) => [i.id, i.level, i.title])], "the home line, then the opening items (line 7 adds each one's fixes):");
 });
 
 await t("a store still on the old editor (cmsMode legacy, which nothing sets since migration 0026): supported false with reason legacy and the plain 'old editor, contact support' words; no steps, never 'being updated'", async () => {
@@ -256,13 +256,13 @@ await t("a failed read is never done: each step stays not done with 'We couldn't
 await t("actions per role come from lib/platform/authz.js: sync start/retry sync.run; starter store, brand save/skip, policy start/read storefront.write; description and test order settings.write; Open storefront.publish", async () => {
   eq(S.ACTION_PERMS, {
     start_sync: "sync.run", retry_sync: "sync.run", starter_store: "storefront.write", brand_save: "storefront.write", brand_skip: "storefront.write",
-    brand_description: "settings.write", policy_start: "storefront.write", policy_read: "storefront.write", test_order: "settings.write", open_store: "storefront.publish",
-    connect_shopify: "settings.write",
+    brand_description: "settings.write", connect_shopify: "settings.write", policy_start: "storefront.write", policy_read: "storefront.write", policy_view: "storefront.read", test_order: "settings.write",
+    cod_on: "settings.write", contact_save: "settings.write", settings_link: "settings.read", open_store: "storefront.publish",
   }, "the map:");
-  const f = base({ connection: CONNECTED, sync: { hasComplete: false, anyRun: false, products: 0, view: view("none") }, opening: OK_OPENING });
+  const f = base({ connection: CONNECTED, hasHome: true, sync: { hasComplete: false, anyRun: false, products: 0, view: view("none") }, opening: OK_OPENING });
   for (const role of ROLES) {
     const all = S.deriveSteps(f, role).steps.flatMap((s) => s.actions);
-    eq(all.map((a) => a.id).sort(), ["brand_description", "brand_save", "brand_skip", "connect_shopify", "open_store", "policy_read", "policy_start", "start_sync", "starter_store", "test_order"], `${role} ids:`);
+    eq(all.map((a) => a.id).sort(), ["brand_description", "brand_save", "brand_skip", "cod_on", "connect_shopify", "contact_save", "open_store", "policy_read", "policy_start", "policy_view", "settings_link", "start_sync", "starter_store", "test_order"], `${role} ids:`);
     for (const a of all) {
       eq(a.allowed, roleAllows(role, S.ACTION_PERMS[a.id]), `${role} ${a.id}:`);
       if (a.allowed) ok(!("reason" in a), `${role} ${a.id} has no reason`);
@@ -278,7 +278,9 @@ await t("actions per role come from lib/platform/authz.js: sync start/retry sync
   const supportConnect = step(f, "connect", "support").actions.find((a) => a.id === "connect_shopify");
   eq([supportConnect.allowed, supportConnect.reason], [false, S.READ_ONLY_REASON], "support Connect (line 4):");
   const sup = S.deriveSteps(f, "support").steps.flatMap((s) => s.actions);
-  ok(sup.every((a) => a.allowed === false && a.reason === S.READ_ONLY_REASON), "support: every action disabled, read-only words");
+  ok(sup.every((a) => (a.id === "policy_view" ? a.allowed === true : a.allowed === false && a.reason === S.READ_ONLY_REASON)), "support: every action but reading a policy draft disabled, read-only words");
+  const staffSettings = step(f, "open", "staff").actions.find((a) => a.id === "settings_link");
+  eq([staffSettings.allowed, staffSettings.reason], [false, S.ADMIN_ONLY_REASON], "staff Settings:");
   ok(S.deriveSteps(f, "nobody").steps.flatMap((s) => s.actions).every((a) => !a.allowed), "an unknown role: nothing allowed");
 });
 
@@ -509,7 +511,8 @@ await t("least-trusted: support GET is 200 with exactly the keys, no shop domain
   for (const c of CANARIES) ok(!text.includes(c), `support: ${c} leaked`);
   ok(!("shopDomain" in r.body.steps[0].facts), "no shopDomain key");
   const actions = r.body.steps.flatMap((s) => s.actions);
-  ok(actions.length > 0 && actions.every((a) => a.allowed === false && a.reason === S.READ_ONLY_REASON), JSON.stringify(actions));
+  // reading a policy draft (storefront.read, line 7) is the one thing support may do
+  ok(actions.length > 0 && actions.every((a) => (a.id === "policy_view" ? a.allowed === true : a.allowed === false && a.reason === S.READ_ONLY_REASON)), JSON.stringify(actions));
   const staff = await call("GET", { tok: users.staff.tok });
   eq(staff.status, 200, "staff:");
   ok(!JSON.stringify(staff.body).includes("onbroute.myshopify.com"), "staff: no domain");
