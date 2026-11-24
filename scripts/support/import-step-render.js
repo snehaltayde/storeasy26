@@ -97,7 +97,7 @@ export async function run({ t, ok, eq, V, live, at, scanText }) {
       const out = html({ view: V.syncView(live({ phase, collections_fetched: 3, collections_total: 12 })) });
       const s = text(out);
       ok(/data-stage="products" data-stage-state="done"/.test(out) && /data-stage="collections" data-stage-state="current"/.test(out), `${phase} stages`);
-      ok(s.includes("120 products so far") && s.includes("3 of 12 collections (25%)") && /aria-valuenow="25"/.test(out), `${phase}: ${s}`);
+      ok(s.includes("120 products, all in") && s.includes("3 of 12 collections (25%)") && /aria-valuenow="25"/.test(out), `${phase}: ${s}`);
     }
   });
 
@@ -156,7 +156,7 @@ export async function run({ t, ok, eq, V, live, at, scanText }) {
 
   await t("UI words: plain founder copy; polling constants as the plan says", async () => {
     const w = M.IMPORT_WORDS;
-    const all = [w.lost, w.start, w.refresh, w.more(3), w.products(1, null), w.products(3, 9), w.collections(2, null), w.started(240_000), w.started(10_000), w.took(360_000), w.nextTry("3:40 pm")].join(" ");
+    const all = [w.lost, w.start, w.refresh, w.more(3), w.allIn(1), w.allIn(480), w.products(1, null), w.products(3, 9), w.collections(2, null), w.started(240_000), w.started(10_000), w.took(360_000), w.nextTry("3:40 pm")].join(" ");
     eq(scanText(all), [], "banned copy:");
     eq([M.POLL_MS, M.SLOW_POLL_MS, M.LOST_AFTER], [3000, 15000, 3], "polling:");
   });

@@ -30,6 +30,7 @@ export const IMPORT_WORDS = Object.freeze({
   start: "Bring in products",
   refresh: "Refresh from Shopify",
   more: (n) => `and ${Number(n).toLocaleString("en-IN")} more`,
+  allIn: (n) => (n === 1 ? "1 product, all in" : `${fmt(n)} products, all in`),
   products: (done, total) => (total ? `${fmt(done)} of ${fmt(total)} products` : `${fmt(done)} ${done === 1 ? "product" : "products"} so far`),
   collections: (done, total) => (total ? `${fmt(done)} of ${fmt(total)} collections` : `${fmt(done)} ${done === 1 ? "collection" : "collections"} so far`),
   started: (ms) => (ms < 90_000 ? "Started just now" : `Started ${durationWords(ms)} ago`),
@@ -148,7 +149,7 @@ export function ImportStepBody({ view, gate = null, busy = false, error = null, 
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[0.8125rem]">
             <dt className="text-muted-foreground">Products</dt>
             <dd className="tabular-nums text-foreground" data-import="products">
-              {IMPORT_WORDS.products(view.products.done, collecting ? null : view.products.total)}
+              {collecting ? IMPORT_WORDS.allIn(view.products.done) : IMPORT_WORDS.products(view.products.done, view.products.total)}
               {pct != null && stage.index === 1 ? ` (${pct}%)` : ""}
             </dd>
             {collecting && (

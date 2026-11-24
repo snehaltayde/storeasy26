@@ -27,6 +27,9 @@
 //   g         setup.mjs: onboarding step 4's policy starters
 //   h         onboarding.mjs: the four-step onboarding page (states, resume
 //             via ?step=, support read-only with reasons, an open store all done)
+//   i         import.mjs: onboarding step 2's live import (running, retrying,
+//             failed with Reconnect Shopify, complete with skips, no polling
+//             when done or hidden, support read-only) on the stage h store
 //   j         open-step.mjs: Phase 1 line 7, the store opened from onboarding
 //             step 4 (checkout on, Back to onboarding, both policies read in
 //             the reader, contact details, the open dialog; the shopper sees
@@ -51,6 +54,7 @@ const STAGE_FILES = {
   e: ["./empty.mjs", "emptyStage"],
   g: ["./setup.mjs", "setupStage"],
   h: ["./onboarding.mjs", "onboardingStage"],
+  i: ["./import.mjs", "importStage"],
   j: ["./open-step.mjs", "openStepStage"],
 };
 export const STAGES = Object.keys(STAGE_FILES);
