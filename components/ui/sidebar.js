@@ -30,6 +30,22 @@ const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
+// Cmd/Ctrl+B toggles the sidebar, except while typing: in a field or the rich
+// text editor it stays bold.
+function isSidebarShortcut(event) {
+  if (event.key !== SIDEBAR_KEYBOARD_SHORTCUT || !(event.metaKey || event.ctrlKey)) return false
+  const target = event.target
+  if (!target) return true
+  if (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName || "")) return false
+  return !target.closest?.('[contenteditable]:not([contenteditable="false"])')
+}
+
+// Scoped to one console's path (/admin by default; the platform console passes
+// /platform) so the two never share a saved state.
+function sidebarCookie(open, path = "/admin") {
+  return `${SIDEBAR_COOKIE_NAME}=${open}; path=${path}; max-age=${SIDEBAR_COOKIE_MAX_AGE}; SameSite=Lax`
+}
+
 const SidebarContext = React.createContext(null)
 
 function useSidebar() {
@@ -45,6 +61,7 @@ function SidebarProvider({
   defaultOpen = true,
   open: openProp,
   onOpenChange: setOpenProp,
+  cookiePath = "/admin",
   className,
   style,
   children,
@@ -78,9 +95,9 @@ function SidebarProvider({
       }
 
       // This sets the cookie to keep the sidebar state.
-      document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+      document.cookie = sidebarCookie(openState, cookiePath)
     },
-    [setOpenProp, open, isCompact]
+    [setOpenProp, open, isCompact, cookiePath]
   )
 
   // Helper to toggle the sidebar.
@@ -91,10 +108,7 @@ function SidebarProvider({
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
     const handleKeyDown = (event) => {
-      if (
-        event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
-        (event.metaKey || event.ctrlKey)
-      ) {
+      if (isSidebarShortcut(event)) {
         event.preventDefault()
         toggleSidebar()
       }
@@ -678,6 +692,8 @@ function SidebarMenuSubButton({
 }
 
 export {
+  isSidebarShortcut,
+  sidebarCookie,
   Sidebar,
   SidebarContent,
   SidebarFooter,

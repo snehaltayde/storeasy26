@@ -7,16 +7,22 @@
 //   2. every app/console.css rule outside @theme, @utility, @property,
 //      @custom-variant and @keyframes is scoped to [data-console] or .console
 //      (no :root, *, html or body); tw-animate-css itself adds only @property,
-//      @theme, @utility and keyframes
-//   3. the console theme adds no default Tailwind key and no globals.css key;
-//      --color-primary and --color-ring are the only two re-pointed names
-//   4. no storefront file uses the new utility names, dark: or class "console"
+//      @theme, @utility and keyframes; console.css @imports only tw-animate-css;
+//      no storefront file uses a tw-animate utility that collides with a
+//      Tailwind built-in (delay-*), found by compiling Tailwind core
+//   3. the console theme's keys are exactly the expected list: no default
+//      Tailwind key, no globals.css key; --color-primary and --color-ring are
+//      the only two re-pointed names
+//   4. no storefront file uses the new utility names, any tw-animate utility
+//      (names read from the package), dark: or class "console"
 //   5. .console / .console.dark hold exactly docs/UI.md's colour table
 //   6. components/ui has no hex, oklch(, rgb( or palette utilities, and uses
 //      the docs/UI.md radius, shadow and weight rules
 //   7. cn merges rounded-ctl/rounded-card and shadow-card/shadow-overlay
 //   8. the components render server-side (Next's SWC, real radix-ui) with their
 //      data-slots; the sheet keeps Esc and the overlays motion-reduce
+//   9. Cmd/Ctrl+B skips inputs and contenteditable; the sidebar cookie is
+//      path-scoped (/admin by default) and SameSite=Lax
 import { createRequire } from "node:module";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
@@ -58,7 +64,7 @@ const walkFiles = (rel, out = []) => {
   for (const f of readdirSync(abs)) walkFiles(join(rel, f), out);
   return out;
 };
-const code = (f) => /\.(m?js|jsx)$/.test(f);
+const code = (f) => /\.(m?js|jsx|tsx?)$/.test(f);
 
 // ---------- CSS: a small block parser (enough for these files) ----------
 
@@ -110,6 +116,36 @@ const declsOf = (body) => Object.fromEntries(blocks(body).filter((d) => d.body =
 const ruleBody = (css, selector) => blocks(stripComments(css)).find((b) => b.prelude === selector)?.body ?? null;
 
 const consoleCss = read("app/console.css");
+const IMPORT_ALLOWLIST = ['"tw-animate-css"'];
+const importsOf = (css) => blocks(stripComments(css)).filter((b) => /^@import\b/.test(b.prelude)).map((b) => b.prelude.replace(/^@import\s+/, ""));
+
+// tw-animate-css's utility names, read from the package (not hand-listed)
+const TWA_CSS = read("node_modules/tw-animate-css/dist/tw-animate.css");
+const TWA_UTILS = [...stripComments(TWA_CSS).matchAll(/@utility\s+(-?[a-z0-9-]+(?:-\*)?)\s*\{([^}]*)\}/g)].map((m) => ({ name: m[1], body: m[2] }));
+const reEsc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// one class token (variants and ! stripped) against utility names; "x-*" takes any value
+const utilityMatcher = (names) => {
+  const alt = names.map((n) => (n.endsWith("-*") ? `${reEsc(n.slice(0, -2))}-[^\\s]+` : reEsc(n))).join("|");
+  const re = new RegExp(`^(?:${alt})$`);
+  return (token) => re.test(token.replace(/^(?:[^\s:]+:)*/, "").replace(/^!|!$/g, ""));
+};
+// class tokens of a storefront file: string literals in JS (comments stripped), @apply in CSS.
+// Hyphen-free names (running, paused) count only inside className/class/cn()/clsx().
+function classTokens(src, isCss) {
+  if (isCss) return { any: [...stripComments(src).matchAll(/@apply\s+([^;]+);/g)].flatMap((m) => m[1].split(/\s+/)), cls: [] };
+  const noComments = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\\])\/\/.*$/gm, "$1");
+  const any = [...noComments.matchAll(/(["'`])((?:\\.|(?!\1)[^\\])*)\1/g)].flatMap((m) => m[2].split(/\s+/)).filter(Boolean);
+  const cls = [...noComments.matchAll(/\b(?:className|class)\s*=\s*\{?\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1|\b(?:cn|clsx|cva)\(([^)]*)\)/g)].flatMap((m) => (m[2] ?? m[3] ?? "").replace(/["'`,]/g, " ").split(/\s+/)).filter(Boolean);
+  return { any, cls };
+}
+const twaUses = (src, isCss, names = TWA_UTILS.map((u) => u.name)) => {
+  const hyphen = utilityMatcher(names.filter((n) => n.includes("-")));
+  const bare = utilityMatcher(names.filter((n) => !n.includes("-")));
+  const { any, cls } = classTokens(src, isCss);
+  return [...any.filter(hyphen), ...cls.filter((t) => bare(t) || hyphen(t))];
+};
+
+const storefrontFiles = () => [...walkFiles("app").filter((f) => !f.startsWith("app/(console)/") && !f.startsWith("app/api/") && (code(f) || f.endsWith(".css")) && f !== "app/console.css"), ...walkFiles("components").filter((f) => code(f) && !CONSOLE_DIRS.some((d) => f.startsWith(d)))];
 
 // ---------- 1. the storefront never reaches the console components ----------
 
@@ -120,7 +156,7 @@ await t("nothing reachable from the storefront resolves into components/ui/, rad
   const bad = [];
   const resolveLocal = (from, id) => {
     const base = id.startsWith("@/") ? join(ROOT, id.slice(2)) : resolve(dirname(join(ROOT, from)), id);
-    for (const c of [base, `${base}.js`, `${base}.mjs`, `${base}.jsx`, join(base, "index.js")]) if (existsSync(c) && statSync(c).isFile()) return relative(ROOT, c);
+    for (const c of [base, ...[".js", ".mjs", ".jsx", ".ts", ".tsx"].map((x) => `${base}${x}`), ...["index.js", "index.jsx", "index.ts", "index.tsx"].map((x) => join(base, x))]) if (existsSync(c) && statSync(c).isFile()) return relative(ROOT, c);
     return null;
   };
   const visit = (rel, chain) => {
@@ -151,6 +187,9 @@ await t("every console.css rule outside @theme/@utility/@property/@custom-varian
   eq(unscoped, [], "unscoped selectors:");
   for (const s of rules.join(",").split(",")) ok(!/(^|[\s>+~,])(:root|html|body|\*)(?![\w-])/.test(s.replace(/^(\[data-console\]|\.console(\.dark)?)/, "").replace(/\.console \*/, "")), `no :root/html/body/* outside the scope in "${s.trim()}":`);
   ok(/^\s*@import\s+"tw-animate-css";/m.test(stripComments(consoleCss)) && stripComments(consoleCss).trim().startsWith('@import "tw-animate-css"'), "@import \"tw-animate-css\" comes first:");
+  eq(importsOf(consoleCss).filter((i) => !IMPORT_ALLOWLIST.includes(i)), [], "console.css @imports off the allowlist:");
+  eq(importsOf(consoleCss).length, 1, "console.css has exactly one @import:");
+  eq(importsOf('@import "tw-animate-css";\n@import "./x.css";'), ['"tw-animate-css"', '"./x.css"'], "the import check sees a second @import:");
   // the bite: an unscoped rule is caught
   eq(styleRules(":root{--x:1} .console a{color:red} @media (x){body{margin:0}}"), [":root", ".console a", "body"], "parser sees nested rules:");
 });
@@ -159,10 +198,46 @@ await t("tw-animate-css adds only @property, @theme, @utility and keyframes (no 
   const css = read("node_modules/tw-animate-css/dist/tw-animate.css");
   const kinds = new Set(blocks(stripComments(css)).map((b) => (b.prelude.match(/^@[\w-]+/) || [b.prelude])[0]));
   eq([...kinds].sort(), ["@property", "@theme", "@utility"], "top-level kinds:");
+  ok(TWA_UTILS.length >= 50 && TWA_UTILS.some((u) => u.name === "delay-*") && TWA_UTILS.some((u) => u.name === "running"), `read ${TWA_UTILS.length} tw-animate utility names:`);
+});
+
+await t("tw-animate-css utilities that collide with a Tailwind built-in are found, and no storefront file uses one", async () => {
+  // compile Tailwind core alone (no tw-animate) on sample candidates of every tw-animate utility
+  const { compile } = require("tailwindcss");
+  const tw = await compile('@import "tailwindcss/theme.css";\n@import "tailwindcss/utilities.css";', {
+    base: ROOT,
+    loadStylesheet: async (id) => {
+      const path = require.resolve(id);
+      return { path, base: dirname(path), content: readFileSync(path, "utf8") };
+    },
+  });
+  const twaTheme = [...TWA_CSS.matchAll(/(--[a-z0-9-]+):/g)].map((m) => m[1]);
+  const samples = (u) => {
+    if (!u.name.endsWith("-*")) return [u.name];
+    const v = new Set(["0", "1", "2", "50", "100", "150", "300", "1000", "initial", "[1s]"]);
+    for (const [, ns] of u.body.matchAll(/--value\((--[a-z0-9-]+)-\*/g)) for (const k of twaTheme) if (k.startsWith(`${ns}-`)) v.add(k.slice(ns.length + 1));
+    for (const [, x] of u.body.matchAll(/"([\w-]+)"/g)) v.add(x);
+    return [...v].map((x) => `${u.name.slice(0, -2)}-${x}`);
+  };
+  const cands = TWA_UTILS.flatMap((u) => samples(u).map((c) => [u.name, c]));
+  const out = tw.build(cands.map(([, c]) => c));
+  const sel = (c) => new RegExp(`\\.${reEsc(c.replace(/[^\w-]/g, "\\$&"))}(?![\\w\\\\-])`);
+  const colliding = [...new Set(cands.filter(([, c]) => sel(c).test(out)).map(([n]) => n))];
+  ok(colliding.includes("delay-*"), `the collision check bites (delay-* is Tailwind's transition-delay too); found ${JSON.stringify(colliding)}:`);
+  const hits = [];
+  for (const f of storefrontFiles()) {
+    const used = twaUses(read(f), f.endsWith(".css"), colliding);
+    if (used.length) hits.push(`${f}: ${[...new Set(used)].join(" ")}`);
+  }
+  eq(hits, [], "storefront uses a colliding utility:");
 });
 
 // ---------- 3. the theme ----------
 
+// --color-* names console.css had before shadcn (Phase 0 line 7 keeps them)
+const LEGACY_KEYS = ["surface", "surface-muted", "surface-sunken", "edge", "edge-strong", "fg", "fg-muted", "fg-subtle", "primary-hover", "primary-fg", "caccent", "caccent-bg", "caccent-edge", ...["success", "warning", "danger", "info"].flatMap((k) => [k, `${k}-bg`, `${k}-edge`])];
+const REPOINTED_KEYS = ["primary", "ring"];
+const CONSOLE_ONLY_KEYS = ["warning-text"]; // maps onto --c-warning-text, not a shadcn variable
 const NEW_KEYS = ["card", "card-foreground", "popover", "popover-foreground", "primary-foreground", "secondary", "secondary-foreground", "muted", "muted-foreground", "accent", "accent-foreground", "destructive", "border", "input", "sidebar", "sidebar-foreground", "sidebar-primary", "sidebar-primary-foreground", "sidebar-accent", "sidebar-accent-foreground", "sidebar-border", "sidebar-ring"];
 
 await t("the console theme adds no default Tailwind key and no globals.css key; only --color-primary and --color-ring are re-pointed", async () => {
@@ -174,6 +249,10 @@ await t("the console theme adds no default Tailwind key and no globals.css key; 
   const globals = new Set(themeKeys(read("app/globals.css")));
   eq(ours.filter((k) => globals.has(k)), [], "globals.css keys redefined:");
   for (const k of NEW_KEYS) ok(ours.includes(`--color-${k}`), `--color-${k} is in the theme:`);
+  const expected = [...[...LEGACY_KEYS, ...REPOINTED_KEYS, ...CONSOLE_ONLY_KEYS, ...NEW_KEYS].map((k) => `--color-${k}`), "--radius-ctl", "--radius-card", "--shadow-card", "--shadow-overlay"];
+  eq(ours.filter((k) => !expected.includes(k)), [], "unexpected theme keys:");
+  eq(expected.filter((k) => !ours.includes(k)), [], "missing theme keys:");
+  eq(ours.length, new Set(ours).size, "no theme key set twice:");
   const theme = Object.assign({}, ...blocks(stripComments(consoleCss)).filter((b) => /^@theme\b/.test(b.prelude)).map((b) => declsOf(b.body)));
   eq(theme["--color-primary"], "var(--primary)", "--color-primary:");
   eq(theme["--color-ring"], "var(--ring)", "--color-ring:");
@@ -184,11 +263,11 @@ await t("the console theme adds no default Tailwind key and no globals.css key; 
 
 // ---------- 4. the storefront doesn't use the new names ----------
 
-await t("no storefront file uses the new utility names, dark: or class \"console\"", async () => {
-  const files = [...walkFiles("app").filter((f) => !f.startsWith("app/(console)/") && !f.startsWith("app/api/") && (code(f) || f.endsWith(".css")) && f !== "app/console.css"), ...walkFiles("components").filter((f) => code(f) && !CONSOLE_DIRS.some((d) => f.startsWith(d)))];
+await t("no storefront file uses the new utility names, a tw-animate utility, dark: or class \"console\"", async () => {
+  const files = storefrontFiles();
   ok(files.length > 50, `scanned ${files.length} files:`);
   const prefixes = "bg|text|border(?:-[trblxyse])?|ring|ring-offset|outline|fill|stroke|divide|from|via|to|shadow|accent|caret|decoration|placeholder";
-  const names = [...NEW_KEYS].sort((a, b) => b.length - a.length).join("|");
+  const names = [...NEW_KEYS, ...REPOINTED_KEYS, ...CONSOLE_ONLY_KEYS].sort((a, b) => b.length - a.length).join("|");
   const utility = new RegExp(`(?<![\\w-])(?:[\\w-]+:)*-?(?:${prefixes})-(?:${names})(?:\\/\\d+)?(?![\\w-])`);
   const anim = /(?<![\w-])(?:animate-in|animate-out|fade-(?:in|out)(?:-\d+)?|zoom-(?:in|out)(?:-\d+)?|slide-(?:in-from|out-to)-[a-z]+(?:-\d+)?)(?![\w-])/;
   const hits = [];
@@ -196,7 +275,7 @@ await t("no storefront file uses the new utility names, dark: or class \"console
     const src = read(f);
     for (const [re, what] of [
       [utility, "a new utility"],
-      [anim, "a tw-animate utility"],
+      [anim, "an animate-in/out utility"],
       [/(?<![\w-])dark:/, "dark:"],
       [/class(?:Name)?=\{?["'`][^"'`]*(?<![\w-])console(?![\w-])/, 'class "console"'],
       [/(?<![\w-])radius-ctl|rounded-card|shadow-card|shadow-overlay(?![\w-])/, "a console radius/shadow"],
@@ -204,8 +283,16 @@ await t("no storefront file uses the new utility names, dark: or class \"console
       const m = re.exec(src);
       if (m) hits.push(`${f}: ${what} (${m[0]})`);
     }
+    const twa = twaUses(src, f.endsWith(".css"));
+    if (twa.length) hits.push(`${f}: a tw-animate utility (${[...new Set(twa)].join(" ")})`);
   }
   eq(hits, [], "storefront uses:");
+  const tokenCount = files.reduce((n, f) => n + classTokens(read(f), f.endsWith(".css")).any.length, 0);
+  ok(tokenCount > 5000, `read ${tokenCount} string tokens from storefront files:`);
+  const bites = ['<i className="hover:delay-150 x" />', '<i className="running" />', "cn('paused', a)", 'const k = "repeat-infinite fill-mode-forwards";', '`direction-reverse play-state-paused`', '"blur-in spin-out-90 animation-duration-300"', '"-spin-in-45 md:fade-in"'];
+  eq(bites.filter((b) => !twaUses(b, false).length), [], "the tw-animate check bites on:");
+  eq(twaUses('// a test is running\nconst s = status === "running"; const t = "delayed";', false), [], "prose, comments and non-class strings are spared:");
+  ok(twaUses(".x { @apply delay-100; }", true).length === 1, "the CSS @apply check bites:");
   ok(utility.test('className="bg-card"') && !utility.test('className="bg-accent-400"') && utility.test("hover:text-muted-foreground/80"), "the name pattern bites (bg-card, hover:text-muted-foreground/80) and spares bg-accent-400:");
 });
 
@@ -276,28 +363,30 @@ await t("cn merges rounded-ctl/rounded-card and shadow-card/shadow-overlay with 
 
 // ---------- 8. server render ----------
 
+// Next's SWC compiles components/ui; real radix-ui and react
+const swc = require("next/dist/build/swc/index.js");
+let swcReady = null;
+const React = require("react");
+const { renderToStaticMarkup } = require("react-dom/server");
+const cache = new Map();
+const load = async (rel) => {
+  await (swcReady ??= swc.loadBindings());
+  const file = join(ROOT, rel);
+  if (cache.has(file)) return cache.get(file);
+  const out = (await swc.transform(readFileSync(file, "utf8"), { filename: file, jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } }, target: "es2022" }, module: { type: "commonjs" } })).code;
+  const deps = new Map();
+  for (const [, , id] of out.matchAll(/require\((["'])([^"']+)\1\)/g)) {
+    if (deps.has(id)) continue;
+    if (id.startsWith("@/components/ui/")) deps.set(id, await load(`${id.slice(2)}.js`));
+    else if (id.startsWith("@/") || id.startsWith(".")) throw new Error(`${rel} imports ${id}, outside components/ui`);
+    else deps.set(id, require(id));
+  }
+  const mod = { exports: {} };
+  new Function("require", "module", "exports", out)((id) => deps.get(id), mod, mod.exports);
+  cache.set(file, mod.exports);
+  return mod.exports;
+};
 await t("the components render server-side with their data-slots", async () => {
-  const swc = require("next/dist/build/swc/index.js");
-  await swc.loadBindings();
-  const React = require("react");
-  const { renderToStaticMarkup } = require("react-dom/server");
-  const cache = new Map();
-  const load = async (rel) => {
-    const file = join(ROOT, rel);
-    if (cache.has(file)) return cache.get(file);
-    const out = (await swc.transform(readFileSync(file, "utf8"), { filename: file, jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } }, target: "es2022" }, module: { type: "commonjs" } })).code;
-    const deps = new Map();
-    for (const [, , id] of out.matchAll(/require\((["'])([^"']+)\1\)/g)) {
-      if (deps.has(id)) continue;
-      if (id.startsWith("@/components/ui/")) deps.set(id, await load(`${id.slice(2)}.js`));
-      else if (id.startsWith("@/") || id.startsWith(".")) throw new Error(`${rel} imports ${id}, outside components/ui`);
-      else deps.set(id, require(id));
-    }
-    const mod = { exports: {} };
-    new Function("require", "module", "exports", out)((id) => deps.get(id), mod, mod.exports);
-    cache.set(file, mod.exports);
-    return mod.exports;
-  };
   const h = React.createElement;
   const [B, I, Sep, Sk, Tt, Sh, Dd, Av, Sb] = await Promise.all(["button", "input", "separator", "skeleton", "tooltip", "sheet", "dropdown-menu", "avatar", "sidebar"].map((n) => load(`${UI}/${n}.js`)));
   const html = renderToStaticMarkup(
@@ -331,6 +420,27 @@ await t("the components render server-side with their data-slots", async () => {
   ok(/class="[^"]*rounded-md[^"]*"[^>]*data-slot="button"|data-slot="button"[^>]*class="[^"]*rounded-md/.test(html), "a button is rounded-md:");
   // portal content (sheet, menu, tooltip) mounts only in a browser; their parts carry data-slot in the source
   for (const [f, s] of [["sheet", ["sheet-content", "sheet-overlay", "sheet-title", "sheet-close"]], ["dropdown-menu", ["dropdown-menu-content", "dropdown-menu-item"]], ["tooltip", ["tooltip-content"]], ["avatar", ["avatar-image"]]]) for (const x of s) ok(read(`${UI}/${f}.js`).includes(`data-slot="${x}"`), `${f}.js has data-slot="${x}":`);
+});
+
+// ---------- 9. sidebar shortcut and cookie ----------
+
+await t("Cmd/Ctrl+B toggles the sidebar except while typing; the sidebar cookie is path-scoped and SameSite=Lax", async () => {
+  const { isSidebarShortcut, sidebarCookie } = await load(`${UI}/sidebar.js`);
+  const el = (tagName, extra = {}) => ({ tagName, isContentEditable: false, closest: () => null, ...extra });
+  const key = (target, mods = { metaKey: true }) => ({ key: "b", ctrlKey: false, metaKey: false, ...mods, target });
+  eq(isSidebarShortcut(key(el("BUTTON"))), true, "Cmd+B on a button:");
+  eq(isSidebarShortcut(key(el("DIV"), { ctrlKey: true })), true, "Ctrl+B on a div:");
+  eq(isSidebarShortcut(key(null)), true, "Cmd+B with no target:");
+  eq(isSidebarShortcut({ key: "b", metaKey: false, ctrlKey: false, target: el("DIV") }), false, "plain b:");
+  eq(isSidebarShortcut(key(el("DIV"), { metaKey: true, key: "c" })), false, "Cmd+C:");
+  for (const tag of ["INPUT", "TEXTAREA", "SELECT"]) eq(isSidebarShortcut(key(el(tag))), false, `Cmd+B in ${tag}:`);
+  eq(isSidebarShortcut(key(el("DIV", { isContentEditable: true }))), false, "Cmd+B in a contenteditable (rich text bold):");
+  eq(isSidebarShortcut(key(el("STRONG", { closest: (q) => (q.includes("contenteditable") ? {} : null) }))), false, "Cmd+B inside a contenteditable's child:");
+  eq(sidebarCookie(true), "sidebar_state=true; path=/admin; max-age=604800; SameSite=Lax", "default cookie:");
+  eq(sidebarCookie(false, "/platform"), "sidebar_state=false; path=/platform; max-age=604800; SameSite=Lax", "platform cookie:");
+  const src = read(`${UI}/sidebar.js`);
+  ok(/document\.cookie = sidebarCookie\(openState, cookiePath\)/.test(src) && !/path=\/;/.test(src), "the provider writes only the scoped cookie:");
+  ok(/if \(isSidebarShortcut\(event\)\)/.test(src), "the keydown handler uses isSidebarShortcut:");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

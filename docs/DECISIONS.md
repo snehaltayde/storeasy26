@@ -143,6 +143,14 @@ without asking the owner are marked so they are easy to review.
 - **Decided by:** owner
 - **Slice:** Phase 0 shadcn line; Phases 2–3
 
+## 2026-11-24 Console sidebar: per-console cookie, shortcut skips typing
+
+- **Decision:** the shadcn sidebar's `sidebar_state` cookie is `path=/admin; SameSite=Lax` by default; `SidebarProvider` takes `cookiePath` (the operator console passes `/platform`). Cmd/Ctrl+B is ignored when the key event's target is an input, textarea, select or contenteditable (`isSidebarShortcut`).
+- **Why:** shadcn's `path=/` sent the cookie with every storefront request and shared one state between the two consoles; its global Cmd+B stole bold from the rich text editor.
+- **Instead of:** dropping the shortcut, or one cookie for both consoles.
+- **Decided by:** reviewer finding, fixed by the builder
+- **Slice:** Phase 0 shadcn line
+
 ## 2026-11-24 Antigravity roadmap (Phases 2A–6) after the UI and onboarding
 
 - **Decision:** the roadmap in `docs/CLAUDE_CODE_HANDOFF_PHASES_2_TO_6.md` becomes Phases 4–9 here, in its own order, written as end-to-end slices.
