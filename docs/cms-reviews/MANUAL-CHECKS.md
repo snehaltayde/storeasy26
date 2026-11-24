@@ -1060,6 +1060,19 @@ Tests, drills and the local harness only ever talk to a local stand-in for Turso
 - [ ] **Errors Turso really sends.** If you can, trigger a plan limit or a wrong group once and note the HTTP status and words. The code treats 400, 401, 402, 403 and an unrequested 409 as "needs an operator", and 5xx, 429 and timeouts as retry (plan risk 3). Not checked against the real service.
 - [ ] **Operator view.** In `/platform`, Provisioning runs: a signup's run shows "Self-serve signup" and, when it failed, why (gave up after 5 tries, needs an operator, lapsed). Resume on such a run queues the signup's own job. Not drilled (the drill does not sign in to the operator console).
 
+## Storeasy Phase 1, line 4: a founder connects Shopify from onboarding step 1
+
+### The one real Shopify check (owner-run only)
+Tests and `pnpm drill:connect` only talk to a local Shopify stand-in. Shopify requires apps created on or after 2026-12-01 to use expiring offline tokens, and only the real service can prove the exchange and the refresh.
+- [ ] **Set up a store's app.** In the store's Shopify app (Dev Dashboard), add the redirect URL the operator console lists under the store ("Redirect URLs to add to this store's Shopify app"), one per store domain, then put the client id and secret on the store in `/platform`.
+- [ ] **Connect as the founder.** Sign in to the store's console, open onboarding step 1, enter the shop's address, press Connect to Shopify and approve in Shopify. Pass: you land on step 2 with step 1 Done and the products start coming in.
+- [ ] **The real check.** In a shell with the platform's database URL, token and secret (never paste them into a chat or a file in the repo):
+  `STOREASY_REAL_SHOPIFY=1 PLATFORM_DB_URL=… PLATFORM_DB_TOKEN=… PLATFORM_SECRET=… node scripts/real-checks/shopify-connect.mjs --tenant <slug>`
+  Pass: the access token expires in about 60 minutes, the refresh token in about 90 days, every scope granted, one refresh saves a new pair, and `shop { name }` answers with the new token. It writes only the store's own token fields.
+- [ ] **What Shopify really sends.** Note whether the token endpoint accepted the JSON refresh body and what a refused refresh returns (the code treats 400 and 401 as "connect again", 5xx and 429 as retry). Not checked against the real service.
+- [ ] **Cancel in Shopify.** Press Connect, then Cancel on Shopify's screen. Shopify may send you back to its admin instead of the callback; if so, the step still says "Didn't finish in Shopify? Press Connect again." only after a return. Decide whether that is enough.
+- [ ] **Browsers.** The callback is a cross-site GET that relies on SameSite=Lax cookies (verified in Chromium only). Try once in Safari and Firefox.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.

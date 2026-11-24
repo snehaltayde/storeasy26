@@ -31,6 +31,7 @@ import { SHOP_WORDS } from "../../../lib/shopify-origin.js";
 import { READ_ONLY_REASON, WORDS } from "../../../lib/onboarding/steps.js";
 
 const DRILL_ID = "P1-CONNECT";
+const ONBOARDING = "/admin/onboarding";
 const port = String(process.env.ROLES_PORT || "").trim();
 const fakePort = Number(process.env.SHOPIFY_FAKE_PORT || 0);
 const ROLES = `http://roles.localhost:${port}`;
@@ -53,6 +54,8 @@ async function control() {
 async function signIn(drill, origin, creds) {
   const ctx = await drill.browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
   ctx.setDefaultTimeout(60_000);
+  // console errors are recorded in the notes (the dev overlay's "1 Issue" is otherwise unexplained)
+  ctx.on("page", (p) => p.on("console", (m) => m.type() === "error" && drill.note(`console error on ${new URL(p.url()).pathname}: ${m.text().slice(0, 300)}`)));
   // the first request on a cold dev server can 404 while the route compiles (the known login flake)
   let res;
   for (let attempt = 1; attempt <= 4; attempt++) {
@@ -69,7 +72,7 @@ async function signIn(drill, origin, creds) {
 const model = async (page, origin) => (await page.request.get(`${origin}/api/admin/onboarding`)).json();
 const step1 = async (page, origin) => (await model(page, origin)).steps?.[0];
 async function openConnect(page, origin, query = "") {
-  await page.goto(`${origin}/admin/onboarding?step=connect${query}`, { waitUntil: "load" });
+  await page.goto(`${origin}${ONBOARDING}?step=connect${query}`, { waitUntil: "load" });
   await settle(page);
   await page.locator('[data-onboarding="panel"][data-step="connect"]').waitFor({ timeout: 60_000 });
 }

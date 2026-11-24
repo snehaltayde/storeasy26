@@ -65,7 +65,22 @@ first opened.
 
 ## 3. Connect Shopify
 
-Open `https://<platform>/api/connect/shopify/start?tenant=<slug>` (as a
+**Founder flow (Phase 1 line 4).** The founder enters the shop's address in
+onboarding step 1. Until the store's Shopify app is set up (client id and
+secret on the store), the address is saved and the step says "Storeasy's team
+is preparing your Shopify connection." Set the app up: in its Shopify app add
+the redirect URL(s) the operator console lists under the store ("Redirect URLs
+to add to this store's Shopify app", one per store domain:
+`https://<store domain>/api/admin/shopify/callback`), then save the client id
+and secret in `/platform`. The address is then locked (a wrong store needs
+support), and the founder presses Connect to Shopify and approves. Tokens are
+Shopify's expiring offline tokens (1 hour, refresh token 90 days): Storeasy
+refreshes them about a minute before they expire. If Shopify refuses a refresh,
+both tokens are cleared, an alert goes out and step 1 says "Connect again".
+The operator flow below shares the same exchange, so it gets expiring tokens
+too. Only an owner or an admin can connect.
+
+**Operator flow.** Open `https://<platform>/api/connect/shopify/start?tenant=<slug>` (as a
 signed-in operator, or append `&secret=$CRON_SECRET`), have the PARTNER click
 Install/Approve on the Shopify screen. The callback stores the permanent
 admin token encrypted, registers the 11 webhooks (catalog ×6, app/uninstalled,

@@ -57,6 +57,15 @@ export default function TenantDetail({ id }) {
             t.config.theme_pin && { key: "Kit", value: `${t.config.theme_pin.kit} v${t.config.theme_pin.version}`, mono: true },
           ]}
         />
+        {data.connect && (
+          <>
+            <p className="mt-3 text-xs font-semibold text-fg">Redirect URLs to add to this store's Shopify app</p>
+            <ul className="mt-1.5 space-y-0.5 font-mono text-fg-muted [overflow-wrap:anywhere]" data-tenant="redirect-urls">
+              {data.connect.redirectUrls.length ? data.connect.redirectUrls.map((u) => <li key={u}>{u}</li>) : <li className="font-sans text-fg-subtle">no store domain yet</li>}
+            </ul>
+            {!data.connect.appReady && <p className="mt-1 text-fg-subtle">The store's Shopify app isn't set up yet (client id and secret), so the founder can't connect.</p>}
+          </>
+        )}
         <p className="mt-3 text-xs font-semibold text-fg">Credentials (presence only)</p>
         <p className="mt-1.5 flex flex-wrap gap-1">
           {Object.keys(t.secretsPresent).length === 0 && <span className="text-fg-subtle">none</span>}
