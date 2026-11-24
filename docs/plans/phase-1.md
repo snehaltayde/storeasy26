@@ -110,3 +110,97 @@ Audit (`lib/platform/audit.js`, tenant id set): `signup.verified` (actor the new
 3. Handoff login CSRF (an attacker's link signs a victim into the attacker's new store): low impact with a 2-minute single-use token; accepted.
 4. New `*.localhost/admin` URLs may trip `test:shopify-boundary`/`test:security` (playbook): run both in the neighbour step; commit new routes before `test:security`.
 5. Production needs wildcard DNS and a wildcard certificate for `SIGNUP_STORE_DOMAIN`; settle at go-live.
+
+## Line 2: signup creates the store's Turso database for real
+
+**Fit:** builds on line 1. Verify queues a `provision_store` job and returns at once; the waiting page polls a status route bound to the `se_signup` cookie. Tests and drills run against a local fake of Turso's Platform API; no real database is ever created except by the owner's opt-in `pnpm check:turso-real`. Fixes two bugs in `lib/platform/provision.js`: a run resuming at `apply_schema`/`content_mode` has no DB token (it lived only in step memory), and `register_tenant` re-mints only for `libsql://`, so `http://` URLs get none.
+
+### 1. Feature list (floor)
+
+1. **Verify returns at once:** flips the signup to `provisioning`, queues `provision_store {signupId}` (key `provision_store:<signupId>`), returns `{status:"provisioning"}`; `after()` then runs the job with a 50 s budget (`runJobById`).
+2. **`POST /api/signup/status`** (marketing host only, `sameOrigin`, only the signup matching `se_signup`): returns the status; four plain-words steps (waiting/working/done/failed) — "Creating your store's database", "Preparing your store", "Registering your store address", "Creating your account"; a retry note ("Our hosting provider is slow to answer. Trying again in 15 seconds (try 2 of 5)"). It also runs the founder's own job if due (this drives retries locally and in drills); the every-minute tick stays as backstop.
+3. **Repeatable, resumable steps:** DB name `storeasy-t-<slug>`; `create_db` saves `refs.dbCreateRequestedAt` before asking Turso; a 409 after that is adopted as this run's DB; a 409 the run never asked for → needs an operator. Steps needing a token mint a 1-hour one; `register_tenant` mints the never-expiring token, stored only in `tenants.db_token_enc` (`k1:`).
+4. **Retries:** network errors, timeouts (15 s per call), 5xx and 429 retried after 5 s, 15 s, 45 s, 2 min, 5 min; 429 waits at least `Retry-After`, capped at 10 min. After the fifth: `failure_kind='retry_exhausted'`, "We couldn't finish setting up your store. Nothing you entered is lost: press Try again."
+5. **Needs us:** 400 (bad group/name), 401, 402, 403, or a 409 the run never asked for stop at once with `failure_kind='needs_operator'`; founder sees "Something on our side needs fixing. We've been told. Press Try again in a while."; operators get `sendAlert` naming the signup, step and HTTP status, never a token.
+6. **Try again** (`{retry:true}`) resets the try count and makes the same job due; resumes the same provision run (never a second DB). A lapsed signup still says "start again".
+7. **Handoff:** the job finishing sets `done` and `done_at`; no token in the job. A poll that sees `done` deletes any unused earlier handoff invite and makes a new 2-minute token (at most one live), returns `redirect`; once a handoff was used or 30 minutes passed, it returns `loginUrl` instead.
+8. **Driver:** Turso HTTP API when `TURSO_API_TOKEN` and `TURSO_ORG` are set (never the `turso` CLI for signup); else a local file DB outside production only; production without the API → 503 "Signups are unavailable".
+9. **API address:** the client reads `TURSO_API_URL` (default `https://api.turso.tech`); production refuses any other value; elsewhere a non-default value must be loopback. A test-only `localUrl` in the fake's reply is honoured only for a loopback address.
+10. **Secrets:** the API token and minted tokens never appear in logs, `provision_runs`, `jobs.last_error`, `signups.error`, audit diffs or error text; errors are scrubbed of Bearer/JWT-looking strings.
+11. **Operator view:** `/platform` provisions shows a "Self-serve signup" badge and the failure kind; resuming a signup run makes its job due (so user and owner membership get made) instead of running inline.
+12. **Local harness:** starts the fake; each new store gets its own sqld, so the new store's storefront ("Opening soon") renders in the drill (closes line 1's risk 1).
+13. **Opt-in real check:** `pnpm check:turso-real` is the only path to real Turso (§6 item 12).
+
+Out of scope: the four steps (line 3); operator list of signups (line 8).
+
+### 2. Data: `migrations/platform/0012_signup_provision.sql` (nothing destructive)
+
+```sql
+ALTER TABLE signups ADD COLUMN job_id TEXT;
+ALTER TABLE signups ADD COLUMN provision_attempts INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE signups ADD COLUMN next_attempt_at TEXT;
+ALTER TABLE signups ADD COLUMN failure_kind TEXT;      -- retry_exhausted | needs_operator | lapsed
+ALTER TABLE signups ADD COLUMN handoff_invite_id TEXT;
+ALTER TABLE signups ADD COLUMN done_at TEXT;
+CREATE INDEX IF NOT EXISTS idx_signups_status ON signups(status, updated_at);
+```
+
+No change to `jobs` (type `provision_store`, `tenant_id` null) or `provision_runs` (new non-secret refs `dbCreateRequestedAt`, `transientStatus`); `runProvision` returns a new `failedKind`; statuses unchanged.
+
+### 3. Job design
+
+States: `verified` → `provisioning` → `done`, or `failed` with a `failure_kind`. Handler `provision_store` in `lib/platform/signup-provision.js`: load the signup (done → `{already}`); lapsed → fail `lapsed`; run or resume the provision run, then user and owner membership; a retryable failure with tries left → increase the count, set `next_attempt_at`, return `{requeue, runAfter}` (own delays, not the queue's 60 s backoff); otherwise `failed`. Unexpected throws fall back to `failJob` (`maxAttempts=3`). `provision_store` joins `LONG_JOB_TYPES` (only budgeted callers: the tick and the two `after()` paths). The job lease (120 s) replaces line 1's `STUCK_PROVISION_MS` claim.
+
+### 4. Permissions and least-trusted tests
+
+| Action | anonymous | merchant roles | operator |
+|---|---|---|---|
+| `POST /api/signup/verify`, `/api/signup/status` (marketing host) | only with the matching cookie; else generic `SIGNUP_GONE` | n/a (store host → 404) | same as anonymous |
+| `/api/jobs/tick` | needs `CRON_SECRET`; production without it refuses everyone | no access | no access |
+| `GET/POST /api/platform/provisions` | 401 | 401 (support included) | allowed, audited `tenant.provision` |
+
+Guard row: `scripts/support/shopper-routes.js` `signup/status` POST as `token`, suite `test-signup-provision.js`. Tests: status with no or another browser's cookie → same generic 400; `pending` and `existing` signups get identical status answers; cross-origin → 403; status on a store host → 404; `/api/jobs/tick` in production with no or wrong secret → 401; a support session → 401 on `/api/platform/provisions`; an earlier poll's handoff token is dead after a newer poll.
+
+### 5. Events
+
+Audit `tenant.provisioned` (system: signup) and `signup.verified` as in line 1; operator resume stays `tenant.provision`. `slog`: `signup_job_queued`, `signup_provision_retry{attempt,status}`, `signup_provision_failed{kind,step}`, `signup_retry`, `signup_done`, `job_*`. `sendAlert` on `needs_operator`.
+
+### 6. File plan
+
+**WP-A: server, fake, tests**
+1. `migrations/platform/0012_signup_provision.sql`.
+2. `lib/platform/turso-api.js` (new): `POST /v1/organizations/{org}/databases` `{name,group}` → `{database:{DbId,Hostname,Name}}`; `GET …/databases/{name}`; `POST …/databases/{name}/auth/tokens?expiration=&authorization=full-access` → `{jwt}`; errors sorted into retry / needs-operator / conflict; the address rule (item 9); a timeout on every call; secret scrubbing. Turso documents 401, 402, 403, 404, 409, and 400 for "group not found"; no documented quota/rate-limit answer.
+3. `lib/platform/provision.js`: `createDbViaApi` → turso-api; `ctx.saveRefs`; `ensureDbToken(ctx)` used by `apply_schema`, `content_mode`, `register_tenant`; the signup-only 409 rule; `failedKind`.
+4. `lib/platform/provisioner.js`: `signupDbDriver()`; a `turso-api` path that never uses the CLI.
+5. `lib/platform/signup.js`: `finishSignup` → `queueSignupProvision` (verify and retry) and `signupStatus` (steps, handoff minting); 503 when no driver.
+6. `lib/platform/signup-provision.js` (new): handler, retry delays, `failure_kind`.
+7. `lib/platform/worker.js`: `provision_store` handler and `LONG_JOB_TYPES` entry.
+8. Routes: `app/api/signup/verify/route.js` (queue + `after()`, `maxDuration=60`); `app/api/signup/status/route.js` (new); `app/api/platform/provisions/route.js` (signup runs resume through the job).
+9. `scripts/support/shopper-routes.js` row.
+10. `scripts/support/fake-turso.js` (new): loopback HTTP server with Bearer checking; create, retrieve, token, delete with Turso's reply shapes and 409/404/401; backends `file` (unit tests) and `sqld` (one sqld per DB on base port + 10 + index, in `<dataDir>/fake-turso/registry.json`); `POST /_fake/faults` `{route,status,times,delayMs,commitThenHang}`; a request log.
+11. `scripts/design-harness.js`: add `TURSO_API_URL` to `BLANKED_ENV`; after blanking set `TURSO_API_URL=http://127.0.0.1:<sqld+3>`, a random `TURSO_API_TOKEN` per run, `TURSO_ORG=local-fake`, `TURSO_GROUP=default`; in dev mode start/stop the fake and record child pids in the pid file for `stopLeftovers` (never kill by name); repoint stores when ports change; check its ports are free.
+12. `scripts/turso-real-check.js` (new): refuses unless `TURSO_REAL_CHECK=yes-i-accept-a-real-database`, `--create-one-database`, the API token and org are set, and the default Turso address is used; `--dry-run`; creates `storeasy-check-<6hex>`, mints a 1-hour token, applies the tenant schema, reads it back, deletes the DB unless `--keep`; prints no token.
+13. Suites: `scripts/test-turso-api.js` (new; a fetch guard failing on any non-loopback host; the real-check refusals); `scripts/test-signup-provision.js` (new; a timeout after the DB is made still yields one DB; retry delays on a fake clock; needs-operator words; Try again resumes the same run with create count 1; a token sweep finds no secret in DB or logs; §4 tests); update `test-signup.js`, `test-design-harness.js` (Turso values must be loopback), `test-jobs.js` (long job type).
+14. `package.json`: `test:turso-api`, `test:signup-provision`, `check:turso-real`; `.env.example`: `TURSO_API_URL` (blank).
+
+**WP-B: UI and drill**
+15. `components/admin/signup/SignupFlow.js`: poll status every 1.5 s (back off when hidden); four-step list with an `aria-live` area; the retry note; both failure cases with Try again; follow the redirect.
+16. `components/platform/ProvisionRunsPanel.js`: signup badge and failure kind.
+17. `scripts/drills/signup/run.mjs`: happy path through the fake on sqld; visit `<slug>.localhost` and see "Opening soon"; 503 twice on create → retry note → done; a second signup with 402 → needs-operator words → clear the fault → Try again → done; evidence in `docs/cms-reviews/drills/SIGNUP/`.
+18. `docs/cms-reviews/MANUAL-CHECKS.md`: the real-check command.
+
+### 7. Checks first
+
+1. `node scripts/test-signup.js && node scripts/test-provision.js && node scripts/test-jobs.js && node scripts/test-design-harness.js`; `pnpm drill:signup` once on HEAD.
+2. sqld present (`ls ~/.turso/sqld` or `which sqld`); a sqld without auth accepts a Bearer request: `sqld --http-listen-addr 127.0.0.1:18990 --db-path <scratch>/x.sqld`, then `curl -s -H 'Authorization: Bearer x' -d '{"statements":["select 1"]}' http://127.0.0.1:18990/`.
+3. `scripts/run-tests.js` runs only `test:*` (so `check:turso-real` never runs in `pnpm test`).
+4. `ls migrations/tenant | wc -l`; time `applyTenantSchema` against a local sqld (vs the 60 s `maxDuration` and 120 s lease).
+5. `node scripts/test-schema-compat.js` after adding 0012.
+
+### 8. Risks
+
+1. Schema apply on real Turso may exceed one `after()` window; the ledger resumes, the founder waits longer; only the real check measures it.
+2. The harness now sets Turso values (pointing at the fake): the loopback-only rule and `test-design-harness` must hold it shut — a mistake could reach real Turso.
+3. No documented quota/rate-limit error: treat 402, 403 and any 400 mentioning "limit" as needs-operator; confirm with the real check.
+4. A crash between minting the never-expiring token and saving the tenant leaves one unused valid token on that DB; accepted.
+5. A harness killed with `-9` leaves per-store sqld processes; pid-file cleanup covers it; review closely.

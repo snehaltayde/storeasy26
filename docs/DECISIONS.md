@@ -3,6 +3,22 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-24 Signup creates the store's Turso database in a job (on the owner's behalf)
+
+- **Decision (schema first):**
+  - Migration `platform/0012` adds job, try-count, failure-kind and handoff columns to `signups` (nothing destructive). One `provision_store` job per signup.
+  - Verify queues the job and returns at once; the waiting page polls a status route (a POST, same-origin, bound to the signup cookie) that also runs the founder's own job when it's due, so the founder never waits on the one-minute scheduler. The scheduled tick stays as the backstop.
+  - Retries are short and counted by the handler (5 s, 15 s, 45 s, 2 min, 5 min; 5 tries) for timeouts, 5xx and 429; auth, payment, quota and bad-request answers stop at once as "needs an operator" with an alert. Try again resumes the same run and never creates a second database.
+  - A database name that already exists is adopted only if this run asked to create it; otherwise an operator looks. Schema work uses 1-hour tokens; one never-expiring token is stored encrypted. Turso's "invalidate tokens" call is not used (outside AWS it may reach other databases' tokens).
+  - The handoff token is made when a poll first sees the store is ready (at most one live), not inside the job.
+  - Signup uses Turso's HTTP API when configured, a local file database outside production otherwise, and is unavailable in production without it. `TURSO_API_URL` must be the real address in production and a loopback address anywhere else.
+  - Tests and drills use a local fake of Turso's API (one local database server per store, so the new store's storefront renders locally). The only path to real Turso is `pnpm check:turso-real`, which refuses unless the owner sets an explicit confirmation and flag; nobody runs it but the owner.
+- **Why:** owner: onboarding must be simple and reliable; real databases cost money, so nothing creates one without the owner.
+- **Instead of:** provisioning inline in the verify request; the queue's 60-second backoff; the `turso` CLI.
+- **Accepted risk:** a crash between minting the long token and saving the store leaves one unused token on that database.
+- **Decided by:** Claude, on the owner's behalf
+- **Slice:** Phase 1, Turso provisioning
+
 ## 2026-11-24 Self-serve signup (on the owner's behalf)
 
 - **Decision (schema first):**
