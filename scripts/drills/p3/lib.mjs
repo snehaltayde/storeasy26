@@ -40,7 +40,8 @@
 //
 // The results folder is docs/cms-reviews/drills/<id>/: screenshots and
 // results-<part>.json together.
-import { spawn } from "node:child_process";
+import { spawn, spawnSync as _spawnSync } from "node:child_process";
+const require_cp = () => ({ spawnSync: _spawnSync });
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Drill, DrillError, assertIsolated, connectHarness, launchChrome, settle } from "../../drill.js";
@@ -134,6 +135,8 @@ export async function loginDiag(drill, page, res, url, tag) {
   try { out.push(`disk login page ${statSync(join(ROOT, "app/(console)/admin/(auth)/login/page.js")).mtime.toISOString()}; (console)/admin: ${readdirSync(join(ROOT, "app/(console)/admin")).join(",")}; app: ${readdirSync(join(ROOT, "app")).join(",")}`); } catch (e) { out.push(`disk ${e.message}`); }
   out.push(`overlay ${await page.evaluate(() => [...document.querySelectorAll("nextjs-portal")].map((p) => p.shadowRoot?.textContent || "").join(" | ").slice(0, 3000)).catch((e) => e.message)}`);
   out.push(`html ${(await page.content().catch(() => "")).slice(0, 6000)}`);
+  if (lastSnap) lastSnap.keep = true;
+  out.push(`cache snapshot at start: ${JSON.stringify(lastSnap)}`);
   out.push(`---- harness output ----\n${owned.harness?.output?.() ?? "(none)"}`);
   writeFileSync(join(drill.dir, `diag-${drill.part}-${tag}-${Date.now()}.log`), out.join("\n"));
 }
@@ -143,8 +146,23 @@ export async function stopOwned() {
   owned.harness = null;
 }
 
+// TEMP DIAG: an APFS clone of the Turbopack dev cache as this start will restore it.
+let lastSnap = null;
+function snapCache() {
+  const { spawnSync } = require_cp();
+  const src = join(ROOT, ".next", "dev", "cache");
+  const dir = join(ROOT, ".drill-cache-snap");
+  spawnSync("mkdir", ["-p", dir]);
+  const dst = join(dir, String(Date.now()));
+  const r = spawnSync("cp", ["-c", "-R", src, dst], { encoding: "utf8" });
+  if (lastSnap && lastSnap.keep !== true) spawnSync("rm", ["-rf", lastSnap.path]);
+  lastSnap = { path: dst, ok: r.status === 0 };
+}
+export const cacheSnap = () => lastSnap;
+
 export async function startOwned() {
   if (owned.harness) return owned.harness;
+  snapCache();
   const h = await connectHarness({ start: true, log: () => {} });
   owned.harness = h;
   for (const d of owned.drills) Object.assign(d.harness, h);

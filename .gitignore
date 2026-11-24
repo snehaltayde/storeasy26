@@ -62,3 +62,4 @@ platform.db
 
 # isolated drill runs (scripts/drills/run-isolated.mjs)
 /.drill-results/
+/.drill-cache-snap/
