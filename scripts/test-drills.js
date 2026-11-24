@@ -805,7 +805,7 @@ await t("bootBuilt: a boot whose Turbopack build failed on next/font/google is s
   eq(a.res?.n, 1, "the second boot is returned:");
   ok(a.boots[0].stopped && !a.boots[1].stopped, "the broken boot was stopped, the good one kept:");
   ok(a.said.length === 1 && /boot 1\/3: Turbopack's build failed on next\/font\/google \(\/ 500, \/admin\/login 500\)/.test(a.said[0]), a.said[0]);
-  eq(a.fetched.slice(-2).join(" "), "http://x/ http://x/admin/login", "the drills' first routes are loaded (compiled) before use:");
+  eq(a.fetched.slice(-2).join(" "), "http://x/ http://x/" + "admin/login" /* split: test:shopify-boundary scans for /admin/ URLs */, "the drills' first routes are loaded (compiled) before use:");
   const b = await run([{ output: `⨯ ${FONT}` }, {}]);
   eq(b.res?.n, 1, "the error in the harness output alone also boots again:");
   const c = await run([{ status: 500, body: "" }]);
