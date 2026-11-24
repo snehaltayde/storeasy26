@@ -103,14 +103,16 @@ await t("the retired drills are gone; the shared libs and the kept drills stay",
   ok(!/--p4\b/.test(readFileSync(join(ROOT, "scripts/seed-design-documents.js"), "utf8")), "seed-design-documents.js has no --p4 mode left:");
 });
 
-await t("p5 and p6 keep exactly the planned stages (no legacy, baseline-legacy, f or final; p6 h is Phase 1 line 3's onboarding page, j line 7's open step)", async () => {
+await t("p5 and p6 keep exactly the planned stages (no legacy, baseline-legacy, f or final; p6 h is Phase 1 line 3's onboarding page, i line 5's import step, j line 7's open step)", async () => {
   const p5 = await import("./drills/p5/run.mjs");
   eq(p5.STAGES.join(","), "pick,create,states,nosaving,disabled,grid,cart,console,unknown", "p5:");
   const p6 = await import("./drills/p6/run.mjs");
-  eq(p6.STAGES.join(","), "baseline,a,b,c,d,e,g,h,j", "p6:");
+  eq(p6.STAGES.join(","), "baseline,a,b,c,d,e,g,h,i,j", "p6:");
   const seed = await import("./drills/p6/seed-p6.mjs");
   eq(seed.P6_STAGES.join(","), "a,b,c,d,e,g,h,j", "seed-p6 P6_STAGES:");
   throws(() => seed.stagePlan("f"), /--stage/, "stagePlan(f):");
+  // stage i plants its runs on stage h's store: it has no seed of its own
+  throws(() => seed.stagePlan("i"), /--stage/, "stagePlan(i):");
 });
 
 await t("assertIsolated refuses this checkout unless DRILL_ISOLATED_ROOT is it", async () => {
