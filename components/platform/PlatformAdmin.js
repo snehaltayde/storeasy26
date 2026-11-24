@@ -9,7 +9,6 @@ import { Banner } from "@/components/console/Banner";
 import { StatusBadge } from "@/components/console/Badge";
 import { Dialog, ConfirmDialog, DangerDialog } from "@/components/console/Dialog";
 import { Field, Input, Select, Textarea } from "@/components/console/fields";
-import { SecretReveal } from "@/components/console/Copy";
 import { SkeletonText, EmptyState, ErrorState } from "@/components/console/bits";
 import { useToast } from "@/components/console/Toast";
 import QueuesPanel from "./QueuesPanel";
@@ -42,99 +41,6 @@ const SECTIONS = [
   ["case-studies", "Case studies"],
   ["queues", "Queues"],
 ];
-
-function NewTenantForm({ onDone }) {
-  const [f, setF] = useState({ id: "", name: "", shopDomain: "", domains: "", clientId: "", clientSecret: "", dbUrl: "", dbToken: "" });
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [created, setCreated] = useState(null); // { tenant, generated }
-
-  async function submit(e) {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
-    const res = await fetch("/api/platform/tenants", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...f,
-        domains: f.domains.split(",").map((d) => d.trim()).filter(Boolean),
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && data.ok) setCreated(data);
-    else setError(data.error || `Provision failed (${res.status})`);
-    setBusy(false);
-  }
-
-  if (created) {
-    return (
-      <Card>
-        <CardHeader title={`Tenant “${created.tenant.id}” provisioned`} description="Next: connect Shopify from the tenant row." />
-        <SecretReveal
-          label="Console password"
-          value={created.generated.admin_password}
-          note="Shown ONCE — hand it to the merchant now; it can't be retrieved later."
-        />
-        <div className="mt-4">
-          <Button variant="primary" onClick={onDone}>
-            Done
-          </Button>
-        </div>
-      </Card>
-    );
-  }
-
-  return (
-    <Card as="div">
-      <form onSubmit={submit}>
-        <CardHeader
-          title="New tenant"
-          description="Recorded, resumable steps: Turso DB → schema → neutral defaults (nothing brand-flavored) → register → Free plan → onboarding record. A failed run shows below with Resume."
-        />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Slug" htmlFor="nt-slug" required hint="lowercase, hyphens — becomes storeasy-t-<slug>">
-            <Input id="nt-slug" required value={f.id} onChange={(e) => setF({ ...f, id: e.target.value })} placeholder="acme" />
-          </Field>
-          <Field label="Display name" htmlFor="nt-name">
-            <Input id="nt-name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="Acme Nutrition" />
-          </Field>
-          <Field label="Shopify store domain" htmlFor="nt-shop" required hint="x.myshopify.com">
-            <Input id="nt-shop" required value={f.shopDomain} onChange={(e) => setF({ ...f, shopDomain: e.target.value })} placeholder="acme.myshopify.com" />
-          </Field>
-          <Field label="Storefront domains" htmlFor="nt-domains" hint="comma-separated hosts">
-            <Input id="nt-domains" value={f.domains} onChange={(e) => setF({ ...f, domains: e.target.value })} placeholder="shop.acme.in" />
-          </Field>
-          <Field label="Shopify app client id" htmlFor="nt-client-id" hint="the tenant's custom-distribution app">
-            <Input id="nt-client-id" value={f.clientId} onChange={(e) => setF({ ...f, clientId: e.target.value })} />
-          </Field>
-          <Field label="Shopify app client secret" htmlFor="nt-client-secret">
-            <Input id="nt-client-secret" type="password" autoComplete="new-password" value={f.clientSecret} onChange={(e) => setF({ ...f, clientSecret: e.target.value })} />
-          </Field>
-          <Field label="Adopt existing DB url" htmlFor="nt-db-url" hint="optional — skips Turso create">
-            <Input id="nt-db-url" mono value={f.dbUrl} onChange={(e) => setF({ ...f, dbUrl: e.target.value })} placeholder="libsql://…" />
-          </Field>
-          <Field label="Adopt DB token" htmlFor="nt-db-token">
-            <Input id="nt-db-token" type="password" autoComplete="new-password" value={f.dbToken} onChange={(e) => setF({ ...f, dbToken: e.target.value })} />
-          </Field>
-        </div>
-        {error && (
-          <Banner tone="danger" className="mt-4">
-            {error}
-          </Banner>
-        )}
-        <div className="mt-4 flex gap-2">
-          <Button type="submit" variant="primary" busy={busy}>
-            Provision tenant
-          </Button>
-          <Button type="button" onClick={onDone} disabled={busy}>
-            Cancel
-          </Button>
-        </div>
-      </form>
-    </Card>
-  );
-}
 
 const when = (s) => (s ? new Date(s).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "never");
 
@@ -264,7 +170,6 @@ const storeOrigin = (t) => {
 export default function PlatformAdmin() {
   const [tenants, setTenants] = useState(null);
   const [loadErr, setLoadErr] = useState(null);
-  const [creating, setCreating] = useState(false);
   const [rowErr, setRowErr] = useState({}); // id → persistent failure text
   const [detail, setDetail] = useState(null); // expanded tenant id (S41 / OP03)
   const [syncing, setSyncing] = useState({}); // id → true while sync in flight
@@ -365,9 +270,9 @@ export default function PlatformAdmin() {
           <div className="flex flex-wrap items-center justify-between gap-3 pt-3">
             <h1 className="text-lg font-semibold tracking-tight text-fg">Platform operations</h1>
             <div className="flex items-center gap-2">
-              <Button variant="primary" size="sm" icon={<Plus size={13} aria-hidden />} onClick={() => setCreating(true)}>
-                New tenant
-              </Button>
+<a href="/platform/stores/new" className="inline-flex items-center gap-1.5 rounded-ctl bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-fg focus-ring hover:bg-primary-hover">
+                <Plus size={13} aria-hidden /> New store
+              </a>
               <Button size="sm" icon={<LogOut size={13} aria-hidden />} onClick={logout}>
                 Sign out
               </Button>
@@ -393,15 +298,6 @@ export default function PlatformAdmin() {
       </div>
 
       <main className="mx-auto max-w-6xl space-y-6 px-6 pt-6">
-        {creating && (
-          <NewTenantForm
-            onDone={() => {
-              setCreating(false);
-              refresh();
-            }}
-          />
-        )}
-
         {/* Tenant registry */}
         <section id="tenants" aria-label="Tenants" className="scroll-mt-20 space-y-3">
           {tenants === null && !loadErr && (
@@ -421,11 +317,11 @@ export default function PlatformAdmin() {
               <CardHeader title="Tenants" />
               <EmptyState
                 title="No tenants yet"
-                body="Provision the first store to get started."
+                body="Create the first store for a founder to get started."
                 action={
-                  <Button size="sm" variant="primary" icon={<Plus size={13} aria-hidden />} onClick={() => setCreating(true)}>
-                    New tenant
-                  </Button>
+                  <a href="/platform/stores/new" className="inline-flex items-center gap-1.5 rounded-ctl bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-fg focus-ring hover:bg-primary-hover">
+                    <Plus size={13} aria-hidden /> New store
+                  </a>
                 }
               />
             </Card>

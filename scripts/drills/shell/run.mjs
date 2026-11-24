@@ -291,7 +291,7 @@ async function ownerFlows(drill, page) {
 const DENIED_PAGES = ["/admin/settings", "/admin/integrations", "/admin/billing", "/admin/automations"];
 const ONBOARDING_OPEN = "/admin/onboarding?step=open";
 const NOTE = /Your role \(support\) can.t .+ ask an owner or admin/;
-const PLATFORM_CONSOLE = /New tenant|Tenant registry|Provision/;
+const PLATFORM_CONSOLE = /New store|Tenant registry|Provision/;
 
 async function supportDeepLinks(drill, page) {
   await page.setViewportSize({ width: 1280, height: HEIGHT });

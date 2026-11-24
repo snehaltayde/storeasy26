@@ -14,6 +14,7 @@ import { useToast } from "@/components/console/Toast";
 // conservative compensation. Done runs are history, not buttons.
 // Phase 1 line 2: a run a self-serve signup made carries `signup`
 // ({ status, failureKind }); resuming it queues the signup's own job.
+// Line 9: a store an operator created (signup.source "operator") reads "Created by Storeasy".
 const FAILURE_KIND = {
   retry_exhausted: "Gave up after 5 tries",
   needs_operator: "Needs an operator",
@@ -76,7 +77,7 @@ export default function ProvisionRunsPanel() {
           <SecretReveal label={`Run ${generated.run} finished — console password`} value={generated.password} note="Shown once — hand it to the merchant now." />
         </div>
       )}
-      {runs && runs.length === 0 && <EmptyState title="No provisioning runs yet" body="Each New-tenant provision records a resumable run here." />}
+      {runs && runs.length === 0 && <EmptyState title="No provisioning runs yet" body="Each store you create with New store, and each self-serve signup, records a resumable run here." />}
       {runs && runs.length > 0 && (
         <ul className="space-y-2">
           {runs.map((r) => (
@@ -87,8 +88,8 @@ export default function ProvisionRunsPanel() {
                 <StatusBadge status={r.status} />
                 {r.signup && (
                   <span data-provision-signup={r.signup.status}>
-                    <Badge tone="info" title={`Signup ${r.signup.status}`}>
-                      Self-serve signup
+                    <Badge tone="info" title={`${r.signup.source === "operator" ? "Store setup" : "Signup"} ${r.signup.status}`}>
+                      {r.signup.source === "operator" ? "Created by Storeasy" : "Self-serve signup"}
                     </Badge>
                   </span>
                 )}

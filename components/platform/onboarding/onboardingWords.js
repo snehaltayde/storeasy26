@@ -20,6 +20,9 @@ const STATUS = Object.freeze({
 
 export const statusWords = (code) => STATUS[code] || { label: "Unknown", tone: "muted" };
 
+// line 9: a store an operator created carries this badge (rows' source "operator")
+export const sourceLabel = (source) => (source === "operator" ? "Created by Storeasy" : null);
+
 export const VIEW_LABELS = Object.freeze({
   attention: "Needs attention",
   signup: "In signup",
@@ -38,6 +41,7 @@ export const MAIL_KIND_WORDS = Object.freeze({
   operator_signin_help: "Sign-in help",
   operator_owner_invite: "Owner invite",
   operator_start_again: "Start-again note",
+  operator_store_invite: "Owner invite (store created)",
 });
 
 export const PROVISION_STEP_WORDS = Object.freeze({

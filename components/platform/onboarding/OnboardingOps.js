@@ -6,7 +6,7 @@
 // with keyset cursors (Next / Previous keep a stack of the cursors seen).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, RefreshCw, Search, X } from "lucide-react";
+import { ArrowLeft, Plus, RefreshCw, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -97,9 +97,17 @@ export default function OnboardingOps() {
             <h1 className="text-[1.375rem] font-semibold">Signups &amp; onboarding</h1>
             <p className="mt-1 text-sm text-muted-foreground">Every signup and every store&apos;s onboarding step. Open a row to help.</p>
           </div>
-          <Button variant="outline" size="sm" onClick={load} disabled={state.loading}>
-            <RefreshCw className="size-3.5" aria-hidden /> Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={load} disabled={state.loading}>
+              <RefreshCw className="size-3.5" aria-hidden /> Refresh
+            </Button>
+            {/* line 9: an operator creates a store for a founder */}
+            <Button size="sm" asChild>
+              <a href="/platform/stores/new">
+                <Plus className="size-3.5" aria-hidden /> New store
+              </a>
+            </Button>
+          </div>
         </div>
 
         {/* views: Tab lands on the chosen one, arrow keys, Home and End move between them */}

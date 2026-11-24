@@ -9,7 +9,7 @@ import { AlertTriangle, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { statusWords, stuckFor, when, STEP_LABELS, STEP_STATE_WORDS, PROVISION_STEP_WORDS } from "./onboardingWords";
+import { statusWords, sourceLabel, stuckFor, when, STEP_LABELS, STEP_STATE_WORDS, PROVISION_STEP_WORDS } from "./onboardingWords";
 
 const NOT_STUCK = ["open", "suspended", "address_freed", "superseded", "expired"];
 const Dash = () => <span className="text-muted-foreground">–</span>;
@@ -150,6 +150,7 @@ export default function OnboardingTable({ rows, busy, onOpen, selected }) {
                 <TableCell>
                   <div className="flex items-center gap-1.5">
                     <Badge variant={s.tone}>{s.label}</Badge>
+                    {sourceLabel(r.source) && <Badge variant="muted">{sourceLabel(r.source)}</Badge>}
                     {r.supportUntil && <Marker icon={Eye} words={`Support access open until ${when(r.supportUntil)}`} className="text-info" />}
                   </div>
                 </TableCell>
