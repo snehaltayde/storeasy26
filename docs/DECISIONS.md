@@ -3,6 +3,14 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Removing legacy code (on the owner's behalf; scope by the owner)
+
+- **Decision:** no migration and no table changes; the 11 legacy tables stay, and only a short list of read-only helpers may name them (enforced by `test:no-dead-code`). `documents` is the only content mode: any other stored value is a 5xx `STORE_MODE_INVALID`, never a fallback. A media delete whose usage read fails is refused (no legacy scan). The 12 legacy redirect pages plus `/admin/start` and `/admin/setup` are deleted, not moved to config redirects (nothing is hosted, so no outside links exist; supersedes keeping start/setup as redirects). `lib/cms/*` and `lib/registry/legacy.js` keep their names (live code). A manual tool stays only if `package.json` names it (`scripts/real-checks/**` is the one allowlisted owner root). Superseded docs are deleted once their still-true parts move to `docs/operations.md` (`CMS_*.md`, `cms-reviews/**`, `plans/**` stay). Code only tests reach counts as dead. The `publish_release` job handler goes.
+- **Open owner question:** single-store env mode (`ADMIN_PASSWORD`, the env database and the commands using it) stays until the owner says where the BeastLife data lives.
+- **Why:** owner: "whatever older code or remnants we have remove them, everything should be based on new architecture".
+- **Decided by:** owner (scope), Claude (details)
+- **Slice:** Phase 1, legacy code removal
+
 ## 2026-11-25 An operator creates a store for a founder (on the owner's behalf)
 
 - **Decision (schema and permissions first):** operator-created stores reuse `signups` with `source='operator'` (platform migration `0015`: seven columns, a partial unique index on the live shop domain); the Shopify client secret is held encrypted on that row only until the job finishes; same `provision_store` job, steps and retries as signup. The page and routes are operator-only; the old `POST /api/platform/tenants` "New tenant" form and its one-time password reveal are removed (owner: remove legacy remnants); answers never carry a token or link. Accepting any invite with an existing account now needs that account's password, checked before the invite is spent; new accounts from an invite count as email-verified. A Shopify store already on any store (active or suspended) is refused. The first invite is automatic; resends use line 8's throttled action. Progress is a page with the signup id in the address so a reload keeps it. Custom domains, adopting a database and the legacy editor stay CLI or domains-panel only.

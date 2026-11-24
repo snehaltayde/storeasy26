@@ -898,3 +898,65 @@ Removed: `NewTenantForm`, the "New tenant" buttons, its one-time console passwor
 3. The client secret sits encrypted until the job finishes (a "needs operator" run keeps it): review scrubbing in job errors.
 4. Merge conflicts with line 6 and the cleanup line: `PlatformAdmin.js`, `package.json`, `run-isolated.mjs`, `onboarding-ops.js`.
 5. Mail failure leaves a store with no owner ("Invite not sent" with Resend); with production mail unconfigured, every operator store waits for an operator to resend.
+
+## Line 10: no legacy code remains
+
+**Fit:** second-to-last-built Phase 1 line; starts after lines 6 and 9 merge (line 6 retires `FirstRun`/`BrandStep`; both touch shared files). The old operator handoff route was already removed by line 8; `/admin/handoff` (signup sign-in) stays. The plan's inventory came from grep; Package B's first job is the real reachability walk in report-only mode.
+
+### 1. Removal list (floor)
+
+**A. Content-mode branches** (0026 set every store to `documents`; `lib/migrate/` is gone, nothing writes `migrating`):
+- `lib/cms-mode.js`: remove `assertLegacyContentWrites`, `legacyWritesRefusal`, `runLegacyBatch`, `legacyGuardStatement`, `migratingGuardStatement`, `MIGRATING_MESSAGE`, the `legacy`/`migrating` entries in `CMS_MODES`, and the "missing table means legacy" rule; keep `getCmsMode`, `documentsGuardStatement`, `classifyAbort`, `publishBadgeState`.
+- Remove codes `STORE_USES_LEGACY`, `STORE_MIGRATING` from `lib/admin/documents-api-shapes.js`, `components/admin/editor/documentsApi.js`, `lib/first-run/generate.js`.
+- Remove the legacy/migrating branches in `editor/page.js`, `editor/templates/page.js`, `releases/page.js`, `settings/page.js`, `(authed)/page.js`, `lib/onboarding/steps.js`, `service.js`, `brand-step.js`, `policy-start.js`, `brand-readability.js`, `preview-session-api.js`, `documents/publish.js`, `content-writes.js`, `SettingsAdmin.js`, `MediaAdmin.js`, `previewMachine.js`, `PreviewBridge`/`bridge-core` (the "legacy" reason), and `lib/sync.js`.
+- Remove the provision flip SQL that only fires in `legacy` mode (`DOCUMENTS_FOR_FRESH_STORE_SQL`, now always a no-op); keep the freshness check over `CONTENT_TABLES`.
+- Remove the `publish_release` skip handler in `lib/platform/worker.js`; `LEGACY_RELEASE_VERSIONS` in `lib/releases.js` if unused.
+
+**B. Dead reads of legacy tables:** `lib/media.js` `legacyMediaUsage`; `lib/repo.js` `collectionPinsByHandle(s)` (then `lib/cms/section-data.js` always reads live pins and the fallback in `lib/registry/sources.js` goes); `cms_pages` from the counts in `app/api/admin/help/route.js`.
+
+**C. Redirect-only routes and their map:** under `app/(console)/admin/(authed)/`: `storefront/{page, designer, designer/product, designer/collection, home, navigation, pages, pages/[slug], product-pages}`, `brand`, `theme`, `upsells`, `start`, `setup`; with them `LEGACY_ROUTE_DOCS`, `legacyPageHref`, the `upsells` helpers in `lib/admin/editor-entry.js`, and `components/admin/shared/editorLayout.js` (its only route is a redirect; `isEditorRoute` is always false).
+
+**D. Files nothing imports:** `components/console/Drawer.js`, `components/Price.js`, `components/admin/editor/parity.js` (test-only, pins deleted admin screens), `scripts/spike-order-push.js`, `scripts/support/home-render-outputs.js` (imports a deleted file), `scripts/fixtures/legacy-journal-outputs.a6d028e.json`.
+
+**E. Script and test leftovers:** `perf-docs-fixture.js` drops `unpublish-legacy`; `perf-http.js` drops its legacy-table readers (~590–643); `perf-fixture.js` drops never-seeded `placements`/`overrides`/`pins`; `drills/p6/lib.mjs:300-301` drops its `cms_blocks`/`cms_pages` scan; test sections stubbing or measuring deleted code: `test-editor-routes.js` (`admin/cms/*` stubs, redirect assertions), `test-editor-inspector.js:626-638`, `test-product-editor.js` (part 5 parity, `CatalogAdmin` stub), `test-editor-shell.js` (`ReleasesAdmin` stub), `test-documents.js:1429` (the `lib/migrate` allowlist), `test-onboarding.js` (start/setup redirect assertions).
+
+**F. Docs:** move what's still true (the command table, the 5.3b restore steps) into `docs/operations.md`, then delete `docs/MANUAL_TESTING_GUIDE.md`, `docs/platform-guide.md`, `docs/onboarding.md`, `docs/CLAUDE_CODE_HANDOFF_PHASES_2_TO_6.md`, and `docs/storeasy-saas/{IMPLEMENTATION_STATUS.md, Storeasy_Claude_Developer_Handoff.md, CLAUDE_START_PROMPT.txt}`; fix links in `docs/platform.md`, `README.md`. Never touch `docs/CMS_*.md`, `docs/cms-reviews/**`, `docs/plans/**`.
+
+**G. Agency:** none left in `app/`, `lib/`, `components/`; the guard keeps it so.
+
+**H. Stale comments** naming deleted files (`lib/cms/store.js`, `lib/cms/registry.js`, `lib/cms/validate.js` …) are corrected (guard check 4).
+
+### 2. Keep list (looks old, still used)
+
+`lib/cms/{issues, section-data, defaults, view}.js` (storefront home and several routes); `lib/registry/legacy.js` (the shape adapter); the `data-legacy` wrapper and old console screens (Phase 2's last line); `SyncProgress` (dashboard, settings); the saved-templates viewer (`editor/templates/page.js`, `lib/admin/saved-templates.js`, `SavedTemplates.js` — read-only `cms_templates`); `lib/platform/export.js` (exportable founder data); `CONTENT_TABLES` in `provision.js`; `lib/schema.sql`, `migrations/**`; `scripts/fixtures/home-render-outputs.a6d028e.json` (`test-sections-render.js:382`); p3/p4 drill libraries (imported by kept drills); manual owner scripts (`scripts/real-checks/**`, `turso-real-check.js`, `restore-drill.js`, `seed-*`, `seed-tenant-beastlife.js`); `gen-icons.js`, `pixel-diff.js` (wired into `package.json`); single-store env mode (`ADMIN_PASSWORD`, env DB; owner question).
+
+### 3. Guard: `scripts/test-no-dead-code.js` (`test:no-dead-code`)
+
+1. **Reachability.** Production roots: Next 16.2.9 file conventions under `app/` (page, layout, route, loading, error, global-error, not-found, template, default, forbidden, unauthorized); metadata files (`sitemap.js`, `robots.js`, `icon.*`, `manifest.webmanifest/route.js`, `globals.css` and its `@import`); `instrumentation.js`, `next.config.mjs`, `postcss.config.mjs`, `proxy.js`/`middleware.js` if present. Tooling roots: files named in `package.json` scripts, suites in `run-tests.js`, the drill table in `run-isolated.mjs`, `scripts/real-checks/**`. Edges: static and literal dynamic `import`, `export from`, `require`, `new URL(…, import.meta.url)`; string literals resolving to an existing repo path from the root or the file's folder; `@/` alias; extension and `index` resolution. Rule: `app/` and `components/` must be reachable from production roots; `lib/` from production or tooling; `scripts/` from tooling; `**/README.md` and `lib/types/**` exempt only via the allowlist.
+2. **Allowlist** `[{ path, reason }]`; fails when an entry no longer exists or has become reachable.
+3. **Legacy names** (comments stripped): a string literal naming `cms_blocks`, `cms_pages`, `cms_history`, `cms_templates`, `cms_approvals`, `cms_preview_candidates`, `product_overrides`, `collection_overrides`, `placements`, `cms_migration_runs`, `content_live_reversed`, job type `publish_release`, or identifiers `assertLegacyContentWrites`, `runLegacyBatch`, `legacyGuardStatement`, `migratingGuardStatement`, `STORE_USES_LEGACY`, `STORE_MIGRATING`, `MIGRATING_MESSAGE` fails; exempt: `migrations/**`, `lib/schema.sql`, `lib/platform/provision.js`, `lib/platform/export.js`, `lib/admin/saved-templates.js`, `editor/templates/page.js`, `test-schema-compat.js`, `test-provision.js`, `test-tenant-ops.js`, `scripts/support/tenant-fixture.js`, the guard itself.
+4. **Path mentions:** every `(lib|components|app|scripts)/….(js|mjs)` mentioned in `app/`, `components/`, `lib/` (including comments) must exist.
+5. **Wiring:** every `node <file>` in `package.json` exists; every `scripts/test-*.js` has a `test:*` script; every `.env.example` key is referenced in code.
+6. **Self-test:** a temp tree makes each check fail (orphan file, legacy table string, missing path mention, stale allowlist entry).
+
+### 4. Data and permissions
+
+No migration; the 11 legacy tables stay; `test-schema-compat` keeps proving the chain creates them. Note: 0026's `DROP TABLE IF EXISTS preview_candidates` never dropped anything (0016 created `cms_preview_candidates`); add that table to `docs/ARCHITECTURE.md`'s legacy row and remove the `publish_release` job row. No new actions, reads or routes; `test:permissions` and `test:support-reads` rerun over the smaller route list (`scripts/support/admin-pages.js`, `admin-routes.js` drop deleted pages). A store whose mode isn't `documents` gets a 5xx `STORE_MODE_INVALID` for every role.
+
+### 5. File plan (two builders, disjoint files, A merged first)
+
+**Package A: mode collapse and legacy reads** — every `lib/`, `app/`, `components/` file in groups A and B; callers of `classifyAbort` in `lib/documents/{commit, service, build}.js`; every `scripts/test-*.js` asserting legacy or migrating behaviour (`grep -l 'STORE_USES_LEGACY\|"legacy"\|migrating\|publish_release\|legacyMediaUsage\|collectionPinsByHandle' scripts/test-*.js`) except Package B's files; `test-documents.js` (incl. line 1429).
+
+**Package B: deletions, tools, docs, guard** — groups C, D, F; `lib/admin/editor-entry.js`, `components/admin/shell/AdminShell.js`; `scripts/{perf-docs-fixture, perf-http, perf-fixture, seed-design-preview}.js`, `scripts/drills/p6/lib.mjs`; tests `test-{editor-routes, editor-inspector, product-editor, editor-shell, drills, perf-docs, perf-tools, onboarding}.js`, `scripts/support/{admin-pages, admin-routes}.js`; `package.json` (`test:no-dead-code`, `icons:gen`, `diff:pixels`), `scripts/run-tests.js`, new `scripts/test-no-dead-code.js`; docs `ARCHITECTURE.md`, `operations.md`, `platform.md`, `README.md`. Extra orphans from B's real walk are B's unless on A's list.
+
+### 6. Checks first
+
+`pnpm test` baseline; `pnpm typecheck`; `node scripts/test-schema-compat.js`; whether any `publish_release` jobs are pending in a fresh harness DB. After: full `pnpm test`, typecheck, schema-compat, `pnpm drill:all` (the cleanup touches onboarding, editor, preview, shell).
+
+### 7. Risks
+
+1. Paths the walk can't see (`loadComponent(sources.get(...))`, `join(here, …)`, `${dir}/x`): string-literal edges cover most; any remaining template-built path goes on the allowlist, never deleted on a guess.
+2. Package A touches publish, media, provision paths; `test-api-shapes`, `test-publish-service` pin response shapes — update deliberately.
+3. Guard false failures (`.env.example`, path mentions): fix code or add a reasoned allowlist entry; never weaken a rule.
+4. Single-store env mode (`ADMIN_PASSWORD`, env DB; `pnpm migrate`, `sync`, `seed:demo`, `db:reset`, `tenant:seed-beastlife`) is pre-SaaS but may hold the owner's BeastLife data: owner question; not part of this line.
+5. `cms-reviews/**` history keeps links to deleted docs (accepted).
