@@ -84,6 +84,7 @@ export default function SubjectSheet({ subject, onClose, onChanged }) {
   const [hours, setHours] = useState("4");
   const [note, setNote] = useState("");
   const [releaseOpen, setReleaseOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const [notify, setNotify] = useState(true);
 
   const load = useCallback(async () => {
@@ -286,7 +287,18 @@ export default function SubjectSheet({ subject, onClose, onChanged }) {
                   </div>
                 )}
 
-                {!a.resume && !a.resendCode && !a.signinHelp && !a.ownerInvite && !a.release && !(d.kind === "tenant" && a.supportAccess) && <Empty>Nothing to help with here right now. Add a note below.</Empty>}
+                {a.cancel && (
+                  <div className="flex flex-col gap-2 rounded-card border border-destructive/30 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                    <p className="text-[0.8125rem] text-muted-foreground sm:max-w-[34ch]">
+                      Storeasy created this store and its setup isn&apos;t running. Cancelling frees its address and Shopify store.
+                    </p>
+                    <Button variant="destructive" disabled={busy != null} onClick={() => setCancelOpen(true)} className="shrink-0">
+                      Cancel this store setup
+                    </Button>
+                  </div>
+                )}
+
+                {!a.resume && !a.resendCode && !a.signinHelp && !a.ownerInvite && !a.release && !a.cancel && !(d.kind === "tenant" && a.supportAccess) && <Empty>Nothing to help with here right now. Add a note below.</Empty>}
               </Section>
 
               <Separator />
@@ -480,6 +492,22 @@ export default function SubjectSheet({ subject, onClose, onChanged }) {
               onClick={() => act("release", { notify }, (b) => (b.notified ? "Address freed. The founder was emailed." : "Address freed."))}
             >
               Free the address
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel setting up {d?.signup?.storeName}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Its address and Shopify store become free, the Shopify app&apos;s secret is deleted, and this setup can&apos;t be resumed. Any database already made stays at the hosting provider.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep the setup</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={() => act("cancel_store", {}, () => "Store setup cancelled. Its address and Shopify store are free.")}>
+              Cancel the setup
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { findUserByEmail, createInvite, loginThrottle } from "@/lib/platform/identity";
+import { findUserByEmail, createInvite, loginThrottle, hasLiveInvite } from "@/lib/platform/identity";
 import { membershipRole } from "@/lib/platform/sessions";
 import { platformConfigured } from "@/lib/platform/control";
 import { currentTenant, tenantId } from "@/lib/tenant-context";
@@ -32,7 +32,9 @@ export const POST = tenantHandler(async (request) => {
   if (blocked) return NextResponse.json(GENERIC); // quietly drop — same response
 
   const user = await findUserByEmail(email);
-  if (user && user.status === "active" && (await membershipRole(user.id, tenantId()))) {
+  // Phase 1 line 9: an existing account invited here (not yet a member) may reset too,
+  // so an invite that asks for their current password isn't a dead end
+  if (user && user.status === "active" && ((await membershipRole(user.id, tenantId())) || (await hasLiveInvite(user.email, tenantId())))) {
     const { token } = await createInvite({
       email,
       tenantId: tenantId(),

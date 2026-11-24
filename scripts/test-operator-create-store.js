@@ -578,6 +578,106 @@ await t("the accept page's peek is rate-limited", async () => {
   }
 });
 
+// ---- review fixes ------------------------------------------------------------------------------
+
+await t("review 1: an existing account accepting an invite shares login's lockout (per email and per IP), cleared on success; a suspended user can't accept", async () => {
+  const u = await I.createUser({ email: "lockout@x.test", password: "lockout-pass-123" });
+  const inv = await I.createInvite({ email: "lockout@x.test", tenantId: "prep-store", role: "admin" });
+  await db.execute({ sql: "DELETE FROM login_limits WHERE key LIKE 'login%'" });
+  let last;
+  for (let i = 0; i < 11; i++) last = await acceptCall("prep-store.stores.test", "POST", { body: { token: inv.token, password: `wrong-pass-${i}` } });
+  eq(last.status, 429, `11th wrong password: ${last.text}`);
+  ok(await one("SELECT count FROM login_limits WHERE key = 'login:lockout@x.test'"), "the login key counts");
+  // the right password is refused too while locked, and the invite stays usable
+  eq((await acceptCall("prep-store.stores.test", "POST", { body: { token: inv.token, password: "lockout-pass-123" } })).status, 429, "locked");
+  ok(await I.peekInvite(inv.token, "prep-store"), "not spent");
+  await db.execute({ sql: "DELETE FROM login_limits WHERE key LIKE 'login%'" });
+  eq((await acceptCall("prep-store.stores.test", "POST", { body: { token: inv.token, password: "lockout-pass-123" } })).status, 200, "accepted once unlocked");
+  eq(await count("SELECT COUNT(*) AS n FROM login_limits WHERE key = 'login:lockout@x.test'"), 0, "cleared on success");
+  const off = await I.createUser({ email: "suspended@x.test", password: "suspended-pass-1" });
+  await I.setUserStatus(off.id, "disabled");
+  const inv2 = await I.createInvite({ email: "suspended@x.test", tenantId: "prep-store", role: "admin" });
+  const r = await acceptCall("prep-store.stores.test", "POST", { body: { token: inv2.token, password: "suspended-pass-1" } });
+  eq(r.status, 403, r.text);
+  eq(await count("SELECT COUNT(*) AS n FROM memberships WHERE user_id = ?", [off.id]), 0, "no membership");
+  ok(await I.peekInvite(inv2.token, "prep-store"), "not spent");
+  ok(u, "user");
+});
+
+await t("review 2: an operator row that isn't provisioning can be cancelled (audited, secret cleared, runs superseded): the shop and address are free again; merchant roles 401", async () => {
+  await fault({ route: "create", status: 402 });
+  const r = await create({ storeName: "Cancel Me", email: "cancel@x.test", shop: "cancel-shop", clientId: "cid-c", clientSecret: SECRET });
+  const f = await finish(r.body.signup);
+  eq(f.body.status, "failed", f.text);
+  await clearFaults();
+  const subject = `signup:${r.body.signup}`;
+  for (const who of ["signed-out", "owner", "admin", "staff", "support", "owner-b"]) {
+    eq((await platformCall("onboarding", "POST", { body: { action: "cancel_store", subject }, cookies: store.cookies[who] || {} })).status, 401, who);
+  }
+  const sheet = (await platformCall("onboarding", "GET", { query: `subject=${subject}` })).body;
+  eq(sheet.actions.cancel, true, "the sheet offers cancel");
+  const before = await auditCount();
+  const c = await onboarding({ action: "cancel_store", subject });
+  eq(c.status, 200, c.text);
+  eq(await auditCount(), before + 1, "one audit row");
+  const a = await lastAudit("signup.store_cancelled");
+  eq(a.actor, operatorId, "names the operator");
+  const row = await one("SELECT status, shopify_secret_enc FROM signups WHERE id = ?", [r.body.signup]);
+  eq(row.status, "released", "released");
+  eq(row.shopify_secret_enc, null, "secret cleared");
+  eq(await count("SELECT COUNT(*) AS n FROM provision_runs WHERE tenant_id = 'cancel-me' AND status != 'superseded' AND status != 'done'"), 0, "runs superseded");
+  eq((await check({ shop: "cancel-shop", slug: "cancel-me" })).body.shop.ok, true, "shop free");
+  eq((await check({ slug: "cancel-me" })).body.slug.ok, true, "address free");
+  eq((await onboarding({ action: "cancel_store", subject })).status, 409, "again: refused");
+  // a founder's own signup and a provisioning row can't be cancelled this way
+  const prov = await create({ storeName: "Busy Store", email: "busy@x.test", shop: "busy-shop" });
+  eq((await onboarding({ action: "cancel_store", subject: `signup:${prov.body.signup}` })).status, 409, "provisioning: refused");
+  await H.drainAfter();
+});
+
+await t("review 2: freeing a lapsed address also clears any stored app secret", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const src = await readFile(join(ROOT, "lib/platform/onboarding-ops.js"), "utf8");
+  ok(/status = 'released'[^"]*shopify_secret_enc = NULL/.test(src), "the release update clears shopify_secret_enc");
+});
+
+await t("review 3: recovery mails a reset link to someone holding a live invite to this store; same answer either way", async () => {
+  const u = await I.createUser({ email: "invited-only@x.test", password: "invited-only-pass" });
+  await I.createInvite({ email: "invited-only@x.test", tenantId: "prep-store", role: "admin" });
+  const before = await count("SELECT COUNT(*) AS n FROM invitations WHERE email = 'invited-only@x.test' AND kind = 'reset'");
+  const r = await store.call("signed-out", "recover", "POST", { host: "prep-store.stores.test", body: { email: "invited-only@x.test" } });
+  eq(r.status, 200, r.text);
+  eq(await count("SELECT COUNT(*) AS n FROM invitations WHERE email = 'invited-only@x.test' AND kind = 'reset'"), before + 1, "a reset link made");
+  const none = await store.call("signed-out", "recover", "POST", { host: "prep-store.stores.test", body: { email: "nobody-here@x.test" } });
+  eq(none.text, r.text, "same answer");
+  ok(u, "user");
+});
+
+await t("review 4: when queueing fails after the row is written, the row goes, the answer is a 500, and a retry works", async () => {
+  await db.execute("ALTER TABLE jobs RENAME TO jobs_hidden");
+  let r;
+  try {
+    r = await create({ storeName: "Queue Fail", email: "qf@x.test", shop: "queue-fail-shop" });
+  } finally {
+    await db.execute("ALTER TABLE jobs_hidden RENAME TO jobs");
+  }
+  eq(r.status, 500, r.text);
+  ok(/no store was created/.test(r.body.error), "truthful words");
+  eq(await count("SELECT COUNT(*) AS n FROM signups WHERE slug = 'queue-fail' AND status IN ('verified','provisioning','failed')"), 0, "no live row left");
+  const again = await create({ storeName: "Queue Fail", email: "qf@x.test", shop: "queue-fail-shop" });
+  eq(again.status, 200, again.text);
+  await H.drainAfter();
+});
+
+await t("review 5: a second runner can't send another invite: the invite is claimed before sending", async () => {
+  const r = await create({ storeName: "Claim Store", email: "claim@x.test", shop: "claim-shop" });
+  // another runner already claimed the invite
+  await db.execute({ sql: "UPDATE signups SET invite_status = 'sending' WHERE id = ?", args: [r.body.signup] });
+  const d = await finish(r.body.signup);
+  eq(d.body.status, "done", d.text);
+  eq(await count("SELECT COUNT(*) AS n FROM platform_mail WHERE recipient = 'claim@x.test'"), 0, "no second invite sent");
+});
+
 // ---- the screen's words (pure) ----------------------------------------------------------------
 
 await t("createStoreWords: invite and app words, failure words for both kinds, the address preview matches the server, the first error field", async () => {

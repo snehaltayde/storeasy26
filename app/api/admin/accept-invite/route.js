@@ -63,11 +63,20 @@ export const POST = tenantHandler(async (request) => {
   }
   let user;
   try {
-    user = await acceptInvite({ token, name: name || null, password, tenantId: tenantId() });
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+    user = await acceptInvite({ token, name: name || null, password, tenantId: tenantId(), ip });
   } catch (e) {
     const infra = infraResponse(e, { route: "admin/accept-invite" }); // DOC-04: a database failure is never a 4xx
     if (infra) return NextResponse.json(infra.body, { status: infra.status });
     return NextResponse.json({ error: String(e?.message || e) }, { status: 400 });
+  }
+  if (user?.throttled) {
+    slog("admin_invite_rejected", { reason: "throttled" });
+    return NextResponse.json({ error: "Too many attempts. Wait a while, then try again." }, { status: 429 });
+  }
+  if (user?.inactive) {
+    slog("admin_invite_rejected", { reason: "inactive" });
+    return NextResponse.json({ error: "This Storeasy account is turned off, so it can't accept invitations. Contact Storeasy support." }, { status: 403 });
   }
   if (user?.wrongPassword) {
     slog("admin_invite_rejected", { reason: "wrong_password" });
