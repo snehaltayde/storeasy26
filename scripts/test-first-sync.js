@@ -961,18 +961,21 @@ console.log("— idempotent writes (the db layer may or may not retry a write)")
     await exact("");
   });
 
-  await t("one page is all or nothing: a bad row leaves the whole page unwritten and the position unmoved", async () => {
+  // Phase 1 line 5: a bad row is skipped, never fatal (scripts/test-import-step.js
+  // covers every reason and the constraint fallback); the rest of its page and
+  // the run go on.
+  await t("a product with no title is skipped: its page and the run go on", async () => {
     await reset();
     const broken = catalog.map((p, i) => (i === 40 ? { ...p, title: null } : p)); // title is NOT NULL
     shop.products = broken;
     const res = await inT("write", () => S.runCatalogSync().catch((e) => ({ error: e.message })));
     shop.products = catalog;
-    ok(res.error, "the sync reported the failure");
+    ok(!res.error, `the sync finished: ${res.error}`);
     const run = await latest("write");
-    eq(run.status, "failed", "run:");
-    eq(run.cursor, enc(30), "position stays after page 1:");
-    eq(await count("write", "products"), 30, "only page 1's rows:");
-    eq(await count("write", "variants"), variantTotal(catalog.slice(0, 30)), "only page 1's variants:");
+    eq(run.status, "complete", "run:");
+    eq(Number(run.skipped_count), 1, "one skipped:");
+    eq(await count("write", "products"), catalog.length - 1, "every other product:");
+    eq(await count("write", "variants"), variantTotal(catalog.filter((_, i) => i !== 40)), "every other product's variants:");
   });
 }
 

@@ -12,7 +12,7 @@
 //   makeTenant({ name, stage, products, id, config, secrets })
 //     A tenant database in .test-<name>-tenant.db at the repo root, migrated
 //     to `stage` and seeded with `products`.
-//       stage     '0017' | '0020' | '0022' | '0023' | '0024' | '0025' | 'latest'
+//       stage     '0017' | '0020' | '0022' | '0023' | '0024' | '0025' | '0027' | 'latest'
 //                 (default 'latest'). The tenant holds every migration whose
 //                 4-digit number is <= stage, through runMigrations(client,
 //                 MIGRATIONS.filter(...)) exactly as test-schema-compat does.
@@ -70,7 +70,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-export const STAGES = Object.freeze(["0017", "0020", "0022", "0023", "0024", "0025", "latest"]);
+export const STAGES = Object.freeze(["0017", "0020", "0022", "0023", "0024", "0025", "0027", "latest"]);
 export const MODES = Object.freeze(["legacy", "documents"]);
 export const SYNCS = Object.freeze(["none", "complete", "partial", "failed"]);
 export const CATALOG_SHAPES = Object.freeze(["one", "few", "many", "all_sold_out", "no_images", "long_titles", "empty", "no_collections"]);

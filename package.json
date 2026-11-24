@@ -57,6 +57,7 @@
     "test:jobs": "node scripts/test-jobs.js",
     "test:sync-generations": "node scripts/test-sync-generations.js",
     "test:first-sync": "node scripts/test-first-sync.js",
+    "test:import-step": "node scripts/test-import-step.js",
     "test:order-projection": "node scripts/test-order-projection.js",
     "alert:test": "node --env-file=.env.local scripts/alert-test.js",
     "rotate:secrets": "node --env-file=.env.local scripts/rotate-secrets.js",
