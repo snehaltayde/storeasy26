@@ -1,6 +1,6 @@
 {
   "id": "SF-STYLES",
-  "ranAt": "2026-11-24T03:59:21.538Z",
+  "ranAt": "2026-11-24T04:15:26.271Z",
   "baseline": {
     "dir": "/Users/snehal/Documents/Projects 2026/storeasy26/.drill-results/2026-11-24T03-51-14-795Z/SF-STYLES",
     "head": "355074f",
@@ -14,17 +14,17 @@
     }
   },
   "run": {
-    "head": "120cf04",
+    "head": "6147b2d",
     "bite": false,
     "css": {
       "files": {
-        "/_next/static/chunks/%5Broot-of-the-server%5D__1gw72-d._.css": 154137,
-        "/_next/static/chunks/%5Broot-of-the-server%5D__1e-iwqf._.css": 150423
+        "/_next/static/chunks/%5Broot-of-the-server%5D__1gw72-d._.css": 155935,
+        "/_next/static/chunks/%5Broot-of-the-server%5D__1e-iwqf._.css": 152221
       },
-      "bytes": 304560
+      "bytes": 308156
     }
   },
-  "cssDeltaBytes": 99308,
+  "cssDeltaBytes": 102904,
   "totals": {
     "style": 0,
     "box": 0,
@@ -32,7 +32,7 @@
     "removed": 0,
     "customChanged": 0,
     "customAdded": 146142,
-    "shots": 1,
+    "shots": 0,
     "missing": 0
   },
   "missing": [],
@@ -236,7 +236,7 @@
       "removed": 0,
       "customChanged": 0,
       "customAdded": 6188,
-      "shot": "differs",
+      "shot": "same",
       "samples": [],
       "customNames": [
         "--blur-xs",
