@@ -30,6 +30,11 @@
 //      with summary.json
 //   7. the worktree is removed (git worktree remove --force, prune) unless --keep;
 //      on Ctrl-C or SIGTERM the runner stops its own children first, then removes it
+//   5c. before each drill, and after one that fails, a warm-up boot checks the
+//      build (warmBuild): a next/font/google build error means .next is deleted
+//      and the boot repeated (up to 2 times), else the run stops with
+//      "Google Fonts could not be fetched; check the network"; a drill that
+//      failed on such a build is run once more
 //   8. the owner's .design-env, .design-data/seeded.json, p*-seed.json and
 //      roles-seed.json are hashed before and after: any change fails the run
 import { spawn, spawnSync } from "node:child_process";
@@ -222,21 +227,89 @@ async function waitUp(url, child, ms = 240_000) {
   return false;
 }
 
+// Before each drill (and after one that failed): a warm-up boot of the
+// worktree's design harness that loads / and /admin/login. Turbopack keeps its
+// dev build in .next/cache across restarts, and a next/font/google failure
+// there ("Can't resolve '@vercel/turbopack-next/internal/font/google/font'")
+// turns every later page into a 500 for every harness started from that .next.
+// When the warm-up sees it, it stops its own harness, deletes the worktree's
+// .next and boots again, up to 2 times; then the run fails plainly. A drill
+// never runs silently against that broken build.
+export const FONT_BUILD_ERROR = "turbopack-next/internal/font/google";
+export const FONT_FAIL = "Google Fonts could not be fetched; check the network";
+const WARM_PATHS = ["/", "/admin/login"];
+
+// start() → { probe() → [{ path, status, body }], output() → string, stop() };
+// clean() deletes .next; gone() → { ok, why }. → { attempts } or throws RunnerError.
+export async function warmBuild({ start, clean, gone, attempts = 3, say = () => {} }) {
+  for (let i = 1; i <= attempts; i++) {
+    const h = await start();
+    let bad = [];
+    try {
+      const pages = await h.probe();
+      bad = pages.filter((p) => p.body.includes(FONT_BUILD_ERROR)).map((p) => `${p.path} ${p.status}`);
+      if (!bad.length && h.output().includes(FONT_BUILD_ERROR)) bad = ["the harness output"];
+    } finally {
+      await h.stop();
+    }
+    const g = await gone();
+    if (!g.ok) throw new RunnerError(`After the warm-up harness: ${g.why}. Nothing was stopped.`);
+    if (!bad.length) return { attempts: i };
+    say(`✗ warm-up ${i}/${attempts}: the build failed on next/font/google (${bad.join(", ")})${i < attempts ? "; deleting the worktree's .next and starting again" : ""}`);
+    if (i < attempts) clean();
+  }
+  throw new RunnerError(`${FONT_FAIL}. The storefront build failed on next/font/google (${FONT_BUILD_ERROR}) in ${attempts} warm-up boots, each after deleting the worktree's .next; no drill ran against that build.`);
+}
+
+// The real warm-up harness: this worktree's dev-design.js on this run's ports, own handle only.
+function warmHarness(c) {
+  return async () => {
+    const log = [];
+    const server = startChild(node, ["scripts/dev-design.js"], { cwd: c.worktree, env: c.env, log });
+    const base = `http://localhost:${c.ports.next}`;
+    if (!(await waitUp(`${base}/api/health`, server.child, 300_000))) {
+      await server.stop();
+      throw new RunnerError(`The warm-up harness did not come up at ${base}: ${log.join("").trim().split("\n").slice(-6).join(" | ")}`);
+    }
+    return {
+      output: () => log.join(""),
+      stop: server.stop,
+      probe: async () => {
+        const out = [];
+        for (const path of WARM_PATHS) {
+          try {
+            const r = await fetch(base + path, { redirect: "manual", signal: AbortSignal.timeout(240_000) });
+            out.push({ path, status: r.status, body: await r.text() });
+          } catch (e) {
+            out.push({ path, status: 0, body: String(e?.message || e) });
+          }
+        }
+        return out;
+      },
+    };
+  };
+}
+
+const realWarm = (c, say) =>
+  warmBuild({ start: warmHarness(c), clean: () => rmSync(join(c.worktree, ".next"), { recursive: true, force: true }), gone: () => waitHarnessGone({ worktree: c.worktree, ports: c.ports }), say });
+
 const node = process.execPath;
-// name → { id (results folder or null), run(ctx) → exit code }
+// name → { id (results folder or null), warm (boot-check the build first), run(ctx) → exit code }
 export const DRILLS = {
   // the --p3 documents store first (it has a live release), as p5's lib seeds it
   smoke: {
     id: "smoke",
+    warm: true,
     async run(c) {
       const seeded = await c.node(["scripts/seed-design-documents.js", "--p3"]);
       return seeded !== 0 ? seeded : c.node(["scripts/drill.js", "smoke", "--start", ...c.headed]);
     },
   },
-  p5: { id: "P5-DRILLS", run: (c) => c.node(["scripts/drills/p5/run.mjs", ...c.stages, ...c.headed]) },
-  p6: { id: "P6-DRILLS", run: (c) => c.node(["scripts/drills/p6/run.mjs", ...c.stages, ...c.headed]) },
+  p5: { id: "P5-DRILLS", warm: true, run: (c) => c.node(["scripts/drills/p5/run.mjs", ...c.stages, ...c.headed]) },
+  p6: { id: "P6-DRILLS", warm: true, run: (c) => c.node(["scripts/drills/p6/run.mjs", ...c.stages, ...c.headed]) },
   "agency-gone": {
     id: null,
+    warm: true,
     async run(c) {
       const seeded = await c.node(["scripts/dev-roles.js", "seed"]);
       if (seeded !== 0) return seeded;
@@ -257,7 +330,7 @@ export const ALL = ["smoke", "p5", "p6", "agency-gone"];
 
 const git = (root, args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
 
-export async function runIsolated({ root = ROOT, names, stages = [], keep = false, headed = false, drills = DRILLS, install = ["pnpm", ["install", "--frozen-lockfile", "--prefer-offline"]], ports = null, base = tmpdir(), say = console.log, gone = waitHarnessGone } = {}) {
+export async function runIsolated({ root = ROOT, names, stages = [], keep = false, headed = false, drills = DRILLS, install = ["pnpm", ["install", "--frozen-lockfile", "--prefer-offline"]], ports = null, base = tmpdir(), say = console.log, gone = waitHarnessGone, warm = realWarm } = {}) {
   const status = git(root, ["status", "--porcelain"]);
   if (status.status !== 0) throw new RunnerError(`git status failed: ${status.stderr.trim()}`);
   assertCleanTree(status.stdout);
@@ -318,17 +391,33 @@ export async function runIsolated({ root = ROOT, names, stages = [], keep = fals
         node: (args, opts = {}) => runChild(node, args, { cwd: worktree, env, log, ...opts }),
       };
       let exit;
+      let fontFail = false;
       try {
         if (spec.id) clearResults(worktree, root, spec.id);
+        if (spec.warm) await warm(ctx, say);
         exit = await spec.run(ctx);
+        // a failed drill: was the build broken under it? Then once more on a fresh .next.
+        if (exit !== 0 && spec.warm && (await warm(ctx, say)).attempts > 1) {
+          const again = `• ${name} failed on a broken next/font/google build; .next was rebuilt, running it once more\n`;
+          log.push(again);
+          say(again.trim());
+          if (spec.id) clearResults(worktree, root, spec.id);
+          exit = await spec.run(ctx);
+        }
       } catch (e) {
-        log.push(`✗ ${e.stack || e}\n`);
+        fontFail = e instanceof RunnerError && e.message.startsWith(FONT_FAIL);
+        log.push(`✗ ${e instanceof RunnerError ? e.message : e.stack || e}\n`);
+        if (e instanceof RunnerError) say(`✗ ${e.message}`);
         exit = 1;
       }
       writeFileSync(join(resultsDir, `${name}.log`), log.join(""));
       const copied = spec.id ? copyResults(worktree, root, stamp, spec.id) : null;
       rows.push({ drill: name, exit, seconds: Math.round((Date.now() - t0) / 1000), results: copied, log: join(resultsDir, `${name}.log`) });
       say(`--- ${name}: ${exit === 0 ? "passed" : `FAILED (exit ${exit})`} in ${Math.round((Date.now() - t0) / 1000)} s`);
+      if (fontFail) {
+        say("✗ the remaining drills are not run.");
+        break;
+      }
       const g = await gone({ worktree, ports: chosen });
       if (!g.ok) {
         rows.push({ drill: `${name} (cleanup)`, exit: 1, seconds: 0, results: null, log: null, why: g.why });

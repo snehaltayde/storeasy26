@@ -16,6 +16,9 @@
 //      stand-in that writes the owner's data fails the run
 //   5b. between drills the runner waits for the last harness to exit; smoke
 //      seeds --p3 first
+//   5c. the warm-up: a next/font/google build error deletes .next and boots
+//      again (up to 2 times), then fails "Google Fonts could not be fetched";
+//      a drill that failed on a broken build reruns once
 //   6. the drill helpers' own checks (p4, p5 and p6 lib.mjs --check)
 //   7. every module the seed and drill scripts load (static and import("…")
 //      relative paths, followed through scripts/) exists, and each name taken
@@ -353,6 +356,83 @@ await t("smoke seeds the --p3 documents store (a live release) before it starts 
   const calls = [];
   await R.DRILLS.smoke.run({ node: async (args) => (calls.push(args.join(" ")), 0), headed: [] });
   eq(calls.join(" | "), "scripts/seed-design-documents.js --p3 | scripts/drill.js smoke --start", "steps:");
+});
+
+// A stand-in harness: each boot answers with the pages in `boots` (in turn); the font error is
+// what Next 16.2.9 Turbopack served in the 2026-11-24T02-20 run.
+const FONT_PAGE = "<html>Build Error: Module not found: Can't resolve '@vercel/turbopack-next/internal/font/google/font'</html>";
+function standInHarness(boots, { output = [] } = {}) {
+  const calls = { starts: 0, stops: 0, cleans: 0, gones: 0 };
+  const start = async () => {
+    const i = calls.starts++;
+    return { probe: async () => boots[i].map((body, n) => ({ path: ["/", "/admin/login"][n], status: body === FONT_PAGE ? 500 : 200, body })), output: () => output[i] || "", stop: async () => void calls.stops++ };
+  };
+  return { calls, start, clean: () => void calls.cleans++, gone: async () => (calls.gones++, { ok: true }) };
+}
+
+await t("warm-up: a good build boots once; nothing is deleted", async () => {
+  const h = standInHarness([["<html>home</html>", "<html>login</html>"]]);
+  const w = await R.warmBuild(h);
+  eq(w.attempts, 1, "attempts:");
+  eq(JSON.stringify(h.calls), JSON.stringify({ starts: 1, stops: 1, cleans: 0, gones: 1 }), "calls:");
+});
+
+await t("warm-up: the next/font/google build error → its own harness stopped, .next deleted, booted again (page or harness output)", async () => {
+  const h = standInHarness([[FONT_PAGE, FONT_PAGE], ["ok", "ok"]]);
+  const said = [];
+  eq((await R.warmBuild({ ...h, say: (m) => said.push(m) })).attempts, 2, "attempts:");
+  eq(JSON.stringify(h.calls), JSON.stringify({ starts: 2, stops: 2, cleans: 1, gones: 2 }), "calls:");
+  ok(/next\/font\/google \(\/ 500, \/admin\/login 500\)/.test(said[0]), `says what it saw: ${said[0]}`);
+  // pages 200 but the harness printed the error: still caught
+  const o = standInHarness([["ok", "ok"], ["ok", "ok"], ["ok", "ok"]], { output: [`⨯ Module not found: Can't resolve '@vercel/${R.FONT_BUILD_ERROR}/font'`, "", ""] });
+  eq((await R.warmBuild(o)).attempts, 2, "output-only attempts:");
+  eq(o.calls.cleans, 1, "output-only cleans:");
+});
+
+await t("warm-up: still broken after 2 retries → fails plainly naming the font fetch; the harness is stopped every time", async () => {
+  const h = standInHarness([[FONT_PAGE, "ok"], [FONT_PAGE, "ok"], [FONT_PAGE, "ok"], ["ok", "ok"]]);
+  let err;
+  await R.warmBuild(h).catch((e) => (err = e));
+  ok(err instanceof R.RunnerError, "a RunnerError:");
+  ok(err.message.startsWith("Google Fonts could not be fetched; check the network"), `message: ${err.message}`);
+  eq(JSON.stringify(h.calls), JSON.stringify({ starts: 3, stops: 3, cleans: 2, gones: 3 }), "calls:");
+  // a harness that won't stop is reported, never killed by the runner
+  let stuck;
+  await R.warmBuild({ ...standInHarness([["ok", "ok"]]), gone: async () => ({ ok: false, why: "ports 6100 still answer" }) }).catch((e) => (stuck = e));
+  ok(/6100 still answer/.test(stuck?.message), `stuck: ${stuck?.message}`);
+  // the stand-in's probe throws: the harness is still stopped
+  const s = standInHarness([["ok", "ok"]]);
+  await R.warmBuild({ ...s, start: async () => ({ ...(await s.start()), probe: async () => { throw new Error("boom"); } }) }).catch(() => {});
+  eq(s.calls.stops, 1, "stopped after a throwing probe:");
+});
+
+await t("runner + warm-up: warm drills warm first; a drill that failed on a broken build reruns once; a font failure stops the run; stand-in drills never warm", async () => {
+  const root = standInRepo();
+  const base = realpathSync(mkdtempSync(join(tmpdir(), "drills-wt-")));
+  try {
+    const order = [];
+    let warms = 0;
+    const warm = async () => (order.push(`warm${++warms}`), { attempts: warms === 2 ? 2 : 1 });
+    let runs = 0;
+    const drills = { a: { id: null, warm: true, run: async () => (order.push(`a${++runs}`), runs === 1 ? 1 : 0) }, b: { id: null, run: async () => (order.push("b"), 0) } };
+    const s = await R.runIsolated({ root, names: ["a", "b"], drills, install: null, ports: PORTS, base, say: () => {}, gone: async () => ({ ok: true }), warm });
+    eq(order.join(","), "warm1,a1,warm2,a2,b", "order:");
+    eq(s.rows[0].exit, 0, "the rerun's exit counts:");
+    ok(readFileSync(s.rows[0].log, "utf8").includes("running it once more"), "the log says it reran:");
+    const ran = [];
+    const fontDrills = { a: { id: null, warm: true, run: async () => (ran.push("a"), 0) }, b: { id: null, warm: true, run: async () => (ran.push("b"), 0) } };
+    const failWarm = async () => {
+      throw new R.RunnerError(`${R.FONT_FAIL}. stand-in`);
+    };
+    const f = await R.runIsolated({ root, names: ["a", "b"], drills: fontDrills, install: null, ports: PORTS, base, say: () => {}, gone: async () => ({ ok: true }), warm: failWarm });
+    eq(ran.length, 0, "no drill ran against the broken build:");
+    eq(f.rows.length, 1, "the run stops after the first:");
+    ok(f.failed > 0 && readFileSync(f.rows[0].log, "utf8").includes("Google Fonts could not be fetched; check the network"), "fails with the plain message:");
+    eq(worktrees(root), 1, "worktree still removed:");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(base, { recursive: true, force: true });
+  }
 });
 
 await t("the drill helpers' own checks pass (p4, p5 and p6 lib.mjs --check; p6 carries the old final stage's selfCheck)", async () => {
