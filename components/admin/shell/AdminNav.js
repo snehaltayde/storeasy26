@@ -55,7 +55,7 @@ const ICONS = {
 };
 
 // The Storeasy mark: the platform lime is the logo's colour only (docs/UI.md).
-export function StoreasyMark() {
+function StoreasyMark() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden className="size-6 shrink-0 rounded-md">
       <rect width="24" height="24" rx="6" fill="#84cc16" />
@@ -90,7 +90,7 @@ const badgeWords = (item, value) => {
 };
 
 // The groups as sidebar menus; used by the sidebar and by the editor's sheet.
-export function NavGroups({ nav, badges = {}, onNavigate }) {
+function NavGroups({ nav, badges = {}, onNavigate }) {
   const pathname = usePathname();
   const current = activeItem(pathname, navItems(nav));
   return (

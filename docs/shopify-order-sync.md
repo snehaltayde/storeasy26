@@ -6,7 +6,7 @@ the stacked offers + free gift + shipping represented, marked **paid**, and GST 
 Shopify never silently re-adds tax and breaks the match.
 
 This was proven end-to-end against `beastlife-dev.myshopify.com` (Admin API `2025-10`).
-Spike harness: [`scripts/spike-order-push.js`](../scripts/spike-order-push.js).
+The spike harness (`scripts/spike-order-push.js`) was removed in Phase 1 line 10; the code that ships is below.
 
 > **PRODUCTIONIZED in Session 12** → [`lib/shopify-push.js`](../lib/shopify-push.js), wired
 > into checkout/webhook via `after()`, with retry queue, dead-letter + alerts,

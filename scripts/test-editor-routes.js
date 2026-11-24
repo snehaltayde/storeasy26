@@ -403,18 +403,10 @@ const navLoad = world({
 });
 const NavModel = await import("../lib/admin/nav.js");
 const { AdminShell } = await navLoad(join(ROOT, "components/admin/shell/AdminShell.js"));
-const NavUi = await navLoad(join(ROOT, "components/admin/shell/AdminNav.js"));
-const Sb = await navLoad(join(ROOT, "components/ui/sidebar.js"));
-const Tt = await navLoad(join(ROOT, "components/ui/tooltip.js"));
 const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
 const shell = ({ role = "owner", badges = { publish: "3" }, ...props } = {}, path = "/admin/dashboard") => {
   pathname = path;
   return renderToStaticMarkup(React.createElement(AdminShell, { nav: NavModel.navFor(role), badges, actor: { kind: "merchant", role }, account: { name: "Olivia Owner", email: "owner@x.test" }, stores: [], storeName: "Design Demo Co", storeId: "design", ...props }, React.createElement("p", null, "page")));
-};
-// what the editor's sheet (and the phone sheet) holds: the same groups
-const sheetNav = (role, path, badges = {}) => {
-  pathname = path;
-  return renderToStaticMarkup(React.createElement(Tt.TooltipProvider, null, React.createElement(Sb.SidebarProvider, null, React.createElement(NavUi.NavGroups, { nav: NavModel.navFor(role), badges }))));
 };
 const hrefs = (html) => [...html.matchAll(/<a [^>]*href="([^"]*)"/g)].map((m) => m[1]);
 const navHrefs = (html) => [...html.matchAll(/<a [^>]*href="([^"]*)"[^>]*data-nav-item=/g)].map((m) => m[1]);
@@ -458,14 +450,11 @@ await t("Phase 1 line 3 rendered: the Storefront group is Editor, Media, Publish
   const store = NavModel.NAV.find((g) => g.label === "Storefront").items;
   eq(store.map((i) => i.id), ["editor", "media", "releases"], "the items:");
   ok(navHrefs(shell({ role: "staff" })).includes("/admin/onboarding"), "staff see Onboarding");
-  ok(navHrefs(sheetNav("owner", "/admin/editor")).includes("/admin/onboarding"), "the sheet has it too:");
 });
 
-// ---- P4-SCAFFOLD: product and collection addresses, document ids, editability --
+// ---- P4-SCAFFOLD: product and collection addresses, document ids -------------
 console.log("— P4-SCAFFOLD: the editor's product and collection addresses (plan section 4)");
 const IDS = await import("../lib/documents/ids.js");
-const EDIT = await import("../lib/registry/editability.js");
-const Reg = await import("../lib/registry/index.js");
 
 await t("P4-SCAFFOLD unit: entityEditorHref and parseEditorTarget round-trip product and collection gids, encoded", () => {
   const P = "gid://shopify/Product/8123456789";
@@ -560,20 +549,7 @@ await t("P4-SCAFFOLD unit: productDocumentId and collectionDocumentId are async,
   eq(await IDS.backfillRouteId("page", "about"), `doc_p_${createHash("sha256").update("route:about").digest("hex").slice(0, 16)}`, "backfillRouteId:");
 });
 
-await t("P4-SCAFFOLD unit: typeHasEditor and cartEditable are pure; the system journal index and unknown types have no editor", () => {
-  for (const type of Reg.documentTypeNames()) {
-    const d = Reg.documentType(type);
-    eq(EDIT.typeHasEditor(type), d.editable && !d.system, `${type}:`);
-  }
-  eq(EDIT.typeHasEditor("journal_index"), false, "journal_index:");
-  for (const yes of ["home", "header", "page", "cart", "product_content", "design"]) eq(EDIT.typeHasEditor(yes), true, `${yes}:`);
-  for (const no of ["", null, undefined, "nope", "__proto__", "constructor", 3]) eq(EDIT.typeHasEditor(no), false, `${String(no)}:`);
-  eq(EDIT.CART_EDITABLE, true, "CART_EDITABLE:");
-  eq(EDIT.cartEditable(), true, "cartEditable():");
-  eq(EDIT.cartEditable(), EDIT.cartEditable(), "stable:");
-  // pure: no database, no request, no node: import
-  const src = readFileSync(join(ROOT, "lib/registry/editability.js"), "utf8");
-  ok(!/from\s+["']node:/.test(src) && !/\b(libsql|db|cookies|headers|fetch)\s*\(/.test(src) && !/lib\/db\.js/.test(src), "editability.js is not pure");
+await t("P4-SCAFFOLD unit: lib/documents/ids.js is pure (no node: import)", () => {
   const ids = readFileSync(join(ROOT, "lib/documents/ids.js"), "utf8");
   ok(!/from\s+["']node:/.test(ids), "ids.js imports node:");
 });

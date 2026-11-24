@@ -727,6 +727,46 @@ await t("the console route /api/admin/media: PATCH {archived} archives and bring
   }
 });
 
+await t("a usage read that fails (document_refs gone) refuses the delete with a 5xx, forced or not, and the media row and its bytes stay", async () => {
+  const I = await import("../lib/platform/identity.js");
+  const Sess = await import("../lib/platform/sessions.js");
+  const route = await import("../app/api/admin/media/route.js");
+  const norefs = await F.makeTenant({ name: "mr-norefs", id: "mrnorefs", config: CONFIG });
+  try {
+    const u = await I.createUser({ email: "owner@mrnorefs.test", name: "Owner", password: "mr-norefs-pass-1" });
+    await I.addMembership(u.id, "mrnorefs", "owner");
+    const tok = (await Sess.createSession({ userId: u.id, kind: "merchant", ttlMs: 600_000 })).token;
+    const req = (body) => ({
+      cookies: { get: (n) => (n === "_admin" ? { value: tok } : undefined) },
+      headers: { get: (k) => ({ host: "mrnorefs.test" })[k.toLowerCase()] ?? null },
+      url: "https://mrnorefs.test/api/admin/media",
+      nextUrl: { pathname: "/api/admin/media" },
+      json: async () => body,
+    });
+    const f = await upload(norefs);
+    const before = await sql(norefs, "SELECT length(data) AS n, sha256 FROM media WHERE id = ?", [f.id]);
+    ok(before[0]?.n > 0, "the file has bytes");
+    const c = norefs.client();
+    try {
+      await c.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
+      await c.execute("DROP TABLE document_refs");
+    } finally {
+      c.close();
+    }
+    for (const force of [false, true]) {
+      const res = await route.DELETE(req({ id: f.id, force }), {});
+      const body = await res.json();
+      ok(res.status >= 500 && res.status < 600, `force ${force}: a 5xx, got ${res.status} ${JSON.stringify(body)}`);
+      ok(!["MEDIA_IN_USE", "STORE_MODE_INVALID"].includes(body.code) && !body.deleted, `force ${force}: refused for the failed read, never deleted, called in use or a mode error: ${JSON.stringify(body)}`);
+      eq(await sql(norefs, "SELECT length(data) AS n, sha256 FROM media WHERE id = ?", [f.id]), before, `force ${force}: the row and its bytes stay:`);
+    }
+    eq(await norefs.run(() => codeOf(M.deleteMedia(f.id, { force: true }))) === "ok", false, "the library call refuses too:");
+    eq(await stored(norefs, f.id), 1, "still stored:");
+  } finally {
+    await norefs.cleanup();
+  }
+});
+
 // ---- done --------------------------------------------------------------------------------
 for (const c of raws.values()) c.close();
 for (const fx of [docs, legacy, moving, old24, cli]) await fx.cleanup();

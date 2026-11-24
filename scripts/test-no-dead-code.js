@@ -6,7 +6,8 @@
 // Checks, over the files git knows (tracked and new, never ignored):
 //   1. reachability: a walk of the real import graph from the roots below.
 //      app/ and components/ must be reached from a production root; lib/ from
-//      a production or a tooling root; scripts/ from a tooling root.
+//      a production or a non-test tooling root (code only tests reach is
+//      dead); scripts/ from any tooling root, test:* suites included.
 //      Edges come from TypeScript's own parser (comments never count): import,
 //      export from, import(), require(), new URL(…, import.meta.url), any
 //      string literal (or template piece, or the literal arguments of a
@@ -16,7 +17,8 @@
 //   2. ALLOWLIST: files the walk cannot see reached, each with a reason. An
 //      entry fails when its file is gone or the walk now reaches it.
 //   3. legacy names: a string literal naming a retired table or job, or an
-//      identifier of the retired content-mode code (outside LEGACY_EXEMPT).
+//      identifier of the retired content-mode code (outside LEGACY_EXEMPT,
+//      whose entries fail once they name none).
 //   4. path mentions: every lib|components|app|scripts/….js|mjs named in
 //      app/, components/ or lib/ (comments included) exists.
 //   5. wiring: every `node <file>` in package.json exists, every
@@ -55,27 +57,23 @@ const COMMAND_FILES = (files) => files.filter((f) => f.startsWith(".githooks/") 
 const LEGACY_TABLES = ["cms_blocks", "cms_pages", "cms_history", "cms_templates", "cms_approvals", "cms_preview_candidates", "product_overrides", "collection_overrides", "placements", "cms_migration_runs", "content_live_reversed", "publish_release"];
 const LEGACY_STRING = new RegExp(`\\b(${LEGACY_TABLES.join("|")})\\b`);
 const LEGACY_IDENTIFIERS = new Set(["assertLegacyContentWrites", "runLegacyBatch", "legacyGuardStatement", "migratingGuardStatement", "STORE_USES_LEGACY", "STORE_MIGRATING", "MIGRATING_MESSAGE"]);
-// Tests that write or count a retired table to prove the documents path
-// ignores it. An entry fails once its file no longer names one.
-const LEGACY_PROOFS = [
+// Files that may name a retired table or job, each with its reason. A path
+// ending in "/" covers everything under it. Every entry fails once nothing it
+// covers names one any more (a string in code, any text in SQL).
+const LEGACY_EXEMPT = [
+  { path: "migrations/", reason: "the migration history creates and alters the retired tables" },
+  { path: "lib/schema.sql", reason: "the base store schema still creates the retired tables (never dropped)" },
+  { path: "lib/platform/provision.js", reason: "CONTENT_TABLES lists them for the fresh-store check" },
+  { path: "lib/platform/export.js", reason: "a founder's data export still includes what the old tables hold" },
+  { path: "app/(console)/admin/(authed)/editor/templates/page.js", reason: "the saved-templates page reads cms_templates" },
+  { path: "scripts/test-schema-compat.js", reason: "proves the migration chain still creates the retired tables" },
+  { path: "scripts/test-provision.js", reason: "proves provisioning's freshness check over the content tables" },
+  { path: "scripts/test-tenant-ops.js", reason: "proves export and tenant operations over the retired tables" },
   { path: "scripts/test-sections-render.js", reason: "seeds a leftover collection_overrides pin to prove a documents store's rails never read it" },
   { path: "scripts/test-design-doc.js", reason: "counts cms_blocks rows to prove a design save writes no legacy block" },
+  { path: SELF, reason: "the guard's own list of retired names" },
 ];
-const LEGACY_EXEMPT = (f) =>
-  f.startsWith("migrations/") ||
-  LEGACY_PROOFS.some((e) => e.path === f) ||
-  [
-    "lib/schema.sql",
-    "lib/platform/provision.js",
-    "lib/platform/export.js",
-    "lib/admin/saved-templates.js",
-    "app/(console)/admin/(authed)/editor/templates/page.js",
-    "scripts/test-schema-compat.js",
-    "scripts/test-provision.js",
-    "scripts/test-tenant-ops.js",
-    "scripts/support/tenant-fixture.js",
-    SELF,
-  ].includes(f);
+const exemptCovers = (e, f) => (e.path.endsWith("/") ? f.startsWith(e.path) : f === e.path);
 
 const PATH_MENTION = /(?<![\w-])((?:lib|components|app|scripts)\/[A-Za-z0-9_\-.()[\]/]*?\.m?js)(?![\w])/g;
 
@@ -104,9 +102,29 @@ function walk(root, rel) {
 
 // A literal is read as a path only where code could load it: a module
 // specifier, an argument of a call or new (import(), require(), join(),
-// readFile(), new URL(), spawn()), or an element of a list (argument lists,
-// file lists). A path held as data ({ where: "components/x.js" }, a constant
-// compared against) names a file without loading it, so it is no edge.
+// new URL(), spawn()), or an element of a list (argument lists, file lists).
+// A path held as data ({ where: "components/x.js" }, a constant compared
+// against) names a file without loading it, so it is no edge. Neither is a
+// file read as text (readFileSync(join(ROOT, "lib/x.js")) to check its
+// source): readsText() marks those, and they reach only non-code files
+// (lib/schema.sql, a JSON fixture), never a module.
+const TEXT_READS = new Set(["readFileSync", "readFile", "existsSync", "statSync", "stat", "lstat", "lstatSync", "access", "accessSync", "createReadStream", "readdir", "readdirSync"]);
+const PATH_BUILDERS = new Set(["join", "resolve"]);
+const calleeName = (call) => (ts.isPropertyAccessExpression(call.expression) ? call.expression.name.text : ts.isIdentifier(call.expression) ? call.expression.text : "");
+function readsText(node) {
+  for (let n = node, p = node.parent; p; n = p, p = p.parent) {
+    if (ts.isCallExpression(p) && p.arguments.includes(n)) {
+      const name = calleeName(p);
+      if (TEXT_READS.has(name)) return true;
+      if (PATH_BUILDERS.has(name)) continue;
+      return false;
+    }
+    if (ts.isNewExpression(p) && ts.isIdentifier(p.expression) && p.expression.text === "URL") continue;
+    if (ts.isTemplateSpan(p) || ts.isTemplateExpression(p)) continue;
+    return false;
+  }
+  return false;
+}
 function loads(node) {
   const p = node.parent;
   if (!p) return false;
@@ -122,38 +140,38 @@ function loads(node) {
 function scan(root, file) {
   const text = readFileSync(join(root, file), "utf8");
   const specs = [];
+  const reads = [];
   const strings = [];
   const identifiers = [];
   if (file.endsWith(".css")) {
     for (const m of text.matchAll(/@import\s+(?:url\()?\s*["']([^"']+)["']/g)) specs.push(m[1]);
-    return { text, specs, strings, identifiers };
+    return { text, specs, reads, strings, identifiers };
   }
-  if (!CODE.test(file)) return { text, specs, strings, identifiers };
+  if (!CODE.test(file)) return { text, specs, reads, strings, identifiers };
   const kind = file.endsWith(".ts") ? ts.ScriptKind.TS : file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.JSX;
   const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, kind);
   const visit = (node) => {
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
       strings.push(node.text);
-      if (loads(node)) specs.push(node.text);
+      if (loads(node)) (readsText(node) ? reads : specs).push(node.text);
     } else if (ts.isTemplateExpression(node)) {
       for (const piece of [node.head.text, ...node.templateSpans.map((s) => s.literal.text)]) {
         strings.push(piece);
-        if (loads(node)) specs.push(piece);
+        if (loads(node)) (readsText(node) ? reads : specs).push(piece);
       }
     } else if (ts.isIdentifier(node)) {
       identifiers.push(node.text);
     }
     if (ts.isCallExpression(node)) {
-      const callee = ts.isPropertyAccessExpression(node.expression) ? node.expression.name.text : ts.isIdentifier(node.expression) ? node.expression.text : "";
-      if (callee === "join" || callee === "resolve") {
+      if (PATH_BUILDERS.has(calleeName(node))) {
         const parts = node.arguments.filter((a) => ts.isStringLiteral(a) || ts.isNoSubstitutionTemplateLiteral(a)).map((a) => a.text);
-        if (parts.length > 1) specs.push(parts.join("/"));
+        if (parts.length > 1) (readsText(node) ? reads : specs).push(parts.join("/"));
       }
     }
     ts.forEachChild(node, visit);
   };
   visit(sf);
-  return { text, specs, strings, identifiers };
+  return { text, specs, reads, strings, identifiers };
 }
 
 function makeResolver(present) {
@@ -201,12 +219,20 @@ export function audit(root, { allowlist = ALLOWLIST } = {}) {
     const base = posix.basename(f);
     return (CODE.test(base) && APP_CONVENTIONS.has(base.replace(CODE, ""))) || APP_METADATA.test(base);
   });
-  const toolingRoots = new Set(files.filter((f) => f.startsWith("scripts/real-checks/")));
-  const commandSources = [...Object.values(scripts), ...COMMAND_FILES(files).map((f) => readFileSync(join(root, f), "utf8"))];
-  for (const cmd of commandSources) {
+  // Tooling roots: every package.json script, hook and workflow command, and
+  // scripts/real-checks/**. Operational roots leave out the test:* suites:
+  // lib/ code that only a test reaches is dead (a suite keeps scripts/ helpers
+  // alive, never product code).
+  const operationalRoots = new Set(files.filter((f) => f.startsWith("scripts/real-checks/")));
+  const testRoots = new Set();
+  const commandSources = [
+    ...Object.entries(scripts).map(([name, cmd]) => [name.startsWith("test:"), cmd]),
+    ...COMMAND_FILES(files).map((f) => [false, readFileSync(join(root, f), "utf8")]),
+  ];
+  for (const [isTest, cmd] of commandSources) {
     for (const w of commandWords(cmd)) {
       const hit = resolve(w, "package.json");
-      if (hit) toolingRoots.add(hit);
+      if (hit) (isTest ? testRoots : operationalRoots).add(hit);
     }
   }
 
@@ -217,18 +243,24 @@ export function audit(root, { allowlist = ALLOWLIST } = {}) {
       const f = stack.pop();
       if (seen.has(f)) continue;
       seen.add(f);
-      for (const spec of scanOf(f).specs) {
+      const { specs, reads } = scanOf(f);
+      for (const spec of specs) {
         const to = resolve(spec, f);
         if (to && !seen.has(to)) stack.push(to);
+      }
+      for (const spec of reads) {
+        const to = resolve(spec, f);
+        if (to && !CODE.test(to) && !seen.has(to)) stack.push(to);
       }
     }
     return seen;
   };
   const production = reach(productionRoots);
-  const tooling = reach(toolingRoots);
+  const operational = reach(operationalRoots);
+  const tooling = reach([...operationalRoots, ...testRoots]);
   const reached = (f) => {
     if (f.startsWith("app/") || f.startsWith("components/")) return production.has(f);
-    if (f.startsWith("lib/")) return production.has(f) || tooling.has(f);
+    if (f.startsWith("lib/")) return production.has(f) || operational.has(f);
     if (f.startsWith("scripts/")) return tooling.has(f);
     return true;
   };
@@ -247,13 +279,13 @@ export function audit(root, { allowlist = ALLOWLIST } = {}) {
   }
   for (const f of unreached) {
     if (allowlist.some((e) => e && typeof e.path === "string" && covers(e, f))) continue;
-    const rule = f.startsWith("scripts/") ? "a tooling root" : f.startsWith("lib/") ? "a production or tooling root" : "a production root";
+    const rule = f.startsWith("scripts/") ? "a tooling root" : f.startsWith("lib/") ? "a production or non-test tooling root (a test alone doesn't count)" : "a production root";
     fail("reachability", `${f} is not reached from ${rule}: delete it, or allowlist it with the reason the walk cannot see it`);
   }
 
   // ---- 3. legacy names ----
   for (const f of files) {
-    if (!CODE.test(f) || !SUBJECT_DIRS.some((d) => f.startsWith(d)) || LEGACY_EXEMPT(f)) continue;
+    if (!CODE.test(f) || !SUBJECT_DIRS.some((d) => f.startsWith(d)) || LEGACY_EXEMPT.some((e) => exemptCovers(e, f))) continue;
     const { strings, identifiers } = scanOf(f);
     for (const s of strings) {
       const m = LEGACY_STRING.exec(s);
@@ -261,8 +293,9 @@ export function audit(root, { allowlist = ALLOWLIST } = {}) {
     }
     for (const id of new Set(identifiers)) if (LEGACY_IDENTIFIERS.has(id)) fail("legacy", `${f} uses the retired ${id}`);
   }
-  for (const e of root === ROOT ? LEGACY_PROOFS : []) {
-    if (!present.has(e.path) || !scanOf(e.path).strings.some((s) => LEGACY_STRING.test(s))) fail("legacy", `${e.path} is exempt as a legacy proof but no longer names a retired table: remove the entry`);
+  for (const e of root === ROOT ? LEGACY_EXEMPT : []) {
+    const names = (f) => (CODE.test(f) ? scanOf(f).strings.some((x) => LEGACY_STRING.test(x)) : LEGACY_STRING.test(scanOf(f).text));
+    if (!files.some((f) => exemptCovers(e, f) && names(f))) fail("legacy", `${e.path} is exempt from the legacy-name check but no longer names a retired table: remove the entry`);
   }
 
   // ---- 4. path mentions ----
@@ -322,11 +355,14 @@ function selfTest() {
     // JSX text with an apostrophe must not open a string
     "components/Comp.js": 'import { y } from "./y";\nexport default function Comp() { return <p>Don\'t {y}</p>; }\n',
     "components/y.js": "export const y = 1;\n",
-    "lib/x.js": "// lib/z.js does the rest\nexport const x = process.env.FOO;\n",
+    // a text read of a non-code file (the schema) is an edge
+    "lib/x.js": '// lib/z.js does the rest\nimport { readFileSync } from "node:fs";\nexport const x = process.env.FOO;\nexport const sql = readFileSync(join(ROOT, "lib", "schema.sql"), "utf8");\n',
     "lib/z.js": "export const z = 1;\n",
-    "scripts/test-a.js": 'import { join } from "node:path";\nimport "../lib/x.js";\nconst p = join(ROOT, "lib", "z.js");\nconst f = new URL("./fixtures/a.json", import.meta.url);\n',
+    "scripts/test-a.js": 'import { join } from "node:path";\nimport "../lib/x.js";\nconst f = new URL("./fixtures/a.json", import.meta.url);\n',
     "scripts/fixtures/a.json": "{}",
-    "scripts/tool.js": "",
+    // a non-test tool keeps lib/z.js alive (a join() it runs)
+    "scripts/tool.js": 'import { spawnSync } from "node:child_process";\nspawnSync(process.execPath, [join(ROOT, "lib", "z.js")]);\n',
+    "lib/schema.sql": "",
   };
   const run = (extra = {}, opts = {}) => {
     const dir = mkdtempSync(join(tmpdir(), "no-dead-code-"));
@@ -345,6 +381,8 @@ function selfTest() {
   expect("a clean tree passes every check", run(), null);
   expect("an orphan component fails reachability", run({ "components/Orphan.js": "export default 1;\n" }), "reachability", "components/Orphan.js");
   expect("a component only a test reaches fails reachability", run({ "components/OnlyTested.js": "export default 1;\n", "scripts/test-a.js": `${base["scripts/test-a.js"]}import "../components/OnlyTested.js";\n` }), "reachability", "components/OnlyTested.js");
+  expect("a lib file only a test imports fails reachability", run({ "lib/tested.js": "export const t = 1;\n", "scripts/test-a.js": `${base["scripts/test-a.js"]}import "../lib/tested.js";\n` }), "reachability", "lib/tested.js");
+  expect("a lib file a non-test tool reads as text is no import", run({ "lib/read.js": "export const r = 1;\n", "scripts/tool.js": `${base["scripts/tool.js"]}import { readFileSync } from "node:fs";\nreadFileSync(join(ROOT, "lib", "read.js"), "utf8");\n` }), "reachability", "lib/read.js");
   expect("an orphan script fails reachability", run({ "scripts/old.js": "" }), "reachability", "scripts/old.js");
   expect("a retired table in a string fails legacy names", run({ "lib/z.js": 'export const z = "select * from cms_pages";\n' }), "legacy", "cms_pages");
   expect("a retired identifier fails legacy names", run({ "lib/z.js": "export const runLegacyBatch = 1;\n" }), "legacy", "runLegacyBatch");
