@@ -6,8 +6,10 @@ restyled to `docs/UI.md`. Consoles only: nothing under `app/(storefront)/` or
 names (`scripts/test-console-ui.js` checks both).
 
 In here: `button`, `input`, `progress`, `separator`, `skeleton`, `tooltip`, `sheet`, `dialog`,
-`dropdown-menu`, `avatar`, `sidebar`, `radio-group`, `label`, the `use-mobile` hook and `utils.js`
-(`cn`). Their tokens live in `app/console.css` under `.console` /
+`dropdown-menu`, `avatar`, `sidebar`, `radio-group`, `label`, `alert-dialog`, `badge`, `table`
+(its `containerClassName` styles the scroll box), `textarea`, `card`, `tabs`, `select`, `switch`,
+`checkbox`, `popover` (the last six from Phase 2 line 0), the `use-mobile` hook and `utils.js`
+(`cn`). Our own parts built from these live in `components/kit/` (docs/UI.md "Components"). Their tokens live in `app/console.css` under `.console` /
 `.console.dark`. Add `.console` to the console root `<body>` to use them.
 
 ## Never run the shadcn CLI in this repo
@@ -49,5 +51,7 @@ instead and copy the result in:
 - Overlays (`sheet`, `dialog`, `dropdown-menu`, `tooltip`) get `motion-reduce:animate-none`.
 - Every part keeps its `data-slot`. Sheets close on Esc (Radix Dialog's default;
   don't override `onEscapeKeyDown`).
+- Radix sets `data-state="checked"`/`"unchecked"`/`"active"`, not `data-checked`:
+  write `data-[state=checked]:` and friends.
 - Then run `node scripts/test-console-ui.js` and `pnpm drill:sf-styles` with
   `SF_STYLES_BASELINE` set to a capture made before the change.

@@ -2,8 +2,8 @@
 //   pnpm test:console-ui
 // No browser, no network. This suite proves:
 //   1. nothing reachable from app/(storefront)/** (or proxy.js / middleware.js /
-//      instrumentation.js) resolves into components/ui/, radix-ui,
-//      class-variance-authority or tailwind-merge
+//      instrumentation.js) resolves into components/ui/, components/kit/
+//      (Phase 2 line 0), radix-ui, class-variance-authority or tailwind-merge
 //   2. every app/console.css rule outside @theme, @utility, @property,
 //      @custom-variant and @keyframes is scoped to [data-console] or .console
 //      (no :root, *, html or body); tw-animate-css itself adds only @property,
@@ -53,9 +53,10 @@ const ok = (v, m = "") => {
 };
 
 const UI = "components/ui";
-const UI_FILES = ["alert-dialog", "avatar", "badge", "button", "dropdown-menu", "input", "label", "progress", "separator", "sheet", "sidebar", "skeleton", "table", "textarea", "tooltip", "use-mobile", "utils"].map((n) => `${UI}/${n}.js`);
+const KIT = "components/kit";
+const UI_FILES = ["alert-dialog", "avatar", "badge", "button", "card", "checkbox", "dropdown-menu", "input", "label", "popover", "progress", "select", "separator", "sheet", "sidebar", "skeleton", "switch", "table", "tabs", "textarea", "tooltip", "use-mobile", "utils"].map((n) => `${UI}/${n}.js`);
 const BANNED_PACKAGES = ["radix-ui", "class-variance-authority", "tailwind-merge"];
-const CONSOLE_DIRS = ["components/admin/", "components/console/", "components/platform/", "components/ui/"];
+const CONSOLE_DIRS = ["components/admin/", "components/console/", "components/platform/", "components/ui/", "components/kit/"];
 
 const walkFiles = (rel, out = []) => {
   const abs = join(ROOT, rel);
@@ -149,7 +150,7 @@ const storefrontFiles = () => [...walkFiles("app").filter((f) => !f.startsWith("
 
 // ---------- 1. the storefront never reaches the console components ----------
 
-await t("nothing reachable from the storefront resolves into components/ui/, radix-ui, class-variance-authority or tailwind-merge", async () => {
+await t("nothing reachable from the storefront resolves into components/ui/, components/kit/, radix-ui, class-variance-authority or tailwind-merge", async () => {
   const entries = [...walkFiles("app/(storefront)").filter(code), ...["proxy.js", "middleware.js", "instrumentation.js"].filter((f) => existsSync(join(ROOT, f)))];
   ok(entries.length > 20, `found ${entries.length} storefront entry files:`);
   const seen = new Set();
@@ -162,7 +163,7 @@ await t("nothing reachable from the storefront resolves into components/ui/, rad
   const visit = (rel, chain) => {
     if (seen.has(rel)) return;
     seen.add(rel);
-    if (rel.startsWith(`${UI}/`)) return bad.push(`${chain.join(" → ")} → ${rel}`);
+    if (rel.startsWith(`${UI}/`) || rel.startsWith(`${KIT}/`)) return bad.push(`${chain.join(" → ")} → ${rel}`);
     const src = readFileSync(join(ROOT, rel), "utf8");
     const ids = [...src.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*)(["'`])([^"'`$]+)\1/g)].map((m) => m[2]);
     for (const id of ids) {
@@ -176,6 +177,9 @@ await t("nothing reachable from the storefront resolves into components/ui/, rad
   for (const e of entries) visit(e, []);
   ok(seen.size > 100, `followed ${seen.size} files:`);
   eq(bad, [], "reached:");
+  // the bite: a storefront file that reached components/kit/ would be caught
+  visit(`${KIT}/money-cell.js`, ["(a storefront file)"]);
+  ok(bad.some((b) => b.endsWith(`${KIT}/money-cell.js`)), "a path into components/kit/ is caught:");
 });
 
 // ---------- 2. console.css is scoped ----------
@@ -421,6 +425,30 @@ await t("the components render server-side with their data-slots", async () => {
   ok(/class="[^"]*rounded-md[^"]*"[^>]*data-slot="button"|data-slot="button"[^>]*class="[^"]*rounded-md/.test(html), "a button is rounded-md:");
   // portal content (sheet, menu, tooltip) mounts only in a browser; their parts carry data-slot in the source
   for (const [f, s] of [["sheet", ["sheet-content", "sheet-overlay", "sheet-title", "sheet-close"]], ["dropdown-menu", ["dropdown-menu-content", "dropdown-menu-item"]], ["tooltip", ["tooltip-content"]], ["avatar", ["avatar-image"]]]) for (const x of s) ok(read(`${UI}/${f}.js`).includes(`data-slot="${x}"`), `${f}.js has data-slot="${x}":`);
+});
+
+await t("Phase 2 line 0's card, tabs, select, switch, checkbox and popover render server-side with their data-slots and the docs/UI.md radius and focus rules", async () => {
+  const h = React.createElement;
+  const [C, Tb, Se, Sw, Cb, Po] = await Promise.all(["card", "tabs", "select", "switch", "checkbox", "popover"].map((n) => load(`${UI}/${n}.js`)));
+  const html = renderToStaticMarkup(
+    h("div", null,
+      h(C.Card, null, h(C.CardHeader, null, h(C.CardTitle, null, "Sales"), h(C.CardDescription, null, "Last 7 days"), h(C.CardAction, null, "…")), h(C.CardContent, null, "₹1,499"), h(C.CardFooter, null, "Updated now")),
+      h(Tb.Tabs, { defaultValue: "a" }, h(Tb.TabsList, null, h(Tb.TabsTrigger, { value: "a" }, "All"), h(Tb.TabsTrigger, { value: "b" }, "Open")), h(Tb.TabsContent, { value: "a" }, "All orders")),
+      h(Se.Select, { defaultValue: "x" }, h(Se.SelectTrigger, { "aria-label": "Status" }, h(Se.SelectValue, { placeholder: "Any status" })), h(Se.SelectContent, null, h(Se.SelectItem, { value: "x" }, "Paid"))),
+      h(Sw.Switch, { "aria-label": "Enabled", defaultChecked: true }),
+      h(Cb.Checkbox, { "aria-label": "Select row", defaultChecked: true }),
+      h(Po.Popover, null, h(Po.PopoverTrigger, null, "Filters"), h(Po.PopoverContent, null, "x")),
+    ),
+  );
+  const slots = new Set([...html.matchAll(/data-slot="([\w-]+)"/g)].map((m) => m[1]));
+  const want = ["card", "card-header", "card-title", "card-description", "card-action", "card-content", "card-footer", "tabs", "tabs-list", "tabs-trigger", "tabs-content", "select-trigger", "select-value", "switch", "switch-thumb", "checkbox", "checkbox-indicator", "popover-trigger"];
+  eq(want.filter((x) => !slots.has(x)), [], "missing data-slots:");
+  ok(/data-slot="tabs-trigger"[^>]*data-state="active"|data-state="active"[^>]*data-slot="tabs-trigger"/.test(html) && /<button [^>]*data-state="checked"[^>]*data-slot="switch"|data-slot="switch"[^>]*data-state="checked"/.test(html), "Radix sets data-state (the variants we use):");
+  ok(/data-slot="card"[^>]*class="[^"]*\brounded-card\b[^"]*\bshadow-card\b|class="[^"]*\brounded-card\b[^"]*\bshadow-card\b[^"]*"[^>]*data-slot="card"/.test(html), "a card is rounded-card with shadow-card:");
+  for (const f of ["select", "switch", "checkbox", "tabs"]) ok(read(`${UI}/${f}.js`).includes("focus-visible:ring-ring focus-visible:ring-offset-2"), `${f} has the accent focus ring:`);
+  for (const f of ["select", "checkbox", "tabs"]) ok(/\brounded-md\b/.test(read(`${UI}/${f}.js`)), `${f}'s control is rounded-md:`);
+  for (const f of ["select", "popover"]) ok(/rounded-card/.test(read(`${UI}/${f}.js`)) && /shadow-overlay/.test(read(`${UI}/${f}.js`)) && read(`${UI}/${f}.js`).includes("motion-reduce:animate-none"), `${f}'s overlay: rounded-card, shadow-overlay, motion-reduce:`);
+  for (const [f, s] of [["select", ["select-content", "select-item", "select-label", "select-separator"]], ["popover", ["popover-content", "popover-title", "popover-description"]]]) for (const x of s) ok(read(`${UI}/${f}.js`).includes(`data-slot="${x}"`), `${f}.js has data-slot="${x}":`);
 });
 
 // ---------- 10. line 8: old screens keep the old tokens inside [data-legacy] ----------

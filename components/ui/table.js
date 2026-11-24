@@ -3,14 +3,17 @@
 import * as React from "react"
 import { cn } from "@/components/ui/utils"
 
+// containerClassName: the scroll box (components/kit/data-table.js bounds its
+// height so the sticky header stays in view).
 function Table({
   className,
+  containerClassName,
   ...props
 }) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      className={cn("relative w-full overflow-x-auto", containerClassName)}
     >
       <table
         data-slot="table"

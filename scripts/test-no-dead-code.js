@@ -14,7 +14,8 @@
 //      join()/resolve() call) that names an existing file from the repo root
 //      or from the file's folder, the @/ alias, CSS @import, and extension and
 //      index resolution.
-//   2. ALLOWLIST: files the walk cannot see reached, each with a reason. An
+//   2. ALLOWLIST (scripts/support/dead-code-allowlist.js): files the walk
+//      cannot see reached, each with a reason. An
 //      entry fails when its file is gone or the walk now reaches it.
 //   3. legacy names: a string literal naming a retired table or job, or an
 //      identifier of the retired content-mode code (outside LEGACY_EXEMPT,
@@ -31,18 +32,15 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { dirname, join, posix } from "node:path";
 import { fileURLToPath } from "node:url";
+import { ALLOWLIST } from "./support/dead-code-allowlist.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SELF = "scripts/test-no-dead-code.js";
 const DRILLS = "scripts/drills/";
 
-// Files nothing reaches through a literal the walk can read. Every entry says
-// why it stays; a path ending in "/" covers everything under it.
-export const ALLOWLIST = [
-  { path: "components/console/README.md", reason: "the folder's notes for people (which console parts to use); Markdown is read, never imported" },
-  { path: "components/ui/README.md", reason: "the folder's notes for people (the shadcn copy-in rules); Markdown is read, never imported" },
-  { path: "lib/types/", reason: "TypeScript contracts that pnpm typecheck checks through tsconfig.json's include; JS modules adopt them one at a time, so nothing imports them yet" },
-];
+// Files nothing reaches through a literal the walk can read: the list lives
+// in scripts/support/dead-code-allowlist.js so parallel lines can append rows.
+export { ALLOWLIST };
 
 const CODE = /\.(js|mjs|cjs|jsx|ts|tsx)$/;
 const EXTS = [".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".json", ".css"];

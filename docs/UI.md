@@ -56,6 +56,7 @@ The Storeasy lime (`#84cc16`) is the platform's logo mark only; it is never a co
 - **From shadcn, restyled:** Button, Input, Textarea, Select, Checkbox, Switch, RadioGroup, Label, Form (react-hook-form + zod for validation messages), Dialog, AlertDialog (every destructive action), Sheet, DropdownMenu, Command (store switcher and search), Tabs, Table, Badge, Card, Tooltip, Popover, Skeleton, Separator, Sonner toasts, Sidebar.
 - **Our own, built from those:** `PageHeader` (title, description, primary action), `StatusBadge` (maps a domain status to a status colour and plain word), `EmptyState` (one sentence and one action), `DataTable` (sort, filter, paginate, row actions), `StepList` (onboarding progress), `MoneyCell`, `RoleGate` (hides a control the role cannot use and shows the reason on hover).
 - **Installed so far (Phase 0 line 7):** Button, Input, Separator, Skeleton, Tooltip, Sheet, DropdownMenu, Avatar, Sidebar (plus the `use-mobile` hook and `cn`), in `components/ui/`. Dialog arrived with Phase 1 line 7 (onboarding step 4's "Open your store"); RadioGroup with Phase 1 line 6 (onboarding step 3's colours). The rest of the list above arrives with the first screen that needs it. **Command** (the store switcher and `⌘K`) is deferred with `cmdk`; Sonner and Form (react-hook-form + zod) are deferred too. How to add one: `components/ui/README.md` (generate in a scratch project, never run the shadcn CLI in this repo). **Phase 1 line 8 adds** Table, Badge (plus status tones `success`, `warning`, `danger`, `info`, `muted`: a tint with the status colour as text; warning text is `text-warning-text`), Textarea, Label and AlertDialog (shadcn 4.23.0), first used by the operator's `/platform/onboarding` screen. That screen is the first operator screen on `components/ui`: `app/(console)/platform/layout.js` is a pass-through and the old operator screens carry their own `data-legacy` region (`page.js`, `loading.js`, `error.js`).
+- **Phase 2 line 0 adds** Card, Tabs, Select, Switch, Checkbox and Popover to `components/ui/` (shadcn 4.23.0, restyled), and our own parts in **`components/kit/`**, built on `components/ui` only (plus `lib/format.js` and `lib/platform/authz.js`): `page-header.js` (`PageHeader`: title, description, breadcrumb, actions), `status-badge.js` (`StatusBadge`: plain words and tones for order, offer, bundle, media and sync states; `offerState()`), `empty-state.js` (`EmptyState`), `money-cell.js` (`MoneyCell`: `formatMoney`, mono, right-aligned), `role-gate.js` (`RoleGate`: hides a control, or shows it `aria-disabled` with the reason in a tooltip, still focusable) and `data-table.js` (`DataTable`: columns, row link, row actions slot, skeleton rows, empty state, a sticky header in a height-capped scroll box, 40px rows (48px on touch), truncation with a tooltip, a "1–50 of N" footer with Previous/Next or "Load more"; sorting and filtering come from the server through props, no TanStack). Tested by `pnpm test:console-kit`. A page on the new UI is listed in `lib/admin/new-ui-routes.js`: the shell then puts it straight into `main` (no `data-legacy` region; the notices keep their own), and support's stray-control rule covers all of `main`, so a read control on such a page (a search box, a filter, a row link, Next) carries `data-read-control`; the kit's own reads already do.
 - **When to add one:** only when the same arrangement appears on three screens. Otherwise compose in the screen.
 - **Words:** plain sentences, no error codes on screen, every refusal says what to do next. Buttons say what they do ("Publish home page", not "Submit").
 
@@ -71,3 +72,17 @@ design.
 - **Crowded:** tables paginate at 50 rows and keep the header and actions visible; long names truncate with the full name in a tooltip.
 - **Support role:** write controls are hidden or disabled with the reason; the page never shows a button that will be refused.
 - **Keyboard:** every action reachable by Tab, visible focus ring in `--c-accent`, Esc closes dialogs and sheets, `⌘K` opens the command menu.
+
+## Merchant screens (Phase 2)
+
+Each Phase 2 line fills only its own sub-heading. Every screen here is on the new UI (listed in `lib/admin/new-ui-routes.js`), built from `components/ui` and `components/kit`.
+
+### Dashboard
+
+### Orders
+
+### Catalog
+
+### Offers and bundles
+
+### Media

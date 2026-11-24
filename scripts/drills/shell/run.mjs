@@ -13,11 +13,13 @@
 // roles store is closed; Phase 1 line 3) in the onboarding shell (no sidebar,
 // the 56px top bar, the step panel); then /admin/dashboard with the sidebar
 // and a 56px top bar; the onboarding nav item opens the onboarding shell; the nav's hrefs are navFor(role); every item
-// opens with 200, no error boundary, a non-empty [data-legacy] and
-// aria-current on that item; at 900 the sidebar is icon width and a tooltip
+// opens with 200, no error boundary, a non-empty [data-legacy] (on a new-UI
+// route, lib/admin/new-ui-routes.js: content in main and no [data-legacy] but
+// the notices') and aria-current on that item; at 900 the sidebar is icon width and a tooltip
 // shows on focus; at 375 the trigger opens the sheet, Esc closes it with
 // focus back on the trigger, and a link tap closes it.
-// Support: outside [data-legacy] only allowlisted controls on every page; the
+// Support: outside [data-legacy] (on a new-UI route: anywhere) only
+// allowlisted controls on every page; the
 // account menu (name, email, "Support", the read-only note, Sign out the only
 // action); no create item in the switcher; the write buttons support still
 // sees inside the old screens go to support-write-controls.json (Phase 2's
@@ -33,6 +35,7 @@ import { join } from "node:path";
 import { ROOT } from "../../design-harness.js";
 import { runDrill, settle } from "../p3/lib.mjs";
 import { navFor, navItems } from "../../../lib/admin/nav.js";
+import { isNewUiRoute } from "../../../lib/admin/new-ui-routes.js";
 
 const DRILL_ID = "SHELL";
 const WIDTHS = [1280, 900, 375];
@@ -68,13 +71,30 @@ const ORIGIN = `http://roles.localhost:${port}`;
 const ANNEX = `http://annex.localhost:${port}`;
 const seed = () => JSON.parse(readFileSync(join(ROOT, ".design-data-roles", "roles-seed.json"), "utf8"));
 
-// In the page: interactive elements outside [data-legacy] that are not nav
-// links or allowlisted shell controls.
-function strayControls(allowed) {
+// In the page: interactive elements that are not nav links or allowlisted
+// shell controls, outside [data-legacy] (an old route) or anywhere (a new-UI
+// route, lib/admin/new-ui-routes.js: the rule covers the whole of main). On a
+// new-UI route a control also passes when it is a read the page marked
+// (inside [data-read-control]: a search box, a row link, Next) or a
+// RoleGate-disabled one (disabled or aria-disabled="true").
+function strayControls([allowed, newUi]) {
   const q = 'a[href], button, input, select, textarea, [role="menuitem"], [tabindex]:not([tabindex="-1"])';
+  const passes = (el) => newUi && (el.closest("[data-read-control]") || el.disabled || el.getAttribute("aria-disabled") === "true");
   return [...document.querySelectorAll(q)]
-    .filter((el) => !el.closest("[data-legacy]") && !el.closest("[data-nav-item]") && !allowed.some((c) => el.closest(`[data-shell-control="${c}"]`)))
+    .filter((el) => (newUi || !el.closest("[data-legacy]")) && !el.closest("[data-nav-item]") && !allowed.some((c) => el.closest(`[data-shell-control="${c}"]`)) && !passes(el))
     .map((el) => `${el.tagName.toLowerCase()}${el.getAttribute("aria-label") ? `[${el.getAttribute("aria-label")}]` : ""} "${(el.innerText || "").trim().slice(0, 40)}"`);
+}
+// In the page: an old route's content sits in main > [data-legacy]; a new-UI
+// route's sits in main directly, and the only [data-legacy] regions left are
+// the notices' own.
+function regionOk(newUi) {
+  const main = document.querySelector("main");
+  if (!newUi) {
+    const el = document.querySelector("main > [data-legacy]");
+    return el ? el.children.length > 0 && (el.textContent || "").trim().length > 0 : false;
+  }
+  const strays = [...main.querySelectorAll("[data-legacy]")].filter((el) => !el.querySelector("[data-console-notices]"));
+  return strays.length === 0 && (main.textContent || "").trim().length > 0;
 }
 // In the page: the enabled buttons and action links inside the old screens.
 function legacyControls() {
@@ -187,10 +207,8 @@ async function roleAtWidth(drill, page, role, width, out) {
       if (role === "support" && width === 1280) check(o.enabledWrites.length === 0, `${href}: support sees no enabled control in the step panel`, o.enabledWrites);
       continue;
     }
-    const legacy = await page.evaluate(() => {
-      const el = document.querySelector("main > [data-legacy]");
-      return el ? el.children.length > 0 && (el.textContent || "").trim().length > 0 : false;
-    });
+    const newUi = isNewUiRoute(href);
+    const legacy = await page.evaluate(regionOk, newUi);
     let current;
     if (width === 375) {
       await page.locator('[data-shell-control="toggle"]').click();
@@ -201,10 +219,10 @@ async function roleAtWidth(drill, page, role, width, out) {
     } else {
       current = await page.locator('[data-slot="sidebar-container"] a[aria-current="page"]').evaluateAll((els) => els.map((e) => e.getAttribute("href")));
     }
-    check(r?.status() === 200 && !ERROR_TEXT.test(body) && legacy && JSON.stringify(current) === JSON.stringify([href]), `${href} opens (200, no error, content in [data-legacy], aria-current)`, { status: r?.status(), error: ERROR_TEXT.test(body), legacy, current });
+    check(r?.status() === 200 && !ERROR_TEXT.test(body) && legacy && JSON.stringify(current) === JSON.stringify([href]), `${href} opens (200, no error, ${newUi ? "new UI: content in main, no [data-legacy] but the notices'" : "content in [data-legacy]"}, aria-current)`, { status: r?.status(), error: ERROR_TEXT.test(body), legacy, current });
     if (role === "support" && width === 1280) {
-      const stray = await page.evaluate(strayControls, CONTROLS);
-      check(stray.length === 0, `${href}: outside [data-legacy] only nav links and shell controls`, stray);
+      const stray = await page.evaluate(strayControls, [CONTROLS, newUi]);
+      check(stray.length === 0, `${href}: ${newUi ? "anywhere" : "outside [data-legacy]"} only nav links and shell controls`, stray);
       out.supportWrites.push({ page: href, controls: await page.evaluate(legacyControls) });
     }
   }
@@ -335,10 +353,7 @@ async function supportEmptyStates(drill, ctx, creds) {
     const r = await page.goto(ANNEX + href, { waitUntil: "load" });
     await settle(page);
     const body = await page.locator("body").innerText().catch(() => "");
-    const legacy = await page.evaluate(() => {
-      const el = document.querySelector("main > [data-legacy]");
-      return el ? (el.textContent || "").trim().length > 0 : false;
-    });
+    const legacy = await page.evaluate(regionOk, isNewUiRoute(href));
     // onboarding is new UI in its own shell (no [data-legacy]): its step panel is the content
     const content = href === ONBOARDING ? (await onboardingShell(page)).panel : legacy;
     drill.check(r?.status() === 200 && !ERROR_TEXT.test(body) && content, `support on the empty Roles Annex: ${href} renders (200, no error, content)`, { status: r?.status(), error: ERROR_TEXT.test(body), legacy, content, url: page.url() });

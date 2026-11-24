@@ -15,7 +15,11 @@
 //      the current store marked; operator-support and bootstrap get []
 //   4. support's shell rendered on the server: outside [data-legacy] the only
 //      interactive elements are nav links and the allowlisted shell controls;
-//      the read-only label is there; the page renders inside [data-legacy]
+//      the read-only label is there; on an old route the page renders inside
+//      main > [data-legacy]; on a new-UI route (isNewUiRoute,
+//      lib/admin/new-ui-routes.js) main holds the page directly, only the
+//      notices keep a [data-legacy] region, and the stray-control rule covers
+//      the whole of main
 //   5. accountItems() and switcherItems() hold no write item
 //   6. the old-region wrapper is on every old region (§3.4) and the editor
 //      preview clears the top bar (§3.6)
@@ -61,6 +65,7 @@ process.env.PLATFORM_CACHE_MS = "0";
 const Nav = await import("../lib/admin/nav.js");
 const { ACTIONS, ROLES, isWriteAction, roleAllows } = await import("../lib/platform/authz.js");
 const { ADMIN_PAGES } = await import("./support/admin-pages.js");
+const { NEW_UI_ROUTES, isNewUiRoute } = await import("../lib/admin/new-ui-routes.js");
 
 // Phase 1 line 3: Setup (admin-only) became Onboarding (every role) and
 // "Logo and colours" moved into onboarding's Brand step.
@@ -362,20 +367,29 @@ await t("consoleNotices(): only operator, reason, expires_at of a grant and id, 
 
 // ---------- 4. support's shell, rendered on the server ----------
 console.log("— the shell, rendered");
-let pathname = "/admin/orders/ord_1";
-const shellLoad = world({
+// an old route: the first support page not yet on the new UI (a detail page
+// while orders is old, so the nav's prefix rule is exercised)
+const OLD_PATH = ["/admin/orders/ord_1", ...Nav.navItems(Nav.navFor("support")).map((i) => `${i.href}/x`)].find((p) => !isNewUiRoute(p) && !p.startsWith("/admin/onboarding"));
+const OLD_ITEM = Nav.activeItem(OLD_PATH, Nav.navItems(Nav.navFor("support"))).href;
+let pathname = OLD_PATH;
+const shellStubs = {
   "next/navigation": { usePathname: () => pathname, useRouter: () => ({ push() {}, refresh() {}, replace() {} }) },
   "next/link": { __esModule: true, default: ({ href, children, ...rest }) => React.createElement("a", { href, ...rest }, children) },
-});
-const { AdminShell } = await shellLoad(join(ROOT, "components/admin/shell/AdminShell.js"));
+};
+const { AdminShell } = await world(shellStubs)(join(ROOT, "components/admin/shell/AdminShell.js"));
+// the same shell with /admin/orders on the new UI, so the new-route branch is
+// proven while NEW_UI_ROUTES is still empty
+const STUB_ROUTES = ["/admin/orders"];
+const { AdminShell: AdminShellNew } = await world({ ...shellStubs, "@/lib/admin/new-ui-routes": { NEW_UI_ROUTES: STUB_ROUTES, isNewUiRoute: (p) => isNewUiRoute(p, STUB_ROUTES) } })(join(ROOT, "components/admin/shell/AdminShell.js"));
 const PAGE = '<p id="page-marker">page</p>';
-const render = (role, actor, path = "/admin/orders/ord_1") => {
+const NOTICES = '<p id="notices-marker">notice</p>';
+const render = (role, actor, path = OLD_PATH, { Shell = AdminShell, notices = null, page = React.createElement("p", { id: "page-marker" }, "page") } = {}) => {
   pathname = path;
   return renderToStaticMarkup(
     React.createElement(
-      AdminShell,
-      { nav: Nav.navFor(role), badges: { returns: 2, publish: "1" }, actor, account: actor.kind === "merchant" ? { name: "Sam Support", email: "support@roles.test" } : null, stores: [], storeName: "Roles Demo Co", storeId: "roles" },
-      React.createElement("p", { id: "page-marker" }, "page"),
+      Shell,
+      { nav: Nav.navFor(role), badges: { returns: 2, publish: "1" }, actor, account: actor.kind === "merchant" ? { name: "Sam Support", email: "support@roles.test" } : null, stores: [], storeName: "Roles Demo Co", storeId: "roles", notices },
+      page,
     ),
   );
 };
@@ -388,6 +402,9 @@ const outsideLegacy = (html) => {
 };
 const interactive = (html) => [...html.matchAll(/<(a|button|input|select|textarea)\b[^>]*>|<[a-z]+\b[^>]*(?:role="(?:menuitem|button|link)"|tabindex="(?!-1")[^"]*")[^>]*>/g)].map((m) => m[0]);
 const ALLOWED_CONTROLS = ["skip", "toggle", "switcher", "account"];
+// on a new-UI route a control in main also passes when the page marked it a
+// read (data-read-control) or RoleGate disabled it (the drill's rule too)
+const newUiPasses = (e) => /\sdata-read-control(?:=""|="true")?(?:\s|>)|\sdisabled(?:=""|\s|>)|aria-disabled="true"/.test(e);
 
 await t("support's shell: outside [data-legacy] only nav links and the allowlisted shell controls; the read-only label; the page inside [data-legacy]", async () => {
   for (const [label, actor, words] of [
@@ -403,8 +420,8 @@ await t("support's shell: outside [data-legacy] only nav links and the allowlist
     eq(ALLOWED_CONTROLS.filter((c) => !out.includes(`data-shell-control="${c}"`)), [], `${label}: every shell control is there:`);
     eq([...out.matchAll(/data-nav-item="([\w-]+)"/g)].map((m) => m[1]), READ_IDS, `${label}: the nav links are support's:`);
     ok(out.includes(`data-shell="read-only"`) && out.includes(words.replace("·", "&#183;")) || out.includes(words), `${label}: the read-only label "${words}":`);
-    ok(/<a [^>]*href="\/admin\/orders"[^>]*aria-current="page"|<a [^>]*aria-current="page"[^>]*href="\/admin\/orders"/.test(out), `${label}: Orders is current on /admin/orders/ord_1:`);
-    ok(/<main [^>]*id="console-content"[^>]*>\s*<div data-legacy="true" class="contents">/.test(html), `${label}: main > [data-legacy]:`);
+    ok(out.includes(`href="${OLD_ITEM}"`) && new RegExp(`<a [^>]*href="${OLD_ITEM}"[^>]*aria-current="page"|<a [^>]*aria-current="page"[^>]*href="${OLD_ITEM}"`).test(out), `${label}: ${OLD_ITEM} is current on ${OLD_PATH}:`);
+    ok(/<main [^>]*id="console-content"[^>]*>\s*<div data-legacy="true" class="contents">/.test(html), `${label}: main > [data-legacy] on the old route ${OLD_PATH}:`);
   }
   const owner = outsideLegacy(render("owner", { kind: "merchant", role: "owner" }));
   ok(!owner.includes('data-shell="read-only"'), "an owner has no read-only label:");
@@ -412,6 +429,45 @@ await t("support's shell: outside [data-legacy] only nav links and the allowlist
   ok(/data-shell="topbar"[^>]*class="[^"]*\bh-14\b/.test(owner) || /class="[^"]*\bh-14\b[^"]*"[^>]*data-shell="topbar"/.test(owner), "the top bar is 56px (h-14):");
   ok(owner.indexOf('data-shell-control="skip"') < owner.indexOf("data-nav-item"), "the skip link comes before the nav:");
   ok(/max-w-\[1200px\]/.test(owner) && /\bpx-4\b[^"]*\bmd:px-6\b/.test(owner), "content capped at 1200px, 16px / 24px side padding:");
+});
+
+await t("isNewUiRoute: a prefix at a '/' (activeItem's rule); NEW_UI_ROUTES is frozen and every row is a console page", () => {
+  ok(Object.isFrozen(NEW_UI_ROUTES), "NEW_UI_ROUTES is frozen:");
+  eq(["/admin/orders", "/admin/orders/ord_1", "/admin/ordersx", "/admin", "/admin/order", null].map((p) => isNewUiRoute(p, STUB_ROUTES)), [true, true, false, false, false, false], "the prefix rule:");
+  eq(NEW_UI_ROUTES.filter((p) => isNewUiRoute(p) !== true), [], "each row matches itself:");
+  const pages = ADMIN_PAGES.filter((r) => r.page).map((r) => `/admin/${r.page}`);
+  eq(NEW_UI_ROUTES.filter((p) => !pages.includes(p)), [], "each row is a console page (scripts/support/admin-pages.js):");
+  eq(new Set(NEW_UI_ROUTES).size, NEW_UI_ROUTES.length, "no repeated row:");
+});
+
+await t("support's shell on a new-UI route: main holds the page directly, the notices keep their own [data-legacy], no stray control anywhere in main", async () => {
+  // every real new-UI prefix with the real shell, and /admin/orders with the stubbed list
+  const cases = [...NEW_UI_ROUTES.map((p) => [p, AdminShell]), ["/admin/orders/ord_1", AdminShellNew]];
+  for (const [path, Shell] of cases) {
+    for (const [label, actor] of [
+      ["support member", { kind: "merchant", role: "support" }],
+      ["operator support", { kind: "operator-support", role: "support", id: "usr_op1" }],
+    ]) {
+      const html = render("support", actor, path, { Shell });
+      ok(!html.includes("data-legacy"), `${label} on ${path}: no [data-legacy] region:`);
+      ok(/<main [^>]*id="console-content"[^>]*>\s*<p id="page-marker">/.test(html), `${label} on ${path}: main > the page:`);
+      const main = html.slice(html.indexOf("<main "), html.indexOf("</main>"));
+      eq(interactive(main).filter((e) => !ALLOWED_CONTROLS.some((c) => e.includes(`data-shell-control="${c}"`)) && !newUiPasses(e)), [], `${label} on ${path}: interactive elements in main:`);
+      const bad = interactive(html).filter((e) => !/data-nav-item="/.test(e) && !ALLOWED_CONTROLS.some((c) => e.includes(`data-shell-control="${c}"`)));
+      eq(bad, [], `${label} on ${path}: interactive elements outside the allowlist:`);
+      const withNotices = render("support", actor, path, { Shell, notices: React.createElement("p", { id: "notices-marker" }, "notice") });
+      ok(new RegExp(`<main [^>]*id="console-content"[^>]*>\\s*<div data-legacy="true" class="contents"><div class="mb-6">${NOTICES}</div></div>\\s*${PAGE}`).test(withNotices), `${label} on ${path}: the notices in their own [data-legacy], then the page:`);
+    }
+  }
+  // the rule bites: a stray write in main fails it; a marked read and a gated control pass
+  const h = React.createElement;
+  const page = h("div", null, h("a", { href: "/admin/orders/ord_2", "data-read-control": true }, "Open"), h("button", { "aria-disabled": true }, "Push"), h("button", { disabled: true }, "Cancel"), h("button", null, "Delete"));
+  const html = render("support", { kind: "merchant", role: "support" }, "/admin/orders", { Shell: AdminShellNew, page });
+  const main = html.slice(html.indexOf("<main "), html.indexOf("</main>"));
+  eq(interactive(main).filter((e) => !newUiPasses(e)), ["<button>"], "only the unmarked Delete is stray:");
+  // the old route with notices: both inside the one region
+  const old = render("support", { kind: "merchant", role: "support" }, OLD_PATH, { notices: React.createElement("p", { id: "notices-marker" }, "notice") });
+  ok(new RegExp(`<div data-legacy="true" class="contents"><div class="mb-6">${NOTICES}</div>${PAGE}</div>`).test(old), "old route: notices and page share main > [data-legacy]:");
 });
 
 // ---------- 6. the old-region wrapper and the editor preview ----------
