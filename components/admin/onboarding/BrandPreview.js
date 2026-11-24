@@ -24,7 +24,6 @@ export const LOOK_HELLO = Object.freeze({ type: "storeasy:editor:hello", v: 2, l
 export const COMPUTER_PX = 1280;
 const COMPUTER_HEIGHT = 640; // what the scaled page shows of itself, in console pixels
 const api = { startDocumentsPreview, setShowDesign };
-let shared = null; // { box: { frame, onView }, ctl }: the page's one preview controller
 
 export default function BrandPreview({ message = null, canEdit = false, saved = 0, className = "" }) {
   const frameRef = useRef(null);
@@ -47,32 +46,26 @@ export default function BrandPreview({ message = null, canEdit = false, saved = 
 
   useEffect(() => {
     const origin = window.location.origin;
-    // One controller (one preview session) per page: a second mount of this
-    // component (a remount, or React's double mount in development) takes
-    // over the first one's controller and points it at its own frame,
-    // instead of minting again.
-    if (!shared) {
-      const box = { frame: null, onView: null };
+    // one controller per mount (start() is idempotent: strict mode's second
+    // effect mints nothing new)
+    let ctl = ctlRef.current;
+    if (!ctl) {
       const frame = {
         setSrc: (p) => {
-          if (box.frame) box.frame.src = p;
+          if (frameRef.current) frameRef.current.src = p;
         },
         post: (msg) => {
           try {
-            box.frame?.contentWindow?.postMessage(msg, origin);
+            frameRef.current?.contentWindow?.postMessage(msg, origin);
           } catch {
             /* the frame is navigating */
           }
         },
-        currentPath: () => box.frame?.contentWindow?.location?.pathname ?? null,
+        currentPath: () => frameRef.current?.contentWindow?.location?.pathname ?? null,
       };
-      shared = { box, ctl: createPreviewController({ api, frame, documentId: "doc_design", pathFor: () => "/", hello: LOOK_HELLO, onChange: (v) => box.onView?.(v) }) };
+      ctl = createPreviewController({ api, frame, documentId: "doc_design", pathFor: () => "/", hello: LOOK_HELLO, onChange: setView });
+      ctlRef.current = ctl;
     }
-    const { box, ctl } = shared;
-    const takeover = box.frame !== null && box.frame !== frameRef.current;
-    box.frame = frameRef.current;
-    box.onView = setView;
-    ctlRef.current = ctl;
     const onMessage = (e) => {
       if (e.origin !== origin || e.source !== frameRef.current?.contentWindow) return;
       ctl.message(e.data);
@@ -81,12 +74,8 @@ export default function BrandPreview({ message = null, canEdit = false, saved = 
     };
     window.addEventListener("message", onMessage);
     ctl.start();
-    // a new frame element on the session already made: load the page in it
-    // (its load event reaches the controller as any reload does)
-    if (takeover && frameRef.current) frameRef.current.src = "/";
     return () => {
       window.removeEventListener("message", onMessage);
-      if (box.onView === setView) box.onView = null;
       ctl.dispose();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
