@@ -69,7 +69,10 @@ export default function StepList({ steps, selected, onSelect, doneCount, total, 
               >
                 <Marker step={s} index={i} selected={s.id === selected} />
                 <span className="text-xs leading-tight text-foreground">{s.label}</span>
-                <span className="sr-only">{STATE_WORDS[s.state]}</span>
+                <span className="sr-only">
+                  {STATE_WORDS[s.state]}
+                  {blockedReason(s, steps) ? `: ${blockedReason(s, steps)}` : ""}
+                </span>
               </button>
             </li>
           ))}
