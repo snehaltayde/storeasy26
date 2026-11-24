@@ -509,7 +509,7 @@ await t("sf-styles compare: identical captures have no differences; a synthetic 
   const same = structuredClone(base);
   same[0].elements[0].s = { "letter-spacing": "normal", color: "red" }; // property order never matters
   const d0 = C.diffRuns(base, same);
-  eq(JSON.stringify(d0.totals), JSON.stringify({ style: 0, box: 0, added: 0, removed: 0, shots: 0, missing: 0 }), "identical:");
+  eq(JSON.stringify(d0.totals), JSON.stringify({ style: 0, box: 0, added: 0, removed: 0, customChanged: 0, customAdded: 0, shots: 0, missing: 0 }), "identical:");
   ok(C.isClean(d0.totals), "identical is clean:");
   eq(C.elementHash(base[0].elements[0]), C.elementHash(same[0].elements[0]), "hash ignores property order:");
   const next = structuredClone(base);
@@ -519,10 +519,17 @@ await t("sf-styles compare: identical captures have no differences; a synthetic 
   next[0].elements.pop();
   next[0].elements.push(el("html>body:1>div:1", { color: "red" }));
   const d1 = C.diffRuns(base, next);
-  eq(JSON.stringify(d1.totals), JSON.stringify({ style: 1, box: 1, added: 1, removed: 1, shots: 1, missing: 0 }), "changed:");
+  eq(JSON.stringify(d1.totals), JSON.stringify({ style: 1, box: 1, added: 1, removed: 1, customChanged: 0, customAdded: 0, shots: 1, missing: 0 }), "changed:");
   ok(!C.isClean(d1.totals), "changed is not clean:");
   const s = d1.pages[0].samples.find((x) => x.kind === "style");
   eq(`${s.k} ${s.prop} ${s.before} → ${s.after}`, "html letter-spacing normal → 0.0375px", "style sample:");
+  // custom properties: a new one is reported, not failed; a changed one fails
+  const tok = structuredClone(base);
+  tok[0].elements[0].s["--tw-enter-opacity"] = "1";
+  const d3 = C.diffRuns(base, tok);
+  eq(`${d3.totals.customAdded} ${d3.totals.customChanged} ${d3.customAdded.join(",")} ${C.isClean(d3.totals)}`, "1 0 --tw-enter-opacity true", "a new custom property:");
+  const d4 = C.diffRuns(tok, structuredClone(tok).map((c) => ((c.elements[0].s["--tw-enter-opacity"] = "0"), c)));
+  eq(`${d4.totals.customChanged} ${C.isClean(d4.totals)}`, "1 false", "a changed custom property:");
   const d2 = C.diffRuns(base, [{ ...base[0], width: 768 }]);
   eq(d2.totals.missing, 2, "a page at another width is missing both ways:");
   eq(C.round(10.26), 10.5, "boxes round to 0.5px:");

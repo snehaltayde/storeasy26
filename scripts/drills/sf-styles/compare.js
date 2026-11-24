@@ -9,8 +9,13 @@
 //        ::before / ::after, which have no box of their own)
 //     shot  sha256 of the full-page screenshot
 //
-// diffRuns(base, next) → { totals, pages, missing }: the computed-style,
-// box and element differences per page and width, with a few samples each.
+// diffRuns(base, next) → { totals, pages, missing, customAdded }: the
+// computed-style, box and element differences per page and width, with a few
+// samples each. Custom properties (--*) are counted apart: one that appears
+// (absent before) is a new token, reported by name; one whose value changed
+// fails like any other property. A console-only change adds tokens a
+// storefront element carries but never reads (tw-animate-css's registered
+// @property --tw-*, theme variables on :root); it must not change any.
 import { createHash } from "node:crypto";
 
 export const round = (n) => Math.round(Number(n) * 2) / 2;
@@ -33,7 +38,8 @@ export const captureKey = (c) => `${c.page}@${c.width}`;
 export function diffCapture(base, next, { limit = 20 } = {}) {
   const a = new Map(base.elements.map((e) => [e.k, e]));
   const b = new Map(next.elements.map((e) => [e.k, e]));
-  const out = { page: next.page, width: next.width, style: 0, box: 0, added: 0, removed: 0, shot: base.shot === next.shot ? "same" : "differs", samples: [] };
+  const out = { page: next.page, width: next.width, style: 0, box: 0, added: 0, removed: 0, customChanged: 0, customAdded: 0, shot: base.shot === next.shot ? "same" : "differs", samples: [], customNames: [] };
+  const names = new Set();
   const sample = (row) => out.samples.length < limit && out.samples.push(row);
   for (const [k, e] of a) {
     const f = b.get(k);
@@ -49,8 +55,14 @@ export function diffCapture(base, next, { limit = 20 } = {}) {
     if (elementHash({ ...e, b: null }) === elementHash({ ...f, b: null })) continue;
     for (const p of new Set([...Object.keys(e.s), ...Object.keys(f.s)])) {
       if (e.s[p] === f.s[p]) continue;
-      out.style++;
-      sample({ k, kind: "style", prop: p, before: e.s[p] ?? null, after: f.s[p] ?? null });
+      if (p.startsWith("--") && e.s[p] === undefined) {
+        out.customAdded++;
+        names.add(p);
+        continue;
+      }
+      if (p.startsWith("--")) out.customChanged++;
+      else out.style++;
+      sample({ k, kind: p.startsWith("--") ? "custom" : "style", prop: p, before: e.s[p] ?? null, after: f.s[p] ?? null });
     }
   }
   for (const k of b.keys()) {
@@ -58,6 +70,7 @@ export function diffCapture(base, next, { limit = 20 } = {}) {
     out.added++;
     sample({ k, kind: "added" });
   }
+  out.customNames = [...names].sort();
   return out;
 }
 
@@ -74,9 +87,11 @@ export function diffRuns(base, next, opts) {
   }
   for (const k of byKey.keys()) missing.push(`${k} (not in this run)`);
   const sum = (f) => pages.reduce((n, p) => n + p[f], 0);
-  const totals = { style: sum("style"), box: sum("box"), added: sum("added"), removed: sum("removed"), shots: pages.filter((p) => p.shot !== "same").length, missing: missing.length };
-  return { totals, pages, missing };
+  const totals = { style: sum("style"), box: sum("box"), added: sum("added"), removed: sum("removed"), customChanged: sum("customChanged"), customAdded: sum("customAdded"), shots: pages.filter((p) => p.shot !== "same").length, missing: missing.length };
+  const customAdded = [...new Set(pages.flatMap((p) => p.customNames))].sort();
+  return { totals, pages, missing, customAdded };
 }
 
-// The pass rule: no computed-style, box or element difference and no missing capture.
-export const isClean = (t) => t.style === 0 && t.box === 0 && t.added === 0 && t.removed === 0 && t.missing === 0;
+// The pass rule: no computed-style, box or element difference, no changed
+// custom property and no missing capture (new custom properties are reported).
+export const isClean = (t) => t.style === 0 && t.box === 0 && t.added === 0 && t.removed === 0 && t.customChanged === 0 && t.missing === 0;

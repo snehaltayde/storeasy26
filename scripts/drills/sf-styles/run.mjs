@@ -64,8 +64,11 @@ export function captureDom() {
       if (cs.content === "none" || cs.content === "normal") continue;
       out.push({ k: path + pseudo, s: styleOf(cs), b: null });
     }
+    // <script>s are never drawn, and Next dev streams a varying number of
+    // them (123 or 124 on one page between two runs of the same commit),
+    // which would shift every later sibling's path: skipped, not counted
     let i = 0;
-    for (const c of el.children) walk(c, `${path}>${c.tagName.toLowerCase()}:${++i}`);
+    for (const c of el.children) if (c.tagName !== "SCRIPT") walk(c, `${path}>${c.tagName.toLowerCase()}:${++i}`);
   };
   walk(document.documentElement, "html");
   return out;
@@ -216,16 +219,17 @@ async function sfStyles(drill) {
     cssDeltaBytes: manifest.css.bytes - base.manifest.css.bytes,
     totals: diff.totals,
     missing: diff.missing,
+    customAdded: diff.customAdded,
     pages: diff.pages,
   };
   writeFileSync(join(drill.dir, "compare.json"), `${JSON.stringify(report, null, 2)}\n`);
   const t = diff.totals;
-  drill.note(`compare: ${t.style} computed-style, ${t.box} box, ${t.added} added and ${t.removed} removed element differences; ${t.shots} screenshot(s) differ; ${t.missing} missing; CSS ${report.cssDeltaBytes >= 0 ? "+" : ""}${report.cssDeltaBytes} bytes`);
+  drill.note(`compare: ${t.style} computed-style, ${t.box} box, ${t.added} added and ${t.removed} removed element differences; ${t.customChanged} changed and ${t.customAdded} added custom properties (${diff.customAdded.join(", ") || "none"}); ${t.shots} screenshot(s) differ; ${t.missing} missing; CSS ${report.cssDeltaBytes >= 0 ? "+" : ""}${report.cssDeltaBytes} bytes`);
   if (bite) {
     const caught = diff.pages.some((p) => p.samples.some((s) => s.prop === "letter-spacing"));
     drill.check(!isClean(t) && caught, "bite: the 0.01em letter-spacing is caught as computed-style differences", t);
   } else {
-    drill.check(isClean(t), "no computed-style, box or element differences against the baseline", t);
+    drill.check(isClean(t), "no computed-style, box or element differences against the baseline (custom properties: additions only)", t);
     if (t.shots) drill.note(`screenshot differences: ${diff.pages.filter((p) => p.shot !== "same").map((p) => `${p.page}@${p.width}`).join(", ")} (they fail only if the baseline-vs-baseline screenshots were identical; see compare.json)`);
   }
 }
