@@ -552,9 +552,9 @@ export async function gridStage(drill) {
   const nowList = (await getDoc(page)).body.sections.find((s) => s.id === secId)?.settings?.bundles;
   drill.check(after.phase === "done" && JSON.stringify(nowList) === JSON.stringify([{ id: A.id }, { id: S.id }, { id: X.id }]), "grid: 'Remove it and publish' on the turned-off bundle removes only it from the grid, and publishes", { phase: after.phase, nowList });
   const left = after.issues.filter((i) => /Remove this bundle from the grid/.test(i.text)).map((i) => i.text.replace(/\s+/g, " "));
-  drill.check(left.length === 2 && left.some((t) => t.includes("Grid sold")) && left.some((t) => t.includes(X.id)), "grid: the republish still warns about the sold-out and the deleted one", left);
+  drill.check(left.length === 2 && left.some((t) => t.includes("Grid sold")) && left.some((t) => t.includes("A deleted bundle")), "grid: the republish still warns about the sold-out and the deleted one", left);
   await drill.screenshot(page, "grid-after-remove-1440");
-  const after2 = await actOn(page, X.id, "Remove it and publish");
+  const after2 = await actOn(page, "A deleted bundle", "Remove it and publish");
   const nowList2 = (await getDoc(page)).body.sections.find((s) => s.id === secId)?.settings?.bundles;
   drill.check(after2.phase === "done" && JSON.stringify(nowList2) === JSON.stringify([{ id: A.id }, { id: S.id }]), "grid: then 'Remove it and publish' on the deleted one removes only it", nowList2);
   const live2 = await liveHome(drill, base);

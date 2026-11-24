@@ -204,7 +204,12 @@ export class P3Drill extends Drill {
     }
     const seed = readSeed();
     const page = await ctx.newPage();
-    await page.goto(storeUrl(this, store, "/admin/login"));
+    const res = await page.goto(storeUrl(this, store, "/admin/login"));
+    if (!(await page.locator("#login-password").waitFor({ timeout: 30_000 }).then(() => true, () => false))) {
+      await this.shoot(page, `login-not-shown-${role}`).catch(() => {});
+      const text = (await bodyText(page).catch(() => "")).replace(/\s+/g, " ").slice(0, 300);
+      throw new DrillError(`The sign-in form didn't show for ${role}: ${res?.status() ?? "no answer"} at ${page.url()}: "${text}"`);
+    }
     if (store === "live") await page.locator("#login-email").fill(seed.logins[role].email);
     await page.locator("#login-password").fill(store === "live" ? seed.logins[role].password : readCredentials(ROOT).DESIGN_ADMIN_PASSWORD || "");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
