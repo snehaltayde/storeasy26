@@ -258,9 +258,11 @@ await t("between drills the runner waits until the last harness has exited (pid 
   const { spawn } = await import("node:child_process");
   const child = spawn(process.execPath, ["-e", `const s=require("net").createServer().listen(${port},"127.0.0.1");setTimeout(()=>{s.close();process.exit(0)},1500)`], { stdio: "ignore" });
   try {
-    await new Promise((r) => setTimeout(r, 300));
-    let calls = 0;
-    const running = (dir) => (dir.endsWith(".design-data") && calls++ < 3 ? { launcher: { pid: child.pid } } : null);
+    // wait until the stand-in really listens (a loaded machine can take a while
+    // to start node), so the wait below has something to wait for
+    const { isPortBusy } = await import("./design-harness.js");
+    for (let i = 0; i < 100 && !(await isPortBusy(port)) && child.exitCode === null; i++) await new Promise((r) => setTimeout(r, 50));
+    const running = (dir) => (dir.endsWith(".design-data") && child.exitCode === null ? { launcher: { pid: child.pid } } : null);
     const t0 = Date.now();
     const g = await R.waitHarnessGone({ worktree: tmpdir(), ports: P, running, timeoutMs: 10_000, stepMs: 100 });
     eq(g.ok, true, "gone:");
