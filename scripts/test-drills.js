@@ -175,8 +175,13 @@ await t("assertCleanTree refuses tracked changes and new code files; ignores the
 await t("choosePorts skips a busy block and every owner port, and never frees anything", async () => {
   const asked = [];
   const busy = new Set([6100]);
-  const p = await R.choosePorts({ isBusy: async (n) => (asked.push(n), busy.has(n)) });
-  eq(JSON.stringify(p), JSON.stringify({ next: 6110, sqld: 7110, rolesNext: 6111, rolesSqld: 7113 }), "block:");
+  const p = await R.choosePorts({ slot: 0, isBusy: async (n) => (asked.push(n), busy.has(n)) });
+  eq(JSON.stringify(p), JSON.stringify({ next: 6110, sqld: 20200, rolesNext: 6111, rolesSqld: 20300 }), "block:");
+  // each heavy slot has its own region, so two slots never pick the same block
+  const regions = await Promise.all([1, 2, 3].map((slot) => R.choosePorts({ slot, isBusy: async () => false })));
+  eq(new Set(regions.flatMap((r) => R.portsOf(r))).size, regions.length * R.portsOf(regions[0]).length, "slot regions overlap");
+  eq(R.slotIndex({ HEAVY_SLOT: "2" }), 2, "HEAVY_SLOT read");
+  eq(R.slotIndex({}), 0, "no slot → region 0");
   const q = await R.choosePorts({ isBusy: async () => false, site: 3016, db: 7100, step: 1 });
   ok(![q.next, q.rolesNext].some((n) => R.OWNER_PORTS.includes(n)), `owner port chosen: ${JSON.stringify(q)}`);
   eq(q.next, 3019, "first block with no owner port:");

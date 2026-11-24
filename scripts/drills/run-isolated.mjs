@@ -76,10 +76,20 @@ export const worktreePath = (stamp, base = tmpdir()) => join(base, `storeasy-dri
 // 3. One block of ports: the design harness (site + three databases) and the
 // roles store (site + three databases). A block with any busy or owner port
 // is skipped, never freed.
-export async function choosePorts({ isBusy = isPortBusy, site = 6100, db = 7100, step = 10, tries = 40 } = {}) {
+// Each heavy slot (~/.claude/bin/heavy exports HEAVY_SLOT=1..3) gets its own port
+// region, so drills running at the same time in different slots can never pick the
+// same block (choosing a free block is check-then-use, so two runners checking at
+// once would otherwise race). Inside a block the design harness owns sqld..sqld+59
+// (databases, the Turso stand-in at +3, new stores from +10) and the roles harness
+// owns rolesSqld..rolesSqld+59, 100 apart, so the two never overlap either.
+export function slotIndex(env = process.env) {
+  const n = Number(env.HEAVY_SLOT);
+  return Number.isInteger(n) && n >= 1 && n <= 3 ? n : 0;
+}
+export async function choosePorts({ isBusy = isPortBusy, slot = slotIndex(), site = 6100 + slot * 100, db = 20000 + slot * 2000, step = 10, dbStep = 200, tries = 10 } = {}) {
   for (let i = 0; i < tries; i++) {
-    const p = { next: site + i * step, sqld: db + i * step, rolesNext: site + i * step + 1, rolesSqld: db + i * step + 3 };
-    const all = [p.next, p.sqld, p.sqld + 1, p.sqld + 2, p.rolesNext, p.rolesSqld, p.rolesSqld + 1, p.rolesSqld + 2];
+    const p = { next: site + i * step, sqld: db + i * dbStep, rolesNext: site + i * step + 1, rolesSqld: db + i * dbStep + 100 };
+    const all = portsOf(p);
     if (all.some((n) => OWNER_PORTS.includes(n))) continue;
     let busy = false;
     for (const n of all) if ((await isBusy(n, "127.0.0.1")) || (await isBusy(n, "::1"))) busy = true;
@@ -131,7 +141,7 @@ export function copyResults(worktree, root, stamp, id) {
 // Before the next drill: the last one's harnesses (design and roles) have
 // fully exited: no pid file names a live launcher and every port of this run
 // is free. → { ok: true } or { ok: false, why } after timeoutMs. Never kills.
-export const portsOf = (p) => [p.next, p.sqld, p.sqld + 1, p.sqld + 2, p.rolesNext, p.rolesSqld, p.rolesSqld + 1, p.rolesSqld + 2];
+export const portsOf = (p) => [p.next, p.sqld, p.sqld + 1, p.sqld + 2, p.sqld + 3, p.sqld + 10, p.rolesNext, p.rolesSqld, p.rolesSqld + 1, p.rolesSqld + 2, p.rolesSqld + 3, p.rolesSqld + 10];
 export async function waitHarnessGone({ worktree, ports, isBusy = isPortBusy, running = runningHarness, timeoutMs = 60_000, stepMs = 500 } = {}) {
   const end = Date.now() + timeoutMs;
   let why = "";
