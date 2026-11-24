@@ -1,6 +1,6 @@
 {
   "id": "CONSOLE-STYLES",
-  "ranAt": "2026-11-24T04:58:11.360Z",
+  "ranAt": "2026-11-24T05:27:31.442Z",
   "baseline": {
     "dir": "/Users/snehal/Documents/Projects 2026/storeasy26/.drill-results/2026-11-24T04-40-10-776Z/CONSOLE-STYLES",
     "head": "f0d2d7b",
@@ -13,16 +13,16 @@
     }
   },
   "run": {
-    "head": "6759d70",
+    "head": "a3b0ef6",
     "bite": false,
     "css": {
       "files": {
-        "/_next/static/chunks/%5Broot-of-the-server%5D__1e-iwqf._.css": 153424
+        "/_next/static/chunks/%5Broot-of-the-server%5D__1e-iwqf._.css": 153825
       },
-      "bytes": 153424
+      "bytes": 153825
     }
   },
-  "cssDeltaBytes": 1106,
+  "cssDeltaBytes": 1507,
   "ignoreProps": [
     "width",
     "height",
@@ -2893,5 +2893,24 @@
         "--sidebar-ring"
       ]
     }
-  ]
+  ],
+  "editorTop": {
+    "ok": true,
+    "moved": {
+      "k": "root>div:1>div:4>div:2",
+      "position": "sticky",
+      "from": "16px",
+      "to": "72px"
+    },
+    "placed": 1,
+    "others": 0,
+    "shifts": [
+      {
+        "k": "root>div:1>div:4>div:2",
+        "position": "sticky",
+        "from": "16px",
+        "to": "72px"
+      }
+    ]
+  }
 }
