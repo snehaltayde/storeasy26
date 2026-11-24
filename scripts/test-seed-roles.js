@@ -432,7 +432,8 @@ await t("15. the roles profile never touches a sibling .design-data/; the defaul
     eq(JSON.stringify(tree(design)) + R.fileHash(join(root, ".design-env")), before, ".design-data/ or .design-env changed by the roles profile");
 
     // the default profile: today's ports, env, folder, credentials and messages
-    eq(JSON.stringify(Harness.harnessPorts({})), JSON.stringify({ next: 3017, sqld: { platform: 18017, tenant: 18018, default: 18019 } }), "default ports");
+    // Phase 1 line 2 added the Turso stand-in (+3) and new stores' databases (+10)
+    eq(JSON.stringify(Harness.harnessPorts({})), JSON.stringify({ next: 3017, sqld: { platform: 18017, tenant: 18018, default: 18019 }, turso: 18020, storeBase: 18027 }), "default ports");
     eq(Harness.harnessEnv({}, {}, Harness.harnessPorts({})).NEXT_PUBLIC_SITE_URL, "http://localhost:3017", "default site url");
     const droot = await tempDir("design");
     mkdirSync(join(droot, ".design-data"));

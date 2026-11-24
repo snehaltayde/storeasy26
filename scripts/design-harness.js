@@ -12,6 +12,15 @@
 //   default    DESIGN_SQLD_PORT + 2  the env default (DATABASE_URL), used outside a store
 //
 // Data lives in .design-data/ (gitignored). Stopping the harness stops sqld.
+//
+// Phase 1 line 2: dev mode also runs a local stand-in for Turso's Platform API
+// (scripts/support/fake-turso-api.js) on DESIGN_SQLD_PORT + 3, and the app is
+// pointed at it (TURSO_API_URL on loopback, a random TURSO_API_TOKEN per run,
+// TURSO_ORG=local-fake), so a self-serve signup gets a store database of its own:
+// one more sqld per new store, on DESIGN_SQLD_PORT + 10 + n, its data under
+// .design-data/fake-turso/. Those children are recorded in the pid file and
+// stopped by their own handles (or, after a kill -9, by their recorded pids on
+// the next start); never by name or port. Seed mode never starts it.
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -59,6 +68,7 @@ const SEEDED = "seeded.json";
 // real payments, send mail or change cookie scope. The harness blanks them.
 // Next keeps a value that is already set, even an empty one, over .env.local.
 export const BLANKED_ENV = [
+  "TURSO_API_URL",
   "TURSO_DB_URL",
   "TURSO_DB_AUTH_TOKEN",
   "DATABASE_AUTH_TOKEN",
@@ -151,16 +161,22 @@ export function readPort(env, name, fallback) {
   return n;
 }
 
+// The Turso stand-in listens right after the databases; new stores' databases
+// start STORE_PORT_OFFSET above the first database port (room for STORE_PORTS).
+export const STORE_PORT_OFFSET = 10;
+export const STORE_PORTS = 50;
 export function harnessPorts(env = process.env, profile = DESIGN_PROFILE) {
   const { next: nextEnv, sqld: sqldEnv } = profile.portEnv;
   const next = readPort(env, nextEnv, profile.defaultPorts.next);
   const first = readPort(env, sqldEnv, profile.defaultPorts.sqld);
-  const last = first + DATABASES.length - 1;
-  if (last > 65535) throw new HarnessError(`${sqldEnv} is too high: the harness needs ${DATABASES.length} ports in a row starting there. Use a lower number.`);
+  const turso = first + DATABASES.length;
+  const storeBase = first + STORE_PORT_OFFSET;
+  const last = storeBase + STORE_PORTS - 1;
+  if (last > 65535) throw new HarnessError(`${sqldEnv} is too high: the harness needs ${last - first + 1} ports starting there (databases, the Turso stand-in and new stores). Use a lower number.`);
   if (next >= first && next <= last) {
     throw new HarnessError(`${nextEnv} (${next}) is one of the database ports (${first} to ${last}). Pick ports that don't overlap.`);
   }
-  return { next, sqld: Object.fromEntries(DATABASES.map((d) => [d.key, first + d.offset])) };
+  return { next, sqld: Object.fromEntries(DATABASES.map((d) => [d.key, first + d.offset])), turso, storeBase };
 }
 
 export const dbUrl = (port) => `http://127.0.0.1:${port}`;
@@ -226,7 +242,11 @@ export function isPortBusy(port, host = "127.0.0.1", timeoutMs = 400) {
 }
 
 async function busyPort(ports, { includeNext, portEnv = DESIGN_PROFILE.portEnv }) {
-  const list = [...(includeNext ? [["the web server", portEnv.next, ports.next]] : []), ...Object.entries(ports.sqld).map(([k, p]) => [`the ${k} database`, portEnv.sqld, p])];
+  const list = [
+    ...(includeNext ? [["the web server", portEnv.next, ports.next]] : []),
+    ...Object.entries(ports.sqld).map(([k, p]) => [`the ${k} database`, portEnv.sqld, p]),
+    ...(includeNext && ports.turso ? [["the local Turso stand-in", portEnv.sqld, ports.turso]] : []),
+  ];
   for (const [what, name, port] of list) {
     if ((await isPortBusy(port)) || (await isPortBusy(port, "::1"))) return { what, name, port };
   }
@@ -396,6 +416,7 @@ export async function stopLeftovers(dataDir, log = () => {}) {
   const targets = [
     ...(info.next ? [{ ...info.next, what: "the web server" }] : []),
     ...(info.sqld || []).map((s) => ({ ...s, what: "a local database server", match: resolve(dataDir) })),
+    ...(info.storeSqld || []).map((s) => ({ ...s, what: "a new store's local database server", match: resolve(dataDir) })),
   ];
   const stopped = [];
   for (const t of targets) {
@@ -440,12 +461,21 @@ export function readCredentials(root) {
 // storeasy.localhost (set after blanking, so a value from .env.local never
 // wins) and gives each new store <slug>.localhost and a file database under
 // the harness's own data folder (dataDir; the profile's folder by default).
-export function harnessEnv(baseEnv, fileEnv, ports, { siteHost = DESIGN_PROFILE.siteHost, dataDir = join(ROOT, DESIGN_PROFILE.dataDirName) } = {}) {
+// Line 2: the Turso values point at the harness's own stand-in on loopback,
+// with a random API token per run (tursoApiToken), set after blanking so a
+// value from the shell or .env.local never wins.
+export const FAKE_TURSO_ORG = "local-fake";
+export const tursoStandInPort = (ports) => ports.turso ?? Math.max(...Object.values(ports.sqld)) + 1;
+export function harnessEnv(baseEnv, fileEnv, ports, { siteHost = DESIGN_PROFILE.siteHost, dataDir = join(ROOT, DESIGN_PROFILE.dataDirName), tursoApiToken = randomBytes(24).toString("hex") } = {}) {
   const urls = harnessUrls(ports);
   const env = { ...baseEnv, ...fileEnv };
   for (const name of BLANKED_ENV) env[name] = "";
   return {
     ...env,
+    TURSO_API_URL: `http://127.0.0.1:${tursoStandInPort(ports)}`,
+    TURSO_API_TOKEN: tursoApiToken,
+    TURSO_ORG: FAKE_TURSO_ORG,
+    TURSO_GROUP: "default",
     PLATFORM_SITE_HOSTS: "storeasy.localhost",
     SIGNUP_STORE_DOMAIN: "localhost",
     STORE_DB_DIR: join(dataDir, "stores"),
@@ -554,11 +584,15 @@ export async function runHarness({ mode, root = ROOT, env = process.env, log = c
 
   let servers = [];
   let nextChild = null;
+  let fake = null;
   let stopping = null;
   const stopAll = () =>
     (stopping ??= (async () => {
       for (const s of servers) s.stopping = true;
       if (nextChild) await stopChild(nextChild, { graceMs: 10_000 });
+      // the stand-in stops each store database by its own handle
+      if (fake) await fake.close().catch(() => {});
+      fake = null;
       await Promise.all(servers.map((s) => stopChild(s.child)));
       clearPidfile(dataDir);
     })());
@@ -667,12 +701,31 @@ export async function runHarness({ mode, root = ROOT, env = process.env, log = c
 
     await startDatabases();
     try {
-      await repoint(harnessUrls(ports), profile.tenantId);
+      const { startFakeTursoApi } = await import("./support/fake-turso-api.js");
+      fake = await startFakeTursoApi({
+        token: childEnv.TURSO_API_TOKEN,
+        org: FAKE_TURSO_ORG,
+        dataDir,
+        backend: "sqld",
+        port: ports.turso,
+        sqldBin: sqld.bin,
+        storeBasePort: ports.storeBase,
+        onChildren: (list) => {
+          pidInfo.storeSqld = list.map((c) => ({ key: c.name, ...processStamp(c.pid), port: c.port }));
+          savePidfile();
+        },
+      });
+    } catch (e) {
+      throw new HarnessError(`The local Turso stand-in didn't start (${String(e?.message || e).slice(0, 160)}). Stop whatever uses ports ${ports.turso} and ${ports.storeBase}+, or set ${profile.portEnv.sqld} to other free ports.`);
+    }
+    try {
+      await repoint(harnessUrls(ports), profile.tenantId, fake.dbs());
     } catch (e) {
       throw new HarnessError(`The harness data looks incomplete (${String(e?.message || e).slice(0, 120)}). Run ${profile.commands.rebuild} to rebuild it.`);
     }
 
     log(`• local databases up: ${servers.map((s) => `${s.key} ${s.port}`).join(", ")} (data in ${profile.dataDirName}/)`);
+    log(`• local Turso stand-in on ${ports.turso}: new stores from signup get their own database (${fake.dbs().length} so far)`);
     log(`• storefront and consoles: http://${profile.siteHost}:${ports.next}  (merchant /admin/login, operator /platform; passwords in ${profile.loginsFile})`);
     nextChild = spawn(next[0], next[1], { cwd: root, env: childEnv, stdio: "inherit" });
     if (nextChild.pid) {
@@ -699,12 +752,20 @@ export async function runHarness({ mode, root = ROOT, env = process.env, log = c
 }
 
 // The tenant row records its database URL at seed time. If the ports changed
-// since, point it at this run's tenant server.
-export async function pointTenantAtThisRun(urls, tenantId = TENANT_ID) {
+// since, point it at this run's tenant server. Line 2: stores made through the
+// Turso stand-in (stores: [{ name: storeasy-t-<slug>, localUrl }]) are pointed
+// at this run's address for their database too.
+export async function pointTenantAtThisRun(urls, tenantId = TENANT_ID, stores = []) {
   const { createClient } = await import("@libsql/client");
   const client = createClient({ url: urls.platform });
   try {
     await client.execute({ sql: "UPDATE tenants SET db_url = ? WHERE id = ? AND db_url <> ?", args: [urls.tenant, tenantId, urls.tenant] });
+    for (const s of stores) {
+      const id = String(s.name || "").replace(/^storeasy-t-/, "");
+      if (!id || id === s.name || !s.localUrl) continue;
+      assertLocalDbUrl(`the ${id} store's database`, s.localUrl);
+      await client.execute({ sql: "UPDATE tenants SET db_url = ? WHERE id = ? AND db_url <> ?", args: [s.localUrl, id, s.localUrl] });
+    }
   } finally {
     client.close();
   }

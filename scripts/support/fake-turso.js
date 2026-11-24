@@ -23,7 +23,9 @@ const encodeResult = (rs) => ({
 });
 const hranaError = (e) => ({ message: String(e?.message || e), code: "SQLITE_ERROR" });
 
-export function fakeTurso(backing) {
+// opts.authorize(header): when given, a request whose Authorization header it
+// refuses gets 401 and runs nothing (the Platform API fake's per-database tokens).
+export function fakeTurso(backing, { authorize = null } = {}) {
   const state = {
     outage: false, // drop every request unexecuted
     // { match: RegExp, mode: "drop_before" | "commit_then_drop", before?, then? }: the
@@ -89,6 +91,10 @@ export function fakeTurso(backing) {
   // One request at a time, like a single SQLite writer.
   let chain = Promise.resolve();
   const server = createServer((req, res) => {
+    if (authorize && !authorize(req.headers.authorization || "")) {
+      req.resume();
+      return res.writeHead(401, { "content-type": "application/json" }).end(JSON.stringify({ error: "Unauthorized" }));
+    }
     let raw = "";
     req.on("data", (c) => (raw += c));
     req.on("end", () => {

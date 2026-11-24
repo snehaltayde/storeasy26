@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
 import { sameOrigin } from "@/lib/origin-check";
-import { listProvisionRuns, runProvision, compensateProvision } from "@/lib/platform/provision";
+import { listProvisionRuns, runProvision, compensateProvision, getProvisionRun } from "@/lib/platform/provision";
+import { resumeSignupRun, signupsForRuns } from "@/lib/platform/signup-provision";
+import { runJobById } from "@/lib/platform/worker";
 import { audit } from "@/lib/platform/audit";
 import { slog } from "@/lib/log";
 
@@ -9,6 +11,10 @@ import { slog } from "@/lib/log";
 // runs (idempotent steps verify real state — no duplicate resources), and
 // conservative compensation (deregisters what the run created; never deletes
 // a database).
+// Phase 1 line 2: each run carries `signup` ({ id, status, failureKind }) when a
+// self-serve signup made it; resuming such a run makes the signup's job due
+// (run in after()) instead of running inline, so the user and the owner
+// membership are made too.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -17,7 +23,9 @@ const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status
 
 export async function GET(request) {
   if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
-  return NextResponse.json({ ok: true, runs: await listProvisionRuns({ limit: 20 }) });
+  const runs = await listProvisionRuns({ limit: 20 });
+  const signups = await signupsForRuns(runs.filter((r) => r.params?.source === "signup").map((r) => r.id));
+  return NextResponse.json({ ok: true, runs: runs.map((r) => (signups[r.id] ? { ...r, signup: signups[r.id] } : r)) });
 }
 
 export async function POST(request) {
@@ -25,6 +33,14 @@ export async function POST(request) {
   if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
   const body = await request.json().catch(() => ({}));
   try {
+    if (body.action === "resume" && (await getProvisionRun(String(body.run || "")))?.params?.source === "signup") {
+      const q = await resumeSignupRun(String(body.run));
+      if (q?.jobId) after(() => runJobById(q.jobId, { budgetMs: 50_000 }));
+      slog("provision_resumed", { run: body.run, queued: Boolean(q?.jobId) });
+      await audit({ actor: { kind: "operator", id: "operator" }, action: "tenant.provision", resource: `run:${body.run}`, diff: { resumed: true, queued: Boolean(q?.jobId), signup: q?.signupId || null } });
+      if (!q?.jobId) return NextResponse.json({ error: q?.lapsed ? "This signup has lapsed; the founder has to start again." : q?.already === "done" ? "This signup is already done." : "No signup uses this run." }, { status: 422 });
+      return NextResponse.json({ ok: true, queued: true, signup: q.signupId });
+    }
     if (body.action === "resume") {
       // dbToken may be re-supplied for adopted-db runs (tokens are never stored)
       const r = await runProvision({ dbToken: body.dbToken || null }, { resumeRunId: String(body.run || "") });

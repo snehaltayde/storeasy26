@@ -264,6 +264,19 @@ await t("long jobs (catalog_sync) only run for a caller with a budget, and after
   eq(order.slice(1).join(","), "probe,sync:true", "with a budget: short first, the long one last and given the deadline:");
 });
 
+await t("Phase 1 line 2: provision_store is a long job (only budgeted callers lease it), with a handler", async () => {
+  ok(W.LONG_JOB_TYPES.includes("provision_store"), "long");
+  eq(typeof W.HANDLERS.provision_store, "function", "handler");
+  await C.platformDb().execute("UPDATE jobs SET status = 'done' WHERE status IN ('pending','leased')");
+  await J.enqueueJob({ type: "provision_store", payload: { signupId: "sgn_x" }, idempotencyKey: "k-prov" });
+  const ran = [];
+  const handlers = { provision_store: async () => ran.push("prov") };
+  await W.runDueJobs({ limit: 10, handlers });
+  eq(ran.length, 0, "no budget: not leased");
+  await W.runDueJobs({ limit: 10, handlers, budgetMs: 50_000 });
+  eq(ran.join(), "prov", "with a budget: run");
+});
+
 await t("a job leased but not reached before the deadline is handed back with its attempt", async () => {
   await C.platformDb().execute("UPDATE jobs SET status = 'done' WHERE status IN ('pending','leased')");
   await J.enqueueJob({ type: "probe", idempotencyKey: "k-slow" });

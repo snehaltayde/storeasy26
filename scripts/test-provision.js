@@ -1253,6 +1253,61 @@ await t("unit (P4-FIX5): createTenantDatabase through a stubbed turso CLI matche
   }
 });
 
+// Phase 1 line 2 (docs/plans/phase-1.md, Fit): two token bugs in the step ledger.
+// The database is served by the local Turso fake, whose Hrana server refuses a
+// request without a token it minted; the `turso` CLI is the stub seam.
+async function withTokenCheckedDb(name, fn) {
+  const { startFakeTursoApi } = await import("./support/fake-turso-api.js");
+  const { mkdtemp } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const dir = await mkdtemp(join(tmpdir(), "storeasy-prov-tok-"));
+  const fake = await startFakeTursoApi({ token: "prov-fake-api", org: "o", dataDir: dir, backend: "file" });
+  const saved = { token: process.env.TURSO_API_TOKEN, org: process.env.TURSO_ORG };
+  delete process.env.TURSO_API_TOKEN;
+  delete process.env.TURSO_ORG;
+  const d = await fake.addDatabase(`storeasy-t-${name}`);
+  const mint = async () => (await (await fetch(`${fake.url}/v1/organizations/o/databases/storeasy-t-${name}/auth/tokens?expiration=never`, { method: "POST", headers: { Authorization: "Bearer prov-fake-api" } })).json()).jwt;
+  globalThis[P.TURSO_TEST_RUNNER] = async (args) => {
+    if (args[1] === "list") return `NAME  GROUP  URL\nstoreasy-t-${name}  default  ${d.localUrl}\n`;
+    if (args[1] === "show") return d.localUrl;
+    if (args[1] === "tokens") return mint();
+    throw new Error(`unexpected turso ${args.join(" ")}`);
+  };
+  try {
+    await fn();
+  } finally {
+    delete globalThis[P.TURSO_TEST_RUNNER];
+    if (saved.token !== undefined) process.env.TURSO_API_TOKEN = saved.token;
+    if (saved.org !== undefined) process.env.TURSO_ORG = saved.org;
+    await fake.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+await t("line 2 bug 1: a run resuming at apply_schema (create_db already done) gets a database token, so the schema step works", async () => {
+  await withTokenCheckedDb("tokres", async () => {
+    const r1 = await P.runProvision({ id: "tokres", shopDomain: "tokres.myshopify.com" }, { failAt: "apply_schema" });
+    eq(r1.failedStep, "apply_schema", "stopped before the schema");
+    const r2 = await P.runProvision({}, { resumeRunId: r1.run.id });
+    eq(r2.run.status, "done", `resumed run: ${r2.error}`);
+  });
+});
+
+await t("line 2 bug 2: a run resuming at register_tenant on an http:// database registers a working token (not only libsql://)", async () => {
+  await withTokenCheckedDb("tokreg", async () => {
+    const r1 = await P.runProvision({ id: "tokreg", shopDomain: "tokreg.myshopify.com" }, { failAt: "register_tenant" });
+    eq(r1.failedStep, "register_tenant", "stopped before registering");
+    const r2 = await P.runProvision({}, { resumeRunId: r1.run.id });
+    eq(r2.run.status, "done", `resumed run: ${r2.error}`);
+    const tn = await C.getTenant("tokreg", { fresh: true });
+    ok(tn.dbUrl.startsWith("http://127.0.0.1:"), tn.dbUrl);
+    ok(tn.dbToken, "a token was registered");
+    const c = createClient({ url: tn.dbUrl, authToken: tn.dbToken });
+    ok((await c.execute("SELECT 1 AS one")).rows.length === 1, "the registered token opens the database");
+    c.close();
+  });
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 await removeDbs();
 process.exit(fail ? 1 : 0);

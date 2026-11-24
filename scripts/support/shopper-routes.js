@@ -31,6 +31,7 @@ export const SHOPPER_ROUTES = Object.freeze([
   { path: "signup", methods: ["GET", "POST"], class: "collector", suite: "test-signup.js", note: "marketing host only; GET checks an address, POST starts a signup" },
   { path: "signup/verify", methods: ["POST"], class: "token", suite: "test-signup.js", note: "the se_signup cookie and the emailed code" },
   { path: "signup/resend", methods: ["POST"], class: "token", suite: "test-signup.js", note: "the se_signup cookie" },
+  { path: "signup/status", methods: ["POST"], class: "token", suite: "test-signup-provision.js", note: "the se_signup cookie; runs that signup's own due job" },
   { path: "quiz/[slug]", methods: ["POST"], class: "collector", suite: "test-commerce.js" },
   { path: "errors", methods: ["POST"], class: "collector", suite: null },
   { path: "preview", methods: ["GET", "POST"], class: "token", suite: "test-logout-preview.js" },

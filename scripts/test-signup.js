@@ -4,7 +4,8 @@
 // stand-in fetch). Covers the provisioner's file driver and its refusals,
 // createUser({ passwordHash, emailVerifiedAt }), the signup rules (fields,
 // addresses, kill switch, limits, the email code, browser binding, no
-// enumeration, expiry), verify → store + user + owner + handoff, a failed
+// enumeration, expiry), verify → queued job (line 2) → store + user + owner →
+// status → handoff, a failed
 // setup resumed by Try again, the audit rows, platform_mail, and every
 // least-trusted test in §3 but the support page read (test-support-reads).
 //   pnpm test:signup
@@ -95,6 +96,13 @@ async function api(path, method, { body, host = MARKETING, origin, cookie, ip = 
     // empty
   }
   return { status: res.status, body: json, text, setCookie: res.headers.getSetCookie() };
+}
+// Line 2: verify queues the store's setup; the job runs in after() and the
+// waiting page polls /api/signup/status for the outcome.
+const status = (cookie) => api("signup/status", "POST", { body: {}, cookie });
+async function settle(cookie) {
+  await H.drainAfter();
+  return status(cookie);
 }
 const cookieFrom = (res) => res.setCookie.find((c) => c.startsWith(`${S.SIGNUP_COOKIE}=`))?.split(";")[0].split("=")[1] ?? null;
 
@@ -451,9 +459,11 @@ await t("limits: start 5 per IP an hour, 3 per email an hour, verify 20 per IP i
 let done; // { body, token, slug, host }
 await t("verify: creates the store (file database, documents mode, closed, Free plan, signup source), the user and the owner; clears the password hash", async () => {
   const code = await codeFor(main.f.email);
-  const r = await api("signup/verify", "POST", { body: { code }, cookie: main.cookie });
-  eq(r.status, 200, `status ${r.text}`);
-  eq(r.body.status, "done", "done");
+  const v = await api("signup/verify", "POST", { body: { code }, cookie: main.cookie });
+  eq(v.status, 200, `status ${v.text}`);
+  eq(v.body.status, "provisioning", "queued");
+  const r = await settle(main.cookie);
+  eq(r.body.status, "done", `done ${r.text}`);
   const m = String(r.body.redirect).match(/^http:\/\/happy-path-goods\.stores\.test\/admin\/handoff#t=([0-9a-f]{64})$/);
   ok(m, `redirect ${r.body.redirect}`);
   done = { token: m[1], slug: "happy-path-goods", host: "happy-path-goods.stores.test" };
@@ -568,7 +578,8 @@ await t("a failed setup says so in plain words, shows in the provisions list, an
   process.env.STORE_DB_DIR = join(blocker, "inside");
   let r;
   try {
-    r = await api("signup/verify", "POST", { body: { code }, cookie: s.cookie });
+    eq((await api("signup/verify", "POST", { body: { code }, cookie: s.cookie })).body.status, "provisioning", "queued");
+    r = await settle(s.cookie);
   } finally {
     process.env.STORE_DB_DIR = keep;
     await rm(blocker, { force: true });
@@ -576,7 +587,8 @@ await t("a failed setup says so in plain words, shows in the provisions list, an
   eq(r.status, 200, "an answer, not a crash");
   eq(r.body.status, "failed", "failed");
   eq(r.body.canRetry, true, "can retry");
-  ok(/couldn't finish setting up your store/i.test(r.body.error) && !/ENOTDIR|EEXIST|Error:/.test(r.body.error), `plain words: ${r.body.error}`);
+  // an unexpected failure (not a hosting provider's answer) needs us
+  ok(/Something on our side needs fixing/i.test(r.body.error) && !/ENOTDIR|EEXIST|Error:/.test(r.body.error), `plain words: ${r.body.error}`);
   const row = await rowFor(s.f.email);
   eq(row.status, "failed", "row failed");
   ok(row.provision_run_id, "run recorded");
@@ -591,7 +603,8 @@ await t("a failed setup says so in plain words, shows in the provisions list, an
   eq((await rowFor(s.f.email)).status, "failed", "still failed");
   const again = await api("signup/verify", "POST", { body: { retry: true }, cookie: s.cookie });
   eq(again.status, 200, again.text);
-  eq(again.body.status, "done", "done on retry");
+  eq(again.body.status, "provisioning", "queued again");
+  eq((await settle(s.cookie)).body.status, "done", "done on retry");
   const after = await rowFor(s.f.email);
   eq(after.provision_run_id, row.provision_run_id, "the same run resumed");
   eq(Number((await one("SELECT COUNT(*) AS n FROM provision_runs WHERE tenant_id = 'retry-rugs'")).n), 1, "one run");
@@ -686,7 +699,8 @@ await t("fix 2: two verifies with the right code at once make exactly one store,
   const s = await start({ storeName: "Twin Click Co" });
   const code = await codeFor(s.f.email);
   const rs = await Promise.all([1, 2].map(() => api("signup/verify", "POST", { body: { code }, cookie: s.cookie })));
-  eq(rs.filter((r) => r.body?.status === "done").length, 1, `one done: ${rs.map((r) => r.text).join(" | ")}`);
+  eq(rs.filter((r) => r.body?.status === "provisioning").length, 1, `one queued: ${rs.map((r) => r.text).join(" | ")}`);
+  eq((await settle(s.cookie)).body.status, "done", "done");
   eq(await count("SELECT COUNT(*) AS n FROM tenants WHERE id = 'twin-click-co'"), 1, "one store");
   eq(await count("SELECT COUNT(*) AS n FROM users WHERE email = ?", [s.f.email]), 1, "one user");
   eq(await count("SELECT COUNT(*) AS n FROM memberships WHERE tenant_id = 'twin-click-co' AND role = 'owner'"), 1, "one owner");
@@ -699,7 +713,8 @@ await t("fix 2: a failure during account creation (after the store is made), the
   await db.execute("CREATE TRIGGER sgn_fault BEFORE INSERT ON memberships WHEN NEW.tenant_id = 'fault-line-goods' BEGIN SELECT RAISE(ABORT, 'injected'); END");
   let r;
   try {
-    r = await api("signup/verify", "POST", { body: { code }, cookie: s.cookie });
+    await api("signup/verify", "POST", { body: { code }, cookie: s.cookie });
+    r = await settle(s.cookie);
   } finally {
     await db.execute("DROP TRIGGER IF EXISTS sgn_fault");
   }
@@ -707,7 +722,8 @@ await t("fix 2: a failure during account creation (after the store is made), the
   ok(await C.getTenant("fault-line-goods", { fresh: true }), "the store was made");
   eq(await count("SELECT COUNT(*) AS n FROM memberships WHERE tenant_id = 'fault-line-goods'"), 0, "no membership yet");
   const again = await api("signup/verify", "POST", { body: { retry: true }, cookie: s.cookie });
-  eq(again.body.status, "done", again.text);
+  eq(again.body.status, "provisioning", again.text);
+  eq((await settle(s.cookie)).body.status, "done", "done");
   eq(await count("SELECT COUNT(*) AS n FROM users WHERE email = ?", [s.f.email]), 1, "one user");
   eq(await count("SELECT COUNT(*) AS n FROM memberships WHERE tenant_id = 'fault-line-goods' AND role = 'owner'"), 1, "one owner membership");
   eq((await rowFor(s.f.email)).status, "done", "signup done");
@@ -813,7 +829,8 @@ await t("fix 5: the file driver refuses a leftover database file unless the run 
   // through signup: a leftover file for the address fails the setup instead of being reused
   await writeFile(join(STORE_DIR, "storeasy-t-leftover-loft.db"), "");
   const s = await start({ storeName: "Leftover Loft" });
-  const v = await api("signup/verify", "POST", { body: { code: await codeFor(s.f.email) }, cookie: s.cookie });
+  await api("signup/verify", "POST", { body: { code: await codeFor(s.f.email) }, cookie: s.cookie });
+  const v = await settle(s.cookie);
   eq(v.body.status, "failed", v.text);
   eq(await C.getTenant("leftover-loft", { fresh: true }), null, "no store on the leftover file");
 });
