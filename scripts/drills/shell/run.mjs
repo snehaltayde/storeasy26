@@ -339,7 +339,9 @@ async function supportEmptyStates(drill, ctx, creds) {
       const el = document.querySelector("main > [data-legacy]");
       return el ? (el.textContent || "").trim().length > 0 : false;
     });
-    drill.check(r?.status() === 200 && !ERROR_TEXT.test(body) && legacy, `support on the empty Roles Annex: ${href} renders (200, no error, content)`, { status: r?.status(), error: ERROR_TEXT.test(body), legacy, url: page.url() });
+    // onboarding is new UI in its own shell (no [data-legacy]): its step panel is the content
+    const content = href === ONBOARDING ? (await onboardingShell(page)).panel : legacy;
+    drill.check(r?.status() === 200 && !ERROR_TEXT.test(body) && content, `support on the empty Roles Annex: ${href} renders (200, no error, content)`, { status: r?.status(), error: ERROR_TEXT.test(body), legacy, content, url: page.url() });
   }
   await page.close();
 }
