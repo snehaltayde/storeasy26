@@ -450,6 +450,20 @@ too. -->
   triples, `caccent` as the sparing lime brand touch, 6px/10px radius
   scale, two shadows, and one shared `focus-ring` utility on every
   interactive element (the consoles previously had NO focus-visible styles).
+  **Phase 0 line 7** adds the shadcn/ui token set beside it in the same file:
+  the `docs/UI.md` light and dark tokens under `.console` / `.console.dark`
+  (oklch, class-based dark; `.console` goes on the console root `<body>` so
+  Radix portals inherit it), shadcn's names (`--background`, `--primary`,
+  `--sidebar-*` …) mapped onto them, `tw-animate-css`, and a `dark:` variant
+  that matches only inside `.console.dark`. `[data-console]` keeps the legacy
+  values (`--primary`/`--ring` point at `--c-primary`/`--c-ring`). No live
+  page carries `.console` yet (line 8). Several UI.md names (`--c-surface`,
+  `--c-border`, `--c-accent`, the status colours) are also legacy names, so
+  `.console` re-skins any legacy screen under it until line 8 aliases them.
+  The components are `components/ui/` (README: generate in a scratch
+  project, never run the shadcn CLI here); `pnpm test:console-ui` keeps them
+  off the storefront and `pnpm drill:sf-styles` proves the storefront and
+  `/admin/login` render exactly as before.
 - **Primitives** (`components/console/`, README has the house rules):
   Button/IconButton, one Input/Select/Textarea/Field, Card, Badge +
   StatusBadge over ONE status→tone map (`status.js`, replacing 12+ local
@@ -493,7 +507,8 @@ too. -->
   default) with data in gitignored `.design-data/`, so the storefront serves
   on the edge runtime with no code edit; Ctrl-C stops Next and sqld together.
   Ports: `DESIGN_PORT` (3017) and `DESIGN_SQLD_PORT` (18017, three in a row).
-  Browser drills (`pnpm drill:smoke`, `drill:p5`, `drill:p6`, `drill:all`: a throwaway worktree; helpers in
+  Browser drills (`pnpm drill:smoke`, `drill:p5`, `drill:p6`, `drill:all`, and the
+  `drill:sf-styles` render comparison outside `all`: a throwaway worktree; helpers in
   `scripts/drill.js`) drive the installed Chrome through playwright-core and
   write screenshots to `docs/cms-reviews/drills/<id>/`.
   See `docs/MANUAL_TESTING_GUIDE.md` §1 and `docs/cms-reviews/P1-HARNESS.md`.

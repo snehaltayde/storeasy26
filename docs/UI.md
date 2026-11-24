@@ -14,7 +14,12 @@ This page covers the **consoles** (`/admin`, `/platform`, onboarding). They are 
 
 ## Color
 
-Tokens live as CSS variables in `app/console.css` under `.console` and are mapped to shadcn's names (`--background`, `--primary`, …). Components use tokens, never raw values.
+Tokens live as CSS variables in `app/console.css` under `.console` (light) and `.console.dark` (dark) and are mapped to shadcn's names (`--background`, `--primary`, `--sidebar-*`, …). Components use tokens, never raw values.
+
+- **Where `.console` goes:** on the console root `<body>`, not `<html>`: Radix portals (menus, sheets, tooltips) mount into `body`, and on `<html>` the storefront's later `:root { --background }` in `app/globals.css` would win.
+- **Dark mode is class-based:** `.console.dark` on the same `<body>`. The `dark:` variant matches only inside `.console.dark`, never on the storefront. There is no toggle yet.
+- **Legacy names:** `--c-surface`, `--c-border`, `--c-accent` and the four status names are also the legacy `[data-console]` tokens, so a legacy screen under `.console` is re-skinned; the console shell (line 8) aliases them first.
+- **Warning as text:** `--c-warning` on white is likely below 4.5:1 (estimated ~2.9:1, unmeasured); use it for fills and icons, and measure before using it for text.
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
@@ -39,12 +44,13 @@ The Storeasy lime (`#84cc16`) is the platform's logo mark only; it is never a co
 - **Shell:** a 240px sidebar (collapses to icons below 1024px, to a sheet below 768px), a 56px top bar with the store switcher and the account menu, content max width 1200px with 24px gutters (16px on phones).
 - **Onboarding:** no sidebar; one centred column, max width 640px, with the step list on the left from 1024px up.
 - **Density:** tables use 40px rows on desktop and 48px on touch; forms use one column below 768px and at most two above.
-- **Radius:** 6px controls, 10px cards and dialogs, full for pills and avatars.
+- **Radius:** 6px controls, 10px cards and dialogs, full for pills and avatars. In classes: `rounded-md` (6px, Tailwind's own) for controls, `rounded-card` (10px, `app/console.css`) for cards, popovers, menus, sheets and dialogs, `rounded-full` for pills and avatars. The `--radius-*` scale is not overridden. Shadows: `shadow-card` at rest, `shadow-overlay` for menus and sheets.
 
 ## Components
 
 - **From shadcn, restyled:** Button, Input, Textarea, Select, Checkbox, Switch, RadioGroup, Label, Form (react-hook-form + zod for validation messages), Dialog, AlertDialog (every destructive action), Sheet, DropdownMenu, Command (store switcher and search), Tabs, Table, Badge, Card, Tooltip, Popover, Skeleton, Separator, Sonner toasts, Sidebar.
 - **Our own, built from those:** `PageHeader` (title, description, primary action), `StatusBadge` (maps a domain status to a status colour and plain word), `EmptyState` (one sentence and one action), `DataTable` (sort, filter, paginate, row actions), `StepList` (onboarding progress), `MoneyCell`, `RoleGate` (hides a control the role cannot use and shows the reason on hover).
+- **Installed so far (Phase 0 line 7):** Button, Input, Separator, Skeleton, Tooltip, Sheet, DropdownMenu, Avatar, Sidebar (plus the `use-mobile` hook and `cn`), in `components/ui/`. The rest of the list above arrives with the first screen that needs it. **Command** (the store switcher and `⌘K`) is deferred with `cmdk`; Sonner, Form (react-hook-form + zod), Dialog and Table are deferred too. How to add one: `components/ui/README.md` (generate in a scratch project, never run the shadcn CLI in this repo).
 - **When to add one:** only when the same arrangement appears on three screens. Otherwise compose in the screen.
 - **Words:** plain sentences, no error codes on screen, every refusal says what to do next. Buttons say what they do ("Publish home page", not "Submit").
 
