@@ -2,10 +2,10 @@
   "id": "SIGNUP",
   "part": "main",
   "title": "SIGNUP — a founder signs up on their own",
-  "ranAt": "2026-11-24T06:42:57.243Z",
+  "ranAt": "2026-11-24T06:53:17.194Z",
   "harness": "http://localhost:6100",
   "chrome": "158.0.8127.37",
-  "passed": 31,
+  "passed": 38,
   "failed": 0,
   "knownFailures": 0,
   "checks": [
@@ -40,16 +40,25 @@
         "signup-name",
         "signup-email",
         "signup-password",
-        "signup-store",
-        "signup-slug"
+        "signup-store"
       ]
+    },
+    {
+      "ok": true,
+      "label": "focus moves to the first field to fix",
+      "detail": "signup-name"
+    },
+    {
+      "ok": true,
+      "label": "the password's error and its rules are both tied to it (aria-describedby)",
+      "detail": "signup-password-error signup-password-hint"
     },
     {
       "ok": true,
       "label": "the address follows the store name and shows the full address",
       "detail": {
         "shownSlug": "drill-signup-shop",
-        "hint": "drill-signup-shop.localhost is free."
+        "hint": "Made from your store name. You can change it now; it's harder to change later.\n\ndrill-signup-shop.localhost\n\ndrill-signup-shop.localhost is free."
       }
     },
     {
@@ -59,8 +68,27 @@
     },
     {
       "ok": true,
+      "label": "Tab reaches Show password; Enter shows and hides it",
+      "detail": {
+        "toggle": "signup-password",
+        "shown": "text",
+        "hidden": "password"
+      }
+    },
+    {
+      "ok": true,
+      "label": "375px: the form has no sideways scroll",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "1680px: the form has no sideways scroll",
+      "detail": null
+    },
+    {
+      "ok": true,
       "label": "the code screen names the email",
-      "detail": "Storeasy\n\nCheck your email\n\nWe sent a 6-digit code to founder@signup-drill.test. It works for 15 minutes.\n\nCode from the email\nVerify and create my store\nSend a new code\n\nYou can ask for a new code in"
+      "detail": "Storeasy\n\nStep 2 of 2\n\nCheck your email\n\nWe sent a 6-digit code to founder@signup-drill.test. It works for 15 minutes.\n\nCode from the email\nCan't find it? Check your spam or promotions folder.\nVerify "
     },
     {
       "ok": true,
@@ -72,9 +100,18 @@
     },
     {
       "ok": true,
+      "label": "the code field takes focus, numeric keypad, one-time-code autofill",
+      "detail": {
+        "id": "signup-code",
+        "mode": "numeric",
+        "ac": "one-time-code"
+      }
+    },
+    {
+      "ok": true,
       "label": "a code was mailed (the mock mail row)",
       "detail": {
-        "id": "pml_13a0ef5bad963fe4"
+        "id": "pml_8176175e2153209e"
       }
     },
     {
@@ -152,15 +189,20 @@
     {
       "ok": true,
       "label": "an existing email gets the same code screen",
-      "detail": "Storeasy\n\nCheck your email\n\nWe sent a 6-digit code to founder@signup-drill.test. It works for 15 minutes.\n\nCode from the email\nVerify and create my store\nSend a new code\n\nYou can ask for a new code in"
+      "detail": "Storeasy\n\nStep 2 of 2\n\nCheck your email\n\nWe sent a 6-digit code to founder@signup-drill.test. It works for 15 minutes.\n\nCode from the email\nCan't find it? Check your spam or promotions folder.\nVerify "
     },
     {
       "ok": true,
       "label": "and no new code is mailed for it",
       "detail": {
-        "before": "pml_13a0ef5bad963fe4",
-        "after": "pml_13a0ef5bad963fe4"
+        "before": "pml_8176175e2153209e",
+        "after": "pml_8176175e2153209e"
       }
+    },
+    {
+      "ok": true,
+      "label": "pasting \"Your code: 000 000\" fills 000000",
+      "detail": null
     },
     {
       "ok": true,
@@ -175,7 +217,7 @@
     {
       "ok": true,
       "label": "a made-up handoff token: refused, with the way to sign in",
-      "detail": "Platform notice: Payments provider latency\n\nCard payments may take a little longer than usual today.\n\nDrill Signup Shop\n\nStore console · powered by Storeasy\n\nThis sign-in link didn't work\n\nThis sign-i"
+      "detail": "Drill Signup Shop\n\nThis sign-in link didn't work\n\nThis sign-in link has expired or was already used. Sign in with your email and password.\n\nSign in with email and password"
     },
     {
       "ok": true,
@@ -206,7 +248,7 @@
     {
       "name": "01-closed",
       "file": "docs/cms-reviews/drills/SIGNUP/01-closed.png",
-      "bytes": 8060,
+      "bytes": 9099,
       "width": 720,
       "height": 506,
       "viewport": 1280,
@@ -215,7 +257,7 @@
     {
       "name": "02-field-errors",
       "file": "docs/cms-reviews/drills/SIGNUP/02-field-errors.png",
-      "bytes": 20010,
+      "bytes": 17466,
       "width": 720,
       "height": 506,
       "viewport": 1280,
@@ -224,16 +266,34 @@
     {
       "name": "03-form",
       "file": "docs/cms-reviews/drills/SIGNUP/03-form.png",
-      "bytes": 18768,
+      "bytes": 19166,
       "width": 720,
       "height": 506,
       "viewport": 1280,
       "path": "/signup"
     },
     {
+      "name": "03b-form-375",
+      "file": "docs/cms-reviews/drills/SIGNUP/03b-form-375.png",
+      "bytes": 21547,
+      "width": 375,
+      "height": 900,
+      "viewport": 375,
+      "path": "/signup"
+    },
+    {
+      "name": "03c-form-wide",
+      "file": "docs/cms-reviews/drills/SIGNUP/03c-form-wide.png",
+      "bytes": 13692,
+      "width": 720,
+      "height": 386,
+      "viewport": 1680,
+      "path": "/signup"
+    },
+    {
       "name": "04-code",
       "file": "docs/cms-reviews/drills/SIGNUP/04-code.png",
-      "bytes": 12124,
+      "bytes": 14415,
       "width": 720,
       "height": 506,
       "viewport": 1280,
@@ -242,7 +302,7 @@
     {
       "name": "05-welcome",
       "file": "docs/cms-reviews/drills/SIGNUP/05-welcome.png",
-      "bytes": 23901,
+      "bytes": 25556,
       "width": 720,
       "height": 506,
       "viewport": 1280,
@@ -251,7 +311,7 @@
     {
       "name": "06-welcome-375",
       "file": "docs/cms-reviews/drills/SIGNUP/06-welcome-375.png",
-      "bytes": 27410,
+      "bytes": 27151,
       "width": 375,
       "height": 900,
       "viewport": 375,
@@ -260,16 +320,16 @@
     {
       "name": "07-wrong-code",
       "file": "docs/cms-reviews/drills/SIGNUP/07-wrong-code.png",
-      "bytes": 14403,
-      "width": 720,
-      "height": 506,
-      "viewport": 1280,
+      "bytes": 17032,
+      "width": 375,
+      "height": 900,
+      "viewport": 375,
       "path": "/signup"
     },
     {
       "name": "08-handoff-refused",
       "file": "docs/cms-reviews/drills/SIGNUP/08-handoff-refused.png",
-      "bytes": 12872,
+      "bytes": 10636,
       "width": 720,
       "height": 506,
       "viewport": 1280,

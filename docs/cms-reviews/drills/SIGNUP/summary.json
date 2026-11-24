@@ -1,7 +1,7 @@
 {
-  "ranAt": "2026-11-24T06-40-56-073Z",
-  "head": "e35076a",
-  "worktree": "/private/var/folders/qv/kw93gh7s6n11gs_hs2cgvd8c0000gn/T/storeasy-drill-2026-11-24T06-40-56-073Z",
+  "ranAt": "2026-11-24T06-51-14-183Z",
+  "head": "388302c",
+  "worktree": "/private/var/folders/qv/kw93gh7s6n11gs_hs2cgvd8c0000gn/T/storeasy-drill-2026-11-24T06-51-14-183Z",
   "kept": false,
   "ports": {
     "next": 6100,
@@ -13,9 +13,9 @@
     {
       "drill": "signup",
       "exit": 0,
-      "seconds": 119,
-      "results": "/Users/snehal/Documents/Projects 2026/storeasy26/.drill-results/2026-11-24T06-40-56-073Z/SIGNUP",
-      "log": "/Users/snehal/Documents/Projects 2026/storeasy26/.drill-results/2026-11-24T06-40-56-073Z/signup.log"
+      "seconds": 121,
+      "results": "/Users/snehal/Documents/Projects 2026/storeasy26/.drill-results/2026-11-24T06-51-14-183Z/SIGNUP",
+      "log": "/Users/snehal/Documents/Projects 2026/storeasy26/.drill-results/2026-11-24T06-51-14-183Z/signup.log"
     }
   ],
   "ownerData": {
