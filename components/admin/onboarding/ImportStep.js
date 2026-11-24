@@ -18,7 +18,7 @@ import { Gated } from "./StepPanels";
 //                   or retries and the tab is visible; reads once on becoming
 //                   visible; after 3 failed reads says "Lost touch, still
 //                   trying" and backs off to 15 s; calls onChange() when the
-//                   import stops running. "Reconnect Shopify" selects step 1.
+//                   import changes state. "Reconnect Shopify" selects step 1.
 
 export const POLL_MS = 3000;
 export const SLOW_POLL_MS = 15_000;
@@ -226,12 +226,13 @@ export default function ImportStep({ step, onChange, onChoose }) {
     if (step.facts?.sync) setView(step.facts.sync);
   }, [fresh]);
 
-  // leaving live (finished, failed, stalled): the page re-reads its steps
+  // the import changed state (running → retrying, finished, failed …): the
+  // page re-reads its steps, so the step's actions (Try now) match the view
   useEffect(() => {
     if (!view || view.state === was.current) return;
     const before = was.current;
     was.current = view.state;
-    if (before && LIVE.has(before) && !LIVE.has(view.state)) onChange?.();
+    if (before) onChange?.();
   }, [view?.state]);
 
   const live = Boolean(view && LIVE.has(view.state));
