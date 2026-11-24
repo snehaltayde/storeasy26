@@ -1,0 +1,2853 @@
+{
+  "id": "SHELL",
+  "part": "main",
+  "title": "SHELL — the new console shell, every role and width",
+  "ranAt": "2026-11-24T05:10:29.064Z",
+  "harness": "http://localhost:6100",
+  "chrome": "158.0.8127.37",
+  "passed": 247,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "owner 1280px: /admin lands on /admin/dashboard",
+      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "owner 1280px: the top bar is 56px",
+      "detail": {
+        "x": 240,
+        "y": 0,
+        "width": 1040,
+        "height": 56
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 1280px: the sidebar is 240px",
+      "detail": 240
+    },
+    {
+      "ok": true,
+      "label": "owner 1280px: the nav's hrefs are navFor(role)",
+      "detail": {
+        "links": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/setup",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights",
+          "/admin/automations",
+          "/admin/integrations",
+          "/admin/billing",
+          "/admin/settings"
+        ],
+        "want": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/setup",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights",
+          "/admin/automations",
+          "/admin/integrations",
+          "/admin/billing",
+          "/admin/settings"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 1280px: /admin/dashboard opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/dashboard"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 1280px: /admin/analytics opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/analytics"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 1280px: /admin/setup opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/setup"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 1280px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/orders"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 1280px: /admin/catalog opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/catalog"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 1280px: /admin/editor opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/editor"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 1280px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/start"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 1280px: /admin/media opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/media"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 1280px: /admin/releases opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/releases"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 1280px: /admin/offers opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/offers"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 1280px: /admin/experiments opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/experiments"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 1280px: /admin/insights opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/insights"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 1280px: /admin/automations opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/automations"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 1280px: /admin/integrations opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/integrations"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 1280px: /admin/billing opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/billing"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 1280px: /admin/settings opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/settings"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: /admin lands on /admin/dashboard",
+      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: the top bar is 56px",
+      "detail": {
+        "x": 48,
+        "y": 0,
+        "width": 852,
+        "height": 56
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: the sidebar is icon width (48px)",
+      "detail": 48
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: the nav's hrefs are navFor(role)",
+      "detail": {
+        "links": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/setup",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights",
+          "/admin/automations",
+          "/admin/integrations",
+          "/admin/billing",
+          "/admin/settings"
+        ],
+        "want": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/setup",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights",
+          "/admin/automations",
+          "/admin/integrations",
+          "/admin/billing",
+          "/admin/settings"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: a tooltip shows on focus",
+      "detail": true
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: /admin/dashboard opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/dashboard"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: /admin/analytics opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/analytics"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: /admin/setup opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/setup"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/orders"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: /admin/catalog opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/catalog"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: /admin/editor opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/editor"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/start"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: /admin/media opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/media"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: /admin/releases opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/releases"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: /admin/offers opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/offers"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: /admin/experiments opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/experiments"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: /admin/insights opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/insights"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: /admin/automations opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/automations"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: /admin/integrations opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/integrations"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: /admin/billing opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/billing"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: /admin/settings opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/settings"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: /admin lands on /admin/dashboard",
+      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: the top bar is 56px",
+      "detail": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 56
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: no sidebar column on a phone",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: Esc closes the sheet",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: focus returns to the trigger",
+      "detail": "toggle"
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: the nav's hrefs are navFor(role)",
+      "detail": {
+        "links": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/setup",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights",
+          "/admin/automations",
+          "/admin/integrations",
+          "/admin/billing",
+          "/admin/settings"
+        ],
+        "want": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/setup",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights",
+          "/admin/automations",
+          "/admin/integrations",
+          "/admin/billing",
+          "/admin/settings"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: a link tap opens the page and closes the sheet",
+      "detail": "http://roles.localhost:6101/admin/orders"
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: /admin/dashboard opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/dashboard"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: /admin/analytics opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/analytics"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: /admin/setup opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/setup"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/orders"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: /admin/catalog opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/catalog"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: /admin/editor opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/editor"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/start"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: /admin/media opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/media"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: /admin/releases opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/releases"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: /admin/offers opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/offers"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: /admin/experiments opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/experiments"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: /admin/insights opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/insights"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: /admin/automations opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/automations"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: /admin/integrations opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/integrations"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: /admin/billing opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/billing"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: /admin/settings opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/settings"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: /admin lands on /admin/dashboard",
+      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: the top bar is 56px",
+      "detail": {
+        "x": 240,
+        "y": 0,
+        "width": 1040,
+        "height": 56
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: the sidebar is 240px",
+      "detail": 240
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: the nav's hrefs are navFor(role)",
+      "detail": {
+        "links": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/setup",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights",
+          "/admin/automations",
+          "/admin/integrations",
+          "/admin/billing",
+          "/admin/settings"
+        ],
+        "want": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/setup",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights",
+          "/admin/automations",
+          "/admin/integrations",
+          "/admin/billing",
+          "/admin/settings"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: /admin/dashboard opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/dashboard"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: /admin/analytics opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/analytics"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: /admin/setup opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/setup"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/orders"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: /admin/catalog opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/catalog"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: /admin/editor opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/editor"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/start"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: /admin/media opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/media"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: /admin/releases opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/releases"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: /admin/offers opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/offers"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: /admin/experiments opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/experiments"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: /admin/insights opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/insights"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: /admin/automations opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/automations"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: /admin/integrations opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/integrations"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: /admin/billing opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/billing"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: /admin/settings opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/settings"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: /admin lands on /admin/dashboard",
+      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: the top bar is 56px",
+      "detail": {
+        "x": 48,
+        "y": 0,
+        "width": 852,
+        "height": 56
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: the sidebar is icon width (48px)",
+      "detail": 48
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: the nav's hrefs are navFor(role)",
+      "detail": {
+        "links": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/setup",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights",
+          "/admin/automations",
+          "/admin/integrations",
+          "/admin/billing",
+          "/admin/settings"
+        ],
+        "want": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/setup",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights",
+          "/admin/automations",
+          "/admin/integrations",
+          "/admin/billing",
+          "/admin/settings"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: a tooltip shows on focus",
+      "detail": true
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: /admin/dashboard opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/dashboard"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: /admin/analytics opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/analytics"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: /admin/setup opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/setup"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/orders"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: /admin/catalog opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/catalog"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: /admin/editor opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/editor"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/start"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: /admin/media opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/media"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: /admin/releases opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/releases"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: /admin/offers opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/offers"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: /admin/experiments opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/experiments"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: /admin/insights opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/insights"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: /admin/automations opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/automations"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: /admin/integrations opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/integrations"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: /admin/billing opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/billing"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: /admin/settings opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/settings"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: /admin lands on /admin/dashboard",
+      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: the top bar is 56px",
+      "detail": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 56
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: no sidebar column on a phone",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: Esc closes the sheet",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: focus returns to the trigger",
+      "detail": "toggle"
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: the nav's hrefs are navFor(role)",
+      "detail": {
+        "links": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/setup",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights",
+          "/admin/automations",
+          "/admin/integrations",
+          "/admin/billing",
+          "/admin/settings"
+        ],
+        "want": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/setup",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights",
+          "/admin/automations",
+          "/admin/integrations",
+          "/admin/billing",
+          "/admin/settings"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: a link tap opens the page and closes the sheet",
+      "detail": "http://roles.localhost:6101/admin/orders"
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: /admin/dashboard opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/dashboard"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: /admin/analytics opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/analytics"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: /admin/setup opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/setup"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/orders"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: /admin/catalog opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/catalog"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: /admin/editor opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/editor"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/start"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: /admin/media opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/media"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: /admin/releases opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/releases"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: /admin/offers opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/offers"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: /admin/experiments opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/experiments"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: /admin/insights opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/insights"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: /admin/automations opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/automations"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: /admin/integrations opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/integrations"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: /admin/billing opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/billing"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: /admin/settings opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/settings"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 1280px: /admin lands on /admin/dashboard",
+      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "staff 1280px: the top bar is 56px",
+      "detail": {
+        "x": 240,
+        "y": 0,
+        "width": 1040,
+        "height": 56
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 1280px: the sidebar is 240px",
+      "detail": 240
+    },
+    {
+      "ok": true,
+      "label": "staff 1280px: the nav's hrefs are navFor(role)",
+      "detail": {
+        "links": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights"
+        ],
+        "want": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 1280px: /admin/dashboard opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/dashboard"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 1280px: /admin/analytics opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/analytics"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 1280px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/orders"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 1280px: /admin/catalog opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/catalog"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 1280px: /admin/editor opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/editor"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 1280px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/start"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 1280px: /admin/media opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/media"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 1280px: /admin/releases opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/releases"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 1280px: /admin/offers opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/offers"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 1280px: /admin/experiments opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/experiments"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 1280px: /admin/insights opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/insights"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 900px: /admin lands on /admin/dashboard",
+      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "staff 900px: the top bar is 56px",
+      "detail": {
+        "x": 48,
+        "y": 0,
+        "width": 852,
+        "height": 56
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 900px: the sidebar is icon width (48px)",
+      "detail": 48
+    },
+    {
+      "ok": true,
+      "label": "staff 900px: the nav's hrefs are navFor(role)",
+      "detail": {
+        "links": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights"
+        ],
+        "want": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 900px: a tooltip shows on focus",
+      "detail": true
+    },
+    {
+      "ok": true,
+      "label": "staff 900px: /admin/dashboard opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/dashboard"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 900px: /admin/analytics opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/analytics"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 900px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/orders"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 900px: /admin/catalog opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/catalog"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 900px: /admin/editor opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/editor"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 900px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/start"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 900px: /admin/media opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/media"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 900px: /admin/releases opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/releases"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 900px: /admin/offers opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/offers"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 900px: /admin/experiments opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/experiments"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 900px: /admin/insights opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/insights"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 375px: /admin lands on /admin/dashboard",
+      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "staff 375px: the top bar is 56px",
+      "detail": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 56
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 375px: no sidebar column on a phone",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "staff 375px: Esc closes the sheet",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "staff 375px: focus returns to the trigger",
+      "detail": "toggle"
+    },
+    {
+      "ok": true,
+      "label": "staff 375px: the nav's hrefs are navFor(role)",
+      "detail": {
+        "links": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights"
+        ],
+        "want": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 375px: a link tap opens the page and closes the sheet",
+      "detail": "http://roles.localhost:6101/admin/orders"
+    },
+    {
+      "ok": true,
+      "label": "staff 375px: /admin/dashboard opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/dashboard"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 375px: /admin/analytics opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/analytics"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 375px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/orders"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 375px: /admin/catalog opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/catalog"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 375px: /admin/editor opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/editor"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 375px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/start"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 375px: /admin/media opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/media"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 375px: /admin/releases opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/releases"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 375px: /admin/offers opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/offers"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 375px: /admin/experiments opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/experiments"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 375px: /admin/insights opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/insights"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin lands on /admin/dashboard",
+      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: the top bar is 56px",
+      "detail": {
+        "x": 240,
+        "y": 0,
+        "width": 1040,
+        "height": 56
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: the sidebar is 240px",
+      "detail": 240
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: the nav's hrefs are navFor(role)",
+      "detail": {
+        "links": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights"
+        ],
+        "want": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/dashboard opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/dashboard"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/dashboard: outside [data-legacy] only nav links and shell controls",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/analytics opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/analytics"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/analytics: outside [data-legacy] only nav links and shell controls",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/orders"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/orders: outside [data-legacy] only nav links and shell controls",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/catalog opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/catalog"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/catalog: outside [data-legacy] only nav links and shell controls",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/editor opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/editor"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/editor: outside [data-legacy] only nav links and shell controls",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/start"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/start: outside [data-legacy] only nav links and shell controls",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/media opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/media"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/media: outside [data-legacy] only nav links and shell controls",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/releases opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/releases"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/releases: outside [data-legacy] only nav links and shell controls",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/offers opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/offers"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/offers: outside [data-legacy] only nav links and shell controls",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/experiments opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/experiments"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/experiments: outside [data-legacy] only nav links and shell controls",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/insights opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/insights"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/insights: outside [data-legacy] only nav links and shell controls",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "support 900px: /admin lands on /admin/dashboard",
+      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "support 900px: the top bar is 56px",
+      "detail": {
+        "x": 48,
+        "y": 0,
+        "width": 852,
+        "height": 56
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 900px: the sidebar is icon width (48px)",
+      "detail": 48
+    },
+    {
+      "ok": true,
+      "label": "support 900px: the nav's hrefs are navFor(role)",
+      "detail": {
+        "links": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights"
+        ],
+        "want": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 900px: a tooltip shows on focus",
+      "detail": true
+    },
+    {
+      "ok": true,
+      "label": "support 900px: /admin/dashboard opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/dashboard"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 900px: /admin/analytics opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/analytics"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 900px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/orders"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 900px: /admin/catalog opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/catalog"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 900px: /admin/editor opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/editor"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 900px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/start"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 900px: /admin/media opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/media"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 900px: /admin/releases opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/releases"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 900px: /admin/offers opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/offers"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 900px: /admin/experiments opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/experiments"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 900px: /admin/insights opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/insights"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 375px: /admin lands on /admin/dashboard",
+      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "support 375px: the top bar is 56px",
+      "detail": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 56
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 375px: no sidebar column on a phone",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "support 375px: Esc closes the sheet",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "support 375px: focus returns to the trigger",
+      "detail": "toggle"
+    },
+    {
+      "ok": true,
+      "label": "support 375px: the nav's hrefs are navFor(role)",
+      "detail": {
+        "links": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights"
+        ],
+        "want": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/start",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/experiments",
+          "/admin/insights"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 375px: a link tap opens the page and closes the sheet",
+      "detail": "http://roles.localhost:6101/admin/orders"
+    },
+    {
+      "ok": true,
+      "label": "support 375px: /admin/dashboard opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/dashboard"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 375px: /admin/analytics opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/analytics"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 375px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/orders"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 375px: /admin/catalog opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/catalog"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 375px: /admin/editor opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/editor"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 375px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/start"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 375px: /admin/media opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/media"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 375px: /admin/releases opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/releases"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 375px: /admin/offers opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/offers"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 375px: /admin/experiments opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/experiments"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 375px: /admin/insights opens (200, no error, content in [data-legacy], aria-current)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "current": [
+          "/admin/insights"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support: the top bar says Read-only access",
+      "detail": "Read-only access"
+    },
+    {
+      "ok": true,
+      "label": "support: the account menu shows name, email, Support and the read-only note",
+      "detail": "Sam Support\nsupport@roles.test\nSupport\n\nYour role can look at everything here but not change it.\n\nSign out"
+    },
+    {
+      "ok": true,
+      "label": "support: Sign out is the account menu's only action",
+      "detail": [
+        "Sign out"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "support: no create item in the switcher",
+      "detail": {
+        "radios": [
+          "Roles Annex\nSupport",
+          "Roles Demo Co\nSupport"
+        ],
+        "sw": "Your stores\nRoles Annex\nSupport\nRoles Demo Co\nSupport\nOpen storefront"
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner: the switcher lists Roles Demo Co (Owner, checked) and Roles Annex (Admin)",
+      "detail": [
+        {
+          "text": "Roles Annex Admin",
+          "checked": "false"
+        },
+        {
+          "text": "Roles Demo Co Owner",
+          "checked": "true"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "owner: choosing Roles Annex requests http://annex.localhost:6101/admin",
+      "detail": "http://annex.localhost:6101/admin"
+    },
+    {
+      "ok": true,
+      "label": "owner: ⌘B collapses the sidebar and it stays collapsed after a reload",
+      "detail": {
+        "collapsed": true,
+        "after": "collapsed"
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner: Esc closes the account menu and focus returns to its trigger",
+      "detail": "account"
+    },
+    {
+      "ok": true,
+      "label": "owner: Tab from the top reaches the skip link first",
+      "detail": "skip"
+    },
+    {
+      "ok": true,
+      "label": "owner: Sign out lands on /admin/login and the dashboard then redirects to sign-in",
+      "detail": {
+        "landed": "/admin/login",
+        "after": "http://roles.localhost:6101/admin/login"
+      }
+    }
+  ],
+  "notes": [
+    "support still sees 46 write control(s) inside the old screens (support-write-controls.json)"
+  ],
+  "screenshots": []
+}

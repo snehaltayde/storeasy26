@@ -1,0 +1,927 @@
+{
+  "id": "CONSOLE-STYLES",
+  "part": "main",
+  "title": "CONSOLE-STYLES — the old console screens render as before",
+  "ranAt": "2026-11-24T04:58:12.588Z",
+  "harness": "http://localhost:6100",
+  "chrome": "158.0.8127.37",
+  "passed": 179,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "owner-dashboard: the page has an address",
+      "detail": "/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "owner-dashboard 375px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-dashboard 375px stays on /admin/dashboard (signed in)",
+      "detail": "/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "owner-dashboard 375px: the region holds elements",
+      "detail": 118
+    },
+    {
+      "ok": true,
+      "label": "owner-dashboard 768px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-dashboard 768px stays on /admin/dashboard (signed in)",
+      "detail": "/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "owner-dashboard 768px: the region holds elements",
+      "detail": 118
+    },
+    {
+      "ok": true,
+      "label": "owner-dashboard 1280px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-dashboard 1280px stays on /admin/dashboard (signed in)",
+      "detail": "/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "owner-dashboard 1280px: the region holds elements",
+      "detail": 118
+    },
+    {
+      "ok": true,
+      "label": "owner-orders: the page has an address",
+      "detail": "/admin/orders"
+    },
+    {
+      "ok": true,
+      "label": "owner-orders 375px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-orders 375px stays on /admin/orders (signed in)",
+      "detail": "/admin/orders"
+    },
+    {
+      "ok": true,
+      "label": "owner-orders 375px: the region holds elements",
+      "detail": 62
+    },
+    {
+      "ok": true,
+      "label": "owner-orders 768px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-orders 768px stays on /admin/orders (signed in)",
+      "detail": "/admin/orders"
+    },
+    {
+      "ok": true,
+      "label": "owner-orders 768px: the region holds elements",
+      "detail": 62
+    },
+    {
+      "ok": true,
+      "label": "owner-orders 1280px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-orders 1280px stays on /admin/orders (signed in)",
+      "detail": "/admin/orders"
+    },
+    {
+      "ok": true,
+      "label": "owner-orders 1280px: the region holds elements",
+      "detail": 62
+    },
+    {
+      "ok": true,
+      "label": "owner-order: the page has an address",
+      "detail": "/admin/orders/ROL-5143343A"
+    },
+    {
+      "ok": true,
+      "label": "owner-order 375px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-order 375px stays on /admin/orders/ROL-5143343A (signed in)",
+      "detail": "/admin/orders/ROL-5143343A"
+    },
+    {
+      "ok": true,
+      "label": "owner-order 375px: the region holds elements",
+      "detail": 105
+    },
+    {
+      "ok": true,
+      "label": "owner-order 768px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-order 768px stays on /admin/orders/ROL-5143343A (signed in)",
+      "detail": "/admin/orders/ROL-5143343A"
+    },
+    {
+      "ok": true,
+      "label": "owner-order 768px: the region holds elements",
+      "detail": 105
+    },
+    {
+      "ok": true,
+      "label": "owner-order 1280px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-order 1280px stays on /admin/orders/ROL-5143343A (signed in)",
+      "detail": "/admin/orders/ROL-5143343A"
+    },
+    {
+      "ok": true,
+      "label": "owner-order 1280px: the region holds elements",
+      "detail": 105
+    },
+    {
+      "ok": true,
+      "label": "owner-offers: the page has an address",
+      "detail": "/admin/offers"
+    },
+    {
+      "ok": true,
+      "label": "owner-offers 375px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-offers 375px stays on /admin/offers (signed in)",
+      "detail": "/admin/offers"
+    },
+    {
+      "ok": true,
+      "label": "owner-offers 375px: the region holds elements",
+      "detail": 25
+    },
+    {
+      "ok": true,
+      "label": "owner-offers 768px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-offers 768px stays on /admin/offers (signed in)",
+      "detail": "/admin/offers"
+    },
+    {
+      "ok": true,
+      "label": "owner-offers 768px: the region holds elements",
+      "detail": 25
+    },
+    {
+      "ok": true,
+      "label": "owner-offers 1280px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-offers 1280px stays on /admin/offers (signed in)",
+      "detail": "/admin/offers"
+    },
+    {
+      "ok": true,
+      "label": "owner-offers 1280px: the region holds elements",
+      "detail": 25
+    },
+    {
+      "ok": true,
+      "label": "owner-catalog: the page has an address",
+      "detail": "/admin/catalog"
+    },
+    {
+      "ok": true,
+      "label": "owner-catalog 375px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-catalog 375px stays on /admin/catalog (signed in)",
+      "detail": "/admin/catalog"
+    },
+    {
+      "ok": true,
+      "label": "owner-catalog 375px: the region holds elements",
+      "detail": 47
+    },
+    {
+      "ok": true,
+      "label": "owner-catalog 768px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-catalog 768px stays on /admin/catalog (signed in)",
+      "detail": "/admin/catalog"
+    },
+    {
+      "ok": true,
+      "label": "owner-catalog 768px: the region holds elements",
+      "detail": 47
+    },
+    {
+      "ok": true,
+      "label": "owner-catalog 1280px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-catalog 1280px stays on /admin/catalog (signed in)",
+      "detail": "/admin/catalog"
+    },
+    {
+      "ok": true,
+      "label": "owner-catalog 1280px: the region holds elements",
+      "detail": 47
+    },
+    {
+      "ok": true,
+      "label": "owner-media: the page has an address",
+      "detail": "/admin/media"
+    },
+    {
+      "ok": true,
+      "label": "owner-media 375px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-media 375px stays on /admin/media (signed in)",
+      "detail": "/admin/media"
+    },
+    {
+      "ok": true,
+      "label": "owner-media 375px: the region holds elements",
+      "detail": 24
+    },
+    {
+      "ok": true,
+      "label": "owner-media 768px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-media 768px stays on /admin/media (signed in)",
+      "detail": "/admin/media"
+    },
+    {
+      "ok": true,
+      "label": "owner-media 768px: the region holds elements",
+      "detail": 24
+    },
+    {
+      "ok": true,
+      "label": "owner-media 1280px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-media 1280px stays on /admin/media (signed in)",
+      "detail": "/admin/media"
+    },
+    {
+      "ok": true,
+      "label": "owner-media 1280px: the region holds elements",
+      "detail": 24
+    },
+    {
+      "ok": true,
+      "label": "owner-releases: the page has an address",
+      "detail": "/admin/releases"
+    },
+    {
+      "ok": true,
+      "label": "owner-releases 375px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-releases 375px stays on /admin/releases (signed in)",
+      "detail": "/admin/releases"
+    },
+    {
+      "ok": true,
+      "label": "owner-releases 375px: the region holds elements",
+      "detail": 7
+    },
+    {
+      "ok": true,
+      "label": "owner-releases 768px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-releases 768px stays on /admin/releases (signed in)",
+      "detail": "/admin/releases"
+    },
+    {
+      "ok": true,
+      "label": "owner-releases 768px: the region holds elements",
+      "detail": 7
+    },
+    {
+      "ok": true,
+      "label": "owner-releases 1280px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-releases 1280px stays on /admin/releases (signed in)",
+      "detail": "/admin/releases"
+    },
+    {
+      "ok": true,
+      "label": "owner-releases 1280px: the region holds elements",
+      "detail": 7
+    },
+    {
+      "ok": true,
+      "label": "owner-editor: the page has an address",
+      "detail": "/admin/editor"
+    },
+    {
+      "ok": true,
+      "label": "owner-editor 375px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-editor 375px stays on /admin/editor (signed in)",
+      "detail": "/admin/editor"
+    },
+    {
+      "ok": true,
+      "label": "owner-editor 375px: the region holds elements",
+      "detail": 222
+    },
+    {
+      "ok": true,
+      "label": "owner-editor 768px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-editor 768px stays on /admin/editor (signed in)",
+      "detail": "/admin/editor"
+    },
+    {
+      "ok": true,
+      "label": "owner-editor 768px: the region holds elements",
+      "detail": 222
+    },
+    {
+      "ok": true,
+      "label": "owner-editor 1280px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-editor 1280px stays on /admin/editor (signed in)",
+      "detail": "/admin/editor"
+    },
+    {
+      "ok": true,
+      "label": "owner-editor 1280px: the region holds elements",
+      "detail": 222
+    },
+    {
+      "ok": true,
+      "label": "owner-settings: the page has an address",
+      "detail": "/admin/settings"
+    },
+    {
+      "ok": true,
+      "label": "owner-settings 375px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-settings 375px stays on /admin/settings (signed in)",
+      "detail": "/admin/settings"
+    },
+    {
+      "ok": true,
+      "label": "owner-settings 375px: the region holds elements",
+      "detail": 343
+    },
+    {
+      "ok": true,
+      "label": "owner-settings 768px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-settings 768px stays on /admin/settings (signed in)",
+      "detail": "/admin/settings"
+    },
+    {
+      "ok": true,
+      "label": "owner-settings 768px: the region holds elements",
+      "detail": 343
+    },
+    {
+      "ok": true,
+      "label": "owner-settings 1280px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "owner-settings 1280px stays on /admin/settings (signed in)",
+      "detail": "/admin/settings"
+    },
+    {
+      "ok": true,
+      "label": "owner-settings 1280px: the region holds elements",
+      "detail": 343
+    },
+    {
+      "ok": true,
+      "label": "support-dashboard: the page has an address",
+      "detail": "/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "support-dashboard 375px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-dashboard 375px stays on /admin/dashboard (signed in)",
+      "detail": "/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "support-dashboard 375px: the region holds elements",
+      "detail": 118
+    },
+    {
+      "ok": true,
+      "label": "support-dashboard 768px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-dashboard 768px stays on /admin/dashboard (signed in)",
+      "detail": "/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "support-dashboard 768px: the region holds elements",
+      "detail": 118
+    },
+    {
+      "ok": true,
+      "label": "support-dashboard 1280px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-dashboard 1280px stays on /admin/dashboard (signed in)",
+      "detail": "/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "support-dashboard 1280px: the region holds elements",
+      "detail": 118
+    },
+    {
+      "ok": true,
+      "label": "support-orders: the page has an address",
+      "detail": "/admin/orders"
+    },
+    {
+      "ok": true,
+      "label": "support-orders 375px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-orders 375px stays on /admin/orders (signed in)",
+      "detail": "/admin/orders"
+    },
+    {
+      "ok": true,
+      "label": "support-orders 375px: the region holds elements",
+      "detail": 62
+    },
+    {
+      "ok": true,
+      "label": "support-orders 768px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-orders 768px stays on /admin/orders (signed in)",
+      "detail": "/admin/orders"
+    },
+    {
+      "ok": true,
+      "label": "support-orders 768px: the region holds elements",
+      "detail": 62
+    },
+    {
+      "ok": true,
+      "label": "support-orders 1280px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-orders 1280px stays on /admin/orders (signed in)",
+      "detail": "/admin/orders"
+    },
+    {
+      "ok": true,
+      "label": "support-orders 1280px: the region holds elements",
+      "detail": 62
+    },
+    {
+      "ok": true,
+      "label": "support-order: the page has an address",
+      "detail": "/admin/orders/ROL-5143343A"
+    },
+    {
+      "ok": true,
+      "label": "support-order 375px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-order 375px stays on /admin/orders/ROL-5143343A (signed in)",
+      "detail": "/admin/orders/ROL-5143343A"
+    },
+    {
+      "ok": true,
+      "label": "support-order 375px: the region holds elements",
+      "detail": 101
+    },
+    {
+      "ok": true,
+      "label": "support-order 768px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-order 768px stays on /admin/orders/ROL-5143343A (signed in)",
+      "detail": "/admin/orders/ROL-5143343A"
+    },
+    {
+      "ok": true,
+      "label": "support-order 768px: the region holds elements",
+      "detail": 101
+    },
+    {
+      "ok": true,
+      "label": "support-order 1280px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-order 1280px stays on /admin/orders/ROL-5143343A (signed in)",
+      "detail": "/admin/orders/ROL-5143343A"
+    },
+    {
+      "ok": true,
+      "label": "support-order 1280px: the region holds elements",
+      "detail": 101
+    },
+    {
+      "ok": true,
+      "label": "support-offers: the page has an address",
+      "detail": "/admin/offers"
+    },
+    {
+      "ok": true,
+      "label": "support-offers 375px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-offers 375px stays on /admin/offers (signed in)",
+      "detail": "/admin/offers"
+    },
+    {
+      "ok": true,
+      "label": "support-offers 375px: the region holds elements",
+      "detail": 25
+    },
+    {
+      "ok": true,
+      "label": "support-offers 768px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-offers 768px stays on /admin/offers (signed in)",
+      "detail": "/admin/offers"
+    },
+    {
+      "ok": true,
+      "label": "support-offers 768px: the region holds elements",
+      "detail": 25
+    },
+    {
+      "ok": true,
+      "label": "support-offers 1280px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-offers 1280px stays on /admin/offers (signed in)",
+      "detail": "/admin/offers"
+    },
+    {
+      "ok": true,
+      "label": "support-offers 1280px: the region holds elements",
+      "detail": 25
+    },
+    {
+      "ok": true,
+      "label": "support-catalog: the page has an address",
+      "detail": "/admin/catalog"
+    },
+    {
+      "ok": true,
+      "label": "support-catalog 375px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-catalog 375px stays on /admin/catalog (signed in)",
+      "detail": "/admin/catalog"
+    },
+    {
+      "ok": true,
+      "label": "support-catalog 375px: the region holds elements",
+      "detail": 47
+    },
+    {
+      "ok": true,
+      "label": "support-catalog 768px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-catalog 768px stays on /admin/catalog (signed in)",
+      "detail": "/admin/catalog"
+    },
+    {
+      "ok": true,
+      "label": "support-catalog 768px: the region holds elements",
+      "detail": 47
+    },
+    {
+      "ok": true,
+      "label": "support-catalog 1280px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-catalog 1280px stays on /admin/catalog (signed in)",
+      "detail": "/admin/catalog"
+    },
+    {
+      "ok": true,
+      "label": "support-catalog 1280px: the region holds elements",
+      "detail": 47
+    },
+    {
+      "ok": true,
+      "label": "support-media: the page has an address",
+      "detail": "/admin/media"
+    },
+    {
+      "ok": true,
+      "label": "support-media 375px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-media 375px stays on /admin/media (signed in)",
+      "detail": "/admin/media"
+    },
+    {
+      "ok": true,
+      "label": "support-media 375px: the region holds elements",
+      "detail": 26
+    },
+    {
+      "ok": true,
+      "label": "support-media 768px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-media 768px stays on /admin/media (signed in)",
+      "detail": "/admin/media"
+    },
+    {
+      "ok": true,
+      "label": "support-media 768px: the region holds elements",
+      "detail": 26
+    },
+    {
+      "ok": true,
+      "label": "support-media 1280px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-media 1280px stays on /admin/media (signed in)",
+      "detail": "/admin/media"
+    },
+    {
+      "ok": true,
+      "label": "support-media 1280px: the region holds elements",
+      "detail": 26
+    },
+    {
+      "ok": true,
+      "label": "support-releases: the page has an address",
+      "detail": "/admin/releases"
+    },
+    {
+      "ok": true,
+      "label": "support-releases 375px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-releases 375px stays on /admin/releases (signed in)",
+      "detail": "/admin/releases"
+    },
+    {
+      "ok": true,
+      "label": "support-releases 375px: the region holds elements",
+      "detail": 7
+    },
+    {
+      "ok": true,
+      "label": "support-releases 768px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-releases 768px stays on /admin/releases (signed in)",
+      "detail": "/admin/releases"
+    },
+    {
+      "ok": true,
+      "label": "support-releases 768px: the region holds elements",
+      "detail": 7
+    },
+    {
+      "ok": true,
+      "label": "support-releases 1280px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-releases 1280px stays on /admin/releases (signed in)",
+      "detail": "/admin/releases"
+    },
+    {
+      "ok": true,
+      "label": "support-releases 1280px: the region holds elements",
+      "detail": 7
+    },
+    {
+      "ok": true,
+      "label": "support-editor: the page has an address",
+      "detail": "/admin/editor"
+    },
+    {
+      "ok": true,
+      "label": "support-editor 375px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-editor 375px stays on /admin/editor (signed in)",
+      "detail": "/admin/editor"
+    },
+    {
+      "ok": true,
+      "label": "support-editor 375px: the region holds elements",
+      "detail": 223
+    },
+    {
+      "ok": true,
+      "label": "support-editor 768px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-editor 768px stays on /admin/editor (signed in)",
+      "detail": "/admin/editor"
+    },
+    {
+      "ok": true,
+      "label": "support-editor 768px: the region holds elements",
+      "detail": 223
+    },
+    {
+      "ok": true,
+      "label": "support-editor 1280px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support-editor 1280px stays on /admin/editor (signed in)",
+      "detail": "/admin/editor"
+    },
+    {
+      "ok": true,
+      "label": "support-editor 1280px: the region holds elements",
+      "detail": 223
+    },
+    {
+      "ok": true,
+      "label": "admin-login: the page has an address",
+      "detail": "/admin/login"
+    },
+    {
+      "ok": true,
+      "label": "admin-login 375px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "admin-login 768px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "admin-login 1280px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "platform: the page has an address",
+      "detail": "/platform"
+    },
+    {
+      "ok": true,
+      "label": "platform 375px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "platform 768px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "platform 1280px answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "no computed-style, box or element differences against the baseline (custom properties: additions only)",
+      "detail": {
+        "style": 0,
+        "box": 0,
+        "added": 0,
+        "removed": 0,
+        "customChanged": 0,
+        "customAdded": 143520,
+        "ignored": 5596,
+        "boxReported": 4319,
+        "frame": 996,
+        "shots": 57,
+        "missing": 0
+      }
+    }
+  ],
+  "notes": [
+    "HEAD 6759d70; baseline /Users/snehal/Documents/Projects 2026/storeasy26/.drill-results/2026-11-24T04-40-10-776Z/CONSOLE-STYLES",
+    "storefront CSS: 153424 bytes (/_next/static/chunks/%5Broot-of-the-server%5D__1e-iwqf._.css 153424)",
+    "compare: 0 computed-style, 0 box, 0 added and 0 removed element differences; 0 changed and 143520 added custom properties (--accent, --accent-foreground, --border, --c-accent-fg, --c-bg, --c-muted, --c-sunken, --c-text, --c-warning-text, --card, --card-foreground, --destructive, --input, --muted, --muted-foreground, --popover, --popover-foreground, --primary-foreground, --secondary, --secondary-foreground, --sidebar, --sidebar-accent, --sidebar-accent-foreground, --sidebar-border, --sidebar-foreground, --sidebar-primary, --sidebar-primary-foreground, --sidebar-ring, --sidebar-width, --sidebar-width-icon); 57 screenshot(s) differ; 0 missing; 5596 ignored layout values, 4319 box differences and 996 frame (outside [data-legacy]) differences reported; CSS +1106 bytes",
+    "screenshot differences: owner-dashboard@375, owner-dashboard@768, owner-dashboard@1280, owner-orders@375, owner-orders@768, owner-orders@1280, owner-order@375, owner-order@768, owner-order@1280, owner-offers@375, owner-offers@768, owner-offers@1280, owner-catalog@375, owner-catalog@768, owner-catalog@1280, owner-media@375, owner-media@768, owner-media@1280, owner-releases@375, owner-releases@768, owner-releases@1280, owner-editor@375, owner-editor@768, owner-editor@1280, owner-settings@375, owner-settings@768, owner-settings@1280, support-dashboard@375, support-dashboard@768, support-dashboard@1280, support-orders@375, support-orders@768, support-orders@1280, support-order@375, support-order@768, support-order@1280, support-offers@375, support-offers@768, support-offers@1280, support-catalog@375, support-catalog@768, support-catalog@1280, support-media@375, support-media@768, support-media@1280, support-releases@375, support-releases@768, support-releases@1280, support-editor@375, support-editor@768, support-editor@1280, admin-login@375, admin-login@768, admin-login@1280, platform@375, platform@768, platform@1280 (they fail only if the baseline-vs-baseline screenshots were identical; see compare.json)"
+  ],
+  "screenshots": []
+}

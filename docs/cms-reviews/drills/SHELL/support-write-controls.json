@@ -1,0 +1,288 @@
+{
+  "id": "SHELL",
+  "note": "Write controls support still sees inside the old screens: Phase 2's list, not a failure.",
+  "total": 46,
+  "pages": [
+    {
+      "page": "/admin/dashboard",
+      "controls": []
+    },
+    {
+      "page": "/admin/analytics",
+      "controls": [
+        {
+          "tag": "button",
+          "text": "Export CSV",
+          "href": null
+        }
+      ]
+    },
+    {
+      "page": "/admin/orders",
+      "controls": [
+        {
+          "tag": "button",
+          "text": "Orders 1",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Returns",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "All 1",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Paid 0",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Synced 0",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Sync failed 0",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "COD pending 1",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Pending payment 0",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Cancelled 0",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Open order ROL-9B440D13",
+          "href": null
+        }
+      ]
+    },
+    {
+      "page": "/admin/catalog",
+      "controls": [
+        {
+          "tag": "button",
+          "text": "New bundle",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "New quiz",
+          "href": null
+        }
+      ]
+    },
+    {
+      "page": "/admin/editor",
+      "controls": [
+        {
+          "tag": "button",
+          "text": "All pages",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Earlier versions",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Hero Roles Demo Co",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Hide Hero",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Delete Hero",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Collections grid Shop by collection",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Move Collections grid down",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Hide Collections grid",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Copy Collections grid",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Delete Collections grid",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Product rail Fixture collection 1",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Move Product rail up",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Move Product rail down",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Hide Product rail",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Copy Product rail",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Delete Product rail",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Product rail Fixture collection 2",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Move Product rail up",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Move Product rail down",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Hide Product rail",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Copy Product rail",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Delete Product rail",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Newest products New arrivals",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Move Newest products up",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Hide Newest products",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Copy Newest products",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Delete Newest products",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "Add a section",
+          "href": null
+        }
+      ]
+    },
+    {
+      "page": "/admin/start",
+      "controls": [
+        {
+          "tag": "a",
+          "text": "Edit the home page",
+          "href": "/admin/editor?doc=doc_home"
+        }
+      ]
+    },
+    {
+      "page": "/admin/media",
+      "controls": []
+    },
+    {
+      "page": "/admin/releases",
+      "controls": []
+    },
+    {
+      "page": "/admin/offers",
+      "controls": [
+        {
+          "tag": "button",
+          "text": "New offer",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "New offer",
+          "href": null
+        }
+      ]
+    },
+    {
+      "page": "/admin/experiments",
+      "controls": [
+        {
+          "tag": "button",
+          "text": "New experiment",
+          "href": null
+        },
+        {
+          "tag": "button",
+          "text": "New experiment",
+          "href": null
+        }
+      ]
+    },
+    {
+      "page": "/admin/insights",
+      "controls": []
+    }
+  ]
+}

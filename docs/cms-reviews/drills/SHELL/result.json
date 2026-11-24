@@ -1,0 +1,82 @@
+{
+  "id": "SHELL",
+  "ranAt": "2026-11-24T05:10:29.062Z",
+  "passed": 247,
+  "failed": 0,
+  "byRoleAndWidth": [
+    {
+      "role": "owner",
+      "width": 1280,
+      "checks": 20,
+      "failed": 0
+    },
+    {
+      "role": "owner",
+      "width": 900,
+      "checks": 21,
+      "failed": 0
+    },
+    {
+      "role": "owner",
+      "width": 375,
+      "checks": 23,
+      "failed": 0
+    },
+    {
+      "role": "admin",
+      "width": 1280,
+      "checks": 20,
+      "failed": 0
+    },
+    {
+      "role": "admin",
+      "width": 900,
+      "checks": 21,
+      "failed": 0
+    },
+    {
+      "role": "admin",
+      "width": 375,
+      "checks": 23,
+      "failed": 0
+    },
+    {
+      "role": "staff",
+      "width": 1280,
+      "checks": 15,
+      "failed": 0
+    },
+    {
+      "role": "staff",
+      "width": 900,
+      "checks": 16,
+      "failed": 0
+    },
+    {
+      "role": "staff",
+      "width": 375,
+      "checks": 18,
+      "failed": 0
+    },
+    {
+      "role": "support",
+      "width": 1280,
+      "checks": 26,
+      "failed": 0
+    },
+    {
+      "role": "support",
+      "width": 900,
+      "checks": 16,
+      "failed": 0
+    },
+    {
+      "role": "support",
+      "width": 375,
+      "checks": 18,
+      "failed": 0
+    }
+  ],
+  "notes": [],
+  "failures": []
+}

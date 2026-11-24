@@ -1,6 +1,6 @@
 {
   "id": "SF-STYLES",
-  "ranAt": "2026-11-24T04:15:26.271Z",
+  "ranAt": "2026-11-24T05:00:14.188Z",
   "baseline": {
     "dir": "/Users/snehal/Documents/Projects 2026/storeasy26/.drill-results/2026-11-24T03-51-14-795Z/SF-STYLES",
     "head": "355074f",
@@ -14,39 +14,70 @@
     }
   },
   "run": {
-    "head": "6147b2d",
+    "head": "6759d70",
     "bite": false,
     "css": {
       "files": {
-        "/_next/static/chunks/%5Broot-of-the-server%5D__1gw72-d._.css": 155935,
-        "/_next/static/chunks/%5Broot-of-the-server%5D__1e-iwqf._.css": 152221
+        "/_next/static/chunks/%5Broot-of-the-server%5D__1gw72-d._.css": 157138,
+        "/_next/static/chunks/%5Broot-of-the-server%5D__1e-iwqf._.css": 153424
       },
-      "bytes": 308156
+      "bytes": 310562
     }
   },
-  "cssDeltaBytes": 102904,
+  "cssDeltaBytes": 105310,
   "totals": {
-    "style": 0,
+    "style": 147,
     "box": 0,
     "added": 0,
     "removed": 0,
-    "customChanged": 0,
-    "customAdded": 146142,
-    "shots": 0,
+    "customChanged": 81,
+    "customAdded": 148914,
+    "ignored": 0,
+    "boxReported": 0,
+    "frame": 0,
+    "shots": 4,
     "missing": 0
   },
   "missing": [],
   "customAdded": [
+    "--accent",
+    "--accent-foreground",
     "--blur-xs",
+    "--border",
+    "--c-accent-fg",
+    "--c-bg",
+    "--c-muted",
+    "--c-sunken",
+    "--c-text",
+    "--c-warning-text",
+    "--card",
+    "--card-foreground",
     "--color-accent",
+    "--destructive",
     "--ease-in-out",
+    "--input",
+    "--muted",
+    "--muted-foreground",
+    "--popover",
+    "--popover-foreground",
     "--primary",
+    "--primary-foreground",
     "--radius-card",
     "--radius-ctl",
     "--radius-xs",
     "--ring",
+    "--secondary",
+    "--secondary-foreground",
     "--shadow-card",
     "--shadow-overlay",
+    "--sidebar",
+    "--sidebar-accent",
+    "--sidebar-accent-foreground",
+    "--sidebar-border",
+    "--sidebar-foreground",
+    "--sidebar-primary",
+    "--sidebar-primary-foreground",
+    "--sidebar-ring",
     "--tw-animation-delay",
     "--tw-animation-direction",
     "--tw-animation-fill-mode",
@@ -76,6 +107,9 @@
       "removed": 0,
       "customChanged": 0,
       "customAdded": 19292,
+      "ignored": 0,
+      "boxReported": 0,
+      "frame": 0,
       "shot": "same",
       "samples": [],
       "customNames": [
@@ -116,6 +150,9 @@
       "removed": 0,
       "customChanged": 0,
       "customAdded": 19292,
+      "ignored": 0,
+      "boxReported": 0,
+      "frame": 0,
       "shot": "same",
       "samples": [],
       "customNames": [
@@ -156,6 +193,9 @@
       "removed": 0,
       "customChanged": 0,
       "customAdded": 19292,
+      "ignored": 0,
+      "boxReported": 0,
+      "frame": 0,
       "shot": "same",
       "samples": [],
       "customNames": [
@@ -196,7 +236,10 @@
       "removed": 0,
       "customChanged": 0,
       "customAdded": 6188,
-      "shot": "same",
+      "ignored": 0,
+      "boxReported": 0,
+      "frame": 0,
+      "shot": "differs",
       "samples": [],
       "customNames": [
         "--blur-xs",
@@ -236,6 +279,9 @@
       "removed": 0,
       "customChanged": 0,
       "customAdded": 6188,
+      "ignored": 0,
+      "boxReported": 0,
+      "frame": 0,
       "shot": "same",
       "samples": [],
       "customNames": [
@@ -276,6 +322,9 @@
       "removed": 0,
       "customChanged": 0,
       "customAdded": 6032,
+      "ignored": 0,
+      "boxReported": 0,
+      "frame": 0,
       "shot": "same",
       "samples": [],
       "customNames": [
@@ -316,6 +365,9 @@
       "removed": 0,
       "customChanged": 0,
       "customAdded": 14508,
+      "ignored": 0,
+      "boxReported": 0,
+      "frame": 0,
       "shot": "same",
       "samples": [],
       "customNames": [
@@ -356,6 +408,9 @@
       "removed": 0,
       "customChanged": 0,
       "customAdded": 14508,
+      "ignored": 0,
+      "boxReported": 0,
+      "frame": 0,
       "shot": "same",
       "samples": [],
       "customNames": [
@@ -396,6 +451,9 @@
       "removed": 0,
       "customChanged": 0,
       "customAdded": 14508,
+      "ignored": 0,
+      "boxReported": 0,
+      "frame": 0,
       "shot": "same",
       "samples": [],
       "customNames": [
@@ -436,6 +494,9 @@
       "removed": 0,
       "customChanged": 0,
       "customAdded": 6864,
+      "ignored": 0,
+      "boxReported": 0,
+      "frame": 0,
       "shot": "same",
       "samples": [],
       "customNames": [
@@ -476,6 +537,9 @@
       "removed": 0,
       "customChanged": 0,
       "customAdded": 6864,
+      "ignored": 0,
+      "boxReported": 0,
+      "frame": 0,
       "shot": "same",
       "samples": [],
       "customNames": [
@@ -516,6 +580,9 @@
       "removed": 0,
       "customChanged": 0,
       "customAdded": 6864,
+      "ignored": 0,
+      "boxReported": 0,
+      "frame": 0,
       "shot": "same",
       "samples": [],
       "customNames": [
@@ -556,6 +623,9 @@
       "removed": 0,
       "customChanged": 0,
       "customAdded": 598,
+      "ignored": 0,
+      "boxReported": 0,
+      "frame": 0,
       "shot": "same",
       "samples": [],
       "customNames": [
@@ -596,6 +666,9 @@
       "removed": 0,
       "customChanged": 0,
       "customAdded": 598,
+      "ignored": 0,
+      "boxReported": 0,
+      "frame": 0,
       "shot": "same",
       "samples": [],
       "customNames": [
@@ -636,6 +709,9 @@
       "removed": 0,
       "customChanged": 0,
       "customAdded": 598,
+      "ignored": 0,
+      "boxReported": 0,
+      "frame": 0,
       "shot": "same",
       "samples": [],
       "customNames": [
@@ -670,25 +746,197 @@
     {
       "page": "admin-login",
       "width": 375,
-      "style": 0,
+      "style": 49,
       "box": 0,
       "added": 0,
       "removed": 0,
-      "customChanged": 0,
-      "customAdded": 1316,
-      "shot": "same",
-      "samples": [],
+      "customChanged": 27,
+      "customAdded": 2240,
+      "ignored": 0,
+      "boxReported": 0,
+      "frame": 0,
+      "shot": "differs",
+      "samples": [
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "background-color",
+          "before": "rgb(255, 255, 255)",
+          "after": "lab(98.395 -0.097543 1.13808)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-block-end-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-block-start-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-bottom-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-inline-end-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-inline-start-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-left-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-right-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-top-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "column-rule-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "outline-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "row-rule-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "text-decoration-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "text-emphasis-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "-webkit-text-fill-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "-webkit-text-stroke-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "custom",
+          "prop": "--c-warning",
+          "before": "#b45309",
+          "after": "lab(62.5333% 24.787 70.0458)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "custom",
+          "prop": "--c-border",
+          "before": "#e4e4e7",
+          "after": "lab(89.5914% -.159144 1.89906)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "custom",
+          "prop": "--c-info",
+          "before": "#0369a1",
+          "after": "lab(44.0208% -8.14715 -35.8784)"
+        }
+      ],
       "customNames": [
+        "--accent",
+        "--accent-foreground",
         "--blur-xs",
+        "--border",
+        "--c-accent-fg",
+        "--c-bg",
+        "--c-muted",
+        "--c-sunken",
+        "--c-text",
+        "--c-warning-text",
+        "--card",
+        "--card-foreground",
         "--color-accent",
+        "--destructive",
         "--ease-in-out",
+        "--input",
+        "--muted",
+        "--muted-foreground",
+        "--popover",
+        "--popover-foreground",
         "--primary",
+        "--primary-foreground",
         "--radius-card",
         "--radius-ctl",
         "--radius-xs",
         "--ring",
+        "--secondary",
+        "--secondary-foreground",
         "--shadow-card",
         "--shadow-overlay",
+        "--sidebar",
+        "--sidebar-accent",
+        "--sidebar-accent-foreground",
+        "--sidebar-border",
+        "--sidebar-foreground",
+        "--sidebar-primary",
+        "--sidebar-primary-foreground",
+        "--sidebar-ring",
         "--tw-animation-delay",
         "--tw-animation-direction",
         "--tw-animation-fill-mode",
@@ -712,25 +960,197 @@
     {
       "page": "admin-login",
       "width": 768,
-      "style": 0,
+      "style": 49,
       "box": 0,
       "added": 0,
       "removed": 0,
-      "customChanged": 0,
-      "customAdded": 1316,
-      "shot": "same",
-      "samples": [],
+      "customChanged": 27,
+      "customAdded": 2240,
+      "ignored": 0,
+      "boxReported": 0,
+      "frame": 0,
+      "shot": "differs",
+      "samples": [
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "background-color",
+          "before": "rgb(255, 255, 255)",
+          "after": "lab(98.395 -0.097543 1.13808)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-block-end-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-block-start-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-bottom-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-inline-end-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-inline-start-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-left-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-right-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-top-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "column-rule-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "outline-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "row-rule-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "text-decoration-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "text-emphasis-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "-webkit-text-fill-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "-webkit-text-stroke-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "custom",
+          "prop": "--c-warning",
+          "before": "#b45309",
+          "after": "lab(62.5333% 24.787 70.0458)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "custom",
+          "prop": "--c-border",
+          "before": "#e4e4e7",
+          "after": "lab(89.5914% -.159144 1.89906)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "custom",
+          "prop": "--c-info",
+          "before": "#0369a1",
+          "after": "lab(44.0208% -8.14715 -35.8784)"
+        }
+      ],
       "customNames": [
+        "--accent",
+        "--accent-foreground",
         "--blur-xs",
+        "--border",
+        "--c-accent-fg",
+        "--c-bg",
+        "--c-muted",
+        "--c-sunken",
+        "--c-text",
+        "--c-warning-text",
+        "--card",
+        "--card-foreground",
         "--color-accent",
+        "--destructive",
         "--ease-in-out",
+        "--input",
+        "--muted",
+        "--muted-foreground",
+        "--popover",
+        "--popover-foreground",
         "--primary",
+        "--primary-foreground",
         "--radius-card",
         "--radius-ctl",
         "--radius-xs",
         "--ring",
+        "--secondary",
+        "--secondary-foreground",
         "--shadow-card",
         "--shadow-overlay",
+        "--sidebar",
+        "--sidebar-accent",
+        "--sidebar-accent-foreground",
+        "--sidebar-border",
+        "--sidebar-foreground",
+        "--sidebar-primary",
+        "--sidebar-primary-foreground",
+        "--sidebar-ring",
         "--tw-animation-delay",
         "--tw-animation-direction",
         "--tw-animation-fill-mode",
@@ -754,25 +1174,197 @@
     {
       "page": "admin-login",
       "width": 1280,
-      "style": 0,
+      "style": 49,
       "box": 0,
       "added": 0,
       "removed": 0,
-      "customChanged": 0,
-      "customAdded": 1316,
-      "shot": "same",
-      "samples": [],
+      "customChanged": 27,
+      "customAdded": 2240,
+      "ignored": 0,
+      "boxReported": 0,
+      "frame": 0,
+      "shot": "differs",
+      "samples": [
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "background-color",
+          "before": "rgb(255, 255, 255)",
+          "after": "lab(98.395 -0.097543 1.13808)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-block-end-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-block-start-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-bottom-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-inline-end-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-inline-start-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-left-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-right-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "border-top-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "column-rule-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "outline-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "row-rule-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "text-decoration-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "text-emphasis-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "-webkit-text-fill-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "style",
+          "prop": "-webkit-text-stroke-color",
+          "before": "rgb(10, 10, 11)",
+          "after": "lab(9.45907 0.172012 -3.73417)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "custom",
+          "prop": "--c-warning",
+          "before": "#b45309",
+          "after": "lab(62.5333% 24.787 70.0458)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "custom",
+          "prop": "--c-border",
+          "before": "#e4e4e7",
+          "after": "lab(89.5914% -.159144 1.89906)"
+        },
+        {
+          "k": "html>body:2",
+          "kind": "custom",
+          "prop": "--c-info",
+          "before": "#0369a1",
+          "after": "lab(44.0208% -8.14715 -35.8784)"
+        }
+      ],
       "customNames": [
+        "--accent",
+        "--accent-foreground",
         "--blur-xs",
+        "--border",
+        "--c-accent-fg",
+        "--c-bg",
+        "--c-muted",
+        "--c-sunken",
+        "--c-text",
+        "--c-warning-text",
+        "--card",
+        "--card-foreground",
         "--color-accent",
+        "--destructive",
         "--ease-in-out",
+        "--input",
+        "--muted",
+        "--muted-foreground",
+        "--popover",
+        "--popover-foreground",
         "--primary",
+        "--primary-foreground",
         "--radius-card",
         "--radius-ctl",
         "--radius-xs",
         "--ring",
+        "--secondary",
+        "--secondary-foreground",
         "--shadow-card",
         "--shadow-overlay",
+        "--sidebar",
+        "--sidebar-accent",
+        "--sidebar-accent-foreground",
+        "--sidebar-border",
+        "--sidebar-foreground",
+        "--sidebar-primary",
+        "--sidebar-primary-foreground",
+        "--sidebar-ring",
         "--tw-animation-delay",
         "--tw-animation-direction",
         "--tw-animation-fill-mode",
