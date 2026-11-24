@@ -14,16 +14,25 @@ import { cn } from "@/components/ui/utils";
 //            offers Try again.
 //   code     the 6-digit code we emailed; a wrong code gets the same words
 //            every time; a new code at most once a minute (the countdown).
-//   working  "Setting up your store…" while the code is checked and the store made
-//   failed   what went wrong in plain words, and Try again (same signup, same run)
-//   done     on the way to the new store's sign-in handoff
+//   working  "Setting up your store…": the four steps (polled from
+//            /api/signup/status every 1.5 s, slower while the tab is hidden)
+//            and, when the hosting provider is slow, the retry note
+//   failed   what went wrong in plain words (data-failure-kind:
+//            retry_exhausted | needs_operator | lapsed), and Try again (same
+//            signup, same job and run) or Start again
+//   done     on the way to the new store's sign-in handoff (or its sign-in page)
 //   closed   signups were switched off meanwhile
-// Talks only to /api/signup, /api/signup/verify and /api/signup/resend; the
-// se_signup cookie (httpOnly) binds the code to this browser.
+// Talks only to /api/signup, /api/signup/verify, /api/signup/status and
+// /api/signup/resend; the se_signup cookie (httpOnly) binds them to this browser.
 const OFFLINE = "We couldn't reach Storeasy. Check your connection, then try again.";
 const SERVER = "Something went wrong on our side. Try again in a moment.";
-// a code check that takes longer than this is the store being made
-const WORKING_AFTER_MS = 1200;
+const LOST = "We lost touch with Storeasy for a moment. Still checking…";
+// how often the waiting page asks where setup stands; hidden tabs ask less often
+const POLL_MS = 1500;
+const POLL_HIDDEN_MS = 15_000;
+// shown until the first status answer names them
+const STEP_LABELS = ["Creating your store's database", "Preparing your store", "Registering your store address", "Creating your account"];
+const INITIAL_STEPS = STEP_LABELS.map((label, i) => ({ label, state: i === 0 ? "working" : "waiting" }));
 
 async function post(url, body) {
   try {
@@ -91,7 +100,9 @@ export default function SignupFlow({ storeDomain, codeMinutes = 15, resendSecond
   const [codeError, setCodeError] = useState(null);
   const [resendIn, setResendIn] = useState(0);
   const [resendNote, setResendNote] = useState(null);
-  const [failure, setFailure] = useState(null); // { text, canRetry }
+  const [failure, setFailure] = useState(null); // { text, canRetry, kind }
+  const [progress, setProgress] = useState(INITIAL_STEPS); // [{ label, state }]
+  const [note, setNote] = useState(null); // the retry note, or a lost connection
   const [closedText, setClosedText] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const codeRef = useRef(null);
@@ -186,45 +197,106 @@ export default function SignupFlow({ storeDomain, codeMinutes = 15, resendSecond
     }
   };
 
-  // verify ({ code }) or resume ({ retry: true }): both can make the store
+  // where the store's setup stands: a done answer moves on, failed shows why
+  const leave = (url) => {
+    setStep("done");
+    window.location.assign(url);
+  };
+  const settle = (r) => {
+    const b = r.body || {};
+    if (r.status === 200 && b.status === "done") {
+      if (Array.isArray(b.steps)) setProgress(b.steps);
+      const url = b.redirect || b.loginUrl;
+      if (url) leave(url);
+      return !url; // done with neither: poll again
+    }
+    if (r.status === 200 && b.status === "provisioning") {
+      if (Array.isArray(b.steps)) setProgress(b.steps);
+      setNote(b.note || null);
+      return true;
+    }
+    if (r.status === 200 && b.status === "failed") {
+      if (Array.isArray(b.steps)) setProgress(b.steps);
+      setNote(null);
+      setFailure({ text: b.error || SERVER, canRetry: b.canRetry !== false, kind: b.failureKind || null });
+      setStep("failed");
+      return false;
+    }
+    if (r.status === 403 && b.code === "SIGNUPS_CLOSED") {
+      closed(b);
+      return false;
+    }
+    if (r.status === 0 || r.status === 429 || r.status >= 500) {
+      // the store keeps being made on our side; keep asking
+      setNote(LOST);
+      return true;
+    }
+    // no signup in this browser any more (or it lapsed): start again
+    setFailure({ text: b.error || SERVER, canRetry: false, kind: null });
+    setStep("failed");
+    return false;
+  };
+
+  // while working: ask every 1.5 s, one request at a time; a hidden tab asks
+  // every 15 s and asks at once when it is shown again
+  useEffect(() => {
+    if (step !== "working") return undefined;
+    let stopped = false;
+    let timer = null;
+    let inFlight = false;
+    const tick = async () => {
+      clearTimeout(timer);
+      if (stopped || inFlight) return;
+      inFlight = true;
+      const r = await post("/api/signup/status");
+      inFlight = false;
+      if (stopped) return;
+      if (settle(r)) timer = setTimeout(tick, document.hidden ? POLL_HIDDEN_MS : POLL_MS);
+    };
+    const onVisible = () => {
+      if (!document.hidden) tick();
+    };
+    timer = setTimeout(tick, POLL_MS);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+    // settle only sets state; the loop lives as long as the working step
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
+  // verify ({ code }) or Try again ({ retry: true }): both queue the store's
+  // setup and answer at once; the working step then polls
   const finish = async (body) => {
     if (busy) return;
     setBusy(true);
     setCodeError(null);
-    let making = Boolean(body.retry);
-    const slow = setTimeout(
-      () => {
-        making = true;
-        setStep("working");
-      },
-      body.retry ? 0 : WORKING_AFTER_MS,
-    );
     const r = await post("/api/signup/verify", body);
-    clearTimeout(slow);
     setBusy(false);
-    if (r.status === 200 && r.body?.status === "done" && r.body.redirect) {
-      setStep("done");
-      window.location.assign(r.body.redirect);
+    const b = r.body || {};
+    if (r.status === 200 && b.status === "provisioning") {
+      setProgress(INITIAL_STEPS);
+      setNote(null);
+      setFailure(null);
+      setStep("working");
+    } else if (r.status === 200 && b.status === "done" && (b.redirect || b.loginUrl)) {
+      leave(b.redirect || b.loginUrl);
     } else if (r.status === 200) {
-      setFailure({ text: r.body?.error || SERVER, canRetry: r.body?.canRetry !== false });
+      setFailure({ text: b.error || SERVER, canRetry: b.canRetry !== false, kind: b.failureKind || null });
       setStep("failed");
-    } else if (r.status === 403 && r.body?.code === "SIGNUPS_CLOSED") {
-      closed(r.body);
-    } else if (r.status === 0 || r.status >= 500) {
-      // the store may be half made: resume it, never ask for the used code again
-      if (making) {
-        setFailure({ text: r.status === 0 ? OFFLINE : SERVER, canRetry: true });
-        setStep("failed");
-      } else {
-        setStep("code");
-        setCodeError(r.status === 0 ? OFFLINE : SERVER);
-      }
+    } else if (r.status === 403 && b.code === "SIGNUPS_CLOSED") {
+      closed(b);
     } else if (body.retry) {
-      setFailure({ text: r.body?.error || SERVER, canRetry: false });
+      // a lost connection or a server error leaves the store as it was: try again later;
+      // anything else (no signup here, lapsed) means start again
+      const again = r.status === 0 || r.status === 429 || r.status >= 500;
+      setFailure({ text: r.status === 0 ? OFFLINE : b.error || SERVER, canRetry: again, kind: failure?.kind || null });
       setStep("failed");
     } else {
       setStep("code");
-      setCodeError(r.body?.error || SERVER);
+      setCodeError(r.status === 0 ? OFFLINE : b.error || SERVER);
     }
   };
 
@@ -273,37 +345,67 @@ export default function SignupFlow({ storeDomain, codeMinutes = 15, resendSecond
     );
   }
 
+  const stepList = (
+    <ol data-signup-steps className="space-y-3">
+      {progress.map((x) => (
+        <li key={x.label} data-step-state={x.state} className={cn("flex items-center gap-3", x.state === "waiting" && "text-muted-foreground")}>
+          <span aria-hidden className="flex size-5 shrink-0 items-center justify-center">
+            {x.state === "done" && <Check className="size-4 text-success" />}
+            {x.state === "working" && <LoaderCircle className="size-4 text-primary motion-safe:animate-spin" />}
+            {x.state === "failed" && <CircleAlert className="size-4 text-destructive" />}
+            {x.state === "waiting" && <span className="size-1.5 rounded-full bg-current" />}
+          </span>
+          <span className={cn(x.state === "working" && "font-medium")}>{x.label}</span>
+          <span className="sr-only">
+            {x.state === "done" ? "(done)" : x.state === "working" ? "(working on it)" : x.state === "failed" ? "(stopped here)" : "(not yet)"}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+
   if (step === "working" || step === "done") {
+    const current = progress.find((x) => x.state === "working");
     return (
-      <section data-signup={step} role="status" aria-live="polite" className="space-y-6">
+      <section data-signup={step} className="space-y-6">
         <div className="space-y-3">
           {heading(step === "done" ? "Opening your store…" : "Setting up your store…")}
           <p className="text-muted-foreground">
             {step === "done"
               ? "Your store is ready. Taking you there now."
-              : `We're making ${signup?.storeName || "your store"} at ${signup?.address || "its new address"}. This takes a few seconds; keep this page open.`}
+              : `We're making ${signup?.storeName || "your store"} at ${signup?.address || "its new address"}. This takes a little while; keep this page open.`}
           </p>
         </div>
-        <div aria-hidden className="h-1 w-full overflow-hidden rounded-full bg-muted">
-          <div className={cn("h-full rounded-full bg-primary", step === "done" ? "w-full" : "w-1/3 motion-safe:animate-pulse")} />
+        {stepList}
+        {/* what a screen reader hears: the step being worked on, the retry note, done */}
+        <div role="status" aria-live="polite" className="space-y-2">
+          <p className="sr-only">{step === "done" ? "Your store is ready." : current ? `${current.label}…` : ""}</p>
+          {step === "working" && note && (
+            <p data-signup-note className="rounded-md border border-border bg-muted px-3 py-2 text-[0.8125rem] text-muted-foreground">
+              {note}
+            </p>
+          )}
         </div>
       </section>
     );
   }
 
   if (step === "failed") {
+    const needsUs = failure?.kind === "needs_operator";
     return (
-      <section data-signup="failed" className="space-y-6">
+      <section data-signup="failed" data-failure-kind={failure?.kind || undefined} className="space-y-6">
         <div className="space-y-3">
-          {heading("We couldn't finish setting up your store")}
+          {heading(needsUs ? "Your store is waiting on us" : "We couldn't finish setting up your store")}
           <p role="alert" className="text-muted-foreground">
             {failure?.text}
           </p>
           {failure?.canRetry && <p className="text-muted-foreground">Your details and code are kept. Trying again picks up where it stopped.</p>}
         </div>
+        {failure?.kind && stepList}
         <div className="flex flex-wrap gap-2">
           {failure?.canRetry && (
             <Button size="lg" disabled={busy} onClick={() => finish({ retry: true })} className="h-10 px-4">
+              {busy && <LoaderCircle aria-hidden className="motion-safe:animate-spin" />}
               {busy ? "Trying again…" : "Try again"}
             </Button>
           )}

@@ -1047,6 +1047,19 @@ Packet: [P6-FIX3.md](P6-FIX3.md), "Owner checks" and "Known limits" (From review
 - [ ] CI sqld download under .github/ is unchanged: its source and checksum still need the owner's approval.
 - [ ] Staging run on a throwaway tenant: NOT DONE.
 
+## Storeasy Phase 1, line 2: signup makes the store's Turso database
+
+### The one real Turso check (`pnpm check:turso-real`, owner-run only)
+Tests, drills and the local harness only ever talk to a local stand-in for Turso's Platform API. This check is the only thing that reaches the real Turso, and only you run it. It costs one real database for a few seconds (longer with `--keep`), counted against your Turso plan.
+- [ ] **Dry run first.** In a shell with your Turso API token and organization (never paste them into a chat or a file in the repo):
+  `TURSO_REAL_CHECK=yes-i-accept-a-real-database TURSO_API_TOKEN=… TURSO_ORG=… pnpm check:turso-real --create-one-database --dry-run`
+  Pass: it prints the database name it would make and calls nothing.
+- [ ] **The real run.** The same line without `--dry-run`. It refuses unless all of these hold: `TURSO_REAL_CHECK` is exactly `yes-i-accept-a-real-database` (your written consent to a real database), the `--create-one-database` flag is given, `TURSO_API_TOKEN` and `TURSO_ORG` are set, and `TURSO_API_URL` is unset (so it can only talk to the default `https://api.turso.tech`). `TURSO_GROUP` is optional (default `default`).
+  What it does: creates one database `storeasy-check-<6 hex>`, mints a 1-hour token for it (never printed), applies the store schema, reads it back, then deletes the database, also when a step fails. With `--keep` it leaves the database for you to inspect and delete in the Turso dashboard.
+  Pass: four ticks (created, minted, applied with its time, read back) and "deleted". Note the schema-apply time: a signup's first try has 50 s (plan risk 1). If it says it could not delete, delete `storeasy-check-…` in the Turso dashboard.
+- [ ] **Errors Turso really sends.** If you can, trigger a plan limit or a wrong group once and note the HTTP status and words. The code treats 400, 401, 402, 403 and an unrequested 409 as "needs an operator", and 5xx, 429 and timeouts as retry (plan risk 3). Not checked against the real service.
+- [ ] **Operator view.** In `/platform`, Provisioning runs: a signup's run shows "Self-serve signup" and, when it failed, why (gave up after 5 tries, needs an operator, lapsed). Resume on such a run queues the signup's own job. Not drilled (the drill does not sign in to the operator console).
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Card, CardHeader } from "@/components/console/Card";
 import { Button } from "@/components/console/Button";
-import { StatusBadge } from "@/components/console/Badge";
+import { Badge, StatusBadge } from "@/components/console/Badge";
 import { DangerDialog } from "@/components/console/Dialog";
 import { SecretReveal } from "@/components/console/Copy";
 import { SkeletonText, ErrorState, EmptyState } from "@/components/console/bits";
@@ -12,6 +12,14 @@ import { useToast } from "@/components/console/Toast";
 // Provisioning runs panel (S41 / OP04, redesigned S50): per-step state, safe
 // resume of failed runs (steps are idempotent — no duplicate resources),
 // conservative compensation. Done runs are history, not buttons.
+// Phase 1 line 2: a run a self-serve signup made carries `signup`
+// ({ status, failureKind }); resuming it queues the signup's own job.
+const FAILURE_KIND = {
+  retry_exhausted: "Gave up after 5 tries",
+  needs_operator: "Needs an operator",
+  lapsed: "Signup lapsed",
+};
+
 export default function ProvisionRunsPanel() {
   const [runs, setRuns] = useState(null);
   const [err, setErr] = useState(null);
@@ -47,8 +55,8 @@ export default function ProvisionRunsPanel() {
   async function resume(run) {
     setBusy(run.id);
     try {
-      await act("resume", run);
-      toast.success(`Run ${run.id} resumed`);
+      const json = await act("resume", run);
+      toast.success(json.queued ? `Run ${run.id} queued; the signup's job picks it up` : `Run ${run.id} resumed`);
     } catch (e) {
       toast.error(String(e?.message || e));
     }
@@ -77,6 +85,18 @@ export default function ProvisionRunsPanel() {
                 <span className="font-semibold text-fg">{r.tenant_id}</span>
                 <span className="font-mono text-xs text-fg-subtle">{r.id}</span>
                 <StatusBadge status={r.status} />
+                {r.signup && (
+                  <span data-provision-signup={r.signup.status}>
+                    <Badge tone="info" title={`Signup ${r.signup.status}`}>
+                      Self-serve signup
+                    </Badge>
+                  </span>
+                )}
+                {r.signup?.failureKind && (
+                  <span data-provision-failure-kind={r.signup.failureKind}>
+                    <StatusBadge status="failed" label={FAILURE_KIND[r.signup.failureKind] || r.signup.failureKind} />
+                  </span>
+                )}
                 <span className="ml-auto text-xs text-fg-subtle">
                   {new Date(r.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                 </span>

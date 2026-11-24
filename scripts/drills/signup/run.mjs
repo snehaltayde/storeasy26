@@ -5,6 +5,9 @@
 // marketing host, new stores get <slug>.localhost). Never in the owner's
 // checkout (runDrill refuses).
 //
+// Line 2 (Phase 1): the store's database is made through the harness's
+// stand-in for Turso's Platform API (scripts/support/fake-turso-api.js), each
+// store on its own sqld, so the new storefront renders too.
 // Steps:
 //   1. flag off: /signup says signups are closed and links to /contact
 //   2. flag ff_self-signup on (the control plane, then waits until the API answers)
@@ -12,8 +15,10 @@
 //   4. an empty submit: an error under each field
 //   5. the form: the address follows the store name; submit → the code screen
 //      with the email and a resend countdown that counts down
-//   6. the code (read from the mock mail row) → "Setting up your store…" (when
-//      it is slow enough to see) → <slug>.localhost/admin/onboarding: the shell's
+//   6. the stand-in answers 503 to the first two "create database" calls; the
+//      code (read from the mock mail row) → "Setting up your store…" with the
+//      four steps (aria-live) and the retry note → done, one database made →
+//      <slug>.localhost/admin/onboarding: the shell's
 //      top bar, no sidebar, a 640px column, "Welcome to …", the address, the
 //      Closed badge, the verified email, "Next: connect your Shopify store";
 //      the handoff fragment is gone from the address and the history
@@ -22,13 +27,16 @@
 //      mailed; a wrong code gets the generic words
 //   9. a used or made-up handoff token: "This sign-in link didn't work"
 //  10. anonymous /admin/onboarding → /admin/login; /signup on the store host → 404
-// The new store's storefront is never visited: the Edge runtime cannot open
-// its file: database (plan risk 1).
+//  11. the new store's storefront (<slug>.localhost/) says "Opening soon"
+//  12. a second founder while the stand-in answers 402: the needs-operator
+//      words and Try again; the fault cleared, Try again → done, the same run
+//      and one database
 // Results: docs/cms-reviews/drills/SIGNUP/results-main.json and screenshots.
 import { runDrill, settle, startOwned } from "../p3/lib.mjs";
 import { harnessPorts, harnessUrls } from "../../design-harness.js";
 import { latestSignupCode } from "../../support/signup-mail.js";
 import { CODE_FAILED } from "../../../lib/platform/signup.js";
+import { NEEDS_US_WORDS } from "../../../lib/platform/signup-provision.js";
 
 const DRILL_ID = "SIGNUP";
 const STORE_NAME = "Drill Signup Shop";
@@ -41,6 +49,20 @@ const ports = harnessPorts();
 const platformUrl = harnessUrls(ports).platform;
 const SITE = `http://storeasy.localhost:${ports.next}`;
 const STORE = `http://${SLUG}.localhost:${ports.next}`;
+const SLUG2 = "drill-second-founder";
+const EMAIL2 = "second@signup-drill.test";
+const STORE2 = `http://${SLUG2}.localhost:${ports.next}`;
+// the harness's stand-in for Turso's Platform API (loopback only)
+const FAKE = `http://127.0.0.1:${ports.turso}`;
+const dbName = (slug) => `storeasy-t-${slug}`;
+
+async function fake(method, path, body) {
+  const r = await fetch(`${FAKE}${path}`, { method, headers: body ? { "content-type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined });
+  return r.json().catch(() => ({}));
+}
+// the "create database" calls the stand-in answered, in order: [status]
+const createStatuses = async () => ((await fake("GET", "/_fake/log")).log || []).filter((e) => e.route === "create").map((e) => e.status);
+const fakeDatabases = async () => (await fake("GET", "/_fake/log")).databases || [];
 const at = (origin, path) => new URL(path, origin).href;
 const text = (page) => page.locator("body").innerText().catch(() => "");
 
@@ -195,13 +217,28 @@ async function signup(drill) {
   const mail = await until(() => latestSignupCode({ platformUrl, email: EMAIL }), 30_000);
   drill.check(Boolean(mail?.code), "a code was mailed (the mock mail row)", mail ? { id: mail.id } : null);
   await page.locator("#signup-code").fill(mail?.code || "");
-  let sawWorking = false;
-  const watch = page.locator('[data-signup="working"]').waitFor({ timeout: 60_000 }).then(() => (sawWorking = true), () => {});
+  // the hosting provider is slow: the first two "create database" calls answer 503
+  const before = (await createStatuses()).length;
+  await fake("DELETE", "/_fake/faults");
+  await fake("POST", "/_fake/faults", { route: "create", status: 503, times: 2 });
+  const t6 = Date.now();
   await page.getByRole("button", { name: "Verify and create my store" }).click();
-  const landed = await page.waitForURL((u) => u.host === new URL(STORE).host && u.pathname === "/admin/onboarding", { timeout: 120_000 }).then(() => true, () => false);
-  await watch;
-  drill.note(sawWorking ? "\"Setting up your store…\" showed while the store was made" : "the store was made too fast for \"Setting up your store…\" to show (under 1.2 s)");
-  drill.check(landed, `verify lands on ${SLUG}.localhost /admin/onboarding`, page.url());
+  const working = await page.locator('[data-signup="working"]').waitFor({ timeout: 30_000 }).then(() => true, () => false);
+  const labels = await page.locator("[data-signup-steps] li").allInnerTexts().catch(() => []);
+  drill.check(working && labels.length === 4 && labels[0].includes("Creating your store's database") && labels[3].includes("Creating your account"), "verify answers at once: \"Setting up your store…\" with the four steps", labels);
+  const live = await page.locator('[data-signup="working"] [aria-live="polite"]').count();
+  drill.check(live === 1, "the steps' progress is announced (one aria-live area)", live);
+  const noteText = await until(async () => {
+    const t = await page.locator("[data-signup-note]").innerText();
+    return /slow to answer/.test(t) ? t : null;
+  }, 40_000, 300);
+  drill.check(Boolean(noteText) && /Trying again in \d+ (second|minute)s? \(try \d of 5\)/.test(noteText), "the retry note: the provider is slow, when the next try is, which try", noteText);
+  if (noteText) await drill.screenshot(page, "05a-working-retry");
+  const landed = await page.waitForURL((u) => u.host === new URL(STORE).host && u.pathname === "/admin/onboarding", { timeout: 180_000 }).then(() => true, () => false);
+  drill.check(landed, `after the retries: done, and on to ${SLUG}.localhost /admin/onboarding`, { url: page.url(), seconds: Math.round((Date.now() - t6) / 1000) });
+  const tries = (await createStatuses()).slice(before);
+  drill.check(tries.length === 3 && tries[0] === 503 && tries[1] === 503 && tries[2] === 200, "the stand-in saw two 503s, then one database made", tries);
+  drill.check((await fakeDatabases()).filter((d) => d === dbName(SLUG)).length === 1, `one database: ${dbName(SLUG)}`, await fakeDatabases());
   await settle(page);
   const welcome = await text(page);
   drill.check(!ERROR_TEXT.test(welcome) && welcome.includes(`Welcome to ${STORE_NAME}`), "the Welcome page names the store", welcome.slice(0, 300));
@@ -289,7 +326,53 @@ async function signup(drill) {
     drill.check(api404 === 404, "/api/signup on a store host is 404", api404);
     await c3.close();
   }
-  drill.note("the new store's storefront was not visited: the Edge runtime cannot open its file: database (plan risk 1)");
+
+  // 11. the new store's storefront renders from its own database: closed, "Opening soon"
+  {
+    const { ctx: c4, page: p4 } = await newPage(drill);
+    const r = await p4.goto(at(STORE, "/"), { waitUntil: "load" });
+    await settle(p4);
+    const body = await text(p4);
+    drill.check(!ERROR_TEXT.test(body) && body.includes("Opening soon"), `the storefront at ${SLUG}.localhost says "Opening soon"`, { status: r?.status(), body: body.slice(0, 200) });
+    await drill.screenshot(p4, "09-storefront-opening-soon");
+    await c4.close();
+  }
+
+  // 12. a second founder while the provider refuses (402, a plan limit): it needs us
+  {
+    const { ctx: c5, page: p5 } = await newPage(drill);
+    await p5.goto(at(SITE, "/signup"), { waitUntil: "load" });
+    await p5.locator('[data-signup="form"]').waitFor();
+    await fillForm(p5, { name: "Second Founder", email: EMAIL2, password: "second-founder-pass", storeName: "Drill Second Founder" });
+    await until(async () => (await p5.locator("#signup-slug").inputValue()) === SLUG2, 30_000);
+    await p5.getByRole("button", { name: "Email me a code" }).click();
+    await p5.locator('[data-signup="code"]').waitFor();
+    const mail2 = await until(() => latestSignupCode({ platformUrl, email: EMAIL2 }), 30_000);
+    await p5.locator("#signup-code").fill(mail2?.code || "");
+    const before2 = (await createStatuses()).length;
+    await fake("DELETE", "/_fake/faults");
+    await fake("POST", "/_fake/faults", { route: "create", status: 402, times: 5 });
+    await p5.getByRole("button", { name: "Verify and create my store" }).click();
+    const failed = await p5.locator('[data-signup="failed"][data-failure-kind="needs_operator"]').waitFor({ timeout: 90_000 }).then(() => true, () => false);
+    const words = await p5.locator('[data-signup="failed"] [role="alert"]').innerText().catch(() => "");
+    drill.check(failed && words === NEEDS_US_WORDS, "402 from the provider: the needs-operator words", words);
+    drill.check((await p5.getByRole("button", { name: "Try again" }).count()) === 1, "and Try again is offered", null);
+    const stopped = await p5.locator('[data-signup-steps] li[data-step-state="failed"]').allInnerTexts().catch(() => []);
+    drill.check(stopped.length === 1 && stopped[0].includes("Creating your store's database"), "the step it stopped at is marked", stopped);
+    const asked = (await createStatuses()).slice(before2);
+    drill.check(asked.length === 1 && asked[0] === 402, "a 402 is not retried on its own (one call)", asked);
+    await drill.screenshot(p5, "10-needs-operator");
+    // fixed on our side: the founder presses Try again
+    await fake("DELETE", "/_fake/faults");
+    await p5.getByRole("button", { name: "Try again" }).click();
+    const landed2 = await p5.waitForURL((u) => u.host === new URL(STORE2).host && u.pathname === "/admin/onboarding", { timeout: 180_000 }).then(() => true, () => false);
+    drill.check(landed2, `fault cleared, Try again → done, on to ${SLUG2}.localhost /admin/onboarding`, p5.url());
+    await settle(p5);
+    drill.check((await text(p5)).includes("Welcome to Drill Second Founder"), "the second store's Welcome page", null);
+    const all2 = (await createStatuses()).slice(before2);
+    drill.check(all2.length === 2 && all2[1] === 200 && (await fakeDatabases()).filter((d) => d === dbName(SLUG2)).length === 1, `the same run made one database: ${dbName(SLUG2)}`, { all2, databases: await fakeDatabases() });
+    await c5.close();
+  }
 }
 
 runDrill({ id: DRILL_ID, part: "main", title: "SIGNUP — a founder signs up on their own" }, signup).then(
