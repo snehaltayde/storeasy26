@@ -90,7 +90,16 @@ async function makeOperator() {
   return { id, token };
 }
 
+// Esc closes the sheet; the URL loses its ?s= once the router has replaced it
+async function closeSheet(page) {
+  if (await page.locator("[data-subject-sheet]").count()) await page.keyboard.press("Escape");
+  await page.locator("[data-subject-sheet]").waitFor({ state: "detached", timeout: 30_000 }).catch(() => {});
+  await page.waitForURL((u) => !u.searchParams.has("s"), { timeout: 30_000 });
+}
+
 async function openRow(page, subject) {
+  if (await page.locator(`[data-subject-sheet="${subject}"]`).count()) return;
+  await closeSheet(page);
   await page.locator(`[data-subject="${subject}"] button`).first().click();
   await page.locator(`[data-subject-sheet="${subject}"]`).waitFor();
   await page.locator(`[data-subject-sheet="${subject}"] h3`, { hasText: "Help" }).waitFor({ timeout: 60_000 });
@@ -167,7 +176,7 @@ async function opsOnboarding(drill) {
   drill.check(/Provisioning resumed/.test(resumedWords || ""), "Resume provisioning: the sheet says it is running", resumedWords);
   const done = await until(async () => (await one("SELECT status FROM signups WHERE id = ?", [signup.id]))?.status === "done", 180_000, 1000);
   drill.check(Boolean(done), "the signup is done: its store is made", null);
-  await page.keyboard.press("Escape");
+  await closeSheet(page);
   await page.goto(at(CONSOLE, `/platform/onboarding?view=all&q=${SLUG}`), { waitUntil: "load" });
   const storeRow = page.locator(`[data-subject="tenant:${SLUG}"]`);
   await storeRow.waitFor({ timeout: 60_000 });
@@ -175,7 +184,7 @@ async function opsOnboarding(drill) {
   await openRow(page, `tenant:${SLUG}`);
   const steps = await sheet(page).innerText();
   drill.check(/1\. Connect Shopify/.test(steps), "the store's sheet reads its steps live: step 1, Connect Shopify", steps.slice(0, 300));
-  await page.keyboard.press("Escape");
+  await closeSheet(page);
   await page.reload({ waitUntil: "load" });
   await storeRow.waitFor();
   const storeText = await storeRow.innerText();
@@ -234,7 +243,7 @@ async function opsOnboarding(drill) {
   await sheet(page).getByRole("button", { name: "Add note" }).click();
   const noted = await until(async () => (await sheet(page).innerText()).includes("Founder will connect Shopify tonight."), 30_000);
   drill.check(Boolean(noted), "the note shows in the sheet", null);
-  await page.keyboard.press("Escape");
+  await closeSheet(page);
   await page.reload({ waitUntil: "load" });
   await storeRow.waitFor();
   drill.check((await storeRow.innerText()).includes("Founder will connect Shopify tonight."), "and on the row as the latest note", null);
@@ -265,7 +274,7 @@ async function opsOnboarding(drill) {
   drill.check(free.available === true, "after: a new signup can take the address", free);
   const startAgain = await latestPlatformMail({ platformUrl, kind: "operator_start_again", recipient: "lapsed@ops-drill.test" });
   drill.check(Boolean(startAgain), "the founder got the start-again note", null);
-  await page.keyboard.press("Escape");
+  await closeSheet(page);
 
   // 8. signed out
   {
