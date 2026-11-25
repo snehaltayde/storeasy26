@@ -3,6 +3,15 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Operator guard, route harness, shell and sign-in (on the owner's behalf)
+
+- **Permissions:** `requireOperator` (`lib/platform/require-operator.js`) gates all 18 operator routes, with the origin check before auth on every write; exempt are login and logout (origin-checked), the billing webhook (signature) and the export link GET (its signed token). Bootstrap ends when one active operator exists and denies on a failed lookup. `scripts/test-platform-permissions.js` calls 58 rows as 10 callers and searches every denied answer for store ids, names, `db_url` and the operator's email; a route with no row fails it.
+- **Fail closed:** export links throw without `PLATFORM_SECRET` (no `"dev-only"` fallback); the open GET answers 503.
+- **Audit:** every operator write records the real operator through `operatorActor()`, so a setup-password caller is recorded as `bootstrap`; `plan_version`, job and inbox replays and the queue tick now write audit rows.
+- **Sign-in:** "Not configured" shows only when there is no setup password and no active operator; the drill types a real authenticator code. The old `/platform` console sits inside the new shell until line 1.
+- **Decided by:** Claude
+- **Slice:** Phase 3 line 0
+
 ## 2026-11-25 Faster build: fewer repeated checks (owner decision)
 
 - Builders run only their own unit suite (and lint), no browser drills; the session's one `steelthread-verify` before merge is the proof.
