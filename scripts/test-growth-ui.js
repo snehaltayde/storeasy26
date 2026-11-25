@@ -280,7 +280,8 @@ await t("support's analytics markup: every control is a marked read (range links
   const s = html(h("div", null, h(AT.AnalyticsRange, { days: 30 }), h(AT.SalesNumbers, prop("SalesNumbers")), h(FunnelCard, prop("FunnelCard")), h(AT.AnalyticsTables, prop("AnalyticsTables"))));
   eq(unmarked(s), [], "unmarked controls:");
   ok(s.includes("Download top products as CSV") && s.includes("Whey 1kg"), "the CSV button and the product:");
-  ok(s.includes('<table class="sr-only"><caption>Funnel steps</caption>'), "the funnel's table for screen readers:");
+  const fun = html(h(FunnelCard, { funnel: { steps: [{ name: "view_item", count: 10 }, { name: "purchase", count: 2 }], conversion_pct: 20 } }));
+  ok(fun.includes('<table class="sr-only"><caption>Funnel steps</caption>') && fun.includes("Opened a product"), "the funnel's table for screen readers:");
   ok(html(h(AT.AnalyticsError, { days: 7 })).includes('href="/admin/analytics?days=7"'), "Try again re-reads the same range:");
   ok(html(h(AT.CoverageNote, { coverage: { sales: 4, event_coverage_pct: 25 } })).includes("Tracking is thin"), "the coverage note:");
   eq(html(h(AT.CoverageNote, { coverage: { sales: 4, event_coverage_pct: 80 } })), "", "no note when tracking is good:");
