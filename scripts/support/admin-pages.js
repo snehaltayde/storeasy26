@@ -7,7 +7,8 @@
 // Row fields:
 //   page    the folder under app/(console)/admin/(authed)/ ("" is the index)
 //   action  the authz string the page's data belongs to
-//   params  route params for a dynamic page ("$order" is the fixture order's id)
+//   params  route params for a dynamic page ("$order", "$offer", "$bundle",
+//           "$experiment" and "$quiz" are the fixture's rows, P2-D)
 //   note    why a page is shaped as it is, when it is not obvious
 
 export const ADMIN_PAGES = Object.freeze([
@@ -16,24 +17,24 @@ export const ADMIN_PAGES = Object.freeze([
   { page: "automations", action: "settings.read" },
   { page: "billing", action: "settings.read" },
   { page: "bundles", action: "offers.read" },
-  { page: "bundles/[id]", action: "offers.read", params: { id: "bun-missing" }, note: "an unknown id is a not-found (Phase 2 line 4)" },
+  { page: "bundles/[id]", action: "offers.read", params: { id: "$bundle" }, note: "the fixture bundle; an unknown id is a not-found (Phase 2 line 4)" },
   { page: "catalog", action: "storefront.read" },
   { page: "dashboard", action: "storefront.read" },
   { page: "editor", action: "storefront.read" },
   { page: "editor/templates", action: "storefront.read" },
   { page: "experiments", action: "storefront.read" },
-  { page: "experiments/[slug]", action: "storefront.read", params: { slug: "exp-missing" }, note: "an unknown slug is a not-found (Phase 2 line 9)" },
+  { page: "experiments/[slug]", action: "storefront.read", params: { slug: "$experiment" }, note: "the fixture experiment; an unknown slug is a not-found (Phase 2 line 9)" },
   { page: "insights", action: "storefront.read" },
   { page: "integrations", action: "settings.read" },
   { page: "media", action: "storefront.read" },
   { page: "offers", action: "offers.read" },
-  { page: "offers/[id]", action: "offers.read", params: { id: "off_missing" }, note: "an unknown id is a not-found; \"new\" is the create form (Phase 2 line 4)" },
+  { page: "offers/[id]", action: "offers.read", params: { id: "$offer" }, note: "the fixture offer; an unknown id is a not-found; \"new\" is the create form (Phase 2 line 4)" },
   { page: "onboarding", action: "storefront.read", note: "the four onboarding steps (Phase 1 lines 1 and 3); every role reads it, controls a role can't use are disabled" },
   { page: "orders", action: "orders.read" },
   { page: "orders/[id]", action: "orders.read", params: { id: "$order" } },
   // Phase 2 line 10
   { page: "quizzes", action: "storefront.read" },
-  { page: "quizzes/[slug]", action: "storefront.read", params: { slug: "missing" }, note: "an unknown slug is a not-found; \"new\" is the create form, writers only (Phase 2 line 10)" },
+  { page: "quizzes/[slug]", action: "storefront.read", params: { slug: "$quiz" }, note: "the fixture quiz; an unknown slug is a not-found; \"new\" is the create form, writers only (Phase 2 line 10)" },
   { page: "releases", action: "storefront.read" },
   { page: "settings/team", action: "team.manage", note: "staff and support get the no-access page; the team is never read for them (Phase 2 line 8)" },
   { page: "settings", action: "settings.read", note: "Details; every settings tab renders the no-access words for a role without settings.read (Phase 2 line 7)" },

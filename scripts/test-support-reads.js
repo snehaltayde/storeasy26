@@ -112,6 +112,7 @@ const store = await H.makeRoleStore({
   name: "sup",
   a: {
     products: 2,
+    collections: 1,
     config: { shopify_scopes: CNY.shopifyScopes, meta_test_event_code: CNY.metaTestEventCode },
     secrets: {
       order_link_secret: CNY.orderLinkSecret,
@@ -230,8 +231,18 @@ const offerA = offerOf("coupon-supread", "SUPREAD10", "SUPREAD10");
 const madeA = await call("owner", "offers", "POST", { body: { offer: offerA } });
 const madeB = await call("owner-b", "offers", "POST", { body: { offer: offerOf("coupon-cnyb", CNY.bOffer, "CNYB10") }, host: b.tenant.domains[0] });
 
+// P2-D: a bundle, an experiment and a quiz in A, so the dynamic pages and the
+// quiz ?slug= probe read real rows
+const bundleA = await call("owner", "bundles", "POST", { body: { create: { title: "Support pair", items: a.products.slice(0, 2).map((p) => ({ variantId: p.variants?.[0]?.id ?? p.variants?.nodes?.[0]?.id, quantity: 1 })), bundle_price: 250, enable: true, mustPass: true } } });
+const experimentA = await call("owner", "experiments", "POST", { body: { experiment: { slug: "sup-exp", name: "Support experiment", hypothesis: "A shorter hero title sells more", target_kind: "hero", min_sample: 50, variants: [{ key: "control", weight: 50 }, { key: "b", weight: 50, payload: { title: "Shorter", highlight: "", subtitle: "" } }] } } });
+const quizA = await call("owner", "quiz", "POST", { body: { quiz: { slug: "sup-quiz", title: "Support quiz", intro: "", questions: [{ prompt: "Your goal?", options: [{ label: "Muscle", tags: ["muscle"] }, { label: "Energy", tags: ["energy"] }] }] } } });
+
 const CTX = {
   docId: pageA.doc.id,
+  bundleId: bundleA.body?.bundle?.id ?? null,
+  experimentSlug: experimentA.body?.experiment?.slug ?? null,
+  quizSlug: quizA.body?.quiz?.slug ?? null,
+  collectionGid: a.collections?.[0]?.id ?? null,
   offerId: madeA.body?.offer?.id ?? offerA.id,
   offer: offerA,
   orderId: ORDER_ID,
@@ -283,6 +294,7 @@ const OWN_TOKEN = { owner: "ownerAdmin", admin: "adminAdmin", staff: "staffAdmin
 const skipFor = (caller) => [...(REDACTED(caller) ? [] : ORDER_PII), OWN_TOKEN[caller]];
 
 await t("setup: outside services blank, only file: databases, the fixture planted", () => {
+  for (const [k, v] of Object.entries({ bundleId: CTX.bundleId, experimentSlug: CTX.experimentSlug, quizSlug: CTX.quizSlug, collectionGid: CTX.collectionGid })) ok(v, `fixture ${k} (${bundleA.text?.slice(0, 120)} | ${experimentA.text?.slice(0, 120)} | ${quizA.text?.slice(0, 120)})`);
   for (const k of H.OUTSIDE_SERVICE_ENV) eq(process.env[k], "", k);
   for (const tn of [a, b, c, d]) F.assertLocalDbUrl(tn.tenant.dbUrl);
   eq(CALLERS.join(","), "staff,support,operator-support", "least-trusted callers, derived from roleAllows:");
@@ -583,7 +595,9 @@ const { makePageHarness } = await import("./support/page-harness.js");
 const pages = await makePageHarness({ tenant: () => C.getTenant(a.id, { fresh: true }) });
 const pageRuns = {};
 for (const r of ADMIN_PAGES) {
-  const params = Object.fromEntries(Object.entries(r.params ?? {}).map(([k, v]) => [k, v === "$order" ? ORDER_ID : v]));
+  // "$order", "$offer", "$bundle", "$experiment" and "$quiz" are the fixture's rows (P2-D)
+  const FIXTURE = { $order: ORDER_ID, $offer: CTX.offerId, $bundle: CTX.bundleId, $experiment: CTX.experimentSlug, $quiz: CTX.quizSlug };
+  const params = Object.fromEntries(Object.entries(r.params ?? {}).map(([k, v]) => [k, v in FIXTURE ? FIXTURE[v] : v]));
   pageRuns[r.page] = await pages.run(pageRel(r.page), { cookies: cookies.support, params });
 }
 
@@ -597,6 +611,10 @@ await t("page sweep: every console page runs as support (a page, a redirect or a
   const rendered = Object.entries(pageRuns).filter(([, run]) => run.props.length).map(([p]) => p);
   const other = Object.entries(pageRuns).filter(([, run]) => !run.props.length).map(([p, run]) => `${p} (${run.redirect ? `redirect ${run.redirect}` : run.notFound ? "not found" : "empty"})`);
   ok(rendered.length >= 15, `most pages rendered props: ${rendered.length}; not: ${other.join(", ")}`);
+  // P2-D: the dynamic pages read the fixture's rows, so support gets the page itself
+  const dynamic = ADMIN_PAGES.filter((r) => Object.values(r.params ?? {}).some((v) => String(v).startsWith("$"))).map((r) => r.page);
+  eq(dynamic.sort().join(","), "bundles/[id],experiments/[slug],offers/[id],orders/[id],quizzes/[slug]", "dynamic rows on fixture ids:");
+  eq(dynamic.filter((p) => pageRuns[p].notFound || pageRuns[p].redirect || !pageRuns[p].props.length).join(","), "", "dynamic pages that did not render:");
 });
 
 await t("page sweep (S1, S2): no prop on any console page holds a canary for support", () => {
