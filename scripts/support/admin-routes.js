@@ -125,6 +125,12 @@ export const ADMIN_ROUTES = Object.freeze([
   // so the final-owner guard refuses an allowed caller (422) and nothing changes.
   { path: "team", method: "POST", variant: "role-of-owner", action: "team.owner", asks: "team.manage", probe: { body: { action: "role", userId: "$owner", role: "staff" } } },
   { path: "team", method: "POST", variant: "remove-owner", action: "team.owner", asks: "team.manage", probe: { body: { action: "remove", userId: "$owner" } } },
+  // Phase 2 line 8: revoke an invite (an owner invite needs team.owner) and
+  // transfer ownership. "i_permownerprobe" is an owner invite the suite plants
+  // already expired, so the owner's probe is a 404 and nothing changes.
+  { path: "team", method: "POST", variant: "revoke-invite", action: "team.manage", probe: { body: { action: "revoke-invite", inviteId: "i_missing" } } },
+  { path: "team", method: "POST", variant: "revoke-owner-invite", action: "team.owner", asks: "team.manage", probe: { body: { action: "revoke-invite", inviteId: "i_permownerprobe" } } },
+  { path: "team", method: "POST", variant: "transfer", action: "team.owner", probe: { body: { action: "transfer", userId: "usr_missing", confirm: "x" } } },
   { path: "theme", method: "GET", action: "storefront.read" },
   { path: "theme", method: "POST", action: "storefront.write", probe: { body: {} } },
 ]);

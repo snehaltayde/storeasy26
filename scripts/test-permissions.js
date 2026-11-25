@@ -117,6 +117,12 @@ const I = await import("../lib/platform/identity.js");
 const S = await import("../lib/platform/sessions.js");
 const { withTenant } = await import("../lib/tenant-context.js");
 const { requireAdmin, adminSessionTokenFor } = await import("../lib/admin-auth.js");
+// Phase 2 line 8: the revoke-owner-invite row's probe, an owner invite of store A
+// that has already expired (the owner's call finds nothing to revoke)
+await (await import("../lib/platform/control.js")).platformDb().execute({
+  sql: "INSERT INTO invitations (id, token_hash, kind, email, tenant_id, role, invited_by, created_at, expires_at) VALUES ('i_permownerprobe', 'probe-hash', 'invite', 'probe-owner@perm.test', ?, 'owner', NULL, '2026-01-01T00:00:00.000Z', '2026-01-02T00:00:00.000Z')",
+  args: [a.id],
+});
 
 // --- 1.6 the guard (the filesystem, and each route module's real exports) --------
 const ROUTE_FILE = /^route\.(js|ts|mjs)$/;
