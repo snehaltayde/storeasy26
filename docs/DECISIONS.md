@@ -3,6 +3,16 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Signed plugin webhooks through an outbox (on the owner's behalf)
+
+- **Schema:** tenant migration `0032_plugin_webhooks.sql` (`plugin_endpoints`, `plugin_events`, `plugin_deliveries`; `secret_enc` nullable so uninstall can clear it), additive.
+- **Custom apps:** per store, at most 10 (counted inside the insert), each with one HTTPS endpoint whose host is its egress allowlist; the `whsec_` secret is shown once, encrypted, rotated with a 24 h two-signature overlap, and cleared on uninstall. Support sees the endpoint as host only (hook URLs carry credentials in the path) and never a payload. No per-app kill switch for custom apps (operators kill first-party plugins).
+- **Events and payloads:** `order.created` from `runOrderEffects`, `order.fulfilled` once from the projection; no customer field in any payload (owner: no `customers.read`).
+- **Egress guard (security review):** `node:https` with a guarded lookup on every connection and `all: true`, a BlockList covering private, reserved, NAT64, 6to4, Teredo, SIIT and IPv4-mapped forms (embedded IPv4 checked), HTTPS on 443 only, no redirects, no IP literals, Shopify hosts refused, 5 s connect and 10 s total, a 4 KB read cap. The local-egress test flag works only under `NODE_ENV` test or development and never on Vercel.
+- **Delivery and fairness:** Standard Webhooks v1 signing; 8 attempts over about 45 h; a row is claimed atomically before sending, and a runner that loses the claim requeues; deliveries are leased apart from other jobs (at most 12 a tick), 2 per app and 4 per store, within a 30 s budget that leaves long jobs about 20 s; never in shoppers' `after()` runs; held-back deliveries go to the back of the line. Endpoint failures never page operators; a 410 or 72 h of failures pauses the endpoint (audited, owners and admins emailed).
+- **Decided by:** Claude
+- **Slice:** Phase 4 line 3
+
 ## 2026-11-25 Installing first-party plugins (on the owner's behalf)
 
 - **Schema:** tenant migration `0030_plugin_installs.sql`; uninstall archives the row and clears its encrypted secrets; one live install per plugin (partial unique index).
