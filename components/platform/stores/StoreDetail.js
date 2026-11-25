@@ -11,6 +11,7 @@ import { CopyButton } from "@/components/kit/copy-button";
 import { PageHeader } from "@/components/kit/page-header";
 import HealthCard from "./HealthCard";
 import LifecycleCard from "./LifecycleCard";
+import SupportAccessCard from "@/components/platform/support/SupportAccessCard"; // line 5
 import { RUN_STATUS, STEP_LABELS, STEP_STATE, STORE_STATUS, SUBSCRIPTION, billingHref, onboardingSheetHref, when, word } from "./storesWords";
 
 const linkClass = "rounded-md text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
@@ -177,19 +178,7 @@ export default function StoreDetail({ detail }) {
         </Section>
 
         {/* line 5: support access */}
-        <Section id="support" title="Support access">
-          {support.open ? (
-            <dl className="space-y-2">
-              <Row label="Status">
-                <Badge variant="info">Open until {when(support.expiresAt)}</Badge>
-              </Row>
-              <Row label="Opened by">{support.operatorName}</Row>
-              <Row label="Reason">{support.reason}</Row>
-            </dl>
-          ) : (
-            <Empty>No support access open.</Empty>
-          )}
-        </Section>
+        <SupportAccessCard storeId={store.id} initial={support} />
 
         <Section id="incidents" title="Open incidents">
           {incidents.length ? (

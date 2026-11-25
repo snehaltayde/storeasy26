@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
+import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE, SUPPORT_COOKIE } from "@/lib/admin-auth";
 import { roleAllows } from "@/lib/platform/authz";
 import { currentTenant } from "@/lib/tenant-context";
 import { siteName } from "@/lib/site";
@@ -29,7 +29,7 @@ export const DEFAULT_STORE_WORDS = "This store is set up from its environment co
 
 export default async function OnboardingPage({ searchParams }) {
   const jar = await cookies();
-  const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value)).catch(() => null);
+  const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value, jar.get(SUPPORT_COOKIE)?.value)).catch(() => null);
   if (!actor) redirect("/admin/login");
   if (!roleAllows(actor.role, "storefront.read")) redirect("/admin/dashboard");
   const sp = await searchParams;

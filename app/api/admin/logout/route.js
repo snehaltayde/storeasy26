@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ADMIN_COOKIE, verifyAdminToken } from "@/lib/admin-auth";
+import { ADMIN_COOKIE, SUPPORT_COOKIE, verifyAdminToken } from "@/lib/admin-auth";
 import { revokeSessionByToken, verifySession } from "@/lib/platform/sessions";
 import { platformConfigured } from "@/lib/platform/control";
 import { currentTenant } from "@/lib/tenant-context";
@@ -46,8 +46,12 @@ export const POST = tenantHandler(
     // S26: revoke the server-side session (no-op for legacy/bootstrap tokens),
     // then clear the cookies: the token is dead everywhere, not just here.
     await revokeSessionByToken(token);
+    // Phase 3 line 5: an operator's support session on this host ends too
+    // (revokeSessionByToken only ever matches the token it is given).
+    await revokeSessionByToken(request.cookies.get(SUPPORT_COOKIE)?.value);
     const res = NextResponse.json({ ok: true });
     res.cookies.set(ADMIN_COOKIE, "", CLEAR);
+    res.cookies.set(SUPPORT_COOKIE, "", CLEAR);
     res.cookies.set(PREVIEW_COOKIE, "", CLEAR);
     res.cookies.set(MAINTENANCE_PASS_COOKIE, "", CLEAR);
     return res;

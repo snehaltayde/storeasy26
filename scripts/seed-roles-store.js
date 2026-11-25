@@ -291,6 +291,15 @@ export async function seedRolesStore({ platformUrl, tenantUrl, defaultUrl, dataD
     );
   });
 
+  // Phase 3 line 5: one support grant the operator opened and closed, so the
+  // store page's and the team page's support-access history have a row. None
+  // is left open: an open grant would put the banner on every page.
+  {
+    const SG = await import("../lib/platform/support.js");
+    const g = await SG.createSupportGrant({ tenantId: ROLES_STORE.id, reason: "Seed: checking the catalog sync with the founder", hours: 1, operator: { kind: "operator", id: op.id } });
+    await SG.revokeSupportGrant(g.id, { operator: { kind: "operator", id: op.id } });
+  }
+
   const figures = { products: Number(sync?.products ?? cat.products.length), collections: Number(sync?.collections ?? cat.collections.length), syncRunId: confirmed.runId, syncStatus: "complete" };
 
   const { audit } = await import("../lib/platform/audit.js");

@@ -261,6 +261,7 @@ const TOKENS = {
   supportAdmin: cookies.support._admin,
   ownerBAdmin: cookies["owner-b"]._admin,
   operatorPlatform: cookies["operator-support"]._platform,
+  operatorSupport: cookies["operator-support-entry"]._support, // Phase 3 line 5
   ownerPreviewToken: "",
 };
 
@@ -285,19 +286,23 @@ const OWNER_SKIP = Object.keys(CNY).filter((k) => !SECRET_KEYS.includes(k) && !k
 // --- the callers ------------------------------------------------------------------
 const MERCHANT = ["owner", "admin", "staff", "support"];
 const LEAST = MERCHANT.filter((r) => !roleAllows(r, "settings.read"));
-const CALLERS = [...LEAST, ...(LEAST.includes("support") ? ["operator-support"] : [])];
+// Phase 3 line 5: an operator under a grant on the same host (_platform) and
+// across hosts (the _support session) both act as support
+const OPERATOR_SUPPORT = ["operator-support", "operator-support-entry"];
+const roleOf = (caller) => (OPERATOR_SUPPORT.includes(caller) ? "support" : caller);
+const CALLERS = [...LEAST, ...(LEAST.includes("support") ? OPERATOR_SUPPORT : [])];
 // the roles that lose customer PII (lib/admin/order-view.js); the others keep it by design
-const REDACTED = (caller) => caller === "support" || caller === "operator-support";
+const REDACTED = (caller) => roleOf(caller) === "support";
 const ORDER_PII = ["orderEmail", "orderPhone", "orderName", "orderAddress", "orderCity", "orderPincode", "orderSnapshot", "customerId"];
 // a caller's own session token is not a leak to itself
-const OWN_TOKEN = { owner: "ownerAdmin", admin: "adminAdmin", staff: "staffAdmin", support: "supportAdmin", "operator-support": "operatorPlatform" };
+const OWN_TOKEN = { owner: "ownerAdmin", admin: "adminAdmin", staff: "staffAdmin", support: "supportAdmin", "operator-support": "operatorPlatform", "operator-support-entry": "operatorSupport" };
 const skipFor = (caller) => [...(REDACTED(caller) ? [] : ORDER_PII), OWN_TOKEN[caller]];
 
 await t("setup: outside services blank, only file: databases, the fixture planted", () => {
   for (const [k, v] of Object.entries({ bundleId: CTX.bundleId, experimentSlug: CTX.experimentSlug, quizSlug: CTX.quizSlug, collectionGid: CTX.collectionGid })) ok(v, `fixture ${k} (${bundleA.text?.slice(0, 120)} | ${experimentA.text?.slice(0, 120)} | ${quizA.text?.slice(0, 120)})`);
   for (const k of H.OUTSIDE_SERVICE_ENV) eq(process.env[k], "", k);
   for (const tn of [a, b, c, d]) F.assertLocalDbUrl(tn.tenant.dbUrl);
-  eq(CALLERS.join(","), "staff,support,operator-support", "least-trusted callers, derived from roleAllows:");
+  eq(CALLERS.join(","), "staff,support,operator-support,operator-support-entry", "least-trusted callers, derived from roleAllows:");
   eq(madeA.status, 200, `offer A: ${madeA.text?.slice(0, 200)}`);
   eq(madeB.status, 200, `offer B: ${madeB.text?.slice(0, 200)}`);
   ok(!media.error, `media saved: ${media.error?.message}`);
@@ -407,7 +412,7 @@ await t("denied rows: every refusal a least-trusted caller gets carries no canar
   const { ADMIN_ROUTES } = await import("./support/admin-routes.js");
   const bad = [];
   for (const caller of CALLERS) {
-    const role = caller === "operator-support" ? "support" : caller;
+    const role = roleOf(caller);
     for (const r of ADMIN_ROUTES.filter((x) => !roleAllows(role, x.action))) {
       const res = await call(caller, r.path, r.method, r.probe ?? {});
       if (res.status !== 403) bad.push(`${caller} ${r.method} ${r.path} ${r.variant ?? ""}: status ${res.status}`);
@@ -429,7 +434,7 @@ await t("S4 orders: a PII-redacted caller's ?q= matches order ids only, never em
 });
 
 await t("orders/[id] (S5): PII and snapshot null with pii_redacted for support; cart_id and idempotency_key absent for every role", async () => {
-  for (const caller of ["support", "operator-support"]) {
+  for (const caller of ["support", ...OPERATOR_SUPPORT]) {
     const o = results[caller]["orders/[id]"].body?.order;
     for (const k of ["email", "phone", "name", "address_line1", "city", "pincode", "snapshot"]) eq(o?.[k], null, `${caller} ${k}:`);
     eq(o?.pii_redacted, true, `${caller} pii_redacted:`);
@@ -511,7 +516,7 @@ await t("stores: support gets exactly A and C (never B or suspended D), each ent
   const ids = (r) => (r.body?.stores ?? []).map((s) => s.id).sort().join(",");
   eq(ids(results.support.stores), [a.id, c.id].sort().join(","), "support:");
   eq(ids(results.staff.stores), a.id, "staff:");
-  eq(ids(results["operator-support"].stores), "", "operator under a grant:");
+  for (const caller of OPERATOR_SUPPORT) eq(ids(results[caller].stores), "", `${caller} (an operator under a grant):`);
   for (const caller of CALLERS) for (const s of results[caller].stores.body?.stores ?? []) eq(Object.keys(s).sort().join(","), "current,id,name,role,url", `${caller} entry keys:`);
 });
 
@@ -641,6 +646,24 @@ await t("page sweep (S1, S2): no prop on any console page holds a canary for sup
     if (found.length) bad.push(`${page}: ${found.join(", ")}`);
   }
   eq(bad.join("\n"), "", "");
+});
+
+// Phase 3 line 5: the operator's cross-host support session (_support) opens
+// every console page as support does: rendered, and no canary in any prop
+await t("page sweep (line 5): every console page runs as operator-support-entry, renders, and no prop holds a canary", async () => {
+  const bad = [];
+  let rendered = 0;
+  for (const r of ADMIN_PAGES) {
+    const params = Object.fromEntries(Object.entries(r.params ?? {}).map(([k, v]) => [k, v === "$order" ? ORDER_ID : v]));
+    const run = await pages.run(pageRel(r.page), { cookies: cookies["operator-support-entry"], params });
+    if (run.error) bad.push(`${r.page}: ${String(run.error?.message || run.error).split("\n")[0].slice(0, 200)}`);
+    if (run.redirect === "/admin/login") bad.push(`${r.page}: sent to the sign-in (the _support session was not accepted)`);
+    if (run.props.length) rendered++;
+    const found = leaks(run.text, { skip: skipFor("operator-support-entry") });
+    if (found.length) bad.push(`${r.page}: ${found.join(", ")}`);
+  }
+  eq(bad.join("\n"), "", "");
+  ok(rendered >= 15, `most pages rendered props: ${rendered}`);
 });
 
 await t("S2 pages: every settings tab, Integrations and Billing show support and staff only the no-access page (Phase 2 line 7), Automations its PermissionNote, and none of their data", async () => {

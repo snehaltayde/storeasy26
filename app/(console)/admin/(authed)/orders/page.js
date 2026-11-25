@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
+import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE, SUPPORT_COOKIE } from "@/lib/admin-auth";
 import { roleAllows } from "@/lib/platform/authz";
 import { NoAccess } from "@/components/admin/settings/NoAccess";
 import { listOrders, orderStatusCounts } from "@/lib/admin/orders";
@@ -25,7 +25,7 @@ export default async function AdminOrdersPage({ searchParams }) {
   const jar = await cookies();
   // S34 (OP10): merchants sign in normally; an OPERATOR passes only under an
   // active support grant (support role — read-only, PII-redacted).
-  const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
+  const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value, jar.get(SUPPORT_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
   if (!roleAllows(actor.role, "orders.read")) return <NoAccess role={actor.role} page />;
   const filters = orderFilters((await searchParams) ?? {});

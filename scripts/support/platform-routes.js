@@ -72,8 +72,13 @@ export const PLATFORM_ROUTES = Object.freeze([
   { path: "stores", method: "GET", write: false, probe: { query: "check=1&slug=probe-slug" } },
   { path: "stores", method: "POST", write: true, probe: { body: {} } },
   { path: "support", method: "GET", write: false },
+  // line 5: the store card's view, every open grant, and the entry token (a
+  // store with no open grant is refused before the setup-password check)
+  { path: "support", method: "GET", write: false, variant: "store", probe: { query: "view=store&tenant=missing-store" } },
+  { path: "support", method: "GET", write: false, variant: "open", probe: { query: "view=open" } },
   { path: "support", method: "POST", write: true, variant: "grant", probe: { body: { action: "grant" } } },
   { path: "support", method: "POST", write: true, variant: "revoke", probe: { body: { action: "revoke", id: "sg_missing" } } },
+  { path: "support", method: "POST", write: true, variant: "enter", probe: { body: { action: "enter", tenant: "missing-store" } } },
   { path: "tenants", method: "GET", write: false },
   { path: "tenants", method: "GET", write: false, variant: "health", probe: { query: "health=missing-store" } },
   { path: "tenants/[id]", method: "GET", write: false, probe: { params: NO_STORE } },

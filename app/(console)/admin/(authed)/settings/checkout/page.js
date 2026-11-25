@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
+import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE, SUPPORT_COOKIE } from "@/lib/admin-auth";
 import { roleAllows } from "@/lib/platform/authz";
 import { settingsView } from "@/lib/admin/settings";
 import { paymentItem } from "@/lib/documents/opening";
@@ -16,7 +16,7 @@ export const metadata = { title: "Checkout and payments · Settings · Admin", r
 // from the open checks' payment item (its words only; a failed read shows none).
 export default async function SettingsCheckoutPage() {
   const jar = await cookies();
-  const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
+  const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value, jar.get(SUPPORT_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
   if (!roleAllows(actor.role, "settings.read")) return <NoAccess role={actor.role} />;
   const [v, payment] = await tfetch(async () => {

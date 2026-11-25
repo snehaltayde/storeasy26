@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
+import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE, SUPPORT_COOKIE } from "@/lib/admin-auth";
 import { tfetch } from "@/lib/console-request";
 import { roleAllows } from "@/lib/platform/authz";
 import { storeCurrency } from "@/lib/offers/catalog";
@@ -31,7 +31,7 @@ const LINK = "mt-1 inline-flex w-fit items-center gap-1 rounded-md text-sm font-
 
 export default async function AdminCatalogPage({ searchParams } = {}) {
   const jar = await cookies();
-  const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
+  const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value, jar.get(SUPPORT_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
 
   const to = catalogHref((await searchParams) || {});

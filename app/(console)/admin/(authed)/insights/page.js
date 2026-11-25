@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
+import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE, SUPPORT_COOKIE } from "@/lib/admin-auth";
 import { listInsights, aiBudget, aiConfigured } from "@/lib/ai/insights";
 import { tfetch } from "@/lib/console-request";
 import { InsightsList } from "@/components/admin/insights/InsightsList";
@@ -13,7 +13,7 @@ export const metadata = { title: "Insights · Admin", robots: { index: false } }
 // role without storefront.write. A failed read hands the screen null (Try again).
 export default async function AdminInsightsPage() {
   const jar = await cookies();
-  const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
+  const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value, jar.get(SUPPORT_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
   const initial = await tfetch(async () => {
     try {

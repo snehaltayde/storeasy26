@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
+import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE, SUPPORT_COOKIE } from "@/lib/admin-auth";
 import { getCmsMode } from "@/lib/cms-mode";
 import { libsql } from "@/lib/db";
 import { notMigratedYet } from "@/lib/schema-shape";
@@ -46,7 +46,7 @@ async function readSavedTemplates() {
 
 export default async function SavedTemplatesPage() {
   const jar = await cookies();
-  const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
+  const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value, jar.get(SUPPORT_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
 
   const { templates, pages } = await tfetch(async () => {

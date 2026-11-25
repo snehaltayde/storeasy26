@@ -89,7 +89,10 @@ export function spyOnRequireAdmin() {
 }
 
 const CALLER_ROLES = ["owner", "admin", "staff", "support"];
-export const CALLERS = Object.freeze([...CALLER_ROLES, "signed-out", "owner-b", "operator-support"]);
+// operator-support: an operator under store A's grant with its _platform
+// cookie (same host); operator-support-entry (Phase 3 line 5): the same
+// operator's support session from the cross-host entry, in a _support cookie.
+export const CALLERS = Object.freeze([...CALLER_ROLES, "signed-out", "owner-b", "operator-support", "operator-support-entry"]);
 
 // Store A (owner, admin, staff and support members, a legacy admin_password
 // secret, an operator support grant) and store B (its own owner), both in
@@ -109,7 +112,7 @@ export async function makeRoleStore({ name = "perm", a: aOpts = {}, b: bOpts = {
   for (const t of [a, b]) F.assertLocalDbUrl(t.tenant.dbUrl);
   const I = await import("../../lib/platform/identity.js");
   const S = await import("../../lib/platform/sessions.js");
-  const { createSupportGrant } = await import("../../lib/platform/support.js");
+  const { createSupportGrant, mintSupportEntry, consumeSupportEntry } = await import("../../lib/platform/support.js");
 
   const users = {};
   for (const role of CALLER_ROLES) {
@@ -118,11 +121,15 @@ export async function makeRoleStore({ name = "perm", a: aOpts = {}, b: bOpts = {
   }
   users["owner-b"] = await I.createUser({ email: `owner@${b.id}.test`, password: `owner-b-pass-${name}` });
   await I.addMembership(users["owner-b"].id, b.id, "owner");
-  users.operator = await I.createOperator({ email: `operator@${name}.test`, password: `operator-pass-${name}` });
+  users.operator = await I.createOperator({ email: `operator@${name}.test`, name: `Opname ${name}`, password: `operator-pass-${name}` });
   await createSupportGrant({ tenantId: a.id, reason: "permission suite support grant", hours: 1, operator: users.operator.id });
 
   const session = async (userKey, kind = "merchant") => (await S.createSession({ userId: users[userKey].id, kind, ttlMs: 10 * 60_000 })).token;
-  const cookies = { "signed-out": {}, "operator-support": { _platform: await session("operator", "operator") } };
+  // the cross-host entry, as the operator console and the store's entry route run it
+  const entry = await mintSupportEntry({ tenantId: a.id, operator: { kind: "operator", id: users.operator.id } });
+  const supportSession = await consumeSupportEntry(entry.token, a.id);
+  if (!supportSession) throw new Error("route-harness: the support entry was refused");
+  const cookies = { "signed-out": {}, "operator-support": { _platform: await session("operator", "operator") }, "operator-support-entry": { _support: supportSession.token } };
   for (const role of [...CALLER_ROLES, "owner-b"]) cookies[role] = { _admin: await session(role) };
   const ids = Object.fromEntries(Object.entries(users).map(([k, u]) => [`$${k}`, u.id]));
   const swap = (v) => JSON.parse(JSON.stringify(v), (_, x) => (typeof x === "string" && Object.hasOwn(ids, x) ? ids[x] : x));

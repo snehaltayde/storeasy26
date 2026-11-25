@@ -27,9 +27,9 @@ export function ConsoleNotices({ grant = null, incidents = [], className = "spac
           <AlertTitle>Platform support access is active</AlertTitle>
           <AlertDescription className="text-warning-text/90">
             <p>
-              Operator <span className="font-mono">{grant.operator}</span>, reason: “{grant.reason}”, until{" "}
+              {grant.operatorName} from Storeasy, reason: “{grant.reason}”, until{" "}
               {new Date(grant.expires_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}. Support access is
-              read-only and never sees customer contact details.
+              read-only and never sees customer contact details. An owner or admin can end it from Settings, Team.
             </p>
           </AlertDescription>
         </Alert>

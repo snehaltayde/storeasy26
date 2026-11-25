@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
+import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE, SUPPORT_COOKIE } from "@/lib/admin-auth";
 import { roleAllows } from "@/lib/platform/authz";
 import { PageHeader } from "@/components/kit/page-header";
 import { tfetch } from "@/lib/console-request";
@@ -20,7 +20,7 @@ const READ_ONLY_REASON = "You can look at what is waiting and what was published
 
 export default async function AdminReleasesPage() {
   const jar = await cookies();
-  const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
+  const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value, jar.get(SUPPORT_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
 
   const canPublish = actor.kind === "bootstrap" ? true : roleAllows(actor.role, "storefront.publish");

@@ -187,7 +187,9 @@ await t("with an open grant: no member, no grant (operator id and reason never r
   eq(anon.grant, null, "no member:");
   eq(leaks(JSON.stringify(anon), [users.operator.id, "permission suite support grant"]), [], "no member leaks:");
   const member = await withTenant(await fresh(), () => N.readNotices({ member: { kind: "merchant", role: "support" } }));
-  eq([member.grant?.operator, member.grant?.reason], [users.operator.id, "permission suite support grant"], "a member:");
+  // Phase 3 line 5: the operator by name (the harness names its operator), never by id
+  eq([member.grant?.operatorName, member.grant?.reason], [users.operator.name, "permission suite support grant"], "a member:");
+  eq(JSON.stringify(member).includes(users.operator.id), false, "the operator id never reaches the member:");
 });
 await t("the sign-in and invite layouts ask for incidents only; the signed-in layout passes its member", async () => {
   for (const L of ["app/(console)/admin/(auth)/layout.js", "app/(console)/admin/(invite)/layout.js"]) {

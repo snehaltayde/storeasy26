@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
+import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE, SUPPORT_COOKIE } from "@/lib/admin-auth";
 import { getCmsMode } from "@/lib/cms-mode";
 import { listDocuments } from "@/lib/documents/service";
 import { editorEntry, parseEditorTarget } from "@/lib/admin/editor-entry";
@@ -96,7 +96,7 @@ async function firstStoreThen(actor, docs) {
 
 export default async function EditorPage({ searchParams }) {
   const jar = await cookies();
-  const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
+  const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value, jar.get(SUPPORT_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
 
   const query = (await searchParams) || {};

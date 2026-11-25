@@ -123,6 +123,9 @@ export const ADMIN_ROUTES = Object.freeze([
   { path: "shopify/connect", method: "POST", action: "settings.write", probe: { body: { shop: "" } } },
   // F3: lists the caller's own memberships (line 2 checks the body)
   { path: "stores", method: "GET", action: "storefront.read" },
+  // Phase 3 line 5 (decision 5): the store's support access, its history and ending it
+  { path: "support-access", method: "GET", action: "audit.read" },
+  { path: "support-access", method: "POST", action: "team.manage", probe: { body: { action: "bogus" } } },
   { path: "sync", method: "GET", action: "storefront.read" },
   { path: "sync", method: "POST", action: "sync.run", probe: { body: {} } },
   { path: "team", method: "GET", action: "team.manage" },
@@ -155,4 +158,5 @@ export const EXEMPT_ROUTES = Object.freeze([
   { path: "handoff", method: "POST", kind: "token" },
   { path: "recover", method: "POST", kind: "recover" },
   { path: "maintenance-pass", method: "GET", kind: "maintenance-pass" },
+  { path: "support-entry", method: "POST", kind: "token" }, // Phase 3 line 5: the single-use entry token is the auth
 ]);

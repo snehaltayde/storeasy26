@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
+import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE, SUPPORT_COOKIE } from "@/lib/admin-auth";
 import { MEDIA_MIME } from "@/lib/media";
 import { listLibrary } from "@/lib/admin/media-library";
 import { tfetch } from "@/lib/console-request";
@@ -15,7 +15,7 @@ export const metadata = { title: "Media · Admin", robots: { index: false } };
 // needs: support's view has no write control at all.
 export default async function AdminMediaPage() {
   const jar = await cookies();
-  const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
+  const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value, jar.get(SUPPORT_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
 
   const initial = await tfetch(async () => {
