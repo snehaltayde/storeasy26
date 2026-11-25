@@ -7,7 +7,7 @@
 // server uses; checkout says "You'll be charged in USD" with no cash on
 // delivery; switching the country to India gives the rupee total and cash on
 // delivery. Nothing is paid (no card is ever entered). The store is put back.
-import { ADDRESS, CONTACT, ORIGIN, flow, seedStore, shopper, stage } from "./lib.mjs";
+import { ADDRESS, CONTACT, ORIGIN, consoleErrors, flow, seedStore, shopper, stage } from "./lib.mjs";
 import { drawer } from "../mobile-cart/lib.mjs";
 import { open, signIn } from "../apps/lib.mjs";
 import { convertPrice } from "../../../lib/markets.js";
@@ -31,6 +31,9 @@ stage("markets", async (drill) => {
   drill.check(saved.status === 200, "admin: the US market is saved", saved.json);
   const refused = await putSettings(admin, { markets: [{ ...US, international: false }] });
   drill.check(refused.status === 422, "admin: a market without the Razorpay tick is refused", refused.json);
+  // that 422 is the answer this check asked for: the browser logs it, drop that one line
+  const expected = consoleErrors.findIndex((e) => /status of 422/.test(e));
+  if (expected >= 0) consoleErrors.splice(expected, 1);
   await admin.reload({ waitUntil: "load" });
   drill.check(await admin.locator('[data-market="US"]').isVisible(), "admin: the saved market is listed with its price example");
   await drill.shoot(admin, "markets-settings");

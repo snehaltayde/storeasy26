@@ -463,9 +463,9 @@ await t("a disabled market is never served (cart, checkout, the picker, the mark
   eq(M.resolveMarket({ ipCountry: "AE", config: cfg }).market, null, "ip suggestion:");
   const res = await marketRoute.GET(new NextRequest(`https://${HOST_A}/api/market?country=AE&return=/products/p-1002`, { headers: { host: HOST_A } }));
   ok(/_market=IN/.test(res.headers.get("set-cookie") || ""), `market route stored ${res.headers.get("set-cookie")}`);
-  eq(new URL(res.headers.get("location")).pathname, "/products/p-1002", "return:");
+  eq(res.headers.get("location"), "/products/p-1002", "return:");
   const evil = await marketRoute.GET(new NextRequest(`https://${HOST_A}/api/market?country=US&return=//evil.example/x`, { headers: { host: HOST_A } }));
-  eq(new URL(evil.headers.get("location")).host, HOST_A, "an off-site return:");
+  eq(evil.headers.get("location"), "/", "an off-site return:");
   ok(/_market=US/.test(evil.headers.get("set-cookie") || ""), "an enabled market is stored");
 });
 

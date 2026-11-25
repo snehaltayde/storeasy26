@@ -22,7 +22,9 @@ export const GET = storefrontHandler(async (request) => {
   const config = currentTenant()?.config ?? null;
   const asked = url.searchParams.get("country");
   const { country } = resolveMarket({ cookie: asked || baseCountry(config), config });
-  const res = NextResponse.redirect(new URL(safeReturn(url.searchParams.get("return")), url), 303);
+  // a relative Location: behind a proxy request.url can name another origin,
+  // and the storefront's CSP (form-action 'self') then blocks the redirect
+  const res = new NextResponse(null, { status: 303, headers: { Location: safeReturn(url.searchParams.get("return")) } });
   res.cookies.set(MARKET_COOKIE, country, MARKET_COOKIE_OPTS);
   return res;
 });
