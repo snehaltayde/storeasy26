@@ -16,6 +16,9 @@ export function routeMatches(pattern, path) {
 // fails until its row says why and the count is raised). Phase 2 lines
 // append rows; when appends conflict, keep both sides.
 export const READ_CONTROLS = [
+  // Phase 4 line 4: API access
+  { path: "components/admin/apps/ApiAccessCard.js", reason: "Try again re-asks GET /api/admin/apps/[id]/tokens after a failed read", marks: 1 },
+  { path: "components/admin/apps/CallLog.js", reason: "Refresh re-asks GET /api/admin/apps/[id]/calls", marks: 1 },
   // Phase 4 line 3: webhooks
   { path: "components/admin/apps/DeliveriesTable.js", reason: "the Status and Event filters re-ask GET /api/admin/apps/[id]/webhooks with a query, and View opens the delivery's payload (already read) in a dialog; no write", marks: 3 },
   { path: "components/admin/apps/WebhooksCard.js", reason: "Try again re-asks GET /api/admin/apps/[id]/webhooks after a failed read", marks: 1 },

@@ -34,6 +34,10 @@ export const ACTION_WORDS = Object.freeze({
   "apps.endpoint_auto_paused": "Webhooks paused by Storeasy",
   "apps.test_event_sent": "Sent a test event",
   "apps.delivery_resent": "Sent a delivery again",
+  // Phase 4 line 4: API access
+  "apps.scopes": "Changed what the app can see",
+  "apps.token_create": "Created an API token",
+  "apps.token_revoke": "Revoked an API token",
 });
 
 // One POST to an apps route → { ok, ...body } | { ok: false, error, errors? }

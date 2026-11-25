@@ -9,6 +9,7 @@ import { AppSettingsForm } from "@/components/admin/apps/AppSettingsForm";
 import { AppDangerZone } from "@/components/admin/apps/AppDangerZone";
 import { AppActivity } from "@/components/admin/apps/AppActivity";
 import { WebhooksCard } from "@/components/admin/apps/WebhooksCard";
+import { ApiAccessCard } from "@/components/admin/apps/ApiAccessCard";
 import { PluginIcon } from "@/components/admin/apps/plugin-icon";
 import { KILLED, KILLED_BODY, SEES_NOTHING, installState, shortDate } from "@/components/admin/apps/app-words";
 
@@ -85,6 +86,7 @@ export function AppDetail({ install: initial, plugin, activity, role }) {
       {/* line 3: webhooks */}
       <WebhooksCard install={install} role={role} />
       {/* line 4: api access */}
+      {install.kind === "custom" && <ApiAccessCard install={install} role={role} />}
       {activity && <AppActivity rows={activity} />}
       <AppDangerZone install={install} role={role} onChanged={setInstall} />
     </div>
