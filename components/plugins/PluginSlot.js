@@ -1,19 +1,19 @@
 // Phase 4 line 2: a named storefront slot (lib/plugins/slots.js). A server
 // component: it runs no plugin JavaScript, here or in the browser. It reads
-// the store's placements once a request (lib/plugins/placements.js
+// the store's placements once a request (lib/plugins/placement.js
 // slotBlocks, cached), and draws each block with a Storeasy primitive
 // (./blocks) from props that passed validateBlockProps.
 //   <PluginSlot name="storefront.pdp.under_atc" ctx={product} />
 // An empty slot renders nothing at all. A slot that can't be read renders
 // nothing too: a plugin never breaks a page. In a founder's preview, a
 // block that is switched off shows with a note that shoppers don't see it.
-import { slotBlocks } from "@/lib/plugins/placements";
+import { slotBlocks } from "@/lib/plugins/placement";
 import { tfetch } from "@/lib/storefront-request";
 import { slog } from "@/lib/log";
 import { contentSource } from "@/lib/content/resolve";
 import { DOCUMENTS_RELEASE_VERSION } from "@/lib/releases";
 import { FounderNote } from "@/components/sections/parts";
-import { BLOCK_COMPONENTS } from "./blocks";
+import { BLOCK_COMPONENTS } from "./blocks/index";
 
 export const OFF_NOTE = "Turned off: shoppers don't see this.";
 

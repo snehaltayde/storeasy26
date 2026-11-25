@@ -4,7 +4,7 @@
 // (components/admin/apps/AppDetail.js, at {/* line 2: placements */}). One row
 // per block the app adds: where on the storefront it sits, Live or Off, its
 // order in that place, its own settings, and "Preview on store".
-//   GET  /api/admin/apps/<id>/placements (apps.read)
+//   GET  /api/admin/apps/<id>/blocks (apps.read)
 //   POST the same, one change at a time (apps.manage)
 // A role without apps.manage sees the same rows with every write control
 // gated (RoleGate apps.manage: aria-disabled with the reason) and the
@@ -183,7 +183,7 @@ function PlacementRow({ placement, previewPath, role, canManage, busy, errors, o
 export default function PlacementsCard({ installId, role, installOff = false }) {
   const toast = useToast();
   const canManage = roleAllows(role, "apps.manage");
-  const url = `/api/admin/apps/${encodeURIComponent(installId)}/placements`;
+  const url = `/api/admin/apps/${encodeURIComponent(installId)}/blocks`;
   const [data, setData] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [busy, setBusy] = useState(null);
@@ -224,7 +224,7 @@ export default function PlacementsCard({ installId, role, installOff = false }) 
 
   const off = installOff || (data && data.installStatus !== "enabled");
   return (
-    <Card id="app-placements" data-placements-card="">
+    <Card id="app-blocks" data-blocks-card="">
       <CardHeader>
         <CardTitle>Where it shows</CardTitle>
         <CardDescription>Choose where each part of this app appears on your store. Everything starts off: nothing shows until you turn it on.</CardDescription>
@@ -246,7 +246,7 @@ export default function PlacementsCard({ installId, role, installOff = false }) 
             <Skeleton className="h-5 w-40" />
             <Skeleton className="h-9 w-full" />
           </div>
-        ) : !data.placements.length ? (
+        ) : !data.blocks.length ? (
           <p className="text-sm text-muted-foreground">This app doesn&rsquo;t add anything to your storefront.</p>
         ) : (
           <>
@@ -261,7 +261,7 @@ export default function PlacementsCard({ installId, role, installOff = false }) 
               </Alert>
             ) : null}
             <ul className="divide-y divide-border">
-              {data.placements.map((p) => (
+              {data.blocks.map((p) => (
                 <PlacementRow
                   key={p.blockId}
                   placement={p}

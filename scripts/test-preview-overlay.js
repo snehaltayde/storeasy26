@@ -957,6 +957,8 @@ const STUBS = {
   "@/components/cart/CartContext": { CartProvider: passthrough },
   "@/components/cart/CartDrawer": nothing,
   "@/components/ServiceWorkerRegister": nothing,
+  // Phase 4 line 2: plugin slots are async server components (they read the store); not rendered here
+  "@/components/plugins/PluginSlot": nothing,
   "@/components/analytics/ConsentBanner": nothing,
   "@/components/analytics/Pixels": nothing,
   "@/components/analytics/ErrorReporter": nothing,
@@ -1110,6 +1112,8 @@ const PAGE_STUBS = {
   "@/components/ProductGallery": nothing,
   "@/components/ProductPurchase": nothing,
   "@/components/WishlistButton": nothing,
+  // Phase 4 line 2: plugin slots are async server components (they read the store); not rendered here
+  "@/components/plugins/PluginSlot": nothing,
   "@/components/CollectionControls": nothing,
   "@/components/analytics/TrackEvent": nothing,
   "./FadeImage": { __esModule: true, default: ({ src, alt }) => React.createElement("img", { src, alt }) },

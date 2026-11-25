@@ -16,7 +16,7 @@
 //    dropped at render; no script, handler, iframe or outside src; the
 //    founder's "Turned off" note only in a founder preview; a database one
 //    migration behind renders nothing.
-// 4. Cost: one placements statement a request (React cache, emulated by
+// 4. Cost: one placement statement a request (React cache, emulated by
 //    support/request-cache.js), and PDP render time before and after the
 //    slots on a store with no plugins.
 // 5. Edge safety: the transitive import scan from PluginSlot.js, and no
@@ -63,7 +63,7 @@ const SL = await import("../lib/plugins/slots.js");
 const BL = await import("../lib/plugins/blocks.js");
 const M = await import("../lib/plugins/manifest.js");
 const CAT = await import("../lib/plugins/catalog.js");
-const PL = await import("../lib/plugins/placements.js");
+const PL = await import("../lib/plugins/placement.js");
 const FLAGS = await import("../lib/platform/flags.js");
 const Cache = await import("../lib/cache.js");
 const { listAudit } = await import("../lib/platform/audit.js");
@@ -230,7 +230,7 @@ const swapSlot = (impl) => {
 };
 
 let perf = {};
-await t("cost on a store with no plugins: every slot renders nothing, the 3 PDP slots share one placements statement a request, and PDP render time is measured before and after", async () => {
+await t("cost on a store with no plugins: every slot renders nothing, the 3 PDP slots share one placement statement a request, and PDP render time is measured before and after", async () => {
   swapSlot(NullSlot);
   const before = await timeRenders(() => pdp(productA));
   swapSlot(realSlot);
@@ -243,7 +243,7 @@ await t("cost on a store with no plugins: every slot renders nothing, the 3 PDP 
     const client = currentDatabase().libsql;
     return watchStatements(client, () => runRequest(() => Promise.all(["storefront.pdp.under_price", "storefront.pdp.under_atc", "storefront.pdp.below_fold", "storefront.footer.above"].map((s) => PL.slotBlocks(s, productA)))));
   });
-  eq(counted.statements.filter((s) => /plugin_placements/.test(s)).length, 1, `one placements read for four slots (${counted.statements.join(" | ")}):`);
+  eq(counted.statements.filter((s) => /plugin_placements/.test(s)).length, 1, `one placement read for four slots (${counted.statements.join(" | ")}):`);
   eq(counted.statements.length, 1, "nothing else:");
   perf = { before: before.toFixed(2), after: after.toFixed(2) };
   console.log(`   PDP render median: ${perf.before} ms without slots, ${perf.after} ms with them (no plugins)`);
@@ -251,16 +251,16 @@ await t("cost on a store with no plugins: every slot renders nothing, the 3 PDP 
 });
 
 // --- 2. the placements route --------------------------------------------------------
-await t("signed out and another store's owner: 401 on the placements route", async () => {
+await t("signed out and another store's owner: 401 on the blocks route", async () => {
   for (const caller of ["signed-out", "owner-b"]) {
-    eq((await call(caller, "apps/[id]/placements", "GET", { params: { id: "pin_0000000000000000" } })).status, 401, `${caller} GET:`);
-    eq((await call(caller, "apps/[id]/placements", "POST", { params: { id: "pin_0000000000000000" }, body: { block: "badges", state: "live" } })).status, 401, `${caller} POST:`);
+    eq((await call(caller, "apps/[id]/blocks", "GET", { params: { id: "pin_0000000000000000" } })).status, 401, `${caller} GET:`);
+    eq((await call(caller, "apps/[id]/blocks", "POST", { params: { id: "pin_0000000000000000" }, body: { block: "badges", state: "live" } })).status, 401, `${caller} POST:`);
   }
 });
 
 const inst = await call("owner", "apps", "POST", { body: { install: { pluginId: "trust-badges", scopes: [] } } });
 const tbId = inst.body?.install?.id;
-const P = (caller, body, opts = {}) => call(caller, "apps/[id]/placements", body ? "POST" : "GET", { params: { id: tbId }, ...(body ? { body } : {}), ...opts });
+const P = (caller, body, opts = {}) => call(caller, "apps/[id]/blocks", body ? "POST" : "GET", { params: { id: tbId }, ...(body ? { body } : {}), ...opts });
 
 await t("install makes one Off placement per block, in its first slot; every role reads them (apps.read)", async () => {
   eq(inst.status, 200, inst.text.slice(0, 200));
@@ -271,8 +271,8 @@ await t("install makes one Off placement per block, in its first slot; every rol
   for (const caller of [...MERCHANT, ...OPS]) {
     const r = await P(caller);
     eq(r.status, 200, `${caller}: ${r.text.slice(0, 160)}`);
-    eq(Object.keys(r.body).sort().join(","), "installStatus,ok,placements,previewPaths", `${caller} keys:`);
-    eq(r.body.placements.map((p) => `${p.blockId}:${p.state}`).join(","), "badges:off,guarantee:off", `${caller} placements:`);
+    eq(Object.keys(r.body).sort().join(","), "blocks,installStatus,ok,previewPaths", `${caller} keys:`);
+    eq(r.body.blocks.map((p) => `${p.blockId}:${p.state}`).join(","), "badges:off,guarantee:off", `${caller} blocks:`);
     eq(r.body.previewPaths["storefront.pdp.under_atc"], `/products/${productA.handle}`, `${caller} preview path:`);
     eq(r.body.previewPaths["storefront.order.status"], null, "no order preview:");
   }
@@ -285,7 +285,7 @@ await t("staff, support and operator support: 403 on every change, and nothing c
       eq((await P(caller, body)).status, 403, `${caller} ${JSON.stringify(body)}:`);
     }
   }
-  eq((await P("owner")).body.placements.map((p) => p.state).join(","), "off,off", "still off:");
+  eq((await P("owner")).body.blocks.map((p) => p.state).join(","), "off,off", "still off:");
   eq((await placementAudit()).length, 0, "no audit rows:");
 });
 
@@ -311,7 +311,7 @@ await t("a javascript: link and an outside link are refused on save, in words th
   }
   const good = await P("owner", { block: "guarantee", settings: { title: "Our promise", text: "We make it right.", link_label: "Refunds", link: "/policies/refund-policy" } });
   eq(good.status, 200, good.text.slice(0, 200));
-  eq(good.body.placements[1].settings.link, "/policies/refund-policy", "saved:");
+  eq(good.body.blocks[1].settings.link, "/policies/refund-policy", "saved:");
   const unknown = await P("owner", { block: "guarantee", settings: { text: "x", style: "color:red" } });
   eq(unknown.status, 422, "an unknown setting:");
 });
@@ -332,7 +332,7 @@ await t("turn Badges live: shown on store A's PDP (both layouts) to the anonymou
     ok(h.includes("Free shipping") && h.includes("Secure checkout"), `${layout} the badges' words`);
     eq(blocksIn(await pdp(productB, { tn: b }, layout)).length, 0, `${layout} B:`);
   }
-  eq(blocksIn(await pdp(productA, { tn: b })).length, 0, "store B never reads A's placements, even for A's product:");
+  eq(blocksIn(await pdp(productA, { tn: b })).length, 0, "store B never reads A's placement rows, even for A's product:");
 });
 
 await t("move to below the details, then order within the slot: Guarantee live too, Move up puts Badges first", async () => {
@@ -342,7 +342,7 @@ await t("move to below the details, then order within the slot: Guarantee live t
   eq(blocksIn(h).join(","), "storefront.pdp.below_fold/guarantee,storefront.pdp.below_fold/badges", "a moved block goes last:");
   const up = await P("owner", { block: "badges", move: "up" });
   eq(up.status, 200, up.text.slice(0, 200));
-  ok(up.body.placements[0].first && up.body.placements[1].last, "first/last flags");
+  ok(up.body.blocks[0].first && up.body.blocks[1].last, "first/last flags");
   h = await pdp(productA);
   eq(blocksIn(h).join(","), "storefront.pdp.below_fold/badges,storefront.pdp.below_fold/guarantee", "moved up:");
   eq((await P("owner", { block: "badges", move: "up" })).status, 409, "already first:");
@@ -453,32 +453,32 @@ await t("install off, then on; the kill switch; then uninstall: each hides every
   eq(await live(), 2, "allowed again:");
   eq((await call("owner", "apps/[id]", "POST", { params: { id: tbId }, body: { uninstall: true } })).status, 200, "uninstall:");
   eq(await live(), 0, "uninstalled:");
-  eq((await P("owner")).status, 404, "its placements are gone with it:");
+  eq((await P("owner")).status, 404, "its blocks are gone with it:");
   const kept = await a.run(() => db.selectFrom("plugin_placements").selectAll().where("install_id", "=", tbId).execute());
   eq(kept.length, 2, "the rows are kept, nothing deleted:");
 });
 
 await t("store B's owner, on B's host, asks for store A's install id: 404 on read and on change", async () => {
-  eq((await call("owner-b", "apps/[id]/placements", "GET", { host: hostB, params: { id: tbId } })).status, 404, "GET:");
-  eq((await call("owner-b", "apps/[id]/placements", "POST", { host: hostB, params: { id: tbId }, body: { block: "badges", state: "live" } })).status, 404, "POST:");
+  eq((await call("owner-b", "apps/[id]/blocks", "GET", { host: hostB, params: { id: tbId } })).status, 404, "GET:");
+  eq((await call("owner-b", "apps/[id]/blocks", "POST", { host: hostB, params: { id: tbId }, body: { block: "badges", state: "live" } })).status, 404, "POST:");
 });
 
 let tb2;
-const P2 = (caller, body) => call(caller, "apps/[id]/placements", body ? "POST" : "GET", { params: { id: tb2 }, ...(body ? { body } : {}) });
+const P2 = (caller, body) => call(caller, "apps/[id]/blocks", body ? "POST" : "GET", { params: { id: tb2 }, ...(body ? { body } : {}) });
 await t("uninstall then install again: the old install's rows hold no place; a moved block goes after the live ones only, Move up is correct, and a no-op move writes no audit row", async () => {
   const r = await call("owner", "apps", "POST", { body: { install: { pluginId: "trust-badges", scopes: [] } } });
   eq(r.status, 200, r.text.slice(0, 200));
   tb2 = r.body.install.id;
   const fresh = await P2("owner");
-  ok(fresh.body.placements.every((p) => p.first && p.last), `alone in their slots (the uninstalled rows don't count): ${JSON.stringify(fresh.body.placements.map((p) => [p.first, p.last]))}`);
+  ok(fresh.body.blocks.every((p) => p.first && p.last), `alone in their slots (the uninstalled rows don't count): ${JSON.stringify(fresh.body.blocks.map((p) => [p.first, p.last]))}`);
   eq((await P2("owner", { block: "badges", slot: "storefront.pdp.below_fold" })).status, 200, "move to below the details:");
-  let list = (await P2("owner")).body.placements;
+  let list = (await P2("owner")).body.blocks;
   ok(!list[0].first && list[0].last && list[1].first && !list[1].last, "badges second, guarantee first");
   const before = (await placementAudit()).length;
   eq((await P2("owner", { block: "badges", move: "down" })).status, 409, "already last:");
   eq((await placementAudit()).length, before, "no audit row for a no-op:");
   eq((await P2("owner", { block: "badges", move: "up" })).status, 200, "move up:");
-  list = (await P2("owner")).body.placements;
+  list = (await P2("owner")).body.blocks;
   ok(list[0].first && list[1].last, "badges first now");
   const pos = await a.run(() => db.selectFrom("plugin_placements").select(["block_id", "position"]).where("install_id", "=", tb2).orderBy("block_id").execute());
   eq(pos.map((x) => `${x.block_id}:${x.position}`).join(","), "badges:0,guarantee:1", "positions renumbered among installed apps only:");
@@ -505,7 +505,7 @@ await t("a fourth Live block in one slot is refused in plain words; three show",
     const r = await call("owner", "apps", "POST", { body: { install: { pluginId: "more-notes", scopes: [] } } });
     eq(r.status, 200, r.text.slice(0, 200));
     const id = r.body.install.id;
-    const N = (body) => call("owner", "apps/[id]/placements", "POST", { params: { id }, body });
+    const N = (body) => call("owner", "apps/[id]/blocks", "POST", { params: { id }, body });
     eq((await N({ block: "n1", state: "live" })).status, 200, "third live:");
     const full = await N({ block: "n2", state: "live" });
     eq(full.status, 409, `fourth: ${full.text.slice(0, 200)}`);
@@ -550,9 +550,9 @@ await t("a database one migration behind (no plugin_placements): every slot rend
   eq(blocksIn(await pdp(productB, { tn: b })).length, 0, "nothing:");
   const r = await call("owner-b", "apps", "POST", { host: hostB, body: { install: { pluginId: "trust-badges", scopes: [] } } });
   eq(r.status, 200, `install on B: ${r.text.slice(0, 200)}`);
-  const list = await call("owner-b", "apps/[id]/placements", "GET", { host: hostB, params: { id: r.body.install.id } });
+  const list = await call("owner-b", "apps/[id]/blocks", "GET", { host: hostB, params: { id: r.body.install.id } });
   eq(list.status, 200, list.text.slice(0, 200));
-  eq(list.body.placements.map((p) => p.state).join(","), "off,off", "listed with defaults:");
+  eq(list.body.blocks.map((p) => p.state).join(","), "off,off", "listed with defaults:");
 });
 
 Cache.__setCacheTestHooks({ onInvalidate: null });
@@ -580,7 +580,7 @@ await t("the transitive import scan from PluginSlot.js finds no node: import (te
       if (r) queue.push(r);
     }
   }
-  for (const f of ["lib/plugins/placements.js", "lib/plugins/blocks.js", "lib/plugins/slots.js", "lib/plugins/catalog.js", "lib/platform/flags.js", "components/plugins/blocks/BadgeRow.js", "lib/storefront-request.js"]) ok(reached.has(f), `${f} reached`);
+  for (const f of ["lib/plugins/placement.js", "lib/plugins/blocks.js", "lib/plugins/slots.js", "lib/plugins/catalog.js", "lib/platform/flags.js", "components/plugins/blocks/BadgeRow.js", "lib/storefront-request.js"]) ok(reached.has(f), `${f} reached`);
   ok(!reached.has("lib/plugins/installs.js"), "installs.js is console-only");
   eq(hits.join(","), "lib/tenant-context.js: node:async_hooks", "node imports reached:");
 });

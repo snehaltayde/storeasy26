@@ -828,6 +828,8 @@ const STUBS = {
   "@/components/cart/CartContext": { CartProvider: passthrough },
   "@/components/cart/CartDrawer": nothing,
   "@/components/ServiceWorkerRegister": nothing,
+  // Phase 4 line 2: plugin slots are async server components (they read the store); not rendered here
+  "@/components/plugins/PluginSlot": nothing,
   "@/components/analytics/ConsentBanner": nothing,
   "@/components/analytics/Pixels": nothing,
   "@/components/analytics/ErrorReporter": { __esModule: true, default: () => null, reportClientError: () => {} },

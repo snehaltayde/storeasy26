@@ -715,6 +715,7 @@ await t("unit: a shopper render of an edited product (card and product page) con
       "@/components/ProductGallery": { __esModule: true, default: ({ images, title }) => h("div", null, images.map((i) => h("img", { key: i.url, src: i.url, alt: i.alt || title }))) },
       "@/components/ProductPurchase": nothing,
       "@/components/WishlistButton": nothing,
+      "@/components/plugins/PluginSlot": nothing, // Phase 4 line 2: an async server component
       "@/components/ProductCard": ProductCard,
       "@/lib/sanitize": await import("../lib/sanitize.js"),
     }),

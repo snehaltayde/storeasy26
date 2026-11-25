@@ -229,6 +229,7 @@ async function productPageModule(tn) {
     "@/components/ProductGallery": { __esModule: true, default: ({ images, title }) => h("div", { "data-gallery": "" }, images.map((i) => h("img", { key: i.url, src: i.url, alt: i.alt || title }))) },
     "@/components/ProductPurchase": nothing,
     "@/components/WishlistButton": nothing,
+    "@/components/plugins/PluginSlot": nothing, // Phase 4 line 2: an async server component
     "@/components/ProductCard": ProductCard,
     "@/lib/sanitize": sanitize,
   });
@@ -900,6 +901,7 @@ async function renderConfirmation(tn, orderId) {
   });
   const status = await loadComponent("app/(storefront)/orders/[orderId]/page.js", {
     "next/link": Link,
+    "@/components/plugins/PluginSlot": nothing, // Phase 4 line 2: an async server component
     "@/components/StoreImage": { __esModule: true, default: ({ alt }) => h("img", { alt }) },
     "next/navigation": nav,
     "next/server": { after: () => {} },

@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { tenantHandler } from "@/lib/tenant-request";
 import { appErrorAnswer } from "@/lib/plugins/installs";
-import { PlacementError, listPlacements, updatePlacement } from "@/lib/plugins/placements";
+import { PlacementError, listPlacements, updatePlacement } from "@/lib/plugins/placement";
 
 // Where an installed app's blocks show on the storefront (Phase 4 line 2).
 // [id] is the install id (pin_…).
-//   GET  apps.read   → { installStatus, placements, previewPaths }
+//   GET  apps.read   → { installStatus, blocks, previewPaths }
 //   POST apps.manage, { block, slot } | { block, state: "off"|"live" } |
 //        { block, settings: { key: value } } | { block, move: "up"|"down" }
 //        → the same as GET, after the change (audited as apps.placement)
@@ -19,7 +19,7 @@ const NOT_FOUND = { error: "This app isn't installed on your store. It may have 
 const deny = (a) => NextResponse.json({ error: a.error }, { status: a.status });
 const failure = (e) => {
   if (e instanceof PlacementError) return NextResponse.json({ error: e.message, code: e.code, ...(e.errors ? { errors: e.errors } : {}) }, { status: e.status });
-  const f = appErrorAnswer(e, "admin/apps/[id]/placements");
+  const f = appErrorAnswer(e, "admin/apps/[id]/where-it-shows");
   return NextResponse.json(f.body, { status: f.status });
 };
 

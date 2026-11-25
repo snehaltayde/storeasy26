@@ -1124,6 +1124,8 @@ const LAYOUT_STUBS = {
   "@/components/cart/CartContext": { CartProvider: passthroughC },
   "@/components/cart/CartDrawer": nothingC,
   "@/components/ServiceWorkerRegister": nothingC,
+  // Phase 4 line 2: plugin slots are async server components (they read the store); not rendered here
+  "@/components/plugins/PluginSlot": nothingC,
   "@/components/analytics/ConsentBanner": nothingC,
   "@/components/analytics/Pixels": nothingC,
   "@/components/analytics/ErrorReporter": nothingC,

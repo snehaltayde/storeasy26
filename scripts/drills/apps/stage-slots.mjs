@@ -12,7 +12,7 @@
 // an answer, never a fixed time.
 import { ORIGIN, api, open, signIn, stage } from "./lib.mjs";
 
-const POSTED = (id) => (r) => r.url().endsWith(`/api/admin/apps/${id}/placements`) && r.request().method() === "POST";
+const POSTED = (id) => (r) => r.url().endsWith(`/api/admin/apps/${id}/blocks`) && r.request().method() === "POST";
 
 stage("slots", async (drill) => {
   const page = await signIn(drill, "owner");
@@ -20,10 +20,10 @@ stage("slots", async (drill) => {
   const made = await api(page, "apps", { install: { pluginId: "trust-badges", scopes: [] } });
   drill.check(made.status === 200, "owner: Trust badges installs for the slots stage", made.json?.error);
   const id = made.json?.install?.id;
-  const listed = await api(page, `apps/${id}/placements`);
+  const listed = await api(page, `apps/${id}/blocks`);
   const productPath = listed.json?.previewPaths?.["storefront.pdp.under_atc"];
   drill.check(typeof productPath === "string" && productPath.startsWith("/products/"), "a product page to look at", productPath);
-  drill.check(listed.json?.placements?.map((p) => p.state).join(",") === "off,off", "both blocks start Off", listed.json?.placements);
+  drill.check(listed.json?.blocks?.map((p) => p.state).join(",") === "off,off", "both blocks start Off", listed.json?.blocks);
 
   // the anonymous shopper: a fresh context with no cookies, on the closed store
   const anonCtx = await drill.browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -38,7 +38,7 @@ stage("slots", async (drill) => {
 
   // the owner turns Badges Live on the card
   await open(page, `/admin/apps/${id}`);
-  const card = page.locator("#app-placements");
+  const card = page.locator("#app-blocks");
   await card.locator('[data-placement="badges"]').waitFor();
   const toggle = card.locator("#pl-badges-live");
   let saved = page.waitForResponse(POSTED(id));
@@ -69,7 +69,7 @@ stage("slots", async (drill) => {
   // support: the card with every write control gated, and the API refuses
   const support = await signIn(drill, "support");
   await open(support, `/admin/apps/${id}`);
-  const sCard = support.locator("#app-placements");
+  const sCard = support.locator("#app-blocks");
   await sCard.locator('[data-placement="badges"]').waitFor();
   const ungated = await sCard.evaluate((el) =>
     [...el.querySelectorAll("button, input, [role=combobox]")]
@@ -77,7 +77,7 @@ stage("slots", async (drill) => {
       .map((b) => b.outerHTML.slice(0, 120)),
   );
   drill.check(ungated.length === 0, "support: every write control on the card is gated", ungated);
-  drill.check((await api(support, `apps/${id}/placements`, { block: "badges", state: "off" })).status === 403, "support: the API refuses a change (403)");
+  drill.check((await api(support, `apps/${id}/blocks`, { block: "badges", state: "off" })).status === 403, "support: the API refuses a change (403)");
   await support.context().close();
 
   // Off: the preview shows it with the founder's note; the shopper still sees nothing
