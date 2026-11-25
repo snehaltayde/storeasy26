@@ -530,7 +530,8 @@ await t("every old region carries data-legacy (className contents); the editor p
     "app/(console)/admin/(auth)/layout.js": /<div data-legacy className="contents">/,
     // Phase 1 line 8: the old operator screens carry their own region (the
     // layout is a pass-through, so /platform/onboarding is new UI outside it)
-    "app/(console)/platform/page.js": /<div data-legacy className="contents">[\s\S]*<div data-legacy className="contents">[\s\S]*<PlatformAdmin \/> : <PlatformLogin \/>/,
+    // Phase 3 line 0: only the signed-in old console; the sign-in is new UI
+    "app/(console)/platform/page.js": /<div data-legacy className="contents">\s*<PlatformAdmin \/>/,
     "app/(console)/platform/loading.js": /^\s{4}<div data-legacy className="contents">/m,
     "app/(console)/platform/error.js": /^\s{4}<div data-legacy className="contents">/m,
     "app/(console)/error.js": /^\s{4}<div data-legacy className="contents">/m,
@@ -539,8 +540,10 @@ await t("every old region carries data-legacy (className contents); the editor p
   };
   for (const [f, re] of Object.entries(WRAPPED)) ok(re.test(read(f)), `${f} has the wrapper:`);
   const platformLayout = read("app/(console)/platform/layout.js").replace(/^\s*\/\/.*$/gm, "");
-  ok(/return children;/.test(platformLayout) && !platformLayout.includes("data-legacy"), "the platform layout is a pass-through:");
-  for (const f of ["app/(console)/platform/onboarding/page.js", "app/(console)/platform/onboarding/loading.js", "components/platform/onboarding/OnboardingOps.js", "components/platform/onboarding/OnboardingTable.js", "components/platform/onboarding/SubjectSheet.js"]) ok(!read(f).replace(/^\s*\/\/.*$/gm, "").includes("data-legacy"), `${f} is new UI, never in a data-legacy region:`);
+  // Phase 3 line 0: operators get the shell (components/ui), anyone else the page alone
+  ok(/if \(!operator\) return children;/.test(platformLayout) && /<PlatformShell /.test(platformLayout) && !platformLayout.includes("data-legacy"), "the platform layout: the shell for operators, the page alone otherwise, no data-legacy:");
+  ok((read("app/(console)/platform/page.js").replace(/^\s*\/\/.*$/gm, "").match(/data-legacy/g) || []).length === 1, "the platform page: one data-legacy region (the old console), the sign-in outside it:");
+  for (const f of ["app/(console)/platform/onboarding/page.js", "app/(console)/platform/onboarding/loading.js", "components/platform/onboarding/OnboardingOps.js", "components/platform/onboarding/OnboardingTable.js", "components/platform/onboarding/SubjectSheet.js", "components/platform/PlatformLogin.js", "components/platform/shell/PlatformShell.js", "components/platform/shell/PlatformNav.js"]) ok(!read(f).replace(/^\s*\/\/.*$/gm, "").includes("data-legacy"), `${f} is new UI, never in a data-legacy region:`);
   const de = read("components/admin/editor/DocumentEditor.js");
   // Phase 2 line 6: the editor's panes fill the height under the 56px top bar (no sticky preview)
   ok(de.includes("lg:h-[calc(100svh-3.5rem)]") && !de.includes("lg:sticky"), "the editor frame sits under the 56px top bar:");
