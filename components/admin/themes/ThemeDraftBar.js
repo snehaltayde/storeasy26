@@ -98,7 +98,7 @@ export function ThemeDraftBar({ state, names, role }) {
           </p>
         ) : null}
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button type="button" size="sm" variant="outline" disabled={!!busy} aria-busy={busy === "preview"} onClick={preview} data-themes-action="preview">
+          <Button type="button" size="sm" variant="outline" disabled={!!busy} aria-busy={busy === "preview"} onClick={preview} data-themes-action="preview" data-read-control>
             <ExternalLink aria-hidden /> Preview
           </Button>
           <RoleGate role={role} action="storefront.publish" reason={NO_PUBLISH}>

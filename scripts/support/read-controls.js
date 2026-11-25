@@ -25,6 +25,7 @@ export const READ_CONTROLS = [
   // Phase 4 line 1: Apps
   // Phase 5 line 1
   { path: "components/admin/themes/ThemeDetail.js", reason: "Download package is a link to GET /api/admin/themes/[id]?download (storefront.read); no write", marks: 1 },
+  { path: "components/admin/themes/ThemeDraftBar.js", reason: "Preview opens the founder preview of the draft theme (POST /api/admin/preview-session create + showDesign, storefront.read, which writes no store content) in a new tab", marks: 1 },
   { path: "components/admin/themes/ThemeLibrary.js", reason: "the Installed / Archived filter is a pair of links to /admin/themes with a ?status query; no write", marks: 2 },
   { path: "components/admin/apps/AppsList.js", reason: "the Installed / Browse tabs (and their list, which Radix makes focusable) only switch the shown tab, and Browse apps switches to the Browse tab; no write", marks: 4 },
   { path: "components/admin/apps/AppCatalog.js", reason: "Open is a link to an installed app's page (a GET)", marks: 1 },
@@ -131,6 +132,7 @@ export const READ_POSTS = [
   // body's single top-level key must be one of them; never saveDraft), and
   // the preview session (storefront.read in admin-routes.js)
   { page: "/admin/editor", method: "PUT", path: "/api/admin/documents", ops: ["listDocuments", "getDocument", "listHistory", "listProductContent", "listChanges", "openingChecks"], reason: "the editor's reads: the page list, the open document, Earlier versions, the products in the page list, what changed since live and the opening checks (DOCUMENT_READS; support's store never sends saveDraft)" },
+  { page: "/admin/themes", method: "POST", path: "/api/admin/preview-session", reason: "Preview on the draft bar: the founder preview session (create, showDesign), storefront.read: it lets this browser see the draft theme and writes no content" },
   { page: "/admin/editor", method: "POST", path: "/api/admin/preview-session", reason: "the preview's session (create, showDesign, revoke), storefront.read: it lets this browser see the draft and writes no content" },
   { page: "/admin/releases", method: "PUT", path: "/api/admin/documents", ops: ["listRecentlyPublished", "listDocuments", "getDocument", "listChanges"], reason: "Publishing's reads: recently published, the pages waiting to publish and what changed in each (DOCUMENT_READS)" },
 ];
