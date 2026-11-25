@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
+import { NoAccess } from "@/components/admin/settings/NoAccess";
 import { roleAllows } from "@/lib/platform/authz";
 import { bundleCompat, listBundles } from "@/lib/bundles";
 import { storeCurrency } from "@/lib/offers/catalog";
@@ -19,6 +20,7 @@ export default async function AdminBundlePage({ params }) {
   const jar = await cookies();
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
+  if (!roleAllows(actor.role, "offers.read")) return <NoAccess role={actor.role} page />;
   const canWrite = roleAllows(actor.role, "offers.write");
   if (id === "new" && !canWrite) redirect("/admin/bundles");
   const data = await tfetch(async () => {

@@ -507,7 +507,10 @@ await t("returns, onboarding, releases: no customer fields and no emails", () =>
   for (const caller of CALLERS) {
     const rows = results[caller].returns.body?.returns ?? [];
     eq(rows.length, 1, `${caller} sees the fixture return:`);
-    for (const row of rows) eq(Object.keys(row).sort().join(","), "created_at,currency,id,note,order_id,reason,refunded_total,status,total,updated_at", `${caller} return keys:`);
+    // P2-B: the shopper's reason and note are customer details, so a redacted caller gets them null
+    const keys = `created_at,currency,id,note,order_id,${REDACTED(caller) ? "pii_redacted," : ""}reason,refunded_total,status,total,updated_at`;
+    for (const row of rows) eq(Object.keys(row).sort().join(","), keys, `${caller} return keys:`);
+    if (REDACTED(caller)) for (const row of rows) eq(JSON.stringify([row.reason, row.note]), "[null,null]", `${caller} return free text:`);
     for (const name of ["returns", "onboarding", "releases", "releases preview"]) {
       const txt = results[caller][name].text;
       ok(!MEMBER_EMAIL.test(txt) && !txt.includes(CNY.orderEmail) && !txt.includes(CNY.orderPhone), `${caller} ${name}`);
@@ -539,20 +542,39 @@ await t("pages: every console page has a row in admin-pages.js, every row a page
   ok(files.length >= 18, `walked ${files.length} pages`);
 });
 
+// a page's gate: roleAllows(actor.role, "<action>") before any data read
+async function gateProblem(r) {
+  const src = await readFile(join(ROOT, pageRel(r.page)), "utf8");
+  const gate = src.indexOf(`roleAllows(actor.role, "${r.action}")`);
+  const actorAt = src.indexOf("adminActor(");
+  // the actor line is `await tfetch(() => adminActor(…))`, so the next tfetch( is the first data read
+  const firstData = src.indexOf("tfetch(", actorAt);
+  const actorEnd = src.indexOf("\n", actorAt);
+  if (gate < 0) return `${r.page}: no roleAllows(actor.role, "${r.action}")`;
+  if (firstData >= 0 && firstData < gate) return `${r.page}: tfetch( before its gate`;
+  // nor a direct awaited call (a lib read outside tfetch) between the actor and the gate
+  if (/\bawait\b/.test(src.slice(actorEnd, gate))) return `${r.page}: an await before its gate`;
+  return null;
+}
+
 await t("S2 pages: every page a least-trusted role may not read checks roleAllows(actor.role, action) before its data", async () => {
   const bad = [];
   for (const r of ADMIN_PAGES) {
     if (LEAST.every((role) => roleAllows(role, r.action))) continue;
-    const src = await readFile(join(ROOT, pageRel(r.page)), "utf8");
-    const gate = src.indexOf(`roleAllows(actor.role, "${r.action}")`);
-    const actorAt = src.indexOf("adminActor(");
-    // the actor line is `await tfetch(() => adminActor(…))`, so the next tfetch( is the first data read
-    const firstData = src.indexOf("tfetch(", actorAt);
-    const actorEnd = src.indexOf("\n", actorAt);
-    if (gate < 0) bad.push(`${r.page}: no roleAllows(actor.role, "${r.action}")`);
-    else if (firstData >= 0 && firstData < gate) bad.push(`${r.page}: tfetch( before its gate`);
-    // nor a direct awaited call (a lib read outside tfetch) between the actor and the gate
-    else if (/\bawait\b/.test(src.slice(actorEnd, gate))) bad.push(`${r.page}: an await before its gate`);
+    const problem = await gateProblem(r);
+    if (problem) bad.push(problem);
+  }
+  eq(bad.join("\n"), "", "");
+});
+
+// P2-F: a page whose data needs more than storefront.read (which every console
+// role holds) is gated in its own source even while every role holds its action,
+// so taking the action from a role later closes the page too
+await t("P2-F guard: every page whose row action isn't storefront.read checks roleAllows(actor.role, action) before its data", async () => {
+  const bad = [];
+  for (const r of ADMIN_PAGES.filter((x) => x.action !== "storefront.read")) {
+    const problem = await gateProblem(r);
+    if (problem) bad.push(problem);
   }
   eq(bad.join("\n"), "", "");
 });

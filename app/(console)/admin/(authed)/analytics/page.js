@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
+import { roleAllows } from "@/lib/platform/authz";
+import { NoAccess } from "@/components/admin/settings/NoAccess";
 import { funnel, topProducts, searchTerms, campaignViews, deviceSplit, coverage, salesRollup } from "@/lib/reporting";
 import { RANGES, DEFAULT_RANGE } from "@/lib/admin/dashboard-ranges";
 import { tfetch } from "@/lib/console-request";
@@ -21,6 +23,7 @@ export default async function AdminAnalyticsPage({ searchParams }) {
   const jar = await cookies();
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
+  if (!roleAllows(actor.role, "orders.read")) return <NoAccess role={actor.role} page />;
   const asked = Number((await searchParams)?.days);
   const days = RANGES.includes(asked) ? asked : DEFAULT_RANGE;
 
