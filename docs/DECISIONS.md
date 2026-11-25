@@ -3,6 +3,13 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Owner decision: usage-saving build mode (from Phase 6 on)
+
+- **Low-severity review findings** are fixed without a second reviewer pass; medium, high and security fixes are still re-read.
+- **A fix that changes only drill files** reruns only that drill, not the whole verify; any app-code change still gets the full verify.
+- **Sonnet builds simple lines** (storefront UX, docs, simpler first-party plugins such as reviews and Shiprocket); Opus keeps payments, OTP, subscriptions, permissions, security and hard UI.
+- Unchanged: the full unit suite on every merge, a reviewer pass on every line, and the phase-end browser suite and least-trusted audit.
+
 ## 2026-11-25 Phase 6 line 2: design tokens in the studio (on the owner's behalf)
 
 - **Schema and permissions:** none. Token edits are documents `saveDraft` on doc_design (`storefront.write`); support and operator support get a read-only store and disabled inputs. Two reads grew a field, both `storefront.read`: `GET /api/admin/themes/[id]` answers `tokens` (the base kit's brand under the package's tokens, exactly what an apply with its brand writes: Reset to the theme's), and `GET /api/admin/themes` `state` answers `liveBrand` and `liveTheme` (the readability check compares with what shoppers see, as the publish rule does).
