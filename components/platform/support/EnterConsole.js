@@ -3,7 +3,7 @@
 // Phase 3 line 5: "Enter store console (read-only)". Asks the operator API for
 // a single-use, 60-second entry token, then submits a form POST with it to the
 // store's own /api/admin/support-entry (another host), which sets the store's
-// host-only _support cookie and sends the browser to /admin. The token lives
+// host-only __Host-support cookie and sends the browser to /admin. The token lives
 // only in this click: never in a URL, the page or storage. Same tab, so no
 // popup blocker can eat the post; the browser's Back returns here.
 import { useState } from "react";

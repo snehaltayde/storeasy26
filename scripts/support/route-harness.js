@@ -89,9 +89,11 @@ export function spyOnRequireAdmin() {
 }
 
 const CALLER_ROLES = ["owner", "admin", "staff", "support"];
+// the operator console's origin the suites mint support entry tokens on (Phase 3 line 5)
+export const CONSOLE_ORIGIN = "https://operator.console.test";
 // operator-support: an operator under store A's grant with its _platform
 // cookie (same host); operator-support-entry (Phase 3 line 5): the same
-// operator's support session from the cross-host entry, in a _support cookie.
+// operator's support session from the cross-host entry, in a __Host-support cookie.
 export const CALLERS = Object.freeze([...CALLER_ROLES, "signed-out", "owner-b", "operator-support", "operator-support-entry"]);
 
 // Store A (owner, admin, staff and support members, a legacy admin_password
@@ -126,10 +128,10 @@ export async function makeRoleStore({ name = "perm", a: aOpts = {}, b: bOpts = {
 
   const session = async (userKey, kind = "merchant") => (await S.createSession({ userId: users[userKey].id, kind, ttlMs: 10 * 60_000 })).token;
   // the cross-host entry, as the operator console and the store's entry route run it
-  const entry = await mintSupportEntry({ tenantId: a.id, operator: { kind: "operator", id: users.operator.id } });
-  const supportSession = await consumeSupportEntry(entry.token, a.id);
+  const entry = await mintSupportEntry({ tenantId: a.id, operator: { kind: "operator", id: users.operator.id }, consoleOrigin: CONSOLE_ORIGIN });
+  const supportSession = await consumeSupportEntry(entry.token, a.id, CONSOLE_ORIGIN);
   if (!supportSession) throw new Error("route-harness: the support entry was refused");
-  const cookies = { "signed-out": {}, "operator-support": { _platform: await session("operator", "operator") }, "operator-support-entry": { _support: supportSession.token } };
+  const cookies = { "signed-out": {}, "operator-support": { _platform: await session("operator", "operator") }, "operator-support-entry": { "__Host-support": supportSession.token } };
   for (const role of [...CALLER_ROLES, "owner-b"]) cookies[role] = { _admin: await session(role) };
   const ids = Object.fromEntries(Object.entries(users).map(([k, u]) => [`$${k}`, u.id]));
   const swap = (v) => JSON.parse(JSON.stringify(v), (_, x) => (typeof x === "string" && Object.hasOwn(ids, x) ? ids[x] : x));

@@ -261,7 +261,7 @@ const TOKENS = {
   supportAdmin: cookies.support._admin,
   ownerBAdmin: cookies["owner-b"]._admin,
   operatorPlatform: cookies["operator-support"]._platform,
-  operatorSupport: cookies["operator-support-entry"]._support, // Phase 3 line 5
+  operatorSupport: cookies["operator-support-entry"]["__Host-support"], // Phase 3 line 5
   ownerPreviewToken: "",
 };
 
@@ -287,7 +287,7 @@ const OWNER_SKIP = Object.keys(CNY).filter((k) => !SECRET_KEYS.includes(k) && !k
 const MERCHANT = ["owner", "admin", "staff", "support"];
 const LEAST = MERCHANT.filter((r) => !roleAllows(r, "settings.read"));
 // Phase 3 line 5: an operator under a grant on the same host (_platform) and
-// across hosts (the _support session) both act as support
+// across hosts (the __Host-support session) both act as support
 const OPERATOR_SUPPORT = ["operator-support", "operator-support-entry"];
 const roleOf = (caller) => (OPERATOR_SUPPORT.includes(caller) ? "support" : caller);
 const CALLERS = [...LEAST, ...(LEAST.includes("support") ? OPERATOR_SUPPORT : [])];
@@ -648,7 +648,7 @@ await t("page sweep (S1, S2): no prop on any console page holds a canary for sup
   eq(bad.join("\n"), "", "");
 });
 
-// Phase 3 line 5: the operator's cross-host support session (_support) opens
+// Phase 3 line 5: the operator's cross-host support session (__Host-support) opens
 // every console page as support does: rendered, and no canary in any prop
 await t("page sweep (line 5): every console page runs as operator-support-entry, renders, and no prop holds a canary", async () => {
   const bad = [];
@@ -657,7 +657,7 @@ await t("page sweep (line 5): every console page runs as operator-support-entry,
     const params = Object.fromEntries(Object.entries(r.params ?? {}).map(([k, v]) => [k, v === "$order" ? ORDER_ID : v]));
     const run = await pages.run(pageRel(r.page), { cookies: cookies["operator-support-entry"], params });
     if (run.error) bad.push(`${r.page}: ${String(run.error?.message || run.error).split("\n")[0].slice(0, 200)}`);
-    if (run.redirect === "/admin/login") bad.push(`${r.page}: sent to the sign-in (the _support session was not accepted)`);
+    if (run.redirect === "/admin/login") bad.push(`${r.page}: sent to the sign-in (the __Host-support session was not accepted)`);
     if (run.props.length) rendered++;
     const found = leaks(run.text, { skip: skipFor("operator-support-entry") });
     if (found.length) bad.push(`${r.page}: ${found.join(", ")}`);

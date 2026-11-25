@@ -5,7 +5,7 @@
 // from roleAllows(), never by hand: an allowed role gets anything but 401/403,
 // a denied role 403, a signed-out caller and another store's owner 401, and an
 // operator under a support grant what support gets (with its _platform cookie,
-// and with the _support session from the cross-host entry, Phase 3 line 5). A static guard keeps the
+// and with the __Host-support session from the cross-host entry, Phase 3 line 5). A static guard keeps the
 // table in step with app/api/admin/**/route.js. Outside services are blanked
 // and fetch() is blocked; every database is a throwaway file: database.
 import { readFile, readdir, stat } from "node:fs/promises";
@@ -389,9 +389,11 @@ await t("exempt recover: cross-origin 403; {} 400; an unknown email 200 with the
   eq(res.body?.message, "If that account exists, a reset link is on its way.", "generic body");
 });
 
-await t("exempt maintenance-pass: always 302 to /admin/login; _mx only for a verified member or operator session", async () => {
+// Phase 3 line 5: an operator's support session never gets an _mx pass (it
+// would outlive the grant); it lifts the curtain only while the grant is open
+await t("exempt maintenance-pass: always 302 to /admin/login; _mx only for a verified member or operator session, never a support session", async () => {
   ok(a.tenant.secrets.order_link_secret, "the store has its pass secret (order_link_secret)");
-  const want = { owner: true, admin: true, staff: true, support: true, "operator-support": true, "operator-support-entry": true, "signed-out": false, "owner-b": false };
+  const want = { owner: true, admin: true, staff: true, support: true, "operator-support": true, "operator-support-entry": false, "signed-out": false, "owner-b": false };
   for (const caller of H.CALLERS) {
     const res = await call(caller, "maintenance-pass", "GET");
     eq(res.status, 302, `${caller} status`);
@@ -404,14 +406,15 @@ await t("exempt maintenance-pass: always 302 to /admin/login; _mx only for a ver
 // for THIS host's store's open grant gets a cookie: a used one, an expired one,
 // store A's on store B and one for a closed grant get 400 and set no cookie.
 const SP = await import("../lib/platform/support.js");
-const supportCookie = (res) => res.setCookie.find((c) => c.startsWith("_support="));
+const supportCookie = (res) => res.setCookie.find((c) => c.startsWith("__Host-support="));
 const OP = { kind: "operator", id: store.users.operator.id };
-const enter = (caller, token, host = a.tenant.domains[0]) => call(caller, "support-entry", "POST", { form: { token }, host, origin: "https://operator.console.test" });
-await t("exempt support-entry: a fresh token → 303 /admin with a host-only HttpOnly Secure Lax _support cookie; used again → 400, no cookie", async () => {
-  const { token } = await SP.mintSupportEntry({ tenantId: a.id, operator: OP });
+const enter = (caller, token, host = a.tenant.domains[0]) => call(caller, "support-entry", "POST", { form: { token }, host, origin: H.CONSOLE_ORIGIN });
+await t("exempt support-entry: a fresh token → 303 /admin with a host-only HttpOnly Secure Lax __Host-support cookie; used again → 400, no cookie", async () => {
+  const { token } = await SP.mintSupportEntry({ tenantId: a.id, operator: OP, consoleOrigin: H.CONSOLE_ORIGIN });
   const res = await enter("signed-out", token);
   eq(res.status, 303, `first use ${res.text.slice(0, 120)}`);
-  eq(new URL(res.headers.get("location")).pathname, "/admin", "location");
+  eq(new URL(res.headers.get("location")).pathname, "/admin", "location path");
+  eq(new URL(res.headers.get("location")).host, a.tenant.domains[0], "location host: the store's own (requestOrigin), never the server's bind address");
   const c = supportCookie(res) || "";
   ok(/HttpOnly/i.test(c) && /Secure/i.test(c) && /SameSite=Lax/i.test(c) && /Path=\//i.test(c), `cookie attributes: ${c.replace(/=[^;]+/, "=…")}`);
   ok(!/Domain=/i.test(c), "host-only: no Domain attribute");
@@ -421,7 +424,7 @@ await t("exempt support-entry: a fresh token → 303 /admin with a host-only Htt
   eq(supportCookie(again), undefined, "no cookie on the second use");
 });
 await t("exempt support-entry: of 6 racing uses of one token exactly one gets the cookie (a conditional UPDATE)", async () => {
-  const { token } = await SP.mintSupportEntry({ tenantId: a.id, operator: OP });
+  const { token } = await SP.mintSupportEntry({ tenantId: a.id, operator: OP, consoleOrigin: H.CONSOLE_ORIGIN });
   const all = await Promise.all(Array.from({ length: 6 }, () => enter("signed-out", token)));
   eq(all.filter((r) => r.status === 303).length, 1, "303s");
   eq(all.filter((r) => supportCookie(r)).length, 1, "cookies");
@@ -429,10 +432,12 @@ await t("exempt support-entry: of 6 racing uses of one token exactly one gets th
 });
 await t("exempt support-entry: an expired token, store A's on store B, a closed grant's, a made-up and a missing one → 400, no cookie, never 401; any caller", async () => {
   const grantA = await SP.activeSupportGrant(a.id);
-  const expired = (await S.createSession({ userId: OP.id, kind: "support_entry", ttlMs: -1000, grantId: grantA.id })).token;
-  const onB = (await SP.mintSupportEntry({ tenantId: a.id, operator: OP })).token;
+  const exp = await S.createSession({ userId: OP.id, kind: "support_entry", ttlMs: -1000, grantId: grantA.id });
+  await store.platform.control.platformDb().execute({ sql: "UPDATE sessions SET entry_origin = ? WHERE id = ?", args: [H.CONSOLE_ORIGIN, exp.id] }); // only its age is wrong
+  const expired = exp.token;
+  const onB = (await SP.mintSupportEntry({ tenantId: a.id, operator: OP, consoleOrigin: H.CONSOLE_ORIGIN })).token;
   const gB = await SP.createSupportGrant({ tenantId: store.b.id, reason: "perm closed grant probe", hours: 1, operator: OP });
-  const closed = (await SP.mintSupportEntry({ tenantId: store.b.id, operator: OP })).token;
+  const closed = (await SP.mintSupportEntry({ tenantId: store.b.id, operator: OP, consoleOrigin: H.CONSOLE_ORIGIN })).token;
   await SP.revokeSupportGrant(gB.id, { operator: OP });
   const cases = [
     ["expired", () => enter("signed-out", expired)],
@@ -452,6 +457,24 @@ await t("exempt support-entry: an expired token, store A's on store B, a closed 
     if (supportCookie(res)) bad.push(`${label}: set a cookie`);
   }
   eq(bad.join("\n"), "", "");
+});
+
+await t("exempt support-entry: a form from another origin, one with no Origin and a JSON body → 400, no cookie, and none of them spends the token", async () => {
+  const { token } = await SP.mintSupportEntry({ tenantId: a.id, operator: OP, consoleOrigin: H.CONSOLE_ORIGIN });
+  const cases = [
+    ["a form from another origin", () => call("signed-out", "support-entry", "POST", { form: { token }, origin: "https://evil.test" })],
+    ["a form from the store itself", () => call("signed-out", "support-entry", "POST", { form: { token } })],
+    ["a form with no Origin", () => call("signed-out", "support-entry", "POST", { form: { token }, origin: null })],
+    ["a JSON body from the console's origin", () => call("signed-out", "support-entry", "POST", { body: { token }, origin: H.CONSOLE_ORIGIN })],
+  ];
+  const bad = [];
+  for (const [label, go] of cases) {
+    const res = await go();
+    if (res.status !== 400) bad.push(`${label}: ${res.status}`);
+    if (supportCookie(res)) bad.push(`${label}: set a cookie`);
+  }
+  eq(bad.join("\n"), "", "");
+  eq((await enter("signed-out", token)).status, 303, "the token still works from the console's origin");
 });
 
 // last: logout revokes the session it is called with

@@ -51,7 +51,7 @@ export const POST = tenantHandler(
     await revokeSessionByToken(request.cookies.get(SUPPORT_COOKIE)?.value);
     const res = NextResponse.json({ ok: true });
     res.cookies.set(ADMIN_COOKIE, "", CLEAR);
-    res.cookies.set(SUPPORT_COOKIE, "", CLEAR);
+    res.cookies.set(SUPPORT_COOKIE, "", { ...CLEAR, secure: true }); // a __Host- cookie is replaced only by a Secure one
     res.cookies.set(PREVIEW_COOKIE, "", CLEAR);
     res.cookies.set(MAINTENANCE_PASS_COOKIE, "", CLEAR);
     return res;

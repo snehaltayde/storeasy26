@@ -4,6 +4,7 @@ import { listAudit, auditFacets, auditChanges } from "@/lib/platform/audit";
 import { currentTenant, tenantId } from "@/lib/tenant-context";
 import { platformConfigured, platformDb } from "@/lib/platform/control";
 import { tenantHandler } from "@/lib/tenant-request";
+import { operatorNames } from "@/lib/platform/support";
 
 // Tenant audit trail, read-only (S27 / BE16). Scoped to the HOST-RESOLVED
 // tenant — a console can never read another store's rows. Owner/admin only
@@ -57,8 +58,12 @@ export const GET = tenantHandler(async (request) => {
   });
   const facets = p.get("facets") === "1" ? await auditFacets({ tenantId: tenantId() }) : null;
   const labels = await whoLabels([...rows.map((r) => ({ actor: r.actor, kind: r.actor_kind })), ...(facets?.actors || []).map((a) => ({ actor: a.actor, kind: a.kind }))]);
+  // Phase 3 line 5: a support-access row by an operator names that operator
+  // (the store's team sees who had access), never their id or email
+  const supportRow = (r) => r.actor_kind === "operator" && String(r.action).startsWith("support.");
+  const opNames = await operatorNames(rows.filter(supportRow).map((r) => r.actor)).catch(() => new Map());
   // the raw diff never leaves the server: only its redacted lines
-  const entries = rows.map(({ diff, ...r }) => ({ ...r, who: labels.get(r.actor), changes: auditChanges(diff) }));
+  const entries = rows.map(({ diff, ...r }) => ({ ...r, who: (supportRow(r) && opNames.get(String(r.actor))) || labels.get(r.actor), changes: auditChanges(diff) }));
   const last = entries.at(-1);
   return NextResponse.json({
     ok: true,

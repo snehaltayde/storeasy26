@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireOperator } from "@/lib/platform/require-operator";
 import { mailConfigured } from "@/lib/mail";
 import { storeOrigin } from "@/lib/platform/onboarding-ops";
+import { requestOrigin } from "@/lib/origin-check";
 import {
   createSupportGrant,
   revokeSupportGrant,
@@ -62,7 +63,7 @@ export async function POST(request) {
     }
     if (body.action === "enter") {
       // a local store's domain has no port: the operator console's is kept (as the onboarding sheet's links do)
-      const entry = await mintSupportEntry({ tenantId: body.tenant, operator: auth.operator, storeOrigin: (t) => storeOrigin(t, request.nextUrl.origin) });
+      const entry = await mintSupportEntry({ tenantId: body.tenant, operator: auth.operator, consoleOrigin: requestOrigin(request), storeOrigin: (t) => storeOrigin(t, requestOrigin(request)) });
       return NextResponse.json({ ok: true, ...entry }, { headers: NO_STORE });
     }
     return NextResponse.json({ error: "action must be grant|revoke|enter" }, { status: 400 });

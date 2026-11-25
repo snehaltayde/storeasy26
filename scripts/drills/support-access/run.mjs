@@ -10,7 +10,7 @@
 //   1. on localhost the operator opens support access to the roles store from
 //      its store page (reason, 1 hour); the card shows it open by name
 //   2. "Enter store console (read-only)" lands on roles.localhost/admin with a
-//      host-only _support cookie (HttpOnly, Secure, Lax, no Domain), and the
+//      host-only __Host-support cookie (HttpOnly, Secure, Lax, no Domain), and the
 //      entry token never shows in a URL
 //   3. the stray-control pass (scripts/drills/support/stray.mjs) on every
 //      ADMIN_PAGES row as the operator under support access
@@ -109,9 +109,9 @@ async function openAndEnter(drill, op, tenant) {
   drill.check(!/\/admin\/login/.test(page.url()), "in the console, not at the sign-in", page.url());
   drill.check(urls.every((u) => !/token=/.test(u)), "no request URL carries the entry token", urls.filter((u) => /token=/.test(u)));
   const cookies = await ctx.cookies(STORE);
-  const sup = cookies.find((c) => c.name === "_support");
-  drill.check(Boolean(sup) && sup.httpOnly && sup.secure && sup.sameSite === "Lax" && sup.domain === HOST, "a host-only HttpOnly Secure Lax _support cookie on roles.localhost", sup && { ...sup, value: "…" });
-  drill.check(!(await ctx.cookies(CONSOLE)).some((c) => c.name === "_support"), "no _support cookie on the operator console's host");
+  const sup = cookies.find((c) => c.name === "__Host-support");
+  drill.check(Boolean(sup) && sup.httpOnly && sup.secure && sup.sameSite === "Lax" && sup.domain === HOST, "a host-only HttpOnly Secure Lax __Host-support cookie on roles.localhost", sup && { ...sup, value: "…" });
+  drill.check(!(await ctx.cookies(CONSOLE)).some((c) => c.name === "__Host-support"), "no __Host-support cookie on the operator console's host");
   const body = await bodyText(page);
   drill.check(/Platform support access is active/.test(body) && body.includes(OP_NAME), "the console's banner names the operator", body.slice(0, 300));
   await drill.screenshot(page, "operator-in-store");
