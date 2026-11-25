@@ -480,7 +480,7 @@ export function EditorView({
           </section>
         )}
         <div className="flex items-center gap-2 md:hidden">
-          <ToggleGroup type="single" variant="outline" size="sm" spacing={0} value={tab} onValueChange={(v) => v && on.setPane?.(v)} aria-label="Show" className="w-full" data-editor-tabs="">
+          <ToggleGroup type="single" variant="outline" size="sm" spacing={0} value={tab} onValueChange={(v) => v && on.setPane?.(v)} aria-label="Show" className="w-full" data-editor-tabs="" data-read-control="">
             {PANES.map((p) => (
               <ToggleGroupItem key={p} value={p} className="flex-1" data-pane-tab={p} data-read-control="">
                 {PANE_WORDS[p]}

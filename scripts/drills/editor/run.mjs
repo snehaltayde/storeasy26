@@ -52,7 +52,7 @@ async function signIn(drill, role, width = 1280) {
 }
 const waitFor = (page, fn, arg, ms = 30_000) => page.waitForFunction(fn, arg, { timeout: ms }).then(() => true, () => false);
 async function openEditor(page, query = "") {
-  await page.goto(`${ORIGIN}/admin/editor${query}`, { waitUntil: "load" });
+  await page.goto(new URL(`/admin/editor${query}`, ORIGIN).href, { waitUntil: "load" });
   await settle(page);
   await page.locator("[data-section-tree], [data-inspector]").first().waitFor({ timeout: 30_000 }).catch(() => {});
 }
@@ -240,7 +240,7 @@ async function ownerPublish(drill, page) {
 
 // the owner's page from the publish flow (the login allows five sign-ins a window)
 async function ownerPublishing(drill, page) {
-  await page.goto(`${ORIGIN}/admin/releases`, { waitUntil: "load" });
+  await page.goto(new URL("/admin/releases", ORIGIN).href, { waitUntil: "load" });
   await settle(page);
   await page.locator("[data-recently-published], [data-history-loading]").first().waitFor({ timeout: 30_000 }).catch(() => {});
   await waitFor(page, () => !document.querySelector("[data-history-loading]"));
@@ -264,7 +264,7 @@ async function staffFlows(drill) {
   const bar = { publish: await page.locator("[data-editor-actions] button", { hasText: /^(Publish|Take this page offline|Undo)$/ }).count(), reason: (await page.locator("[data-publish-reason]").innerText().catch(() => "")).trim() };
   drill.check(bar.publish === 0 && /owner or an admin/.test(bar.reason), "staff: the bar shows the reason, and no Publish, Take offline or Undo", bar);
   await drill.shoot(page, "staff-1280");
-  await page.goto(`${ORIGIN}/admin/releases`, { waitUntil: "load" });
+  await page.goto(new URL("/admin/releases", ORIGIN).href, { waitUntil: "load" });
   await settle(page);
   await waitFor(page, () => !document.querySelector("[data-history-loading]"));
   const pub = { buttons: await page.locator("main [data-publishing-page] button", { hasText: /^(Publish selected|Undo|Undo all \d+)/ }).count(), boxes: await page.locator("[data-waiting-select]").count(), reasons: await page.locator("[data-publish-reason], [data-undo-reason]").count() };
