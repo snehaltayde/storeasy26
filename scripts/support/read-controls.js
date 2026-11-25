@@ -32,6 +32,12 @@ export const READ_CONTROLS = [
   { path: "app/(console)/admin/(authed)/orders/[id]/page.js", reason: "View in Shopify opens the order in the store's Shopify admin", marks: 1 },
   { path: "app/(console)/admin/(authed)/orders/[id]/not-found.js", reason: "Back to orders links to the orders list", marks: 1 },
   { path: "app/(console)/admin/(authed)/orders/error.js", reason: "Try again re-renders the page, which only reads", marks: 1 },
+  // Phase 2 line 3 (Catalog)
+  { path: "app/(console)/admin/(authed)/catalog/page.js", reason: "links to the editor's Products list (writers only) and to the Bundles page: navigation only", marks: 2 },
+  { path: "components/admin/catalog/CatalogTabs.js", reason: "the Products and Collections tabs switch what is shown; nothing is written", marks: 2 },
+  { path: "components/admin/catalog/ProductsTable.js", reason: "the search box, the content and stock filter buttons, a row's name opening the product sheet, Clear, Try again and the onboarding link: GET reads and navigation", marks: 6 },
+  { path: "components/admin/catalog/ProductSheet.js", reason: "the editor link (View content for support), View on store, View in Shopify and the sheet's close button: navigation only", marks: 4 },
+  { path: "components/admin/catalog/CollectionsTable.js", reason: "a collection's title opens its products in a sheet, and Try again re-reads the list: GET reads", marks: 2 },
 ];
 
 // Reads sent as a non-GET request: { page, method, path, reason }, an exact

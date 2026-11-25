@@ -109,6 +109,8 @@
     "test:media-upload": "node scripts/test-media-upload.js",
     "test:schema-compat": "node scripts/test-schema-compat.js",
     "test:order-catalog": "node scripts/test-order-catalog.js",
+    "test:catalog-browse": "node scripts/test-catalog-browse.js",
+    "drill:catalog": "node scripts/drills/run-isolated.mjs catalog",
     "test:rates": "node scripts/test-rates.js",
     "test:perf": "node scripts/perf-report.js",
     "test:perf-tools": "node scripts/test-perf-tools.js",

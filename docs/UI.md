@@ -93,6 +93,16 @@ Each Phase 2 line fills only its own sub-heading. Every screen here is on the ne
 
 ### Catalog
 
+`/admin/catalog` (Phase 2 line 3), read-only: Shopify owns the values, the editor owns the content.
+- **Header:** `PageHeader` with the store's words (names, photos, brand and type are set in the editor; price, stock and Shopify's own type and vendor stay in Shopify) and, on the right, `SyncHeader`: "Last synced …" and the product count (mono), then "Sync from Shopify" (outline, `RoleGate` on `sync.run`: staff and support see it disabled with the reason; while a sync runs, a `StatusBadge` of kind `sync` and "Syncing…").
+- **Two cards** under it: "Product pages" (opens the editor's Products list) and "Bundles are with your offers" (→ `/admin/bundles`).
+- **Tabs** Products and Collections (`components/ui/tabs`, each trigger a marked read).
+- **Products:** a GET search box (published name, Shopify's name, handle), two segmented filter groups (content: All, Edited, Changed in Shopify, No longer in Shopify, each with the store's count in mono; stock: Any stock, In stock, Sold out), then `DataTable`: image (32px), name (a button that opens the sheet; Shopify's name under it when different), type, price range (`MoneyCell`, min – max), stock, content badge (Published success, Draft changes warning, Shopify only muted, No longer in Shopify danger). 50 a page, "1–50 of N" with Previous/Next.
+- **Product sheet** (right, `max-w-md`): image, name, content badge; links "Edit content" (support: "View content"), "View on store", "View in Shopify"; the price-and-stock note on a muted strip; price, stock, vendor, Shopify type; variants with SKU, price and stock; collections as outline badges; the published badge and module titles, or the "published view unavailable" note.
+- **Collections:** `DataTable` of title (opens the collection sheet), handle (mono), product count, pinned count. The collection sheet (`max-w-xl`) lists its products in Shopify's order (position, image, name, price, content), "Load more" by 50, with "Edit collection content" (support: "View collection content"), "View on store", "View in Shopify".
+- **States:** `catalog/loading.js` skeletons (header, cards, tabs, eight rows); an empty catalog says "Connect Shopify in onboarding"; a search or filter with no match offers "Clear search and filters"; a failed read says so with "Try again".
+- **Quizzes:** writers (`storefront.write`) keep the old `QuizPanel` in a `[data-legacy][data-legacy-tray="quizzes"]` section at the foot (the drill's region rule allows that one tray); support sees one line, "Product-finder quizzes: n quizzes."
+
 ### Offers and bundles
 
 Line 4. `/admin/offers`, `/admin/offers/[id]` (`new` is the create form), `/admin/bundles` and `/admin/bundles/[id]`, on the same APIs as before; Bundles is a Growth nav item after Offers. Parts: `components/admin/offers/` and `components/admin/bundles/`.

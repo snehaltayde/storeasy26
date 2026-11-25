@@ -36,6 +36,7 @@ import { ROOT } from "../../design-harness.js";
 import { runDrill, settle } from "../p3/lib.mjs";
 import { navFor, navItems } from "../../../lib/admin/nav.js";
 import { isNewUiRoute } from "../../../lib/admin/new-ui-routes.js";
+import { roleAllows } from "../../../lib/platform/authz.js";
 import { RANGES, rangeHref } from "../../../lib/admin/dashboard-ranges.js";
 import * as RC from "../../support/read-controls.js";
 
@@ -367,14 +368,19 @@ async function supportSelfTest(drill, ctx) {
 // In the page: an old route's content sits in main > [data-legacy]; a new-UI
 // route's sits in main directly, and the only [data-legacy] regions left are
 // the notices' own.
-function regionOk(newUi) {
+// Exactly one old-screen tray ([data-legacy-tray]) is allowed where a Phase 2
+// plan keeps one for writers: /admin/catalog's quizzes, for roles with
+// storefront.write (Phase 2 line 3); anywhere else a tray is a stray.
+const trayOk = (href, role) => href === "/admin/catalog" && roleAllows(role, "storefront.write");
+function regionOk([newUi, tray]) {
   const main = document.querySelector("main");
   if (!newUi) {
     const el = document.querySelector("main > [data-legacy]");
     return el ? el.children.length > 0 && (el.textContent || "").trim().length > 0 : false;
   }
-  const strays = [...main.querySelectorAll("[data-legacy]")].filter((el) => !el.querySelector("[data-console-notices]"));
-  return strays.length === 0 && (main.textContent || "").trim().length > 0;
+  const strays = [...main.querySelectorAll("[data-legacy]")].filter((el) => !el.querySelector("[data-console-notices]") && !el.hasAttribute("data-legacy-tray"));
+  const trays = main.querySelectorAll("[data-legacy][data-legacy-tray]").length;
+  return trays === (tray ? 1 : 0) && strays.length === 0 && (main.textContent || "").trim().length > 0;
 }
 // In the page: the enabled buttons and action links inside the old screens.
 function legacyControls() {
@@ -488,7 +494,7 @@ async function roleAtWidth(drill, page, role, width, out) {
       continue;
     }
     const newUi = isNewUiRoute(href);
-    const legacy = await page.evaluate(regionOk, newUi);
+    const legacy = await page.evaluate(regionOk, [newUi, trayOk(href, role)]);
     let current;
     if (width === 375) {
       await page.locator('[data-shell-control="toggle"]').click();
@@ -639,7 +645,7 @@ async function supportEmptyStates(drill, ctx, creds) {
     const r = await page.goto(ANNEX + href, { waitUntil: "load" });
     await settle(page);
     const body = await page.locator("body").innerText().catch(() => "");
-    const legacy = await page.evaluate(regionOk, isNewUiRoute(href));
+    const legacy = await page.evaluate(regionOk, [isNewUiRoute(href), trayOk(href, "support")]);
     // onboarding is new UI in its own shell (no [data-legacy]): its step panel is the content
     const content = href === ONBOARDING ? (await onboardingShell(page)).panel : legacy;
     drill.check(r?.status() === 200 && !ERROR_TEXT.test(body) && content, `support on the empty Roles Annex: ${href} renders (200, no error, content)`, { status: r?.status(), error: ERROR_TEXT.test(body), legacy, content, url: page.url() });

@@ -7,15 +7,23 @@ import { tenantHandler } from "@/lib/tenant-request";
 import { StoreUsesDocumentsError } from "@/lib/cms-mode";
 import { shopifyAdminBase } from "@/lib/admin/shopify-admin-url";
 import { publishedGetters } from "@/lib/cms/view";
+import { browseProducts, productDetail, listCollections, collectionProducts, BROWSE_FILTERS, STOCK_FILTERS, UNAVAILABLE_NOTE } from "@/lib/admin/catalog-browse";
 
 // Catalog browser API (Documents-only). Shopify owns catalog VALUES;
 // published presentation overlays come from product_content_live /
 // collection_content_live through publishedGetters(). Writes go through the
 // unified Documents editor (/api/admin/documents).
+//
+// Browse modes (Phase 2 line 3, the Catalog page; lib/admin/catalog-browse.js):
+//   ?view=products&q=&filter=&stock=&cursor=  50 a page; filter one of
+//                       BROWSE_FILTERS, stock any | in_stock | sold_out
+//   ?view=product&id=<gid>                    the product sheet
+//   ?view=collections                         every collection, with counts
+//   ?view=collection&id=<gid>&cursor=         one collection's products in order
+// An id that isn't in this store's own database (another store's, or junk) is
+// 404. With no `view`, the answer is the old one.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const UNAVAILABLE_NOTE = "We couldn't read what's published right now, so modules, badges, templates and pinned products aren't shown here. The products themselves are listed.";
 
 function unavailable(e, part) {
   slog("catalog_published_unreadable", {
@@ -54,6 +62,8 @@ export const GET = tenantHandler(async (request) => {
   const auth = await requireAdmin(request, "storefront.read");
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const url = new URL(request.url);
+  const view = url.searchParams.get("view");
+  if (view != null) return browse(view, url.searchParams);
   const getters = await publishedGetters().catch((e) => unavailable(e, "release"));
 
   const productGid = url.searchParams.get("product");
@@ -120,6 +130,40 @@ export const GET = tenantHandler(async (request) => {
     ...(published ? { published, note: UNAVAILABLE_NOTE } : {}),
   });
 });
+
+const bad = (error) => NextResponse.json({ error }, { status: 400 });
+const notFound = (what) => NextResponse.json({ error: `${what} not found` }, { status: 404 });
+
+async function browse(view, sp) {
+  if (view === "products") {
+    const filter = sp.get("filter") || "all";
+    const stock = sp.get("stock") || "any";
+    if (!BROWSE_FILTERS.includes(filter)) return bad(`filter must be one of ${BROWSE_FILTERS.join(", ")}`);
+    if (!Object.hasOwn(STOCK_FILTERS, stock)) return bad(`stock must be one of ${Object.keys(STOCK_FILTERS).join(", ")}`);
+    const q = (sp.get("q") || "").trim().slice(0, 200);
+    try {
+      return NextResponse.json({ ok: true, ...(await browseProducts({ q, filter, available: STOCK_FILTERS[stock], cursor: sp.get("cursor") || null })) });
+    } catch (e) {
+      if (e instanceof TypeError && /cursor/.test(e.message)) return bad("bad cursor");
+      throw e;
+    }
+  }
+  if (view === "product") {
+    const d = await productDetail(sp.get("id") || "");
+    return d ? NextResponse.json({ ok: true, ...d }) : notFound("product");
+  }
+  if (view === "collections") return NextResponse.json({ ok: true, ...(await listCollections()) });
+  if (view === "collection") {
+    try {
+      const d = await collectionProducts(sp.get("id") || "", sp.get("cursor") || null);
+      return d ? NextResponse.json({ ok: true, ...d }) : notFound("collection");
+    } catch (e) {
+      if (e instanceof TypeError && /cursor/.test(e.message)) return bad("bad cursor");
+      throw e;
+    }
+  }
+  return bad("view must be products, product, collections or collection");
+}
 
 export const POST = tenantHandler(async (request) => {
   const auth = await requireAdmin(request, "storefront.write");

@@ -415,6 +415,8 @@ export const DRILLS = {
   // the orders console on the new UI (Phase 2 line 2): the roles store and its seeded order
   orders: { id: "ORDERS", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/orders/run.mjs", ...c.headed])) },
   p6: { id: "P6-DRILLS", warm: true, run: (c) => c.node(["scripts/drills/p6/run.mjs", ...c.stages, ...c.headed]) },
+  // the Catalog page on the new UI (Phase 2 line 3), on the roles store
+  catalog: { id: "CATALOG", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/catalog/run.mjs", ...c.headed])) },
   // the storefront render comparison (Phase 0 line 7); SF_STYLES_BASELINE and
   // SF_STYLES_BITE pass through the env. A tool, not part of drill:all.
   "sf-styles": { id: "SF-STYLES", warm: true, run: (c) => c.node(["scripts/drills/sf-styles/run.mjs", ...c.headed]) },

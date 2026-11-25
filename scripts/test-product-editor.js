@@ -1269,9 +1269,13 @@ await t("rendered: the catalog page says the brand and product type shown are se
     "@/lib/console-request": { tfetch: (fn) => fn() },
     "@/lib/cms-mode": { getCmsMode: async () => "documents" },
     "@/lib/db": { db: {} },
-    "@/lib/bundles": { listBundles: async () => [] },
     "@/lib/quiz": { listQuizzes: async () => [] },
-    "@/components/admin/CommercePanels": { BundlesPanel: marker("BundlesPanel"), QuizPanel: marker("QuizPanel") },
+    "@/lib/offers/catalog": { storeCurrency: async () => "INR" },
+    "@/lib/admin/catalog-browse": {
+      browseProducts: async () => ({ items: [], nextCursor: null, total: 0, counts: { all: 0, edited: 0, changedInShopify: 0, orphaned: 0 } }),
+      catalogHeader: async () => ({ lastSyncedAt: null, lastSynced: null, products: 0, sync: null }),
+    },
+    "@/components/admin/CommercePanels": { QuizPanel: marker("QuizPanel") },
   });
   const CatalogPage = (await catWorld(join(ROOT, "app/(console)/admin/(authed)/catalog/page.js"))).default;
   const page = plain(html(await CatalogPage({ searchParams: Promise.resolve({}) })));
