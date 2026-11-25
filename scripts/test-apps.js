@@ -355,6 +355,63 @@ await t("uninstall archives the row (nothing deleted); it leaves Installed; inst
   ok((await auditRows()).some((x) => x.action === "apps.uninstall" && x.resource === `app:${tbId}`), "apps.uninstall audited");
 });
 
+await t("uninstall clears the secrets: secrets_enc is null and no secret key is listed in the row", async () => {
+  const set = await call("owner", "apps/[id]", "POST", { params: { id: fxId }, body: { settings: { api_key: `  ${SECRET}  `, greeting: "Hey" } } });
+  eq(set.body?.install?.secretsSet?.api_key, true, "set:");
+  const { decryptJson } = await import("../lib/platform/crypto.js");
+  const before = await a.run(async () => (await import("../lib/db.js")).db.selectFrom("plugin_installs").select("secrets_enc").where("id", "=", fxId).executeTakeFirst());
+  eq((await decryptJson(before.secrets_enc)).api_key, SECRET, "the secret is stored trimmed:");
+  eq((await call("owner", "apps/[id]", "POST", { params: { id: fxId }, body: { uninstall: true } })).status, 200, "uninstalled:");
+  const row = await a.run(async () => (await import("../lib/db.js")).db.selectFrom("plugin_installs").selectAll().where("id", "=", fxId).executeTakeFirst());
+  eq(row.status, "uninstalled", "status:");
+  eq(row.secrets_enc, null, "secrets_enc:");
+  ok(!row.settings.includes("__secret_keys") && !row.settings.includes(SECRET), `settings: ${row.settings}`);
+  const again = await call("owner", "apps", "POST", { body: { install: { pluginId: "fixture-secrets", scopes: ["orders.read"] } } });
+  eq(again.status, 200, "installed again:");
+  fxId = again.body.install.id;
+  eq(again.body.install.secretsSet.api_key, false, "fresh: no secret:");
+});
+
+await t("a cache that can't be told never turns a saved write into a refusal (install, turn off, on, uninstall)", async () => {
+  const { __setCacheTestHooks } = await import("../lib/cache.js");
+  __setCacheTestHooks({ onInvalidate: () => { throw new Error("cache down"); } });
+  try {
+    const off = await call("owner", "apps/[id]", "POST", { params: { id: fxId }, body: { disable: true } });
+    eq(off.status, 200, `off: ${off.text.slice(0, 160)}`);
+    eq((await call("owner", "apps/[id]", "POST", { params: { id: fxId }, body: { enable: true } })).status, 200, "on:");
+    eq((await call("owner", "apps/[id]", "POST", { params: { id: fxId }, body: { settings: { greeting: "Yo" } } })).status, 200, "settings:");
+    eq((await call("owner", "apps/[id]", "POST", { params: { id: fxId }, body: { uninstall: true } })).status, 200, "uninstall:");
+    const again = await call("owner", "apps", "POST", { body: { install: { pluginId: "fixture-secrets", scopes: ["orders.read"] } } });
+    eq(again.status, 200, "install:");
+    fxId = again.body.install.id;
+  } finally {
+    __setCacheTestHooks({});
+  }
+});
+
+await t("kill switch fails closed for install and turn on: unreadable flags refuse in plain words (503); turn off still works", async () => {
+  const I = await import("../lib/plugins/installs.js");
+  I.__setKillSwitchReader(async () => {
+    throw new Error("control plane down");
+  });
+  try {
+    const words = "Storeasy can't check this app right now. Try again in a minute.";
+    const off = await call("owner", "apps/[id]", "POST", { params: { id: fxId }, body: { disable: true } });
+    eq(off.status, 200, "turn off is not a kill-switch question:");
+    const on = await call("owner", "apps/[id]", "POST", { params: { id: fxId }, body: { enable: true } });
+    eq(on.status, 503, "turn on:");
+    eq(on.body.error, words, "words:");
+    eq((await call("owner", "apps/[id]", "GET", { params: { id: fxId } })).body.install.status, "disabled", "still off:");
+    eq((await call("owner", "apps/[id]", "POST", { params: { id: fxId }, body: { uninstall: true } })).status, 200, "uninstall works:");
+    const inst = await call("owner", "apps", "POST", { body: { install: { pluginId: "fixture-secrets", scopes: ["orders.read"] } } });
+    eq(inst.status, 503, "install:");
+    eq(inst.body.error, words, "install words:");
+    eq((await call("owner", "apps", "GET")).body.installs.filter((x) => x.pluginId === "fixture-secrets").length, 0, "nothing installed:");
+  } finally {
+    I.__setKillSwitchReader(null);
+  }
+});
+
 await t("another store: store B's owner sees none of store A's installs, and A's ids are not found on B", async () => {
   const r = await call("owner-b", "apps", "GET", { host: hostB });
   eq(r.status, 200, "B reads:");

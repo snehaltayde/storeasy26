@@ -2,7 +2,7 @@
 export const NO_MANAGE = "Only an owner or admin can install apps or change them.";
 export const SEES_NOTHING = "It can't see your orders or customers.";
 export const KILLED = "Turned off by Storeasy";
-export const KILLED_BODY = "Storeasy has turned this app off for every store for now. Its settings are kept. You can turn it on again once Storeasy allows it.";
+export const KILLED_BODY = "Storeasy has turned this app off for your store for now. Its settings are kept. You can turn it on again once Storeasy allows it.";
 
 // An install's state as a badge: [label, tone] (components/ui/badge variants).
 export function installState(install) {

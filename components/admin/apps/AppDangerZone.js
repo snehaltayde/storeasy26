@@ -87,7 +87,7 @@ export function AppDangerZone({ install, role, onChanged }) {
           </Button>
         </RoleGate>
       </CardContent>
-      <AlertDialog open={Boolean(asking)} onOpenChange={(v) => !v && setAsking(null)}>
+      <AlertDialog open={Boolean(asking)} onOpenChange={(v) => !v && !busy && setAsking(null)}>
         <AlertDialogContent data-apps="confirm">
           {asking && (
             <>
@@ -97,7 +97,7 @@ export function AppDangerZone({ install, role, onChanged }) {
               </AlertDialogHeader>
               <AppRefusal>{error}</AppRefusal>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
                 <Button type="button" variant={asking === "enable" ? "default" : "destructive"} disabled={busy} onClick={go} data-apps="confirm-go">
                   {busy ? words[asking].busy : words[asking].go}
                 </Button>

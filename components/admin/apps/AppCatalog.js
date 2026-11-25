@@ -48,7 +48,7 @@ export function AppCatalog({ catalog, role }) {
                   </>
                 ) : !app.available ? (
                   <p className="text-sm text-muted-foreground" data-app-unavailable={app.id}>
-                    {`Not available right now (${KILLED.toLowerCase()})`}
+                    {`Not available right now (${KILLED})`}
                   </p>
                 ) : (
                   <RoleGate role={role} action="apps.manage" reason={NO_MANAGE}>

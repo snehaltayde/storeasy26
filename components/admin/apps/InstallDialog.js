@@ -18,6 +18,7 @@ export function InstallDialog({ app, open, onOpenChange }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const change = (v) => {
+    if (!v && busy) return; // Esc and Cancel wait for the request
     if (!v) setError(null);
     onOpenChange(v);
   };
@@ -62,7 +63,7 @@ export function InstallDialog({ app, open, onOpenChange }) {
         </section>
         <AppRefusal>{error}</AppRefusal>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => change(false)}>
+          <Button type="button" variant="outline" disabled={busy} onClick={() => change(false)}>
             Cancel
           </Button>
           <Button type="button" disabled={busy} onClick={install} data-apps="approve-install">
