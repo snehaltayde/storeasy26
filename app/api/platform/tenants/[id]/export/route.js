@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
+import { operatorError } from "@/lib/platform/operator-error";
 import { requireOperator } from "@/lib/platform/require-operator";
 import { buildTenantExport, mintExportToken, spendExportToken } from "@/lib/platform/export";
 import { audit, operatorActor } from "@/lib/platform/audit";
 import { slog } from "@/lib/log";
 import { getTenant } from "@/lib/platform/control";
-import { scrubSecrets } from "@/lib/platform/turso-api";
 
 // Tenant export (S43 / BE29).
 //   POST (operator cookie)     → mint a download link: single-use, 15 minutes,
@@ -12,8 +12,9 @@ import { scrubSecrets } from "@/lib/platform/turso-api";
 //   GET ?token=<x.exp.jti.hmac> → the export itself (manifest + data JSON) —
 //                                the token IS the auth so the link can be
 //                                handed to the merchant; the first use spends
-//                                it, and every download is audited as
-//                                tenant.export_downloaded.
+//                                it in one batch with its
+//                                tenant.export_downloaded audit row (no row,
+//                                no download: 503 and the link stays unspent).
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -40,7 +41,9 @@ export async function GET(request, { params }) {
   let spent;
   try {
     spent = await spendExportToken(id, token);
-  } catch {
+  } catch (e) {
+    // the download's audit row couldn't be written: the link stays unspent
+    if (e?.code === "EXPORT_AUDIT_FAILED") return NextResponse.json({ error: "The download couldn't be recorded, so it wasn't served. Try the same link again in a minute." }, { status: 503 });
     // no PLATFORM_SECRET: no link can be checked, so none is honoured
     return NextResponse.json({ error: "exports are not available on this server" }, { status: 503 });
   }
@@ -49,8 +52,6 @@ export async function GET(request, { params }) {
   }
   try {
     const exp = await buildTenantExport(id);
-    // the operator who minted the link; a link spent by a failed build is not a download
-    await audit({ actor: spent.operator ? operatorActor(spent.operator) : { kind: "system", id: "export-link" }, action: "tenant.export_downloaded", resource: `tenant:${id}`, tenantId: id, diff: { tables: Object.keys(exp.manifest.tables).length } });
     slog("tenant_exported", { tenant: id, tables: Object.keys(exp.manifest.tables).length });
     return new NextResponse(JSON.stringify(exp, null, 1), {
       headers: {
@@ -61,8 +62,6 @@ export async function GET(request, { params }) {
     });
   } catch (e) {
     // P3-B: the driver's error can name the store's database; it goes to the log scrubbed
-    const tenant = await getTenant(id).catch(() => null);
-    slog("tenant_export_failed", { tenant: id, error: scrubSecrets(e?.message || e, [tenant?.dbUrl, tenant?.dbToken]).slice(0, 300) });
-    return NextResponse.json({ error: "We couldn't build this store's export just now. Mint a new link and try again." }, { status: 422 });
+    return operatorError(e, { tenant: await getTenant(id).catch(() => null), words: "We couldn't build this store's export just now. Mint a new link and try again.", event: "tenant_export_failed" });
   }
 }

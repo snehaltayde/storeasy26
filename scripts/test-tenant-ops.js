@@ -139,6 +139,31 @@ await t("P3-A export links: migration 0018 is additive; a link is spent once, ne
   eq(await X.verifyExportToken("ta", tok), true, "the signature alone still checks");
 });
 
+await t("P3-A export links: rows a day past their end are pruned (on mint and by pruneQueues); newer ones stay", async () => {
+  const ago = (ms) => new Date(Date.now() - ms).toISOString();
+  const put = (jti, expires) => C.platformDb().execute({ sql: "INSERT INTO export_links (jti, tenant_id, created_at, expires_at) VALUES (?, 'ta', ?, ?)", args: [jti, expires, expires] });
+  const has = async (jti) => (await C.platformDb().execute({ sql: "SELECT 1 FROM export_links WHERE jti = ?", args: [jti] })).rows.length === 1;
+  await put("old-mint", ago(25 * 3600_000));
+  await put("recent", ago(3600_000));
+  await X.mintExportToken("ta");
+  eq(await has("old-mint"), false, "a day-old row, after a mint:");
+  eq(await has("recent"), true, "an hour-old row stays:");
+  await put("old-tick", ago(48 * 3600_000));
+  const J = await import("../lib/platform/jobs.js");
+  await J.pruneQueues();
+  eq(await has("old-tick"), false, "a two-day-old row, after pruneQueues:");
+  eq(await has("recent"), true, "an hour-old row stays after pruneQueues:");
+  // the query plan on a throwaway connection (an EXPLAIN left open on the shared one blocks later commits)
+  const { createClient } = await import("@libsql/client");
+  const probe = createClient({ url: process.env.PLATFORM_DB_URL });
+  try {
+    const plan = (await probe.execute({ sql: "EXPLAIN QUERY PLAN DELETE FROM export_links WHERE expires_at < ?", args: [ago(0)] })).rows.map((r) => String(r.detail)).join(" ");
+    ok(/idx_export_links_expires/.test(plan), `the prune uses the index: ${plan}`);
+  } finally {
+    probe.close();
+  }
+});
+
 console.log("— BE29: offboarding");
 
 await t("offboard: suspend + key revocation + billing cancel + platform purge; DB and row kept", async () => {

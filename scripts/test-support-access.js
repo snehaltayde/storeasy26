@@ -365,9 +365,14 @@ await t("logout on the store's host clears __Host-support and revokes the sessio
   eq(await S.verifySession(s, "support"), null, "revoked");
 });
 
-await t("P3-E the operator signing out of /platform ends their __Host-support session on store B (401) and their unspent entry tokens", async () => {
+await t("P3-E the operator signing out of /platform ends their __Host-support session on store B (401) and their unspent entry tokens; another operator's session stays", async () => {
   const { session: s } = await enterB(); // the logout probe's grant is still open
   eq((await asSupport(s, "orders", "GET", { host: hostB })).status, 200, "before");
+  // a second operator in store B under the same grant
+  const op2 = await I.createOperator({ email: "operator2@supacc.test", name: "Opname two", password: "operator2-pass-supacc" });
+  const e2 = await SP.mintSupportEntry({ tenantId: b.id, operator: { kind: "operator", id: op2.id }, consoleOrigin: `http://${OPERATOR_HOST}` });
+  const s2 = cookieValue(supportCookie(await enter(e2.token, hostB)));
+  eq((await asSupport(s2, "orders", "GET", { host: hostB })).status, 200, "the second operator, before");
   const unspent = (await platform("operator", "POST", { body: { action: "enter", tenant: b.id } })).body.token;
   const opToken = (await S.createSession({ userId: operatorId, kind: "operator", ttlMs: 10 * 60_000 })).token;
   const route = await import(pathToFileURL(join(ROOT, "app/api/platform/logout/route.js")).href);
@@ -377,6 +382,7 @@ await t("P3-E the operator signing out of /platform ends their __Host-support se
   eq((await asSupport(s, "orders", "GET", { host: hostB })).status, 401, "the support session on B after sign-out");
   eq((await enter(unspent, hostB)).status, 400, "an unspent entry token after sign-out");
   ok(await S.verifySession(JARS.operator._platform, "operator"), "the operator's other console sessions are untouched");
+  eq((await asSupport(s2, "orders", "GET", { host: hostB })).status, 200, "the second operator's support session survives the first operator's sign-out");
 });
 
 await t("a support session for one grant is refused once another grant is the open one", async () => {
