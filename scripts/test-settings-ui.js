@@ -282,6 +282,25 @@ await t("the audit log pages with no gap or repeat and filters by who, action an
   ok((await call("admin", "audit", "GET", { query: `since=${today}` })).body.entries.length >= 7, "since today:");
 });
 
+// P2-E: the tenant filter comes before every other filter, so A's admin naming
+// B's user, B's action or asking for facets still reads A's rows only
+await t("store A's admin filtering the audit log by store B's user, action or facets gets only A's rows and no B email", async () => {
+  const bUser = users["owner-b"];
+  await AUD.audit({ actor: { kind: "merchant", id: bUser.id, role: "owner" }, action: "drill.bonly", tenantId: store.b.id, resource: "cnybaudres0" });
+  const aIds = new Set((await AUD.listAudit({ tenantId: a.id, limit: 200 })).map((r) => r.id));
+  const bIds = new Set((await AUD.listAudit({ tenantId: store.b.id, limit: 200 })).map((r) => r.id));
+  ok(bIds.size >= 1 && bUser.email, "B has an audit row and a member email:");
+  for (const query of [`actor=${bUser.id}`, "action=drill.bonly", `actor=${bUser.id}&action=drill.bonly`, "facets=1&limit=200", `facets=1&actor=${bUser.id}`]) {
+    const r = await call("admin", "audit", "GET", { query });
+    eq(r.status, 200, `${query} status:`);
+    const entries = r.body.entries ?? [];
+    ok(entries.every((e) => aIds.has(e.id) && !bIds.has(e.id)), `${query}: a row that is not A's`);
+    if (query.includes("actor=") || query.includes("action=")) eq(entries.length, 0, `${query} rows:`);
+    for (const c of [bUser.email, "cnybaudres0", "drill.bonly"]) ok(!r.text.includes(c), `${query} leaks ${c}`);
+    if (r.body.facets) ok(!r.body.facets.actors.some((x) => x.actor === bUser.id), `${query}: B's user in the facets`);
+  }
+});
+
 await t("two tabs saving at once both stick: Shipping and Tracking sent together, each key written on its own (patchTenant json_set)", async () => {
   for (let round = 0; round < 3; round++) {
     const rate = 40 + round;
