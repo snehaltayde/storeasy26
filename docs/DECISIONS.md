@@ -65,7 +65,7 @@ without asking the owner are marked so they are easy to review.
 
 ## 2026-11-25 Phase 4 by midnight: 5 heavy slots and one design sweep (owner decision)
 
-- Heavy commands run in up to 5 machine-wide slots (was 3) until Phase 4 closes; `~/.claude/bin/heavy` defaults to 5. Revert to 3 afterwards.
+- Heavy commands ran in up to 5 machine-wide slots (was 3) until Phase 4 closed; reverted to 3 on 2026-11-25 after the Phase 4 full suite passed.
 - Lines 2–4 skip the per-line design pass; one design sweep covers every Phase 4 screen before the phase-end full browser suite. The reviewer, the egress guard's security review, the unit suite, the build and each slice's own drill stay on every merge.
 - Lines 2 and 3 start from line 1's core commit and line 4 from line 3's, instead of waiting for merges.
 - **Decided by:** owner
