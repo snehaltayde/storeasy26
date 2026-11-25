@@ -14,7 +14,10 @@
 //      no customer details; staff and support get 403 on push, reconcile and
 //      cancel, staff may decide a return; signed out → 401; push on an unknown
 //      order → 404 "We couldn't find that order." with no audit row; a push
-//      refusal (no Shopify) is a plain answer, never a 5xx
+//      refusal (no Shopify) is a plain answer, never a 5xx; another store's
+//      order id is a 404 everywhere with no detail, no audit row and a
+//      not-found page; a push that throws is a 502 whose raw text reaches
+//      slog only; a refund id must match rfnd_ plus 8+ letters or digits
 //   4. The pages through scripts/support/page-harness.js: support's list and
 //      order props hold no customer detail, its customer card says hidden,
 //      and no push, reconcile or cancel control is offered; staff the same
@@ -250,14 +253,89 @@ await t("owner: cancelling a cash-on-delivery order works and reads in plain wor
   ok(view.cancelAnswer(paid.body, paid.status).text.includes("Refund it in Razorpay first"), "refund words:");
 });
 
-// =============================================================================
-console.log("— 4. the pages, every role");
-
 const { makePageHarness } = await import("./support/page-harness.js");
 const C = await import("../lib/platform/control.js");
 const pages = await makePageHarness({ tenant: () => C.getTenant(a.id, { fresh: true }) });
 const LIST = "app/(console)/admin/(authed)/orders/page.js";
 const DETAIL = "app/(console)/admin/(authed)/orders/[id]/page.js";
+
+await t("another store's order id: GET, push, reconcile and cancel from store A are 404 with no detail and no audit row", async () => {
+  const B_ID = "BSTORE-0000ORDCB";
+  const B_MAIL = "cnyordcb0@example.test";
+  await store.b.run(() =>
+    db.insertInto("orders").values({ id: B_ID, idempotency_key: "ordc-b-1", status: "cod_pending", payment_method: "cod", payment_status: "cod", total: 777, subtotal: 777, discount_total: 0, currency: "INR", email: B_MAIL, name: "cnyordcbname0", sync_attempts: 0, created_at: new Date(BASE).toISOString(), updated_at: new Date(BASE).toISOString() }).execute(),
+  );
+  const audits = async () => (await Promise.all([a.id, store.b.id].map((tenantId) => listAudit({ tenantId, limit: 200 })))).flat().filter((r) => String(r.resource).includes(B_ID)).length;
+  const before = await audits();
+  for (const caller of ["owner", "admin"]) {
+    const g = await call(caller, "orders/[id]", "GET", { params: { id: B_ID } });
+    eq(g.status, 404, `${caller} GET:`);
+    eq(Object.keys(g.body ?? {}), ["error"], `${caller} GET body keys:`);
+    for (const action of ["push", "reconcile", "cancel"]) {
+      const r = await call(caller, "orders/[id]", "POST", { params: { id: B_ID }, body: { action } });
+      eq([r.status, r.body], [404, { error: "We couldn't find that order." }], `${caller} ${action}:`);
+    }
+    for (const r of [g]) ok(!r.text.includes(B_MAIL) && !r.text.includes("777"), `${caller}: no detail of B's order`);
+  }
+  eq(await audits(), before, "audit rows naming B's order:");
+  eq((await store.b.run(() => db.selectFrom("orders").select("status").where("id", "=", B_ID).executeTakeFirst()))?.status, "cod_pending", "B's order untouched:");
+  const page = await pages.run(DETAIL, { cookies: cookies.owner, params: { id: B_ID } });
+  eq(page.notFound, true, "store A's order page for B's id is not found:");
+});
+
+await t("a push that throws is a 502 in plain words; the raw error reaches slog, never the body", async () => {
+  const { registerHooks } = await import("node:module");
+  const real = new URL("../lib/shopify-push.js", import.meta.url).href;
+  const stub = `data:text/javascript,${encodeURIComponent(`export * from ${JSON.stringify(real)}; export async function pushOrderToShopify() { throw new Error("shopify said x"); }`)}`;
+  registerHooks({
+    resolve(specifier, context, nextResolve) {
+      if (specifier === "@/lib/shopify-push" && context.parentURL?.includes("stub502")) return { url: stub, shortCircuit: true };
+      return nextResolve(specifier, context);
+    },
+  });
+  const route = await import(`${new URL("../app/api/admin/orders/[id]/route.js", import.meta.url).href}?stub502`);
+  const { NextRequest } = await import("./support/next-server-stub.js");
+  const host = a.tenant.domains[0];
+  const id = ids[16]; // cod_pending: pushable
+  const req = new NextRequest(`http://${host}/api/admin/orders/${id}`, { method: "POST", headers: { host, origin: `http://${host}`, "content-type": "application/json", cookie: `_admin=${cookies.admin._admin}` }, body: JSON.stringify({ action: "push" }) });
+  const logged = [];
+  const log = console.log;
+  console.log = (...args) => {
+    logged.push(args.join(" "));
+    log(...args);
+  };
+  let res;
+  try {
+    res = await route.POST(req, { params: Promise.resolve({ id }) });
+  } finally {
+    console.log = log;
+  }
+  const text = await res.text();
+  eq(res.status, 502, "status:");
+  ok(!text.includes("shopify said x"), `the raw error is in the body: ${text}`);
+  ok(/didn't go through/.test(JSON.parse(text).error), `plain words: ${text}`);
+  ok(logged.some((l) => l.includes("admin_order_action_failed") && l.includes("shopify said x")), `slog has the raw error: ${logged.join(" | ").slice(0, 300)}`);
+});
+
+await t("a refund id must look like Razorpay's: the server refuses another shape in plain words and cancels with a real one", async () => {
+  eq(["rfnd_ABCdef12", "rfnd_1234567890"].map((x) => view.REFUND_ID_RE.test(x)), [true, true], "accepted:");
+  eq(["rfnd_short", "rfnd_ABC-def12", "pay_ABCdef1234", " rfnd_ABCdef12", "rfnd_"].map((x) => view.REFUND_ID_RE.test(x)), [false, false, false, false, false], "refused:");
+  const id = ids[13]; // paid online
+  for (const refundId of ["rfnd_bad!", "12345678", "rfnd_abc"]) {
+    const r = await call("owner", "orders/[id]", "POST", { params: { id }, body: { action: "cancel", refundId } });
+    eq([r.status, r.body?.code], [422, "REFUND_ID_INVALID"], `${refundId}:`);
+    eq(view.cancelAnswer(r.body, r.status).text, view.REFUND_ID_WORDS, `${refundId} words:`);
+  }
+  eq((await inA(() => db.selectFrom("orders").select("status").where("id", "=", id).executeTakeFirst())).status, "paid", "still paid:");
+  const good = await call("owner", "orders/[id]", "POST", { params: { id }, body: { action: "cancel", refundId: "rfnd_ABCdef1234" } });
+  eq([good.status, good.body?.ok], [200, true], `a real-shaped id cancels: ${good.text.slice(0, 200)}`);
+  const dialog = readFileSync(join(ROOT, "components/admin/orders/CancelDialog.js"), "utf8");
+  ok(/REFUND_ID_RE\.test\(refundId\.trim\(\)\)/.test(dialog) && /disabled=\{busy \|\| needsRefund\}/.test(dialog) && dialog.includes("{REFUND_ID_WORDS}"), "the dialog checks the same shape, says why and keeps Cancel disabled:");
+});
+
+// =============================================================================
+console.log("— 4. the pages, every role");
+
 const propsOf = (run, name) => run.props.filter((p) => p.component.endsWith(`#${name}`) || p.component === name).map((p) => p.props);
 
 await t("support's orders list: no customer detail in any prop, id-only search, ?q=<email> lists nothing", async () => {

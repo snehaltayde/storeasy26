@@ -276,6 +276,8 @@ async function renderOrderPage(orderId, { role = "owner", src = linesSrc } = {})
     // console pages read the store through lib/console-request.js (P1-FIX-C)
     "@/lib/console-request": { tfetch: inT },
     ...UI_STUBS,
+    // icons render nothing here (the design pass's EyeOff and any later one)
+    "lucide-react": new Proxy({ __esModule: true }, { get: (t, k) => (k in t ? t[k] : () => null) }),
     "@/components/admin/orders/OrderHeader": { OrderHeader: ({ order }) => h("header", null, order.id) },
     "@/components/admin/orders/OrderActions": { OrderActions: () => null },
     "@/components/admin/orders/OrderLines": lines,

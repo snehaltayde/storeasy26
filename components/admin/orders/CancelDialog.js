@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/console/Toast";
-import { cancelAnswer } from "@/lib/admin/order-view";
+import { cancelAnswer, REFUND_ID_RE, REFUND_ID_WORDS } from "@/lib/admin/order-view";
 
 // Cancel an order (orders.cancel; docs/plans/phase-2.md "Line 2" §1.6). The
 // server owns the policy (lib/order-cancel.js): an order in Shopify is
@@ -30,7 +30,8 @@ export function CancelDialog({ orderId, paymentCaptured = false, open, onOpenCha
   const [refundId, setRefundId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const needsRefund = paymentCaptured && !refundId.trim();
+  const refundBad = paymentCaptured && refundId.trim() !== "" && !REFUND_ID_RE.test(refundId.trim());
+  const needsRefund = paymentCaptured && (!refundId.trim() || refundBad);
 
   async function cancel(e) {
     e.preventDefault(); // stay open until the server answers
@@ -70,7 +71,12 @@ export function CancelDialog({ orderId, paymentCaptured = false, open, onOpenCha
               <p id="cancel-refund-hint" className="text-xs text-foreground">
                 This order was paid online. Refund it in Razorpay first, then paste the refund id here (it starts with rfnd_). Cancelling here moves no money.
               </p>
-              <Input id="cancel-refund-id" className="bg-card font-mono" value={refundId} maxLength={80} onChange={(e) => setRefundId(e.target.value)} placeholder="rfnd_…" aria-describedby="cancel-refund-hint" aria-required="true" />
+              <Input id="cancel-refund-id" className="bg-card font-mono" value={refundId} maxLength={80} onChange={(e) => setRefundId(e.target.value)} placeholder="rfnd_…" aria-describedby={refundBad ? "cancel-refund-hint cancel-refund-error" : "cancel-refund-hint"} aria-required="true" aria-invalid={refundBad || undefined} />
+              {refundBad && (
+                <p id="cancel-refund-error" className="text-xs text-destructive">
+                  {REFUND_ID_WORDS}
+                </p>
+              )}
             </div>
           )}
           <div className="space-y-1.5">

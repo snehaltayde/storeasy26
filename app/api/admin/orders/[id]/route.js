@@ -5,7 +5,7 @@ import { getOrder } from "@/lib/orders";
 import { pushOrderToShopify } from "@/lib/shopify-push";
 import { getOrderProjection, reconcileOrderProjection } from "@/lib/order-projection";
 import { cancelOrder } from "@/lib/order-cancel";
-import { redactOrderForRole } from "@/lib/admin/order-view";
+import { redactOrderForRole, REFUND_ID_RE, REFUND_ID_WORDS } from "@/lib/admin/order-view";
 import { orderExists } from "@/lib/admin/orders";
 import { infraResponse } from "@/lib/infra-response";
 import { slog } from "@/lib/log";
@@ -46,9 +46,12 @@ export const POST = tenantHandler(async (request, { params }) => {
     // audit row: nothing happened); push used to answer it with a 500.
     if (!(await orderExists(id))) return NextResponse.json({ error: "We couldn't find that order." }, { status: 404 });
     if (action === "cancel") {
+      // a refund id, when given, must look like Razorpay's (nothing runs otherwise)
+      const refundId = body.refundId == null || body.refundId === "" ? null : String(body.refundId).trim();
+      if (refundId !== null && !REFUND_ID_RE.test(refundId)) return NextResponse.json({ ok: false, code: "REFUND_ID_INVALID", error: REFUND_ID_WORDS }, { status: 422 });
       const result = await cancelOrder(id, {
         reason: String(body.reason || "cancelled from admin console").slice(0, 200),
-        refundId: body.refundId ? String(body.refundId).slice(0, 80) : null,
+        refundId,
         via: "admin-console",
       });
       slog("admin_order_cancel", { order_id: id, ok: result.ok, code: result.code });
