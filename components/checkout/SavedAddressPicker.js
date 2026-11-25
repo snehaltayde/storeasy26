@@ -30,6 +30,10 @@ async function getJson(url) {
   return res.ok ? res.json().catch(() => null) : null;
 }
 
+// What the last mount learned, so a remount (review → Edit) knows the shopper
+// at once instead of after its fetches; they still refresh it.
+let known = null;
+
 const memoKey = (cartId) => `sf_saved_address:${cartId || "cart"}`;
 function readMemo(k) {
   try {
@@ -47,10 +51,10 @@ function writeMemo(k, patch) {
 }
 
 export default function SavedAddressPicker({ form, onAddress }) {
-  const [state, setState] = useState({ loaded: false, signedIn: false, email: "", list: [] });
-  const [save, setSaveState] = useState(true);
+  const [state, setState] = useState(() => known?.state || { loaded: false, signedIn: false, email: "", list: [] });
+  const [save, setSaveState] = useState(() => (known?.memo && typeof readMemo(known.memo).save === "boolean" ? readMemo(known.memo).save : true));
   const anchor = useRef(null);
-  const memo = useRef(null); // the sessionStorage key, once the cart is known
+  const memo = useRef(known?.memo || null); // the sessionStorage key, once the cart is known
   const latest = useRef({});
   const setSave = (v) => {
     setSaveState(v);
@@ -64,14 +68,19 @@ export default function SavedAddressPicker({ form, onAddress }) {
     (async () => {
       const me = await getJson("/api/account");
       if (!live) return;
-      if (!me?.authenticated) return setState({ loaded: true, signedIn: false, email: "", list: [] });
+      if (!me?.authenticated) {
+        known = null;
+        return setState({ loaded: true, signedIn: false, email: "", list: [] });
+      }
       const [r, cart] = await Promise.all([getJson("/api/account?view=addresses"), getJson("/api/cart")]);
       if (!live) return;
       memo.current = memoKey(cart?.id);
       const remembered = readMemo(memo.current);
       if (typeof remembered.save === "boolean") setSaveState(remembered.save);
       const list = r?.addresses || [];
-      setState({ loaded: true, signedIn: true, email: r?.email || "", list });
+      const next = { loaded: true, signedIn: true, email: r?.email || "", list };
+      known = { state: next, memo: memo.current };
+      setState(next);
       const f = latest.current.form;
       const empty = ADDRESS_TYPED.every((k) => !String(f[k] || "").trim());
       const patch = {};
@@ -91,7 +100,11 @@ export default function SavedAddressPicker({ form, onAddress }) {
     const flow = anchor.current?.closest('[data-protected="checkout"]') || null;
     return () => {
       const { form: f, save: ticked, signedIn, picked: p } = latest.current;
-      if (!flow?.isConnected || !signedIn || p || !ticked || !addressValid(f)) return;
+      if (!flow?.isConnected) {
+        known = null; // the page was left: forget the shopper
+        return;
+      }
+      if (!signedIn || p || !ticked || !addressValid(f)) return;
       const key = memo.current;
       const savedId = key ? readMemo(key).savedId : null;
       // an address saved earlier in this checkout is edited, not added again
