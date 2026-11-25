@@ -32,6 +32,7 @@ import {
   productListArgs,
   createNavGuard,
   createStoreCall,
+  readOnlyApi,
   createTabStorage,
   framePathFor,
   inspectorPath,
@@ -524,7 +525,11 @@ export function EditorView({
 //                  can.write false: the store is read-only (no saveDraft is
 //                  ever sent, not even the keepalive on pagehide)
 //   role           the actor's role, for RoleGate
-export default function DocumentEditor({ document: entry, note = null, entity: entityProp = null, readOnly = null, can = {}, role = null, currency = undefined, startingBrand = null, api = documentsApi }) {
+export default function DocumentEditor({ document: entry, note = null, entity: entityProp = null, readOnly = null, can = {}, role = null, currency = undefined, startingBrand = null, api: givenApi = documentsApi }) {
+  // Phase 2 line 6 review: one read-only guard for every direct call below
+  // (createDocument, archive, the missing singleton's start, …): without
+  // storefront.write only the document reads leave the browser
+  const api = useMemo(() => (can?.write === true ? givenApi : readOnlyApi(givenApi)), [givenApi, can?.write]);
   const router = useRouter();
   const [docs, setDocs] = useState(null);
   const [catalog, setCatalog] = useState({ products: [], collections: [] });

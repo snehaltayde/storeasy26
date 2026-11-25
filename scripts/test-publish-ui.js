@@ -1030,8 +1030,12 @@ await t("P3-FIX3 rendered: without undo rights, there is no Undo, only the reaso
   const rows = [row, { ...row, logId: "log_2", documentId: SALE.id, label: "Diwali sale", undo: { id: SALE.id, revision: 2, logId: "log_2" } }];
   const page = html(h(Recent.default, { rows, call: async () => ({}), access, timeZone: "UTC" }));
   eq(page.match(/<button[^>]*>(Undo|Undo all 2)<\/button>/g) || [], [], "no Undo button on the two rows or the set:");
-  eq((page.match(/data-undo-reason=""/g) || []).length, 3, "a reason on each, in place of the button:");
-  eq((textOf(page).match(new RegExp(access.reason.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length, 3, "the reason is shown as text, each time:");
+  // Phase 2 line 6 design pass: the reason is said once, above the list, not on each row
+  eq((page.match(/data-undo-reason=""/g) || []).length, 1, "one reason, in place of the buttons:");
+  eq((textOf(page).match(new RegExp(access.reason.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length, 1, "the reason is shown as text, once:");
+  const at = page.indexOf("data-undo-reason");
+  ok(at >= 0 && at < page.indexOf('data-recently-published=""'), "it sits above the Recently published list");
+  ok(!page.split('data-recently-published=""')[1].includes("data-undo-reason"), "and no row repeats it");
   const owner = html(h(Recent.default, { rows, call: async () => ({}), access: { canPublish: true, reason: null }, timeZone: "UTC" }));
   ok(!/disabled=""[^>]*>Undo/.test(owner) && !owner.includes("data-undo-reason"), "an owner's Undo is enabled");
   const notice = html(h(Undo.default, { target: { kind: "one", label: "Diwali sale", undo: { id: SALE.id, revision: 2, logId: "log_2" } }, call: async () => ({}), access }));

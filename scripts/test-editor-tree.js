@@ -602,8 +602,10 @@ await t("P3-FIX3 rendered: every enabled tree icon button keeps its label as its
   ok(/disabled=""/.test(hero) && /title="The hero can only go at the top/.test(hero), `disabled with its reason: ${hero}`);
 });
 
-await t("P3-FIX3 rendered: a disabled button's reason is text under the row, named by aria-describedby; at the top, Move up is disabled", () => {
-  const html = renderToStaticMarkup(React.createElement(SectionTree, { type: "product_layout", sections: sample("product_layout"), selectedId: null }));
+await t("P3-FIX3 rendered: a disabled button's reason is text under the selected row (Phase 2 line 6 design: other rows keep it for screen readers), named by aria-describedby; at the top, Move up is disabled", () => {
+  const quiet = wholeRow(renderToStaticMarkup(React.createElement(SectionTree, { type: "product_layout", sections: sample("product_layout"), selectedId: null })), "sec_main");
+  ok(/<li id="sec_main--why-hide" class="sr-only">/.test(quiet), "an unselected row's reason is still there, for screen readers");
+  const html = renderToStaticMarkup(React.createElement(SectionTree, { type: "product_layout", sections: sample("product_layout"), selectedId: "sec_main" }));
   const row = wholeRow(html, "sec_main");
   for (const verb of ["Hide", "Copy", "Delete"]) {
     const tag = buttonTag(row, `${verb} Product details and buy button`);
@@ -753,6 +755,20 @@ await t("P3-FIX3 rendered: 'Needs a fix' marks a section with an error, and only
   const html = renderToStaticMarkup(React.createElement(SectionTree, { type: "home", sections: s, selectedId: null, issuesBySection: issues }));
   ok(rowOf(html, "sec_text").includes(">Needs a fix</span>"), "the error row");
   for (const id of ["sec_hero", "sec_coll", "sec_bann", "sec_faq"]) ok(!rowOf(html, id).includes("Needs a fix"), `${id} is not marked`);
+});
+
+await t("no reason or hint in the tree ends in a doubled full stop (the hero's place: '…of the home page.', never 'page..')", () => {
+  const hero = { id: "sec_h", kind: "hero", v: 1, enabled: true, settings: {}, blocks: [] };
+  const text = { id: "sec_t", kind: "text", v: 1, enabled: true, settings: { title: "x", body: ["y"] }, blocks: [] };
+  const seen = [];
+  for (const type of ["home", "page", "product_layout", "collection_layout"])
+    for (const secs of [[], [hero], [hero, text], [text]]) {
+      for (const i of [0, secs.length]) for (const o of T.addOptions(type, secs, i)) seen.push(o.reason);
+      for (const sec of secs) for (const v of Object.values(T.rowActions(secs, sec.id, type))) seen.push(v?.reason);
+    }
+  const words = seen.filter((w) => typeof w === "string");
+  ok(words.some((w) => w === "The hero can only go at the top of the home page."), "the hero's place reads as one sentence");
+  eq(words.filter((w) => /\.\.(\s|$)/.test(w)), [], "doubled full stops:");
 });
 
 console.log(`\n${pass} passed, ${fail} failed (${((Date.now() - started) / 1000).toFixed(1)} s)`);

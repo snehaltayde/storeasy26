@@ -151,7 +151,8 @@ function refusalFor(issue, type, sections, after, verb) {
       return refuse(issue.code, max === 1 ? `${cap(noun)} already has a ${lower(label)}. It can have only one.` : `${cap(noun)} can have only ${max} ${lower(label)} sections.`);
     }
     case "POSITION_NOT_ALLOWED":
-      return refuse(issue.code, issue.message.replace(/ Move it there\.$/, "."));
+      // validate's "…of the home page. Move it there.": drop the instruction, keep one full stop
+      return refuse(issue.code, issue.message.replace(/ Move it there\.$/, ""));
     case "KIND_NOT_ALLOWED":
       return refuse(issue.code, `A ${lower(label)} section can't go on ${noun}.`);
     case "PROTECTED_HIDDEN":

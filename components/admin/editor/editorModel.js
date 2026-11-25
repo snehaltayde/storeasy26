@@ -304,6 +304,12 @@ export const storeDocument = (s) => ({ ...(s.document || {}), id: s.id, type: s.
 // (test-editor-ui pins STORE_CALL_READS ⊆ DOCUMENT_READS).
 export const STORE_CALL_READS = Object.freeze(["getDocument", "listDocuments", "listHistory", "listChanges", "listProductContent", "openingChecks", "listRecentlyPublished"]);
 const READ_ONLY_REFUSAL = Object.freeze({ ok: false, error: true, code: "READ_ONLY", message: "You can look at this page but not change it." });
+// documentsApi for someone who may only read (support): call() sends only
+// STORE_CALL_READS and answers READ_ONLY to anything else, without a request;
+// the preview session (a storefront.read) is left as it is.
+export function readOnlyApi(api) {
+  return { ...api, call: (op, ...rest) => (STORE_CALL_READS.includes(op) ? api.call(op, ...rest) : Promise.resolve({ ...READ_ONLY_REFUSAL })) };
+}
 export function createStoreCall({ api, getStore, getPinned = () => null, onReplaced = () => {} }) {
   const refusal = { refused: true, code: "DRAFT_CHANGED", message: WORDS.changedSinceReview };
   async function flushed(store) {

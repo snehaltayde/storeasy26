@@ -194,6 +194,16 @@ for (const [op, args] of Object.entries(CALL_WRITES)) {
     eq([r?.code, api.calls.map((c) => c.op)], ["READ_ONLY", []], `${op}:`);
   });
 }
+await t("readOnly: the editor's direct calls go through readOnlyApi: createDocument, archive and startMissing answer READ_ONLY with no request; reads and the preview session pass", async () => {
+  const api = fakeApi(fakeDoc());
+  api.startDocumentsPreview = async () => ({ ok: true, sid: "ps_x" });
+  const ro = EM.readOnlyApi(api);
+  for (const [op, ...args] of [["createDocument", { type: "page", meta: { title: "x", slug: "x" } }], ["archive", "doc_p1", { revision: 3 }], ["startMissing", { type: "header" }], ["saveDraft", { id: "doc_p1", body: {} }, { revision: 3 }]]) eq((await ro.call(op, ...args)).code, "READ_ONLY", `${op}:`);
+  await ro.call("listDocuments", true);
+  eq(api.calls.map((c) => c.op), ["listDocuments"], "only the read was sent:");
+  eq((await ro.startDocumentsPreview()).ok, true, "the preview session:");
+  ok(/const api = useMemo\(\(\) => \(can\?\.write === true \? givenApi : readOnlyApi\(givenApi\)\)/.test(read("components/admin/editor/DocumentEditor.js")), "DocumentEditor wraps its api for a session without storefront.write");
+});
 await t("readOnly: createStoreCall still sends the document reads (STORE_CALL_READS ⊆ DOCUMENT_READS); a writer's store is not refused", async () => {
   const { DOCUMENT_READS } = await import("../lib/admin/documents-api.js");
   eq(EM.STORE_CALL_READS.filter((op) => !DOCUMENT_READS.includes(op)), [], "reads that aren't DOCUMENT_READS:");
@@ -576,7 +586,8 @@ await t("the 6c files import no old console part and use no old tokens", () => {
   for (const f of files) {
     const src = read(f);
     ok(!/from "(@\/components\/console\/|(\.\.\/)+console\/)/.test(src), `${f}: no old console part`);
-    ok(!/\b(text-fg|bg-surface|border-edge|divide-edge|rounded-ctl|rounded-card|focus-ring)\b/.test(src), `${f}: no old tokens`);
+    // rounded-card is the console's 10px card radius (docs/UI.md "Radius", app/console.css), not an old token
+    ok(!/\b(text-fg|bg-surface|border-edge|divide-edge|rounded-ctl|focus-ring)\b/.test(src), `${f}: no old tokens`);
   }
   ok(!/export function PublishingHistory/.test(read("components/admin/editor/DocumentEditor.js")), "PublishingHistory moved out of DocumentEditor.js");
 });
