@@ -43,7 +43,7 @@ export function AppsList({ installs, catalog, role }) {
           Browse
         </TabsTrigger>
       </TabsList>
-      <TabsContent value="installed" className="mt-4">
+      <TabsContent value="installed" tabIndex={-1} className="mt-4">
         <DataTable
           label="Installed apps"
           columns={columns}
@@ -63,7 +63,7 @@ export function AppsList({ installs, catalog, role }) {
           }
         />
       </TabsContent>
-      <TabsContent value="browse" className="mt-4">
+      <TabsContent value="browse" tabIndex={-1} className="mt-4">
         <AppCatalog catalog={catalog} role={role} />
       </TabsContent>
     </Tabs>
