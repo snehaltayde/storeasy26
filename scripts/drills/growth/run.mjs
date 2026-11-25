@@ -85,6 +85,7 @@ async function adminStarts(drill) {
 
 async function staffSeesReason(drill) {
   const page = await signIn(drill, "staff");
+  await open(page, "/admin/experiments");
   const saved = await page.evaluate(async (slug) => {
     const r = await fetch("/api/admin/experiments", {
       method: "POST",
