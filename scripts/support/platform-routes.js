@@ -68,6 +68,8 @@ export const PLATFORM_ROUTES = Object.freeze([
   { path: "support", method: "POST", write: true, variant: "grant", probe: { body: { action: "grant" } } },
   { path: "support", method: "POST", write: true, variant: "revoke", probe: { body: { action: "revoke", id: "sg_missing" } } },
   { path: "tenants", method: "GET", write: false },
+  { path: "tenants", method: "GET", write: false, variant: "health", probe: { query: "health=missing-store" } },
+  { path: "tenants", method: "GET", write: false, variant: "legacy", probe: { query: "legacy=1" } },
   { path: "tenants/[id]", method: "GET", write: false, probe: { params: NO_STORE } },
   { path: "tenants/[id]", method: "PATCH", write: true, variant: "update", probe: { params: NO_STORE, body: { update: {} } } },
   { path: "tenants/[id]", method: "PATCH", write: true, variant: "maintenance", probe: { params: NO_STORE, body: { maintenance: { enabled: false } } } },

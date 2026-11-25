@@ -1,18 +1,18 @@
 import { cookies } from "next/headers";
+import { Suspense } from "react";
 import { verifyPlatformToken, platformAdminConfigured, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
 import { platformConfigured } from "@/lib/platform/control";
 import { operatorsExist } from "@/lib/platform/sessions";
 import PlatformLogin from "@/components/platform/PlatformLogin";
-import PlatformAdmin from "@/components/platform/PlatformAdmin";
+import StoresTable from "@/components/platform/stores/StoresTable";
 
-// Platform OPERATOR console (Session 22, redesigned S50): tenant registry +
-// health + create wizard. Control-plane-scoped — host/tenant context is
-// irrelevant here, and everything data-ish loads client-side through the
-// operator-gated API. Phase 3 line 0: the sign-in and the "not set up" state
-// are on components/ui; the signed-in console is still the old screen, in its
-// own [data-legacy] region inside the operator shell (layout.js).
+// The operator console's home (Phase 3 line 1): the Stores list for a
+// signed-in operator, the sign-in (or "not set up") for anyone else. The list
+// loads client-side through the operator-gated GET /api/platform/tenants, so
+// this page renders no store data itself. The old console is at
+// /platform/legacy until Phase 3 line 7.
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Storeasy platform", robots: { index: false } };
+export const metadata = { title: "Stores · Storeasy platform", robots: { index: false } };
 
 // "Not set up" only when nobody could sign in: no setup password AND no
 // active operator account. A failed operator lookup shows the sign-in (the
@@ -32,8 +32,8 @@ export default async function PlatformPage() {
   const token = (await cookies()).get(PLATFORM_COOKIE)?.value;
   if (!(await verifyPlatformToken(token))) return <PlatformLogin />;
   return (
-    <div data-legacy className="contents">
-      <PlatformAdmin />
-    </div>
+    <Suspense>
+      <StoresTable />
+    </Suspense>
   );
 }

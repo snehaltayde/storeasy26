@@ -495,6 +495,15 @@ export const DRILLS = {
       return seeded !== 0 ? seeded : c.node(["scripts/drills/operator-onboarding/run.mjs", ...c.headed]);
     },
   },
+  // Phase 3 line 1: the operator's Stores list and store page, on the --p3 design store
+  "platform-stores": {
+    id: "PLATFORM-STORES",
+    warm: true,
+    async run(c) {
+      const seeded = await c.node(["scripts/seed-design-documents.js", "--p3"]);
+      return seeded !== 0 ? seeded : c.node(["scripts/drills/platform-stores/run.mjs", ...c.headed]);
+    },
+  },
   // Phase 2 line 9: analytics, experiments, insights and automations on the roles store (admin, staff, support); evidence in docs/cms-reviews/drills/GROWTH/
   growth: { id: "GROWTH", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/growth/run.mjs", ...c.headed])) },
   // an operator creates a store for a founder (Phase 1 line 9 §5 item 21), on

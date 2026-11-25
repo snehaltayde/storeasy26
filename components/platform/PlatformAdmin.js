@@ -182,7 +182,7 @@ export default function PlatformAdmin() {
 
   async function refresh() {
     try {
-      const res = await fetch("/api/platform/tenants");
+      const res = await fetch("/api/platform/tenants?legacy=1");
       const data = await res.json().catch(() => ({}));
       if (data.ok) {
         setTenants(data.tenants);

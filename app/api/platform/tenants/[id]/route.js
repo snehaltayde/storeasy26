@@ -1,72 +1,28 @@
 import { NextResponse, after } from "next/server";
 import { requireOperator } from "@/lib/platform/require-operator";
-import { patchTenant, getTenant, listTenants, platformDb } from "@/lib/platform/control.js";
+import { patchTenant, getTenant, listTenants } from "@/lib/platform/control.js";
 import { audit } from "@/lib/platform/audit";
 import { startCatalogSync, KICK_BUDGET_MS } from "@/lib/platform/sync-jobs";
 import { withTenant } from "@/lib/tenant-context.js";
 import { slog } from "@/lib/log";
-import { themePinOf } from "@/lib/themes/kits";
+import { storeDetail } from "@/lib/platform/stores-list";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// GET — tenant DETAIL (S41 / OP03): lifecycle, config summary, secrets as a
-// PRESENCE MAP (which keys exist — values never leave the envelope), billing
-// snapshot, onboarding progress, provisioning history.
+// GET — the store page's read model (Phase 3 line 1, lib/platform/stores-list.js
+// storeDetail): lifecycle, Shopify connection, plan, live release and
+// migrations, secrets by NAME only (values never leave the envelope; no
+// database url or token), provisioning runs, recent audit rows, open incidents,
+// support access and notes. It keeps the fields the old console reads.
 export async function GET(request, { params }) {
   const auth = await requireOperator(request);
   if (auth instanceof Response) return auth;
   const { id } = await params;
-  const tenant = await getTenant(id, { fresh: true }); // the operator's next view after a save shows it
-  if (!tenant) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-  const secretsPresent = Object.fromEntries(Object.keys(tenant.secrets || {}).map((k) => [k, true]));
-  const runs = (
-    await platformDb().execute({ sql: "SELECT id, status, steps, error, created_at FROM provision_runs WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 10", args: [id] })
-  ).rows.map((r) => {
-    let steps = [];
-    try {
-      steps = JSON.parse(r.steps || "[]").map((s) => ({ name: s.name, status: s.status }));
-    } catch { /* malformed */ }
-    return { id: r.id, status: r.status, steps, error: r.error, created_at: r.created_at };
-  });
-  let onboarding = null;
-  try {
-    // Phase 1 line 3: the four step states (a read-only role: actions and the shop domain are not this view's)
-    const { onboardingFor } = await import("@/lib/onboarding/service.js");
-    onboarding = await withTenant(tenant, () => onboardingFor({ role: "support" }));
-  } catch { /* tenant db unreachable */ }
-
-  return NextResponse.json({
-    ok: true,
-    tenant: {
-      id: tenant.id,
-      name: tenant.name,
-      status: tenant.status,
-      domains: tenant.domains || [],
-      config: {
-        shop_domain: tenant.config?.shopify_store_domain || null,
-        client_id: tenant.config?.shopify_client_id || null,
-        order_prefix: tenant.config?.order_prefix || null,
-        site_name: tenant.config?.site?.name || null,
-        support_email: tenant.config?.site?.support_email || null,
-        checkout_mode: tenant.config?.checkout_mode || "direct",
-        // P3-DESIGN (TOK-03): the live look's pin, not the draft
-        theme_pin: themePinOf(tenant.config),
-        billing: tenant.config?.billing || null,
-        onboarding_manual: tenant.config?.onboarding?.manual || {},
-      },
-      secretsPresent,
-    },
-    // Phase 1 line 4: the founder connect's callback on each store domain, to add to the store's Shopify app
-    connect: {
-      appReady: Boolean(tenant.config?.shopify_client_id && tenant.secrets?.shopify_client_secret),
-      redirectUrls: (tenant.domains || []).map((d) => `${/(^|\.)localhost(:|$)|^127\.0\.0\.1/.test(d) ? "http" : "https"}://${d}/api/admin/shopify/callback`),
-    },
-    onboarding: onboarding && onboarding.supported ? { doneCount: onboarding.doneCount, total: onboarding.total, open: onboarding.open, steps: onboarding.steps.map((s) => ({ id: s.id, label: s.label, state: s.state })) } : null,
-    runs,
-  });
+  const detail = await storeDetail(id);
+  if (!detail) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json({ ok: true, ...detail }, { headers: { "Cache-Control": "no-store" } });
 }
 
 // PATCH {status} — suspend/reactivate a tenant (S25: suspended hosts FAIL

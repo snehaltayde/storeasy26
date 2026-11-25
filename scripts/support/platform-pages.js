@@ -12,6 +12,9 @@ export const PLATFORM_PAGES = Object.freeze([
   { path: "/platform/operations", file: "app/(console)/platform/operations/page.js" },
   { path: "/platform/flags", file: "app/(console)/platform/flags/page.js" },
   { path: "/platform/incidents", file: "app/(console)/platform/incidents/page.js" },
+  // line 1: the old console moved here; a store's page (a made-up id: operators get not-found)
+  { path: "/platform/legacy", file: "app/(console)/platform/legacy/page.js" },
+  { path: "/platform/stores/missing-store", file: "app/(console)/platform/stores/[id]/page.js" },
 ]);
 
 // the pages a signed-out or merchant visitor must be sent away from
