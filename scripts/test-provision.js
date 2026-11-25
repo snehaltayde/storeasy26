@@ -518,7 +518,7 @@ await t("unit: on the closed new store an anonymous checkout is refused (403 STO
 });
 
 const FORBIDDEN_HREF = (h) => /^\/admin\/(theme|catalog|home|upsells)(?:[/?#]|$)/.test(h) || /^\/admin\/storefront(?:[?#]|$)/.test(h);
-const CONSOLE_PAGES = { "/admin/integrations": "integrations", "/admin/settings": "settings", "/admin/billing": "billing", "/admin/onboarding": "onboarding" };
+const CONSOLE_PAGES = { "/admin/integrations": "integrations", "/admin/settings": "settings", "/admin/billing": "billing", "/admin/onboarding": "onboarding", ...Object.fromEntries(["checkout", "shipping", "domains", "tracking", "sync", "privacy", "audit", "help"].map((t) => [`/admin/settings/${t}`, `settings/${t}`])) }; // the settings tabs (Phase 2 line 7)
 async function hrefWorks(h) {
   if (h === "/admin/editor" || h.startsWith("/admin/editor?")) return access(join(ROOT, "app/(console)/admin/(authed)/editor/page.js")).then(() => true, () => false);
   const path = h.split(/[?#]/)[0];
