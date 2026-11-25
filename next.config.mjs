@@ -30,6 +30,13 @@ const CONTENT_SECURITY_POLICY = [
   "form-action 'self'",
 ].join("; ");
 
+// Phase 3 line 5: the operator console posts the support entry form to a
+// store's own host (/api/admin/support-entry on another origin), so its pages
+// may submit forms to any https store (custom domains) and, outside
+// production, to the local *.localhost stores. Everything else keeps 'self'.
+const OPERATOR_FORM_ACTION = ["form-action 'self' https:", ...(process.env.NODE_ENV === "production" ? [] : ["http://*.localhost:*", "http://localhost:*"])].join(" ");
+const OPERATOR_CONTENT_SECURITY_POLICY = CONTENT_SECURITY_POLICY.replace("form-action 'self'", OPERATOR_FORM_ACTION);
+
 const nextConfig = {
   // Pin the workspace root — a package-lock.json in $HOME otherwise confuses
   // Turbopack's root inference (multiple-lockfiles warning).
@@ -56,6 +63,9 @@ const nextConfig = {
           { key: "Content-Security-Policy", value: CONTENT_SECURITY_POLICY },
         ],
       },
+      // the operator console (Phase 3 line 5): the same policy but form-action;
+      // a later rule's header with the same key overrides the first
+      ...["/platform", "/platform/:path*"].map((source) => ({ source, headers: [{ key: "Content-Security-Policy", value: OPERATOR_CONTENT_SECURITY_POLICY }] })),
     ];
   },
 };
