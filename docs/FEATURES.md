@@ -64,7 +64,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - [x] An operator can manage feature flags and incidents
 - [ ] An operator can open time-boxed support access to a store, and the store's team sees that it is open
 - [x] An operator can run job queues, provisioning runs, privacy requests, themes and case studies on the new UI
-- [ ] The old operator console and `components/console/` are removed once every operator screen is on the new UI
+- [x] The old operator console and `components/console/` are removed once every operator screen is on the new UI
 
 ## Phase 4: plugin system (roadmap Phase 2A)
 

@@ -18,7 +18,7 @@ Storeasy is a multi-tenant storefront platform for D2C founders whose catalog li
 ## Folder layout
 
 - `app/(storefront)/` — shopper pages (Edge-safe). `app/(console)/admin/` — merchant console. `app/(console)/platform/` — operator console. `app/api/` — routes (`admin/`, `platform/`, `cart/`, `checkout/`, webhooks, `jobs/tick`).
-- `components/` — storefront components at the top level; `components/admin/`, `components/console/`, `components/platform/` for consoles. New shadcn components go in `components/ui/` (consoles only).
+- `components/` — storefront components at the top level; `components/admin/` and `components/platform/` for the two consoles, built on shadcn parts in `components/ui/` and shared console parts in `components/kit/` (consoles only).
 - `lib/` — domain code: `documents/` (the CMS), `registry/` (section and document schemas), `content/` (storefront readers), `catalog/` (effective product reads), `offers/`, `platform/` (control plane, auth, jobs, billing), `first-run/`, `types/` (TypeScript contracts).
 - `migrations/tenant/`, `migrations/platform/` — numbered SQL migrations. `lib/schema.sql` — base store tables.
 - `scripts/` — `test-*.js` suites, `run-tests.js`, CLIs, `drills/` browser drills, `support/` test helpers.

@@ -3,6 +3,15 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Old operator console and components/console removed (on the owner's behalf)
+
+- **Scope:** `/platform/legacy`, `PlatformAdmin`, `TenantDetail` and the 11 old panels, all of `components/console/`, the `data-legacy` CSS, the nav's "Old console" and `GET /api/platform/tenants?legacy=1` (only the old console used it; it now returns the ordinary list) are deleted. No table dropped, no migration. `useToast` stays in `components/kit/toast.js` (no sonner). The console body uses the shadcn tokens.
+- **Closes:** the known gaps recorded for lines 2 and 4 (the old console's reasonless suspend and its flags cohort field) are gone with the screens.
+- **Guards:** `test:no-legacy-ui` scans every tracked source file with no exemptions and checks each deleted operator file stays gone; the full operator nav order is pinned again in `test-platform-shell` and the `platform-shell` drill (line 5 adds Support access at the end when it merges). `ALL` gains the operator drills.
+- **CLAUDE.md:** the folder layout no longer names `components/console/` (consoles are `components/ui/` plus `components/kit/`).
+- **Decided by:** Claude
+- **Slice:** Phase 3 line 7
+
 ## 2026-11-25 Operator store lifecycle and secrets (on the owner's behalf)
 
 - **Schema:** none. New audit actions `tenant.maintenance`, `tenant.secrets_rotate`, `tenant.export`, `tenant.offboard`; new mail kinds `store_suspended`, `store_resumed`.
