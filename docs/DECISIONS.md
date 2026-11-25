@@ -3,6 +3,14 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Self-hosted fonts (on the owner's behalf)
+
+- **Decision:** the storefront and consoles load Geist, Geist Mono and Fraunces from `app/fonts/` via `next/font/local` (latin, preloaded) plus `fonts.css` for the other subsets and Google's fallback metrics; the files are the exact ones `next/font/google` served. `test:fonts` bans `next/font/google` and Google Fonts URLs; `pnpm build` runs `check-built-fonts.js`, which fails if a built `--font-*` family isn't declared or has no face covering ₹. The CSP no longer allows Google Fonts hosts. Accepted change: the mono family is named `GeistMono` (Turbopack names a local family after its binding); same file and glyphs. The drill runner's font retry is gone.
+- **Why:** Turbopack's `next/font/google` failed a build now and then under load, at boot and on later route compiles, making every page 500.
+- **Owner follow-up:** add the OFL texts before hosting.
+- **Decided by:** Claude
+- **Slice:** fix outside the feature list
+
 ## 2026-11-25 Phase 2 merchant console: shape of the rebuild (on the owner's behalf)
 
 - **Schema:** tenant 0029 adds two orders indexes (`created_at, id` and `status, created_at, id`), nothing destructive; the orders cursor becomes `(created_at, id)` (old `before=<iso>` still accepted). New order ids carry 64 random bits (`PREFIX-` + 16 hex); old ids are never rewritten.

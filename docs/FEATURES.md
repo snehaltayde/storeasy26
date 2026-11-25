@@ -121,7 +121,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - Sign-in takes a different time for an unknown email than for a wrong password, so timing reveals who is a member; make both paths do the same work. (Phase 0 audit, open gap 2.)
 - The collectors (`/api/track`, `/api/exp`, `/api/errors`), `/api/shopify/webhooks` and the 23 public storefront pages have library tests and the browser pass but no route-level least-trusted suite. (Phase 0 audit, open gap 4.)
 - The "operator has support access" banner (operator id and reason) also shows to signed-out visitors on `/admin/login`; show it only to signed-in members.
-- The storefront and console fonts come from `next/font/google`, so every cold build fetches Google Fonts over the network; a failed fetch breaks the whole dev build. Self-host the font files (`next/font/local`) so builds don't depend on the network.
+- **Font licences (owner):** fonts are now self-hosted from `app/fonts/` (done 2026-11-25). Before the site is hosted, add each family's SIL OFL 1.1 text (`OFL.txt` for Geist/Geist Mono and for Fraunces) next to its files; no copy existed on this machine.
 - `requireAdmin`'s origin check passes a write with no Origin header; add a `Sec-Fetch-Site: cross-site` refusal as a second layer.
 
 - Multi-provider AI (Gemini, OpenAI) beside Anthropic.
