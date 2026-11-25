@@ -207,6 +207,12 @@ Each Phase 3 line fills only its own sub-heading.
 
 ### Lifecycle and secrets (line 2)
 
+- **Store controls card** (`components/platform/stores/LifecycleCard.js`, full width under Health on the store page). Status (Active or Suspended) and Maintenance (Off, or On with the shoppers' message), then one row of buttons: Suspend or Resume, Maintenance, Rotate secrets, Edit details, Sync catalog now (off while suspended; the 202's progress shows in an info Alert), Export (the link in the kit's Copy box with its expiry) and Offboard. After each action the page is read again, so the card, the header badge and Recent activity change at once.
+- **Suspend / Resume** (AlertDialog): what happens as a list (storefront unavailable, console closed, jobs wait, up to 30 seconds on other servers), whether the owner is emailed, and a reason (5+ characters, for the audit log only); the confirm button stays off until then.
+- **Maintenance** (Dialog): a switch, the message (300 characters, the default shown as its placeholder) and a preview of the shoppers' page.
+- **Rotate secrets** (`RotateSecretsDialog.js`): two checkboxes, none ticked: Order-link signing key (a warning that links in earlier emails stop working) and Store console password (disabled with a reason when the store has members). The store's own keys (Razorpay, Meta, Google Analytics) as outline badges, "changed in Settings"; Shopify tokens can't be rotated. A new password shows once with Copy.
+- **Edit details** (`EditStoreDialog.js`): name, domains (one per line), Shopify store domain, client id, client secret (write-only), order prefix, support email; a server error shows under its field. **Offboard** (`OffboardDialog.js`): the four stages in order, what is kept, and the store id typed back.
+
 ### Billing (line 3)
 
 - **Page.** `/platform/billing` (`components/platform/billing/`), a `PageHeader` and `components/ui/tabs` with the tab in the URL (`?tab=overview|subscriptions|plans|events|overrides|costs`); each tab's filters are URL params too, so a link reopens the same view. Data loads client-side from `/api/platform/billing` and `/api/platform/costs`.

@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { platformOperator, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
 import { storeDetail } from "@/lib/platform/stores-list";
+import { lifecycleView } from "@/lib/platform/store-lifecycle";
 import StoreDetail from "@/components/platform/stores/StoreDetail";
 
 // Phase 3 line 1: one store's page, read-only (lib/platform/stores-list.js
@@ -18,5 +19,7 @@ export default async function StorePage({ params }) {
   const { id } = await params;
   const detail = await storeDetail(typeof id === "string" ? id : null);
   if (!detail) notFound();
-  return <StoreDetail detail={detail} />;
+  // line 2: the lifecycle card's state (status, maintenance, rotatable key names)
+  const lifecycle = await lifecycleView(detail.store.id);
+  return <StoreDetail detail={{ ...detail, lifecycle }} />;
 }

@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { CopyButton } from "@/components/kit/copy-button";
 import { PageHeader } from "@/components/kit/page-header";
 import HealthCard from "./HealthCard";
+import LifecycleCard from "./LifecycleCard";
 import { RUN_STATUS, STEP_LABELS, STEP_STATE, STORE_STATUS, SUBSCRIPTION, billingHref, onboardingSheetHref, when, word } from "./storesWords";
 
 const linkClass = "rounded-md text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
@@ -79,6 +80,11 @@ export default function StoreDetail({ detail }) {
         </div>
 
         {/* line 2: lifecycle */}
+        {detail.lifecycle && (
+          <div className="lg:col-span-2">
+            <LifecycleCard store={{ id: store.id, name: store.name }} lifecycle={detail.lifecycle} />
+          </div>
+        )}
 
         <Section
           id="onboarding"

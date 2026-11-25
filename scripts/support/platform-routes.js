@@ -81,6 +81,7 @@ export const PLATFORM_ROUTES = Object.freeze([
   { path: "tenants/[id]", method: "PATCH", write: true, variant: "update", probe: { params: NO_STORE, body: { update: {} } } },
   { path: "tenants/[id]", method: "PATCH", write: true, variant: "maintenance", probe: { params: NO_STORE, body: { maintenance: { enabled: false } } } },
   { path: "tenants/[id]", method: "PATCH", write: true, variant: "status", probe: { params: NO_STORE, body: { status: "not-a-status" } } },
+  { path: "tenants/[id]", method: "PATCH", write: true, variant: "rotate", probe: { params: NO_STORE, body: { rotate: { keys: ["order_link_secret"] } } } },
   { path: "tenants/[id]", method: "POST", write: true, variant: "sync", probe: { params: NO_STORE } },
   { path: "tenants/[id]/export", method: "POST", write: true, probe: { params: NO_STORE } },
   { path: "tenants/[id]/offboard", method: "POST", write: true, probe: { params: NO_STORE, body: { confirm: "not-this-store" } } },

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireOperator } from "@/lib/platform/require-operator";
 import { buildTenantExport, mintExportToken, verifyExportToken } from "@/lib/platform/export";
-import { audit } from "@/lib/platform/audit";
+import { audit, operatorActor } from "@/lib/platform/audit";
 import { slog } from "@/lib/log";
+import { getTenant } from "@/lib/platform/control";
 
 // Tenant export (S43 / BE29).
 //   POST (operator cookie)     → mint an EXPIRING download link (1h, tenant-bound)
@@ -18,13 +19,14 @@ export async function POST(request, { params }) {
   const auth = await requireOperator(request, { write: true });
   if (auth instanceof Response) return auth;
   const { id } = await params;
+  if (!(await getTenant(id))) return NextResponse.json({ error: "Not found" }, { status: 404 });
   let token;
   try {
     token = await mintExportToken(id);
   } catch {
     return NextResponse.json({ error: "Exports aren't available: PLATFORM_SECRET isn't set on this server." }, { status: 503 });
   }
-  await audit({ actor: auth.operator, action: "tenant.status", tenantId: id, diff: { export_link_minted: true } });
+  await audit({ actor: operatorActor(auth.operator), action: "tenant.export", resource: `tenant:${id}`, tenantId: id, diff: { export_link_minted: true } });
   slog("tenant_export_link", { tenant: id });
   return NextResponse.json({ ok: true, url: `/api/platform/tenants/${id}/export?token=${token}`, expires_in: "1 hour" });
 }

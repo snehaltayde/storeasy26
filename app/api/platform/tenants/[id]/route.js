@@ -1,7 +1,8 @@
 import { NextResponse, after } from "next/server";
 import { requireOperator } from "@/lib/platform/require-operator";
 import { patchTenant, getTenant, listTenants } from "@/lib/platform/control.js";
-import { audit } from "@/lib/platform/audit";
+import { audit, operatorActor } from "@/lib/platform/audit";
+import { LifecycleError, operatorRotate, setMaintenance, setStoreStatus } from "@/lib/platform/store-lifecycle";
 import { startCatalogSync, KICK_BUDGET_MS } from "@/lib/platform/sync-jobs";
 import { withTenant } from "@/lib/tenant-context.js";
 import { slog } from "@/lib/log";
@@ -26,16 +27,19 @@ export async function GET(request, { params }) {
   return NextResponse.json({ ok: true, ...detail }, { headers: { "Cache-Control": "no-store" } });
 }
 
-// PATCH {status} — suspend/reactivate a tenant (S25: suspended hosts FAIL
-// CLOSED). PATCH {maintenance: {enabled, message?}} — S43 (OP12): branded
-// maintenance page for shoppers, console stays reachable, checkout closes.
+// PATCH {status, reason} — suspend/resume a tenant (S25: suspended hosts FAIL
+// CLOSED; Phase 3 line 2: a reason of 5+ characters, 409 when already there,
+// the owner mailed when mail is set up). PATCH {maintenance: {enabled,
+// message?}} — S43 (OP12): branded maintenance page for shoppers, console
+// stays reachable, checkout closes. PATCH {rotate: {keys}} — Phase 3 line 2:
+// new order-link key and/or console password (lib/platform/store-lifecycle.js).
 // PATCH {update: {name?, domains?, shop_domain?, client_id?, client_secret?,
 // support_email?}} — S51: edit tenant details after provisioning (the form
 // used to be the only writer). client_secret is write-only; values never
 // come back. Domains are validated and checked against every other tenant,
 // since resolveHost would otherwise serve one host from two stores.
 const HOST_RE = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d{2,5})?$/;
-const bad = (error) => NextResponse.json({ ok: false, error }, { status: 400 });
+const bad = (error, field = null) => NextResponse.json({ ok: false, error, ...(field ? { field } : {}) }, { status: 400 });
 
 async function applyUpdate(id, u, operator) {
   // fresh: `site` below is merged from this read, so a cached copy would undo
@@ -49,7 +53,7 @@ async function applyUpdate(id, u, operator) {
 
   if (u.name !== undefined) {
     const name = String(u.name).trim().slice(0, 80);
-    if (!name) return bad("Name can't be empty");
+    if (!name) return bad("Name can't be empty", "name");
     patch.name = name;
     // the storefront site name follows the registry name only while the
     // merchant hasn't customized it away from the old registry name
@@ -58,17 +62,17 @@ async function applyUpdate(id, u, operator) {
     changed.push("name");
   }
   if (u.domains !== undefined) {
-    if (!Array.isArray(u.domains)) return bad("domains must be a list of hosts");
+    if (!Array.isArray(u.domains)) return bad("domains must be a list of hosts", "domains");
     const domains = [...new Set(u.domains.map((d) => String(d).trim().toLowerCase()).filter(Boolean))];
     const invalid = domains.find((d) => !HOST_RE.test(d));
-    if (invalid) return bad(`"${invalid}" is not a valid host (e.g. pavos.in or pavos.localhost:3007)`);
+    if (invalid) return bad(`"${invalid}" is not a valid host (e.g. pavos.in or pavos.localhost:3007)`, "domains");
     const taken = new Map();
     for (const t of await listTenants()) {
       if (t.id === id) continue;
       for (const d of t.domains || []) taken.set(String(d).toLowerCase(), t.id);
     }
     const clash = domains.find((d) => taken.has(d));
-    if (clash) return bad(`"${clash}" already belongs to tenant "${taken.get(clash)}"`);
+    if (clash) return bad(`"${clash}" already belongs to tenant "${taken.get(clash)}"`, "domains");
     patch.domains = domains;
     const firstReal = domains.find((d) => !/^(localhost|127\.0\.0\.1|\[::1\])/.test(d));
     config.site_url = firstReal ? `https://${firstReal.split(":")[0]}` : current.config?.site_url || null;
@@ -76,7 +80,7 @@ async function applyUpdate(id, u, operator) {
   }
   if (u.shop_domain !== undefined) {
     const sd = String(u.shop_domain).trim().toLowerCase();
-    if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(sd)) return bad("Shopify store domain must look like x.myshopify.com");
+    if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(sd)) return bad("Shopify store domain must look like x.myshopify.com", "shop_domain");
     config.shopify_store_domain = sd;
     changed.push("shop_domain");
   }
@@ -90,13 +94,13 @@ async function applyUpdate(id, u, operator) {
   }
   if (u.order_prefix !== undefined) {
     const p = String(u.order_prefix).trim().toUpperCase();
-    if (p && !/^[A-Z0-9]{2,4}$/.test(p)) return bad("Order id prefix must be 2–4 letters/digits (e.g. PAV)");
+    if (p && !/^[A-Z0-9]{2,4}$/.test(p)) return bad("Order id prefix must be 2–4 letters/digits (e.g. PAV)", "order_prefix");
     config.order_prefix = p || null;
     changed.push("order_prefix");
   }
   if (u.support_email !== undefined) {
     const email = String(u.support_email).trim();
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return bad("Support email doesn't look like an email address");
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return bad("Support email doesn't look like an email address", "support_email");
     config.site = { ...(config.site || current.config?.site || {}), support_email: email || undefined };
     changed.push("support_email");
   }
@@ -108,7 +112,7 @@ async function applyUpdate(id, u, operator) {
     ...(Object.keys(secrets).length ? { secrets } : {}),
   });
   slog("tenant_updated", { tenant: id, changed });
-  await audit({ actor: operator, action: "tenant.update", tenantId: id, diff: { changed } });
+  await audit({ actor: operatorActor(operator), action: "tenant.update", resource: `tenant:${id}`, tenantId: id, diff: { changed } });
   return NextResponse.json({ ok: true, tenant: { id: t.id, name: t.name, domains: t.domains }, changed });
 }
 
@@ -119,24 +123,23 @@ export async function PATCH(request, { params }) {
   const body = await request.json().catch(() => ({}));
   try {
     if (body.update && typeof body.update === "object") return await applyUpdate(id, body.update, auth.operator);
+    // Phase 3 line 2 (lib/platform/store-lifecycle.js): rotate the keys Storeasy
+    // holds. A new console password is in this answer once and nowhere else.
+    if (body.rotate !== undefined) {
+      const r = await operatorRotate(id, body.rotate?.keys, { actor: auth.operator });
+      return NextResponse.json({ ok: true, ...r }, { headers: { "Cache-Control": "no-store" } });
+    }
     if (body.maintenance !== undefined) {
-      const m = body.maintenance;
-      const maintenance = m?.enabled
-        ? { enabled: true, message: String(m.message || "").slice(0, 300), since: new Date().toISOString() }
-        : null;
-      const t = await patchTenant(id, { config: { maintenance } });
-      slog("tenant_maintenance", { tenant: id, enabled: !!maintenance });
-      await audit({ actor: auth.operator, action: "tenant.status", tenantId: id, diff: { maintenance: !!maintenance } });
+      const { tenant: t } = await setMaintenance(id, body.maintenance || {}, { actor: auth.operator });
       return NextResponse.json({ ok: true, tenant: { id: t.id, maintenance: t.config?.maintenance || null } });
     }
     if (!["active", "suspended"].includes(body.status))
-      return NextResponse.json({ error: 'status must be "active" or "suspended" (or pass maintenance)' }, { status: 400 });
-    const t = await patchTenant(id, { status: body.status });
-    slog("tenant_status_changed", { tenant: id, status: body.status });
-    await audit({ actor: auth.operator, action: "tenant.status", tenantId: id, diff: { status: body.status } });
-    return NextResponse.json({ ok: true, tenant: { id: t.id, status: t.status } });
+      return NextResponse.json({ ok: false, error: 'status must be "active" or "suspended" (or pass maintenance or rotate)' }, { status: 400 });
+    const { tenant: t, mail } = await setStoreStatus(id, body.status, { reason: body.reason, actor: auth.operator });
+    return NextResponse.json({ ok: true, tenant: { id: t.id, status: t.status }, mail });
   } catch (e) {
-    return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 404 });
+    if (e instanceof LifecycleError) return NextResponse.json({ ok: false, error: e.message }, { status: e.status });
+    return NextResponse.json({ ok: false, error: String(e?.message || e).slice(0, 300) }, { status: 404 });
   }
 }
 
@@ -159,7 +162,7 @@ export async function POST(request, { params }) {
       startCatalogSync({ startedBy: "operator", defer: after, budgetMs: Math.max(0, KICK_BUDGET_MS - (Date.now() - started)) }),
     );
     slog("tenant_sync_queued", { tenant: id, run: run.id, action, via: "platform-console" });
-    await audit({ actor: auth.operator, action: "tenant.sync", tenantId: id, diff: { run: run.id, action } });
+    await audit({ actor: operatorActor(auth.operator), action: "tenant.sync", resource: `tenant:${id}`, tenantId: id, diff: { run: run.id, action } });
     return NextResponse.json(
       { ok: true, queued: true, action, runId: run.id, products: Number(run.products_fetched || 0), collections: Number(run.collections_fetched || 0) },
       { status: 202 },

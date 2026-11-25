@@ -4,7 +4,7 @@
 // and its data are never touched: a drill seeds and wipes only the worktree's
 // own folders, and this runner fails if the owner's seed files change anyway.
 //
-//   node scripts/drills/run-isolated.mjs <p5|p6|orders|smoke|agency-gone|shell|flags-incidents|editor|signup|connect|operator-onboarding|operator-create-store|platform-shell|sf-styles|console-styles|all> [stage,…] [--keep] [--headed]
+//   node scripts/drills/run-isolated.mjs <p5|p6|orders|smoke|agency-gone|shell|flags-incidents|editor|signup|connect|operator-onboarding|operator-create-store|platform-shell|store-lifecycle|sf-styles|console-styles|all> [stage,…] [--keep] [--headed]
 //   (pnpm drill:p5, drill:p6, drill:smoke, drill:agency-gone, drill:shell, drill:signup, drill:sf-styles,
 //   drill:console-styles, drill:all; sf-styles and console-styles are not in all)
 //
@@ -482,6 +482,15 @@ export const DRILLS = {
         const annex = await cc.node(["scripts/dev-roles.js", "annex"]);
         return annex !== 0 ? annex : cc.node(["scripts/drills/connect/run.mjs", ...c.headed]);
       });
+    },
+  },
+  // Phase 3 line 2: suspend -> storefront closed -> resume, and maintenance, from the store page, on the --p3 design store
+  "store-lifecycle": {
+    id: "STORE-LIFECYCLE",
+    warm: true,
+    async run(c) {
+      const seeded = await c.node(["scripts/seed-design-documents.js", "--p3"]);
+      return seeded !== 0 ? seeded : c.node(["scripts/drills/store-lifecycle/run.mjs", ...c.headed]);
     },
   },
   // Phase 2 line 8: the team screen on the roles store (invite, accept, roles, transfer); evidence in docs/cms-reviews/drills/TEAM/
