@@ -49,13 +49,15 @@ never returned by any endpoint, and neither is any checkout or cart id.
 | `/api/apps/v1/products/{handle}` | `{ product }`: the card fields plus `display_vendor`, `description`, `description_html`, `options`, `images`, `variants` |
 | `/api/apps/v1/collections` | `{ items: [{ id, handle, title, products }], nextCursor }` |
 | `/api/apps/v1/offers` | `{ items: [{ id, type, label, starts_at, ends_at, updated_at, terms }], nextCursor }`: live offers only (enabled and inside their start/end window); `terms` is what qualifies and what it gives (`title`, `target`, `buy`, `free`, `tiers`, `discount`, `threshold`, `minSubtotal`, `gift`, `items`, `price`), never a coupon's code |
-| `/api/apps/v1/orders` | `{ items: [order], nextCursor }`, newest first; `?status=` filters |
+| `/api/apps/v1/orders` | `{ items: [order], nextCursor }`, newest first; `?status=` filters (an unknown status answers 400) |
 | `/api/apps/v1/orders/{id}` | `{ order }` with `items` |
 
 An order is `{ id, status, payment_method, payment_status, subtotal,
-discount_total, shipping_total, total, currency, coupon_code, applied_offers,
+discount_total, shipping_total, total, currency, applied_offers,
 shopify_order_id, created_at, updated_at, paid_at, synced_at }`. Money is a
-number in the store currency; times are ISO 8601 UTC.
+number in the store currency; times are ISO 8601 UTC. A coupon's code never
+reaches an app: `discount_total` carries what it saved, and an applied coupon
+shows in `applied_offers` as `{ id, type: "COUPON", label: "Coupon", amount }`.
 
 ## Paging
 
@@ -68,7 +70,7 @@ Every error is JSON `{ error, code }` in plain words.
 
 | Status | When |
 |---|---|
-| 400 | a bad `limit` or `cursor` |
+| 400 | a bad `limit`, `cursor` or order `status` |
 | 401 | "This token isn't valid for this store." (missing, unknown, revoked, expired, another store's, or the app is off) |
 | 403 | "This app wasn't given permission to …" (the scope's words) |
 | 404 | no such product or order |
@@ -77,9 +79,10 @@ Every error is JSON `{ error, code }` in plain words.
 
 ## Limits and records
 
-- 120 calls a minute per token, whatever address calls. A revoked, expired
-  or switched-off token counts against the same budget. Tokens that don't
-  resolve are limited by client address.
+- 120 calls a minute per token, and 120 a minute per app across all its
+  tokens, whatever address calls: more tokens don't buy more calls. A
+  revoked, expired or switched-off token counts against the same budgets.
+  Tokens that don't resolve are limited by client address.
 - Without Upstash (Redis) configured, each limit is counted per server
   instance, so the real ceiling is 120 times the number of instances.
 - Every call made with a real token (allowed or refused) is recorded in the

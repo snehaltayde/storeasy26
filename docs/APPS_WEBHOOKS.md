@@ -10,7 +10,7 @@ A custom app gets store events as signed HTTPS POSTs to the address saved for it
 | `order.fulfilled` | The order's fulfilment status moves to fulfilled (once per order) |
 | `ping` | Someone presses Send test event |
 
-Order events need the "See your orders, without customer details" permission. **No event ever carries a customer's name, email, phone number or address.**
+Order events need the "See your orders, without customer details" permission. **No event ever carries a customer's name, email, phone number or address.** Nor does it carry a coupon's code; `discount_total` carries what the discount saved.
 
 ## The request
 
@@ -39,7 +39,6 @@ Body:
       "fulfillment_status": null,
       "currency": "INR",
       "subtotal": 999, "discount_total": 0, "shipping_total": 0, "total": 999,
-      "coupon_code": null,
       "created_at": "2026-11-25T12:00:00.000Z",
       "paid_at": null,
       "line_items": [
