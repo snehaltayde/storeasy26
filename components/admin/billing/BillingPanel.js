@@ -22,6 +22,11 @@ import { ConfirmAction, sendJson } from "@/components/admin/offers/ConfirmAction
 const money = (paise, currency = "INR") => (paise === 0 ? "Free" : `₹${(paise / 100).toLocaleString("en-IN")}${currency !== "INR" ? ` ${currency}` : ""}`);
 const day = (iso) => (iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "");
 const STATUS = { active: ["success", "Active"], grace: ["warning", "Payment overdue"], degraded: ["danger", "Checkout paused"], none: ["muted", "Free plan"] };
+// "orders_per_month" -> "Orders per month" (sentence case, docs/UI.md "Type")
+const metricWords = (m) => {
+  const w = String(m).replace(/_/g, " ").toLowerCase();
+  return w.charAt(0).toUpperCase() + w.slice(1);
+};
 const KIND = { "subscription.charged": "Charge", "refund.processed": "Refund" };
 
 export function BillingPanel({ initial, role }) {
@@ -43,8 +48,13 @@ export function BillingPanel({ initial, role }) {
     try {
       json = await sendJson("/api/admin/billing", "POST", { action: "subscribe", plan: plan.id });
     } catch (e) {
-      // 503: the payment provider isn't set up; its own words, plainly
-      throw new Error(e.status === 503 ? `Plans can't be bought yet: ${e.message}. Storeasy's team has to finish setting up payments first.` : e.message);
+      // 503: the payment provider isn't set up. Said in words (docs/UI.md "Billing"); the server's
+      // reason names its configuration, which is for Storeasy's team, not the founder.
+      throw new Error(
+        e.status === 503
+          ? "Paid plans can't be bought yet: Storeasy's team is still setting up payments for plans. Nothing was charged, and your store keeps the Free plan's limits."
+          : e.message,
+      );
     }
     setData(json);
     toast.success(
@@ -117,13 +127,13 @@ export function BillingPanel({ initial, role }) {
             return (
               <div key={q.metric} className="space-y-1.5">
                 <div className="flex justify-between text-sm">
-                  <span className="capitalize">{q.metric.replace(/_/g, " ")}</span>
+                  <span>{metricWords(q.metric)}</span>
                   <span className={q.over ? "font-mono text-destructive" : q.warn ? "font-mono text-warning-text" : "font-mono text-muted-foreground"}>
                     {q.used} of {q.limit}
                     {q.over ? ", over" : q.warn ? ", nearly there" : ""}
                   </span>
                 </div>
-                <Progress value={pct} aria-label={`${q.metric.replace(/_/g, " ")} used`} aria-valuetext={`${q.used} of ${q.limit}`} />
+                <Progress value={pct} aria-label={`${metricWords(q.metric)} used`} aria-valuetext={`${q.used} of ${q.limit}`} />
               </div>
             );
           })}
@@ -135,16 +145,16 @@ export function BillingPanel({ initial, role }) {
           <CardTitle className="text-base font-semibold">Plans</CardTitle>
         </CardHeader>
         <CardContent>
-          <ul className="grid gap-3 sm:grid-cols-3">
+          <ul className="grid gap-3 md:grid-cols-3">
             {data.plans.map((p) => {
               const current = sub?.plan === p.id;
               return (
-                <li key={p.id} className={`flex flex-col rounded-card border p-4 ${current ? "border-primary/40 bg-muted" : "border-border"}`} data-plan={p.id}>
+                <li key={p.id} className={`flex flex-col rounded-card border p-4 ${current ? "border-primary bg-muted ring-1 ring-primary" : "border-border"}`} data-plan={p.id}>
                   <p className="flex items-center gap-2 text-sm font-semibold">
                     {p.name}
                     {current && <Badge variant="success">Your plan</Badge>}
                   </p>
-                  <p className="mt-1 font-mono text-lg font-semibold">
+                  <p className={`mt-1 text-lg font-semibold ${p.price > 0 ? "font-mono" : ""}`}>
                     {money(p.price, p.currency)}
                     {p.price > 0 && <span className="font-sans text-xs font-normal text-muted-foreground"> a {p.interval}</span>}
                   </p>

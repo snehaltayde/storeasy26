@@ -75,7 +75,7 @@ export function DomainsList({ role }) {
                   {d.domains.map((dom) => (
                     <li key={dom.host} className="rounded-card border border-border p-3" data-domain={dom.host}>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="truncate font-mono text-[0.8125rem] font-medium" title={dom.host}>
+                        <span className="min-w-0 truncate font-mono text-sm font-medium" title={dom.host}>
                           {dom.host}
                         </span>
                         <Badge variant={dom.verified ? "success" : "warning"}>{dom.verified ? "Verified" : "Waiting for the TXT record"}</Badge>
@@ -91,26 +91,28 @@ export function DomainsList({ role }) {
                         )}
                       </div>
                       {dom.challenge && (
-                        <div className="mt-3 space-y-1 rounded-md bg-muted p-3 text-[0.8125rem]">
-                          <p>Add this TXT record at your domain provider, then press Verify:</p>
-                          <p className="font-mono">
-                            <span className="text-muted-foreground">Name </span>
-                            {dom.challenge.record}
-                          </p>
-                          <p className="flex items-center gap-2 font-mono break-all">
-                            <span className="text-muted-foreground">Value </span>
-                            <span className="min-w-0">{dom.challenge.value}</span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label={`Copy the TXT value for ${dom.host}`}
-                              onClick={() => copy(dom.challenge.value)}
-                              data-read-control
-                            >
-                              <Copy aria-hidden />
-                            </Button>
-                          </p>
+                        <div className="mt-3 rounded-md border border-dashed border-border bg-muted p-3 text-[0.8125rem]">
+                          <p className="text-foreground">Add this TXT record at your domain provider, then press Verify.</p>
+                          <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5">
+                            <dt className="text-muted-foreground">Type</dt>
+                            <dd className="font-mono">TXT</dd>
+                            <dt className="text-muted-foreground">Name</dt>
+                            <dd className="font-mono break-all">{dom.challenge.record}</dd>
+                            <dt className="text-muted-foreground">Value</dt>
+                            <dd className="flex min-w-0 items-center gap-1 rounded-md border border-border bg-card py-0.5 pr-0.5 pl-2">
+                              <span className="min-w-0 flex-1 font-mono break-all">{dom.challenge.value}</span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={`Copy the TXT value for ${dom.host}`}
+                                onClick={() => copy(dom.challenge.value)}
+                                data-read-control
+                              >
+                                <Copy aria-hidden />
+                              </Button>
+                            </dd>
+                          </dl>
                         </div>
                       )}
                     </li>

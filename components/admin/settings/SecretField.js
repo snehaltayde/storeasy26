@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -12,18 +12,24 @@ import { Badge } from "@/components/ui/badge";
 // the saved one (buildSettingsPatch drops an empty secret). Cancel empties it.
 export function SecretField({ id, label, isSet, value, onChange, disabled = false, hint = null }) {
   const [open, setOpen] = useState(false);
+  const input = useRef(null);
+  const opener = useRef(null);
+  const moveFocus = useRef(null); // "input" after Replace, "opener" after Cancel
   const editing = open || Boolean(value);
+  useEffect(() => {
+    if (moveFocus.current === "input") input.current?.focus();
+    if (moveFocus.current === "opener") opener.current?.focus();
+    moveFocus.current = null;
+  }, [editing]);
   return (
     <div className="space-y-1.5" data-secret-field={id}>
-      <div className="flex items-center gap-2">
-        <Label htmlFor={editing ? id : undefined} id={`${id}-label`}>
-          {label}
-        </Label>
-        <Badge variant={isSet ? "success" : "muted"}>{isSet ? "Saved" : "Not set"}</Badge>
-      </div>
+      <Label htmlFor={editing ? id : undefined} id={`${id}-label`}>
+        {label}
+      </Label>
       {editing ? (
         <div className="flex gap-2">
           <Input
+            ref={input}
             id={id}
             type="password"
             autoComplete="new-password"
@@ -32,11 +38,20 @@ export function SecretField({ id, label, isSet, value, onChange, disabled = fals
             value={value}
             placeholder={isSet ? "Type the new value" : "Paste it here"}
             onChange={(e) => onChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Escape") return;
+              e.preventDefault();
+              moveFocus.current = "opener";
+              onChange("");
+              setOpen(false);
+            }}
+            className="font-mono"
           />
           <Button
             type="button"
             variant="ghost"
             onClick={() => {
+              moveFocus.current = "opener";
               onChange("");
               setOpen(false);
             }}
@@ -45,9 +60,29 @@ export function SecretField({ id, label, isSet, value, onChange, disabled = fals
           </Button>
         </div>
       ) : (
-        <Button type="button" variant="outline" size="sm" disabled={disabled} aria-describedby={`${id}-label`} onClick={() => setOpen(true)}>
-          {isSet ? "Replace" : "Add"}
-        </Button>
+        <div className="flex h-8 items-center gap-2 rounded-md border border-dashed border-input pr-1 pl-2.5">
+          {isSet && (
+            <span aria-hidden className="font-mono text-sm tracking-widest text-muted-foreground">
+              ••••••••
+            </span>
+          )}
+          <Badge variant={isSet ? "success" : "muted"}>{isSet ? "Saved" : "Not set"}</Badge>
+          <Button
+            ref={opener}
+            type="button"
+            variant="ghost"
+            size="xs"
+            className="ml-auto"
+            disabled={disabled}
+            aria-describedby={`${id}-label`}
+            onClick={() => {
+              moveFocus.current = "input";
+              setOpen(true);
+            }}
+          >
+            {isSet ? "Replace" : "Add"}
+          </Button>
+        </div>
       )}
       <p className="text-xs text-muted-foreground">{hint || (isSet ? "A saved value is never shown again, only replaced." : "It is never shown after you save it.")}</p>
     </div>

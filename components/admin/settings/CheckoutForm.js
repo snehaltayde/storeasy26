@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Wallet } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,8 +66,9 @@ export function CheckoutForm({ initial, role }) {
       <form onSubmit={form.save} noValidate className="space-y-4">
         <ReadOnlyNote form={form} />
         {payWith && (
-          <p data-settings="pay-with" className="rounded-card border border-border bg-muted px-4 py-3 text-sm text-foreground">
-            {payWith}
+          <p data-settings="pay-with" className="flex items-start gap-3 rounded-card border border-border bg-muted px-4 py-3 text-sm text-foreground">
+            <Wallet aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            <span>{payWith}</span>
           </p>
         )}
         <Card>

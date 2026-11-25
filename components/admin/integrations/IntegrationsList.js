@@ -90,7 +90,7 @@ export function IntegrationsList({ initial, messages = [], notifications = [], r
                   </CardTitle>
                   <CardDescription>{WHAT[r.provider] || r.kind}</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="flex flex-1 flex-col gap-3">
                   {facts(r).length > 0 && (
                     <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[0.8125rem]">
                       {facts(r).map(([k, v]) => (
@@ -109,7 +109,7 @@ export function IntegrationsList({ initial, messages = [], notifications = [], r
                       <AlertDescription className="text-current">{res.words}</AlertDescription>
                     </Alert>
                   )}
-                  <div className="flex flex-wrap gap-2">
+                  <div className="mt-auto flex flex-wrap gap-2 empty:hidden">
                     {r.actions?.includes("test") && (
                       <Button type="button" variant="outline" size="sm" disabled={Boolean(testing)} onClick={() => test(r.provider)} data-read-control>
                         {testing === r.provider ? "Testing…" : "Test"}

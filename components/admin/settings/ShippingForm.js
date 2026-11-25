@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, X } from "lucide-react";
+import { Plus, ReceiptText, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -119,6 +119,26 @@ export function ShippingForm({ initial, role }) {
         </CardContent>
       </Card>
 
+      <section data-settings="shipping-example" aria-labelledby="st-example-title" className="rounded-card border border-dashed border-border bg-muted px-4 py-4">
+        <h3 id="st-example-title" className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <ReceiptText aria-hidden className="size-4 text-muted-foreground" />
+          What a shopper pays
+          {dirty && <span className="text-xs font-normal text-muted-foreground">with your unsaved rates</span>}
+        </h3>
+        {example.length ? (
+          <ul className="mt-3 divide-y divide-dashed divide-border text-sm" aria-live="polite">
+            {example.map((line) => (
+              <li key={line} className="py-2 first:pt-0 last:pb-0">
+                {line}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-3 text-sm text-muted-foreground">Fix the rates above to see an example.</p>
+        )}
+        {errs.form && <p className="mt-2 text-xs text-destructive">{errs.form}</p>}
+      </section>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base font-semibold">Pincode zones</CardTitle>
@@ -128,15 +148,15 @@ export function ShippingForm({ initial, role }) {
           {sh.zones.length === 0 && <p className="text-sm text-muted-foreground">No zones. Every pincode pays the same.</p>}
           {sh.zones.map((z, i) => (
             <div key={i} className="space-y-1">
-              <div className="grid gap-2 sm:grid-cols-[1fr_1fr_100px_100px_auto] sm:items-center">
-                <Input aria-label={`Zone ${i + 1} name`} placeholder="Name, like Remote" disabled={readOnly} value={z.label} onChange={(e) => zone(i, { label: e.target.value })} />
+              <div className="grid grid-cols-2 gap-2 rounded-md border border-dashed border-border p-2 sm:grid-cols-[1fr_1fr_100px_100px_auto] sm:items-center sm:border-0 sm:p-0">
+                <Input className="col-span-2 sm:col-span-1" aria-label={`Zone ${i + 1} name`} placeholder="Name, like Remote" disabled={readOnly} value={z.label} onChange={(e) => zone(i, { label: e.target.value })} />
                 <Input
                   aria-label={`Zone ${i + 1} pincode starts`}
                   placeholder="Pincode starts, like 19, 18"
                   disabled={readOnly}
                   value={z.prefixes}
                   onChange={(e) => zone(i, { prefixes: e.target.value })}
-                  className="font-mono"
+                  className="col-span-2 font-mono sm:col-span-1"
                 />
                 <Input
                   aria-label={`Zone ${i + 1} rate`}
@@ -160,6 +180,7 @@ export function ShippingForm({ initial, role }) {
                   type="button"
                   variant="ghost"
                   size="icon"
+                  className="col-span-2 justify-self-end sm:col-span-1"
                   aria-label={`Remove zone ${z.label || i + 1}`}
                   disabled={readOnly}
                   onClick={() => setState((s) => ({ ...s, shipping: { ...s.shipping, zones: s.shipping.zones.filter((_, j) => j !== i) } }))}
@@ -180,24 +201,6 @@ export function ShippingForm({ initial, role }) {
             <Plus aria-hidden />
             Add zone
           </Button>
-        </CardContent>
-      </Card>
-
-      <Card data-settings="shipping-example">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold">What a shopper pays</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {example.length ? (
-            <ul className="list-disc space-y-1 pl-5 text-sm">
-              {example.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-muted-foreground">Fix the rates above to see an example.</p>
-          )}
-          {errs.form && <p className="mt-2 text-xs text-destructive">{errs.form}</p>}
         </CardContent>
       </Card>
 

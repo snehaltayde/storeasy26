@@ -44,8 +44,10 @@ export function SettingsNav({ sections }) {
                   aria-current={on ? "page" : undefined}
                   data-read-control
                   className={cn(
-                    "flex min-h-8 items-center rounded-md px-2.5 py-1.5 text-sm outline-none motion-safe:transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background pointer-coarse:min-h-10",
-                    on ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    "relative flex min-h-8 items-center rounded-md px-3 py-1.5 text-sm outline-none motion-safe:transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background pointer-coarse:min-h-10",
+                    on
+                      ? "bg-muted font-medium text-foreground before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
                 >
                   {s.label}

@@ -77,13 +77,16 @@ export function SaveBar({ form, role, label }) {
         </Alert>
       )}
       {dirty && (
-        <div className="flex flex-wrap items-center gap-2 rounded-card border border-border bg-card px-4 py-3 shadow-overlay">
-          <p className="flex-1 text-sm font-medium text-foreground">You have unsaved changes</p>
-          <Button type="button" variant="outline" onClick={discard} disabled={busy}>
+        <div className="flex flex-wrap items-center gap-2 rounded-card border border-border bg-card px-4 py-3 shadow-overlay" role="region" aria-label="Unsaved changes">
+          <p className="flex min-w-0 basis-full items-center gap-2 text-sm font-medium text-foreground sm:flex-1 sm:basis-auto">
+            <span aria-hidden className="size-2 shrink-0 rounded-full bg-warning" />
+            You have unsaved changes
+          </p>
+          <Button type="button" variant="outline" className="flex-1 sm:flex-none" onClick={discard} disabled={busy}>
             Discard
           </Button>
           <RoleGate role={role} action="settings.write" reason="Only the owner or an admin can change settings.">
-            <Button type="submit" disabled={busy}>
+            <Button type="submit" className="flex-1 sm:flex-none" disabled={busy}>
               {busy ? "Saving…" : label}
             </Button>
           </RoleGate>

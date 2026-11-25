@@ -18,6 +18,24 @@ const when = (iso) => new Date(iso).toLocaleString("en-IN", { day: "numeric", mo
 const ACTION_WORDS = {
   "settings.write": "Changed settings",
   "integration.revoke": "Disconnected an integration",
+  "auth.login": "Signed in",
+  "auth.operator_login": "Storeasy's team signed in",
+  "storefront.write": "Edited the storefront",
+  "storefront.publish": "Published",
+  "offers.write": "Changed an offer",
+  "sync.run": "Synced from Shopify",
+  "domain.verified": "Verified a domain",
+  "domain.claimed": "Added a domain",
+  "domain.primary": "Changed the primary domain",
+  "domain.removed": "Removed a domain",
+  "team.manage": "Changed the team",
+  "team.invite_created": "Invited someone",
+  "team.invite_accepted": "Joined the team",
+  "support.grant_created": "Gave Storeasy's team access",
+  "support.grant_revoked": "Ended Storeasy's team access",
+  "orders.cancel": "Cancelled an order",
+  "returns.decide": "Decided a return",
+  "privacy.customer_redact": "Erased a shopper's data",
 };
 
 // filters → the route's query (a "to" date counts the whole day)
@@ -33,12 +51,24 @@ export function auditQuery({ actor = "", action = "", from = "", to = "" } = {},
 }
 
 const COLUMNS = [
-  { key: "at", header: "When", cell: (r) => <span className="whitespace-nowrap font-mono text-xs">{when(r.at)}</span> },
-  { key: "who", header: "Who", truncate: true, cell: (r) => r.who || r.actor_kind },
-  { key: "action", header: "What", cell: (r) => <span title={r.action}>{ACTION_WORDS[r.action] || r.action}</span> },
+  { key: "at", header: "When", className: "w-44 align-top", cell: (r) => <span className="whitespace-nowrap font-mono text-xs">{when(r.at)}</span> },
+  { key: "who", header: "Who", className: "w-48 max-w-48 align-top", truncate: true, cell: (r) => r.who || r.actor_kind },
+  {
+    key: "action",
+    header: "What",
+    className: "w-48 align-top",
+    cell: (r) =>
+      ACTION_WORDS[r.action] ? (
+        <span title={r.action}>{ACTION_WORDS[r.action]}</span>
+      ) : (
+        // an action without plain words yet: shown as the recorded name, in mono, so it reads as a name
+        <span className="font-mono text-xs text-muted-foreground">{r.action}</span>
+      ),
+  },
   {
     key: "changes",
     header: "Details",
+    className: "align-top",
     cell: (r) => (
       <span className="block min-w-0 text-xs text-muted-foreground">
         {r.resource && (

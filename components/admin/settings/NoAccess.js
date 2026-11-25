@@ -7,8 +7,10 @@ import { NO_ACCESS_WORDS } from "@/lib/admin/settings-sections";
 // role: the caller's role, named in the sentence (never anything of the store's)
 export function NoAccess({ role = null }) {
   return (
-    <section data-settings="no-access" className="mx-auto flex max-w-md flex-col items-center gap-2 rounded-card border border-dashed border-border px-6 py-12 text-center">
-      <Lock aria-hidden className="size-6 text-muted-foreground" />
+    <section data-settings="no-access" className="mx-auto mt-6 flex max-w-md flex-col items-center gap-2 rounded-card border border-dashed border-border px-6 py-12 text-center">
+      <span aria-hidden className="mb-1 flex size-10 items-center justify-center rounded-full bg-muted">
+        <Lock className="size-5 text-muted-foreground" />
+      </span>
       <h1 className="text-[1.125rem] font-semibold text-foreground">{NO_ACCESS_WORDS.title}</h1>
       <p className="text-sm text-muted-foreground">{NO_ACCESS_WORDS.body(role)}</p>
       <a
