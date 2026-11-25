@@ -134,6 +134,9 @@ export const READ_POSTS = [
   // the preview session (storefront.read in admin-routes.js)
   { page: "/admin/editor", method: "PUT", path: "/api/admin/documents", ops: ["listDocuments", "getDocument", "listHistory", "listProductContent", "listChanges", "openingChecks"], reason: "the editor's reads: the page list, the open document, Earlier versions, the products in the page list, what changed since live and the opening checks (DOCUMENT_READS; support's store never sends saveDraft)" },
   { page: "/admin/themes", method: "POST", path: "/api/admin/preview-session", reason: "Preview on the draft bar: the founder preview session (create, showDesign), storefront.read: it lets this browser see the draft theme and writes no content" },
+  // Phase 6: the studio composes the editor's parts, so support sends the same reads from /admin/studio
+  { page: "/admin/studio", method: "PUT", path: "/api/admin/documents", ops: ["listDocuments", "getDocument", "listHistory", "listProductContent", "listChanges", "openingChecks"], reason: "the studio's reads: the document switcher's list, the open document and the design (DOCUMENT_READS; a read-only studio never sends saveDraft, createDocument or publishSet)" },
+  { page: "/admin/studio", method: "POST", path: "/api/admin/preview-session", reason: "the studio preview's session (create, showDesign), storefront.read: it lets this browser see the draft and writes no content" },
   { page: "/admin/editor", method: "POST", path: "/api/admin/preview-session", reason: "the preview's session (create, showDesign, revoke), storefront.read: it lets this browser see the draft and writes no content" },
   { page: "/admin/releases", method: "PUT", path: "/api/admin/documents", ops: ["listRecentlyPublished", "listDocuments", "getDocument", "listChanges"], reason: "Publishing's reads: recently published, the pages waiting to publish and what changed in each (DOCUMENT_READS)" },
 ];
