@@ -1685,7 +1685,9 @@ await t("the connect callback queues the sync instead of running it in after(); 
 
 await t("the dashboard shows the card while a sync isn't complete; settings uses it too", async () => {
   const dash = await readFile(join(root, "app/(console)/admin/(authed)/dashboard/page.js"), "utf8");
-  ok(/catalogSyncStatus\(\)/.test(dash) && /state !== "complete"/.test(dash) && /<SyncProgress/.test(dash), "dashboard card");
+  // Phase 2 line 1: the card is onboarding's ImportStepBody (components/admin/dashboard/SyncCard.js)
+  const card = await readFile(join(root, "components/admin/dashboard/SyncCard.js"), "utf8");
+  ok(/catalogSyncStatus\(\)/.test(dash) && /state !== "complete"/.test(dash) && /<SyncCard/.test(dash) && /<ImportStepBody/.test(card), "dashboard card");
   ok(/v\.firstSync \|\| v\.state === "failed" \|\| v\.state === "stalled"/.test(dash), "a refresh shows on the dashboard only when it needs the founder");
   const settings = await readFile(join(root, "components/admin/SettingsAdmin.js"), "utf8");
   ok(/<SyncProgress/.test(settings) && !/Syncing — this can take a minute/.test(settings), "settings card");

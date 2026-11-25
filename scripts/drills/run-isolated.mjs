@@ -409,6 +409,8 @@ export const DRILLS = {
       return seeded !== 0 ? seeded : c.node(["scripts/drill.js", "smoke", "--start", ...c.headed]);
     },
   },
+  // the dashboard on the new UI (Phase 2 line 1 §5 item 6), on the roles store
+  dashboard: { id: "DASHBOARD", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/dashboard/run.mjs", ...c.headed])) },
   p5: { id: "P5-DRILLS", warm: true, run: (c) => c.node(["scripts/drills/p5/run.mjs", ...c.stages, ...c.headed]) },
   p6: { id: "P6-DRILLS", warm: true, run: (c) => c.node(["scripts/drills/p6/run.mjs", ...c.stages, ...c.headed]) },
   // the storefront render comparison (Phase 0 line 7); SF_STYLES_BASELINE and

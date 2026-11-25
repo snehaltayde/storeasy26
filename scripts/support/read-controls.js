@@ -4,4 +4,11 @@
 // and any mark on a submit button or inside a form that is not method="get".
 // Each row: { path, reason } (the read the control performs). Phase 2 lines
 // append rows; when appends conflict, keep both sides.
-export const READ_CONTROLS = [];
+export const READ_CONTROLS = [
+  // Phase 2 line 1: the dashboard
+  { path: "components/admin/dashboard/RangeSwitch.js", reason: "the 7/30/90-day links only change ?days= on the dashboard (a GET)" },
+  { path: "components/admin/dashboard/SalesSummary.js", reason: "a link to the onboarding page on a store with no orders (a GET)" },
+  { path: "components/admin/dashboard/ActionQueue.js", reason: "each row links to the filtered orders list, an order, or Integrations (GETs)" },
+  { path: "components/admin/dashboard/StoreStatus.js", reason: "links to onboarding, the storefront and Publishing (GETs)" },
+  { path: "app/(console)/admin/(authed)/dashboard/error.js", reason: "Try again re-renders the dashboard segment (reset(), a re-read, no write)" },
+];

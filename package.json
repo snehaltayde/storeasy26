@@ -85,6 +85,8 @@
     "test:design-harness": "node scripts/test-design-harness.js",
     "check:turso-real": "node scripts/turso-real-check.js",
     "test:reporting": "node scripts/test-reporting.js",
+    "test:dashboard": "node scripts/test-dashboard.js",
+    "drill:dashboard": "node scripts/drills/run-isolated.mjs dashboard",
     "test:tenant-ops": "node scripts/test-tenant-ops.js",
     "test:marketing": "node scripts/test-marketing.js",
     "test:customers": "node scripts/test-customers.js",

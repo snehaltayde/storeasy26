@@ -79,6 +79,8 @@ Each Phase 2 line fills only its own sub-heading. Every screen here is on the ne
 
 ### Dashboard
 
+`/admin/dashboard` (Phase 2 line 1). `PageHeader` with the range switch (7, 30 or 90 days through `?days=`, links) as its action. Top to bottom: the suspended or maintenance banner; the first-import card (onboarding's `ImportStepBody` in a Card, only while a first import runs, failed or stalled; "Run again" disabled with the reason for a role without `sync.run`); four number cards (Today so far, Last 7 days, the range, Average order; money in Geist Mono); one line of freshness in plain words; then two columns from 1024px (3:2, stacked below): "Orders to act on" (a count, plain words and a link per row, "Nothing needs you right now" when empty) and the daily net-revenue bars (every day drawn, quiet days a flat line, a visually hidden table for screen readers) on the left, "Your store" (open or closed with the onboarding count, address and Open storefront, Shopify, catalog, sent-to-Shopify share, unpublished changes) on the right. A part the server couldn't read says "Couldn't check". A store with no orders points to onboarding. Loading is `dashboard/loading.js` (skeletons in the same layout); an error is `dashboard/error.js` (plain words, Try again). Support sees the same page with no write control: every link carries `data-read-control`.
+
 ### Orders
 
 ### Catalog
