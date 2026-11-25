@@ -2,12 +2,13 @@
 // the pincode lookup (line 1) and saved addresses (line 3) all change the form
 // the same way. No React, no imports: unit-tested in scripts/test-checkout-model.js.
 
-export const ADDRESS_KEYS = ["email", "phone", "name", "line1", "line2", "city", "state", "pincode"];
+// Phase 8 line 4: plus the shipping country (a two-letter code), which picks the market.
+export const ADDRESS_KEYS = ["email", "phone", "name", "line1", "line2", "city", "state", "pincode", "country_code"];
 
 // Where a change came from: the shopper typing, a pincode lookup, or a saved address.
 export const ADDRESS_SOURCES = ["typed", "pincode", "saved"];
 
-export function emptyForm() {
+export function emptyForm(country = "IN") {
   return {
     email: "",
     phone: "",
@@ -17,6 +18,7 @@ export function emptyForm() {
     city: "",
     state: "",
     pincode: "",
+    country_code: country,
   };
 }
 

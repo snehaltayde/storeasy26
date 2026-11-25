@@ -104,6 +104,7 @@ export default async function AccountOrderPage({ params }) {
             </p>
           )}
         </div>
+          {o.market ? <p data-order="charged-in" className="text-right text-xs text-sf-text-subtle">{`Charged in ${cur}`}</p> : null}
       </section>
 
       {data.fulfillments.length > 0 && (

@@ -2,6 +2,7 @@
 
 import Image from "@/components/StoreImage";
 import { formatMoney } from "@/lib/format";
+import { useMoney } from "@/components/MarketContext";
 
 // Phase 7 line 3 (docs/plans/phase-7.md decision 11): the phone buy bar.
 // Storeasy's own part, like the buy box and the cart: data-protected, with no
@@ -20,6 +21,7 @@ export const BUY_BAR_LABEL = {
 };
 
 export default function StickyBuyBar({ visible, title, image, variantLabel, price, compareAt, currency = "INR", state, chooseLabel = "Choose options", onAdd, onView, onChoose }) {
+  const { money } = useMoney(); // Phase 8 line 4: base prices, shown in the shopper's market
   const label = state === "choose" ? chooseLabel : BUY_BAR_LABEL[state] || BUY_BAR_LABEL.add;
   const action = state === "view" ? onView : state === "choose" ? onChoose : state === "add" ? onAdd : undefined;
   const disabled = state === "soldout";
@@ -42,9 +44,9 @@ export default function StickyBuyBar({ visible, title, image, variantLabel, pric
           <p className="truncate text-sm font-semibold text-sf-text">{title}</p>
           <p className="flex items-baseline gap-2 text-sm">
             {variantLabel ? <span className="truncate text-sf-text-subtle">{variantLabel}</span> : null}
-            <span className="font-bold text-sf-text">{formatMoney(price, currency)}</span>
+            <span className="font-bold text-sf-text">{money(price, currency)}</span>
             {compareAt && Number(compareAt) > Number(price) ? (
-              <span className="text-xs text-sf-text-faint line-through">{formatMoney(compareAt, currency)}</span>
+              <span className="text-xs text-sf-text-faint line-through">{money(compareAt, currency)}</span>
             ) : null}
           </p>
         </div>

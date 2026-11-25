@@ -81,10 +81,14 @@ export const POST = tenantHandler(async (request) => {
 
   // Defense in depth: the captured amount must match OUR order to the paisa.
   const { toMinor } = await import("@/lib/money");
+  // Phase 8 line 4: in the order's own currency (a market order was minted in
+  // it), so the minor units are that currency's; a capture in any other
+  // currency is a mismatch too.
   const expectedMinor = toMinor(order.total, order.currency || "INR");
-  if (Number(amount) !== expectedMinor) {
+  const currencyOk = !payment.currency || String(payment.currency).toUpperCase() === String(order.currency || "INR").toUpperCase();
+  if (Number(amount) !== expectedMinor || !currencyOk) {
     console.error(
-      `[rz-webhook] AMOUNT MISMATCH ${order.id}: captured ${amount}, expected ${expectedMinor} (payment ${paymentId})`,
+      `[rz-webhook] AMOUNT MISMATCH ${order.id}: captured ${amount} ${payment.currency || ""}, expected ${expectedMinor} ${order.currency || "INR"} (payment ${paymentId})`,
     );
     if (inboxId) await markInbox(inboxId, "dead", { error: "amount_mismatch" }).catch(() => {});
     return NextResponse.json({ ok: true, flagged: "amount_mismatch", orderId: order.id });

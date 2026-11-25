@@ -815,7 +815,7 @@ const MERCHANT_TEXT_ROUTES = {
   "shipping title": { path: "shippingLine.title", from: "the shipping label, which can carry a merchant's zone label" },
   note: { path: "note", from: "a fixed sentence with our order id, which carries the store's order-id prefix" },
   tags: { path: "tags[]", from: "a fixed tag and our order id" },
-  "order id attribute": { path: "customAttributes[].value", from: "our order id on bl_order_id, with the store's order-id prefix. The other attributes are a fixed string, an amount and payment ids" },
+  "order id attribute": { path: "customAttributes[].value", from: "our order id on bl_order_id, with the store's order-id prefix. The other attributes are a fixed string, an amount and payment ids, and on a market order (Phase 8 line 4) the charged currency code (charged_currency) and the charged amount (charged_total)" },
 };
 const CANCEL_STAFF_NOTE = { variable: "staffNote", from: "the reason typed when cancelling an order" };
 

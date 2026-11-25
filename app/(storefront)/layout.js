@@ -32,6 +32,10 @@ import PreviewBanner, { PreviewMain } from "@/components/PreviewBanner";
 import EditThisPage from "@/components/preview/EditThisPage";
 import { DOCUMENTS_RELEASE_VERSION } from "@/lib/releases";
 import StoreClosed from "@/components/StoreClosed";
+import { MarketProvider } from "@/components/MarketContext";
+import { storefrontMarket } from "@/lib/market-request";
+import { publicMarket, countryOptions } from "@/lib/markets";
+import { currentTenant } from "@/lib/tenant-context";
 
 // Render pages on the edge runtime — the libSQL client resolves to its
 // fetch-based `edge-light` build, and search uses edge-safe fetch.
@@ -245,12 +249,26 @@ const NEUTRAL_CURTAIN = ["Store", null, null];
 
 // P4-EFFECTIVE (OVL-06, plan decision 13): the cart handed to CartProvider (a
 // client component) is the shopper's projection: no Shopify title or SKU.
-async function initialCart() {
+// Phase 8 line 4: priced in the shopper's market (the presentment run).
+async function initialCart(market = null) {
   try {
     const id = (await cookies()).get(CART_COOKIE)?.value;
-    return id ? shopperCart(await tfetch(() => getCart(id))) : emptyCart();
+    return id || market ? shopperCart(await tfetch(() => getCart(id || null, { market }))) : emptyCart();
   } catch {
     return emptyCart();
+  }
+}
+
+// Phase 8 line 4: this request's market (lib/market-request.js, this store's
+// config only) and the footer picker's countries. Base market: market null.
+async function marketData() {
+  try {
+    return await tfetch(async () => {
+      const { country, market } = await storefrontMarket();
+      return { country, market, options: countryOptions(currentTenant()?.config ?? null) };
+    });
+  } catch {
+    return { country: null, market: null, options: [] };
   }
 }
 
@@ -362,7 +380,8 @@ export default async function RootLayout({ children }) {
   // menus starts this read once its chrome is known, not alongside it.
   const chromeRead = chromeData();
   const collectionsRead = chromeRead.then((c) => (Array.isArray(c.navHeader) && Array.isArray(c.navFooter) ? [] : navCollections()));
-  const [collections, cart, chrome] = await Promise.all([collectionsRead, initialCart(), chromeRead]);
+  const markets = await marketData();
+  const [collections, cart, chrome] = await Promise.all([collectionsRead, initialCart(markets.market), chromeRead]);
   const frame = chrome.frame;
   const editing = frame?.kind === "documents"; // preview-only data-doc / data-field
   const liveConsole = frame?.kind === "live" && (await consoleCookiePresent());
@@ -397,6 +416,7 @@ export default async function RootLayout({ children }) {
         {chrome.preview && editing && <PreviewBridgeMount state={frame.state} ok look={chrome.look ?? null} />}
         {frame?.kind === "refused" && <PreviewBridgeMount ok={false} reason={frame.reason} />}
         {liveConsole && <PreviewBridgeMount ok={false} reason="live" />}
+        <MarketProvider market={publicMarket(markets.market)}>
         <CartProvider initialCart={cart}>
           <Header collections={collections} logo={chrome.logo} nav={chrome.navHeader} announcement={chrome.announcement} variant={chrome.headerVariant} editing={editing} />
           {editing ? <PreviewMain routes={frame.routes}>{children}</PreviewMain> : <main className="flex-1">{children}</main>}
@@ -411,9 +431,11 @@ export default async function RootLayout({ children }) {
             pages={chrome.footerPages}
             variant={chrome.footerVariant}
             editing={editing}
+            market={{ country: markets.country, options: markets.options }}
           />
           <CartDrawer />
         </CartProvider>
+        </MarketProvider>
         <ServiceWorkerRegister />
         <ConsentBanner storeName={chrome.name} />
         <Pixels ga4Id={chrome.ga4Id} metaPixelId={chrome.metaPixelId} />

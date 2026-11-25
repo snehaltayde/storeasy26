@@ -7,12 +7,15 @@
 // configs. Placing an order always reprices on the server.
 import { useEffect, useRef, useState } from "react";
 
-export const quoteKey = (cart, pincode) => `${String(pincode || "").trim()}|${cart?.subtotal}|${cart?.discountTotal}|${cart?.total}`;
+// Phase 8 line 4: the country is part of the key, and the cart's currency.
+export const quoteKey = (cart, pincode, country = "") => `${String(pincode || "").trim()}|${country}|${cart?.currency}|${cart?.subtotal}|${cart?.discountTotal}|${cart?.total}`;
 
-export default function useQuote({ cart, address }) {
+// onMarket(data): the answer moved the market (another country), with that
+// market's cart and rates; the caller redraws from them and the key follows.
+export default function useQuote({ cart, address, onMarket = null }) {
   const [quote, setQuote] = useState(null); // { key, terms }
   const seq = useRef(0);
-  const key = quoteKey(cart, address?.pincode);
+  const key = quoteKey(cart, address?.pincode, address?.country_code);
   useEffect(() => {
     const mine = ++seq.current;
     const timer = setTimeout(async () => {
@@ -23,7 +26,11 @@ export default function useQuote({ cart, address }) {
           body: JSON.stringify({ action: "quote", address }),
         });
         const data = await res.json();
-        if (mine === seq.current && data?.ok && data.quote) setQuote({ key, terms: data.quote });
+        if (mine !== seq.current || !data?.ok || !data.quote) return;
+        if (data.marketChanged && data.cart) {
+          setQuote({ key: quoteKey(data.cart, address?.pincode, address?.country_code), terms: data.quote });
+          onMarket?.(data);
+        } else setQuote({ key, terms: data.quote });
       } catch {
         // the preview stays; placing the order reprices anyway
       }
@@ -32,6 +39,6 @@ export default function useQuote({ cart, address }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   // a refusal hands back a fresh quote for the cart it priced
-  const replace = (terms, forCart) => setQuote(terms ? { key: quoteKey(forCart, address?.pincode), terms } : null);
+  const replace = (terms, forCart) => setQuote(terms ? { key: quoteKey(forCart, address?.pincode, address?.country_code), terms } : null);
   return { terms: quote?.key === key ? quote.terms : null, replace };
 }

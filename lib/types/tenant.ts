@@ -60,6 +60,21 @@ export interface PaymentConfig {
   cod?: CodRules;
 }
 
+// tenants.config.markets (Phase 8 line 4): selling in another currency and
+// country. Saved by buildSettingsPatch through lib/markets.js validateMarkets.
+export interface Market {
+  id: string; // its first country code
+  countries: string[]; // ISO 3166-1 alpha-2, never the store's own
+  currency: string; // on RAZORPAY_CURRENCIES (lib/money.js)
+  rate: number; // base units per 1 market unit
+  rateSetAt: string; // ISO 8601 UTC
+  rounding: "exact" | "whole" | "x.99";
+  flatRate: number; // in the market's currency
+  freeThreshold: number | null;
+  enabled: boolean;
+  international: boolean; // the founder's Razorpay international payments tick
+}
+
 export interface BrandTokens {
   accent?: string;
   accent_hover?: string;
@@ -111,6 +126,7 @@ export interface TenantConfig {
   checkout_mode?: "direct" | "disabled" | "shopify";
   shipping_config?: Partial<ShippingConfig>;
   payment_config?: PaymentConfig;
+  markets?: Market[]; // Phase 8 line 4: lib/markets.js validateMarkets
   theme_pin?: ThemePin | null;
   theme_pin_at?: string | null;
   maintenance?: {

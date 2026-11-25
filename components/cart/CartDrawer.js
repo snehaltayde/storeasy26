@@ -6,11 +6,13 @@ import Link from "next/link";
 import { useCart } from "./CartContext";
 import OfferProgress from "./OfferProgress";
 import { formatMoney } from "@/lib/format";
+import { useMoney } from "@/components/MarketContext";
 
 // Cart-drawer upsell slot (Session 23): shown only when the merchant has a
 // cart_upsell placement configured. Lazy-fetched on open, re-fetched when the
 // cart's product mix changes; one-tap add through the normal cart pipeline.
 function UpsellSlot({ open, items, addItem, pending, currency }) {
+  const { money } = useMoney(); // Phase 8 line 4: catalog prices, shown in the shopper's market
   const [slot, setSlot] = useState(null);
   const keyRef = useRef("");
 
@@ -43,7 +45,7 @@ function UpsellSlot({ open, items, addItem, pending, currency }) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="line-clamp-1 text-sm font-medium text-sf-text">{p.title}</p>
-              <p className="text-xs text-sf-text-subtle">{formatMoney(p.variant_price ?? p.price_min, p.currency || currency)}</p>
+              <p className="text-xs text-sf-text-subtle">{money(p.variant_price ?? p.price_min, p.currency || currency)}</p>
             </div>
             <button
               onClick={() => addItem(p.variant_id)}

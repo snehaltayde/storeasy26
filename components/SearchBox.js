@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "@/components/StoreImage";
 import { formatMoney } from "@/lib/format";
+import { useMoney } from "@/components/MarketContext";
 
 // Header search (S38 / SF05): debounced suggestions with stale-response
 // cancellation (AbortController), per-session recent searches (sessionStorage
@@ -31,6 +32,7 @@ const pushRecent = (term) => {
 };
 
 export default function SearchBox() {
+  const { money } = useMoney(); // Phase 8 line 4: the shopper's market
   const router = useRouter();
   const [q, setQ] = useState("");
   const [results, setResults] = useState([]);
@@ -225,7 +227,7 @@ export default function SearchBox() {
                       </div>
                       {r.price != null && (
                         <span className="shrink-0 text-sm font-semibold text-sf-text">
-                          {formatMoney(r.price, r.currency)}
+                          {money(r.price, r.currency)}
                         </span>
                       )}
                     </Link>

@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "@/components/cart/CartContext";
 import { formatMoney, discountPercent } from "@/lib/format";
+import { useMoney } from "@/components/MarketContext";
 import StickyBuyBar from "@/components/pdp/StickyBuyBar";
 import DeliveryCheck from "@/components/pdp/DeliveryCheck";
 
 // Phase 4 line 2: underPrice and underAtc are server-rendered plugin slots
 // (components/plugins/PluginSlot.js) passed in by the PDP layouts.
 export default function ProductPurchase({ product, underPrice = null, underAtc = null }) {
+  const { money, market } = useMoney(); // Phase 8 line 4: the same convertPrice the cart line uses
   const {
     options = [],
     variants = [],
@@ -134,11 +136,11 @@ export default function ProductPurchase({ product, underPrice = null, underAtc =
   return (
     <div className="mt-5">
       <div className="flex flex-wrap items-baseline gap-3">
-        <span className="text-3xl font-bold text-sf-text">{formatMoney(price, currency)}</span>
+        <span className="text-3xl font-bold text-sf-text">{money(price, currency)}</span>
         {pct > 0 && (
           <>
             <span className="text-lg text-sf-text-faint line-through">
-              {formatMoney(compareAt, currency)}
+              {money(compareAt, currency)}
             </span>
             <span className="rounded-sf-xs bg-sf-sale-soft px-2 py-0.5 text-sm font-bold text-sf-on-sale-soft">
               Save {pct}%
@@ -245,7 +247,8 @@ export default function ProductPurchase({ product, underPrice = null, underAtc =
       )}
 
       {/* Phase 8 line 1: PIN code → delivery estimate, cash on delivery, free shipping */}
-      <DeliveryCheck currency={currency} />
+      {/* Phase 8 line 4: PIN codes are the store's own country's; a market has no check */}
+      {!market && <DeliveryCheck currency={currency} />}
 
       {/* S38 (SF04) → Phase 7 line 3: the phone buy bar (components/pdp/StickyBuyBar.js) */}
       <StickyBuyBar

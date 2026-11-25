@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "@/components/StoreImage";
 import BundleAddButton from "@/components/BundleAddButton";
 import { formatMoney } from "@/lib/format";
+import { BundleFigure } from "@/components/Price";
 import { stateLine } from "@/lib/commerce/bundle-words";
 import { settingsOf, MediaFallback, FounderNote } from "./parts";
 
@@ -103,9 +104,9 @@ export function BundleBox({ bundle, Heading = "h3", ctx }) {
       </ul>
       <div className="mt-auto pt-5">
         <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="text-2xl font-extrabold">{formatMoney(price, cur)}</span>
-          {sum > price ? <span className="text-base text-sf-text-faint line-through">{formatMoney(sum, cur)}</span> : null}
-          {saving > 0 ? <span className="rounded-sf-xs bg-sf-sale-soft px-2 py-0.5 text-sm font-bold text-sf-on-sale-soft">{`You save ${formatMoney(saving, cur)}`}</span> : null}
+          <span className="text-2xl font-extrabold"><BundleFigure bundle={bundle} kind="price" /></span>
+          {sum > price ? <span className="text-base text-sf-text-faint line-through"><BundleFigure bundle={bundle} kind="sum" /></span> : null}
+          {saving > 0 ? <span className="rounded-sf-xs bg-sf-sale-soft px-2 py-0.5 text-sm font-bold text-sf-on-sale-soft"><BundleFigure bundle={bundle} kind="saving" prefix="You save " /></span> : null}
         </p>
         <div className="mt-4">
           <BundleAddButton components={addProps(components)} disabled={bundle.state !== "available"} />

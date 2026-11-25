@@ -11,6 +11,8 @@ import { numericId } from "@/lib/ids";
 import { parseFacetParams, activeCount, facetHref, facetParams, clearedFilters, PER_PAGE } from "@/lib/catalog/facets";
 import { runFacetSearch } from "@/lib/catalog/facet-search";
 import { tfetch } from "@/lib/storefront-request";
+import { storefrontMarket } from "@/lib/market-request";
+import { boundToBase, convertPrice } from "@/lib/markets";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +38,14 @@ export default async function SearchPage({ searchParams }) {
   const s = parseFacetParams(await searchParams);
   const filters = activeCount(s);
   const ran = s.q.length >= 2 || filters > 0;
-  const result = ran ? await tfetch(() => runFacetSearch(s)) : null;
+  // Phase 8 line 4: the price filter is typed in the shopper's market money;
+  // the catalog is in base money, so the bounds go back to base (widened so a
+  // price that converts to a bound stays inside it) and the placeholders come
+  // out converted.
+  const { market } = await tfetch(() => storefrontMarket());
+  const asBase = market ? { ...s, min: boundToBase(s.min, market, "min"), max: boundToBase(s.max, market, "max") } : s;
+  const searched = ran ? await tfetch(() => runFacetSearch(asBase)) : null;
+  const result = searched && market && searched.price ? { ...searched, price: { min: convertPrice(searched.price.min, market), max: convertPrice(searched.price.max, market) } } : searched;
   const found = result?.found ?? 0;
 
   const products = (result?.hits ?? []).map((h) => ({

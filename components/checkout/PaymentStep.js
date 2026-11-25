@@ -16,7 +16,8 @@ export default function PaymentStep({ cart, method, onMethod, razorpayEnabled, c
     <section>
       <h2 className="mb-4 text-lg font-bold">Payment</h2>
       <div className="space-y-3">
-        {!codShown && (
+        {/* Phase 8 line 4: outside the store's own country COD is simply absent */}
+        {!codShown && !cart.market && (
           <p data-checkout="cod-unavailable" className="rounded-sf-card border border-sf-border bg-sf-surface-muted px-4 py-3 text-sm text-sf-text-muted">
             {terms.cod.reason}.
           </p>
@@ -85,6 +86,11 @@ export default function PaymentStep({ cart, method, onMethod, razorpayEnabled, c
               : `Pay ${formatMoney(grandTotal, cart.currency)}`}
         </button>
       </div>
+      {cart.market ? (
+        <p data-checkout="charged-in" className="mt-2 text-center text-xs text-sf-text-subtle">
+          {`You'll be charged in ${cart.currency}.`}
+        </p>
+      ) : null}
 
       {/* S38 (SF14): the store's own policies, right where the money moves */}
       {policies.length > 0 && (

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { rateLimitAsync } from "@/lib/rate-limit";
 import { storefrontHandler } from "@/lib/storefront-request";
+import { requestMarket } from "@/lib/market-request";
 import {
   CART_COOKIE,
-  emptyCart,
   getCart as fullCart,
   shopperCart,
   createCart,
@@ -19,7 +19,8 @@ export const runtime = "edge";
 
 // P4-EFFECTIVE (OVL-06, plan decision 13): every cart this route answers with
 // is the shopper's projection: Shopify's title and the SKU stay on the server.
-const getCart = async (id) => shopperCart(await fullCart(id));
+// Phase 8 line 4: priced in this request's market (the presentment run).
+const cartFor = (request) => async (id) => shopperCart(await fullCart(id || null, { market: requestMarket(request).market }));
 export const dynamic = "force-dynamic";
 
 const COOKIE_OPTS = {
@@ -32,7 +33,7 @@ const COOKIE_OPTS = {
 
 export const GET = storefrontHandler(async (request) => {
   const id = request.cookies.get(CART_COOKIE)?.value;
-  const cart = id ? await getCart(id) : emptyCart();
+  const cart = await cartFor(request)(id);
   return NextResponse.json(cart);
 });
 
@@ -52,6 +53,7 @@ export const POST = storefrontHandler(async (request) => {
     return res;
   };
 
+  const getCart = cartFor(request);
   const body = await request.json().catch(() => ({}));
   try {
     switch (body.action) {

@@ -3,6 +3,7 @@ import Image from "@/components/StoreImage";
 import { notFound } from "next/navigation";
 import { getBundle } from "@/lib/bundles";
 import { formatMoney } from "@/lib/format";
+import Price, { BundleFigure } from "@/components/Price";
 import BundleAddButton from "@/components/BundleAddButton";
 import { BUNDLE_PAGE_UNAVAILABLE, bundlePageSaysOutOfStock } from "@/lib/commerce/bundle-words";
 import { tfetch } from "@/lib/storefront-request";
@@ -75,18 +76,18 @@ export default async function BundlePage({ params }) {
                   {!c.available && <span className="ml-2 font-bold text-sf-text-subtle">{c.state === "missing" ? "NO LONGER AVAILABLE" : "SOLD OUT"}</span>}
                 </p>
               </div>
-              {c.price != null && <span className="shrink-0 text-sm text-sf-text-subtle line-through">{formatMoney(c.price * c.quantity, cur)}</span>}
+              {c.price != null && <span className="shrink-0 text-sm text-sf-text-subtle line-through"><Price amount={c.price} quantity={c.quantity} currency={cur} /></span>}
             </li>
           ))}
         </ul>
 
         <div className="h-fit rounded-sf-card border border-sf-border p-6 lg:sticky lg:top-24">
           <p className="flex items-baseline gap-3">
-            <span className="text-3xl font-extrabold">{formatMoney(b.bundle_price, cur)}</span>
-            <span className="text-lg text-sf-text-faint line-through">{formatMoney(b.componentsSum, cur)}</span>
+            <span className="text-3xl font-extrabold"><BundleFigure bundle={{ ...b, currency: cur }} kind="price" /></span>
+            <span className="text-lg text-sf-text-faint line-through"><BundleFigure bundle={{ ...b, currency: cur }} kind="sum" /></span>
             {b.saving > 0 && (
               <span className="rounded-sf-xs bg-sf-sale-soft px-2 py-0.5 text-sm font-bold text-sf-on-sale-soft">
-                Save {formatMoney(b.saving, cur)}
+                Save <BundleFigure bundle={{ ...b, currency: cur }} kind="saving" />
               </span>
             )}
           </p>

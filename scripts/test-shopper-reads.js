@@ -181,10 +181,12 @@ await t("no shopper-class file reads a cart or customer id from the body or the 
   for (const f of files) same(readsBodyId(await readFile(join(ROOT, f), "utf8")), [], f);
 });
 
-await t("the storefront layout's initialCart reads only the cart cookie", async () => {
+// Phase 8 line 4: plus the shopper's market, which comes from this store's own
+// config through lib/market-request.js (never a query or body value).
+await t("the storefront layout's initialCart reads only the cart cookie (and the store's market)", async () => {
   const src = await readFile(join(ROOT, "app/(storefront)/layout.js"), "utf8");
-  const fn = src.slice(src.indexOf("async function initialCart()"), src.indexOf("export default async function RootLayout"));
-  ok(/\(await cookies\(\)\)\.get\(CART_COOKIE\)\?\.value/.test(fn) && /shopperCart\(await tfetch\(\(\) => getCart\(id\)\)\)/.test(fn), fn.slice(0, 300));
+  const fn = src.slice(src.indexOf("async function initialCart("), src.indexOf("export default async function RootLayout"));
+  ok(/\(await cookies\(\)\)\.get\(CART_COOKIE\)\?\.value/.test(fn) && /shopperCart\(await tfetch\(\(\) => getCart\(id \|\| null, \{ market \}\)\)\)/.test(fn) && /await storefrontMarket\(\)/.test(fn), fn.slice(0, 300));
   ok(!/searchParams|params|body/.test(fn), "initialCart takes nothing else");
 });
 

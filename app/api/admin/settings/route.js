@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin, adminSessionTokenFor, adminBootstrapMode, ADMIN_COOKIE } from "@/lib/admin-auth";
 import { audit } from "@/lib/platform/audit";
 import { settingsView, buildSettingsPatch } from "@/lib/admin/settings";
+import { rateChanges } from "@/lib/markets";
 import { smsAvailable } from "@/lib/messaging/sms";
 import { patchTenant } from "@/lib/platform/control.js";
 import { currentTenant, tenantId } from "@/lib/tenant-context.js";
@@ -61,12 +62,18 @@ export const PUT = tenantHandler(async (request) => {
     actor: auth.actor,
     action: "settings.write",
     resource: "settings",
-    diff: { config_keys: Object.keys(patch.config), secret_keys: Object.keys(patch.secrets) },
+    // Phase 8 line 4: a markets save lists its rate changes ("US: 84.2 → 85")
+    diff: {
+      config_keys: Object.keys(patch.config),
+      secret_keys: Object.keys(patch.secrets),
+      ...(patch.config.markets ? { rate_changes: rateChanges(tenant.config?.markets || [], patch.config.markets) } : {}),
+    },
   });
 
   const res = NextResponse.json({
     ok: true,
-    settings: settingsView(updated, { counts: await syncCounts() }),
+    // Phase 8 line 4: the saved markets go back only to the writer who saved them
+    settings: { ...settingsView(updated, { counts: await syncCounts() }), ...(patch.config.markets ? { markets: updated?.config?.markets ?? patch.config.markets } : {}) },
     ...(patch.secrets.admin_password ? { passwordRotated: true } : {}),
   });
   // A BOOTSTRAP-password rotation kills the old derived cookie token — re-issue

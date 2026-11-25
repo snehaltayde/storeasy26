@@ -8,6 +8,8 @@ import { productPage } from "@/lib/catalog/effective";
 import { numericId } from "@/lib/ids";
 import { abs, siteName } from "@/lib/site";
 import { tfetch } from "@/lib/storefront-request";
+import { storefrontMarket } from "@/lib/market-request";
+import { convertPrice } from "@/lib/markets";
 
 export const dynamic = "force-dynamic";
 
@@ -55,13 +57,17 @@ export async function generateMetadata({ params }) {
 }
 
 // Product + BreadcrumbList structured data for rich results.
-function productJsonLd(product, brandName) {
+// Phase 8 line 4: in the shopper's market (price and priceCurrency), the same
+// convertPrice the page and cart show; no market → exactly as before.
+function productJsonLd(product, brandName, market = null) {
+  const amt = (v) => String(market ? convertPrice(v ?? 0, market) : v ?? 0);
+  const cur = market ? market.currency : product.currency || "INR";
   const offers =
     product.price_min === product.price_max
       ? {
           "@type": "Offer",
-          price: String(product.price_min ?? 0),
-          priceCurrency: product.currency || "INR",
+          price: amt(product.price_min),
+          priceCurrency: cur,
           availability: product.available
             ? "https://schema.org/InStock"
             : "https://schema.org/OutOfStock",
@@ -69,9 +75,9 @@ function productJsonLd(product, brandName) {
         }
       : {
           "@type": "AggregateOffer",
-          lowPrice: String(product.price_min ?? 0),
-          highPrice: String(product.price_max ?? product.price_min ?? 0),
-          priceCurrency: product.currency || "INR",
+          lowPrice: amt(product.price_min),
+          highPrice: amt(product.price_max ?? product.price_min),
+          priceCurrency: cur,
           availability: product.available
             ? "https://schema.org/InStock"
             : "https://schema.org/OutOfStock",
@@ -123,12 +129,13 @@ export default async function ProductPage({ params }) {
     return { product, pairs, brandName: siteName(), extras, override, template: surface.template };
   });
   if (!product) notFound();
+  const { market } = await tfetch(() => storefrontMarket());
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd(product, brandName)) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd(product, brandName, market)) }}
       />
       <TrackEvent
         name="view_item"

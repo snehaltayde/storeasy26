@@ -1,4 +1,5 @@
 import Link from "next/link";
+import MarketPicker from "@/components/MarketPicker";
 
 // P6-LOGO-RENDER (GEN-04): a documents store's picture logo (logo.image, a
 // library path from the live design document) replaces the text wordmark in
@@ -56,7 +57,11 @@ export default function Footer({
   // P3-FRAME (ED-04): a documents preview only: data-doc="doc_footer", the
   // document a click in the editor's frame picks. Shoppers' markup is unchanged.
   editing = false,
+  // Phase 8 line 4: { country, options } for the "Ship to" picker (absent or
+  // one option: nothing renders, so a one-market store's footer is unchanged)
+  market = null,
 }) {
+  const picker = market?.options?.length > 1 ? <MarketPicker options={market.options} country={market.country} /> : null;
   const doc = editing ? { "data-doc": "doc_footer" } : {};
   // nested nav items flatten here (dropdowns are a header affordance)
   const shopItems = Array.isArray(nav)
@@ -104,6 +109,7 @@ export default function Footer({
               ) : null}
             </p>
           )}
+          {picker ? <div className="mt-6 flex justify-center">{picker}</div> : null}
           <p className="mt-8 border-t border-sf-border pt-5 text-xs text-sf-text-faint">© {legalName}</p>
         </div>
       </footer>
@@ -185,6 +191,7 @@ export default function Footer({
           </div>
         </div>
 
+        {picker ? <div className="mt-8">{picker}</div> : null}
         <p className="mt-10 border-t border-sf-border pt-6 text-xs text-sf-text-faint">
           © {legalName}
         </p>

@@ -4,11 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "@/components/StoreImage";
 import { formatMoney } from "@/lib/format";
+import { useMoney } from "@/components/MarketContext";
 
 // Quiz runner (S46 / SF19): steps through the questions client-side, sends
 // the answers once for a DETERMINISTIC result. Contact capture at the end is
 // optional and explicitly consented — skipping it loses nothing.
 export default function QuizRunner({ quiz }) {
+  const { money } = useMoney(); // Phase 8 line 4: the shopper's market
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState({});
   const [state, setState] = useState("quiz"); // quiz | loading | results
@@ -74,7 +76,7 @@ export default function QuizRunner({ quiz }) {
                 </div>
                 <div className="p-3">
                   <p className="truncate text-sm font-semibold group-hover:underline">{p.title}</p>
-                  <p className="text-sm text-sf-text-subtle">{formatMoney(p.price, p.currency)}</p>
+                  <p className="text-sm text-sf-text-subtle">{money(p.price, p.currency)}</p>
                 </div>
               </Link>
             ))}

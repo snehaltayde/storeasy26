@@ -32,14 +32,12 @@ const FIELDS = [
   { key: "state", label: "State", required: true, half: true },
 ];
 
-export default function AddressStep({ form, valid, onAddress, onContinue }) {
-  return (
-    <section>
-      <h2 className="mb-4 text-lg font-bold">Contact &amp; shipping address</h2>
-      {/* saved-addresses */}
-      <SavedAddressPicker form={form} onAddress={onAddress} />
-      <PincodeField form={form} onAddress={onAddress}>
-        {(chip) => (
+// Phase 8 line 4: the country comes first (the store's own and its enabled
+// markets', `countries` from lib/markets.js countryOptions). The PIN lookup is
+// India's; any other country gets a plain postal code field.
+export default function AddressStep({ form, valid, onAddress, onContinue, countries = [] }) {
+  const india = (form.country_code || "IN") === "IN";
+  const fields = (chip) => (
           <div className="grid grid-cols-2 gap-3">
             {(chip
               ? FIELDS.filter((f) => f.key !== "city" && f.key !== "state")
@@ -62,8 +60,55 @@ export default function AddressStep({ form, valid, onAddress, onContinue }) {
               </div>
             ))}
           </div>
-        )}
-      </PincodeField>
+  );
+  return (
+    <section>
+      <h2 className="mb-4 text-lg font-bold">Contact &amp; shipping address</h2>
+      {countries.length > 1 && (
+        <div className="mb-3">
+          <label htmlFor="checkout-country" className="mb-1 block text-xs font-medium text-sf-text-subtle">
+            Country
+          </label>
+          <select
+            id="checkout-country"
+            name="country_code"
+            autoComplete="country"
+            value={form.country_code}
+            onChange={(e) => onAddress({ country_code: e.target.value }, "typed")}
+            className="w-full rounded-sf-control border border-sf-border bg-sf-surface px-3 py-2.5 text-sm outline-none focus:border-sf-border-hover"
+          >
+            {countries.map((c) => (
+              <option key={c.country} value={c.country}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      {/* saved-addresses */}
+      <SavedAddressPicker form={form} onAddress={onAddress} />
+      {india ? (
+        <PincodeField form={form} onAddress={onAddress}>
+          {fields}
+        </PincodeField>
+      ) : (
+        <>
+          <div className="mb-3">
+            <label htmlFor="checkout-postal" className="mb-1 block text-xs font-medium text-sf-text-subtle">
+              Postal code
+            </label>
+            <input
+              id="checkout-postal"
+              name="pincode"
+              autoComplete="postal-code"
+              value={form.pincode}
+              onChange={(e) => onAddress({ pincode: e.target.value }, "typed")}
+              className="w-full rounded-sf-control border border-sf-border px-3 py-2.5 text-sm outline-none focus:border-sf-border-hover"
+            />
+          </div>
+          {fields(false)}
+        </>
+      )}
       <button
         onClick={onContinue}
         disabled={!valid}

@@ -54,6 +54,12 @@ export default function OrderSummary({ cart, shipping, grandTotal, paymentDiscou
         <span className="font-semibold">Total</span>
         <span className="text-lg font-bold">{formatMoney(grandTotal, cart.currency)}</span>
       </div>
+      {/* Phase 8 line 4: a market's shopper is told the currency before paying */}
+      {cart.market ? (
+        <p data-checkout="charged-in-summary" className="mt-1 text-right text-xs text-sf-text-subtle">
+          {`You'll be charged in ${cart.currency}.`}
+        </p>
+      ) : null}
       {cart.discountTotal + paymentDiscount > 0 && (
         <p className="mt-1 text-right text-xs font-semibold text-sf-accent-text">
           You save {formatMoney(cart.discountTotal + paymentDiscount, cart.currency)}

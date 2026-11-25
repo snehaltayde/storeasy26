@@ -1,6 +1,7 @@
 import Link from "next/link";
 import FadeImage from "./FadeImage";
 import { formatMoney, discountPercent } from "@/lib/format";
+import Price from "@/components/Price";
 
 export default function ProductCard({ product, priority = false }) {
   const {
@@ -63,10 +64,10 @@ export default function ProductCard({ product, priority = false }) {
         </h3>
         <p data-part="product-card-price" className="text-sm">
           {ranged && <span className="text-sf-text-subtle">from </span>}
-          <span className="font-semibold text-sf-text">{formatMoney(price_min, currency)}</span>
+          <span className="font-semibold text-sf-text"><Price amount={price_min} currency={currency} /></span>
           {onSale && (
             <span className="ml-2 text-xs text-sf-text-faint line-through">
-              {formatMoney(compare_at_min, currency)}
+              <Price amount={compare_at_min} currency={currency} />
             </span>
           )}
         </p>

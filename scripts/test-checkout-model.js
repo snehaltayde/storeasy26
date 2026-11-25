@@ -26,14 +26,15 @@ const ok = (v, label) => {
   if (!v) throw new Error(label);
 };
 
-const FILLED = { email: "a@b.test", phone: "9999999999", name: "A Shopper", line1: "1 Road", line2: "", city: "Pune", state: "MH", pincode: "411001" };
+const FILLED = { email: "a@b.test", phone: "9999999999", name: "A Shopper", line1: "1 Road", line2: "", city: "Pune", state: "MH", pincode: "411001", country_code: "IN" };
 
 // ---- checkoutModel --------------------------------------------------------------
 
 console.log("— checkoutModel");
 
 t("emptyForm: every address field, blank, and a fresh object each time", () => {
-  eq(emptyForm(), { email: "", phone: "", name: "", line1: "", line2: "", city: "", state: "", pincode: "" });
+  eq(emptyForm(), { email: "", phone: "", name: "", line1: "", line2: "", city: "", state: "", pincode: "", country_code: "IN" });
+  eq(emptyForm("US").country_code, "US", "Phase 8 line 4: the starting country:");
   eq(Object.keys(emptyForm()), ADDRESS_KEYS);
   const a = emptyForm();
   a.city = "Pune";

@@ -117,6 +117,8 @@ export default async function ConfirmationPage({ params, searchParams }) {
             <span>Total</span>
             <span>{formatMoney(order.total, order.currency)}</span>
           </div>
+          {/* Phase 8 line 4: an order from another market says what it was charged in */}
+          {order.market ? <p data-order="charged-in" className="text-right text-xs text-sf-text-subtle">{`Charged in ${order.currency}`}</p> : null}
         </div>
 
         <div className="mt-6 grid gap-4 text-sm sm:grid-cols-2">

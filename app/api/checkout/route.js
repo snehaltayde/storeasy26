@@ -16,6 +16,7 @@ import { verifyBrowserPayment, runOrderEffects } from "@/lib/payment-settle";
 import { razorpayConfigured, razorpayKeyId, createRazorpayOrder } from "@/lib/razorpay";
 import { toMinor, sameAmount } from "@/lib/money";
 import { priceMismatch, PRICE_CHANGED } from "@/lib/checkout-price";
+import { formatMoney } from "@/lib/format";
 import { checkoutCapability } from "@/lib/commerce/adapter";
 import { tenantHandler } from "@/lib/tenant-request";
 import { conversionUnit } from "@/lib/experiments";
@@ -26,6 +27,10 @@ import { paymentTerms, COD_OTP_MESSAGES } from "@/lib/checkout/payment-terms";
 import { sendCodOtp, verifyCodOtp, requireVerified, consumeChallenge, CodOtpError } from "@/lib/checkout/cod-otp";
 import { smsAvailable } from "@/lib/messaging/sms";
 import { e164, PHONE_INVALID } from "@/lib/checkout/phone";
+import { requestMarket, MARKET_COOKIE_OPTS } from "@/lib/market-request";
+import { MARKET_COOKIE, marketForCountry, marketShipping, marketPaymentConfig, baseCountry, countryName, postalCodeValid } from "@/lib/markets";
+import { RAZORPAY_CURRENCIES } from "@/lib/money";
+import { baseFigures } from "@/lib/checkout/market-order";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,6 +55,45 @@ function validate(contact, address) {
 
 // S31 (BE36): amount comparisons happen at minor-unit precision via lib/money.
 
+// Phase 8 line 4 (decision 17): the address country decides the market at
+// checkout. `address.country_code` is the country the shopper chose; a page
+// that sends none (an older tab) means the store's own country. A country that
+// is neither the store's nor in an enabled market is refused; one whose market
+// differs from the cookie's is priced again and refused (409) in the new
+// currency, with the cookie moved to that country.
+const storeConfig = () => currentTenant()?.config ?? null;
+function checkoutMarket(request, address) {
+  const config = storeConfig();
+  const code = String(address?.country_code ?? "").trim().toUpperCase();
+  const country = /^[A-Z]{2}$/.test(code) ? code : baseCountry(config);
+  const market = marketForCountry(country, config);
+  const cookieMarket = requestMarket(request).market;
+  return {
+    country,
+    market,
+    supported: country === baseCountry(config) || Boolean(market),
+    changed: (cookieMarket?.id ?? null) !== (market?.id ?? null),
+  };
+}
+const unsupportedCountry = (ctx) =>
+  NextResponse.json({ error: `We don't ship to ${countryName(ctx.country)} yet.`, code: "COUNTRY_UNAVAILABLE" }, { status: 400 });
+const postalInvalid = (ctx) =>
+  NextResponse.json(
+    { error: ctx.country === "IN" ? "Please enter a 6-digit PIN code." : "Please enter a valid postal code.", code: "POSTAL_INVALID" },
+    { status: 400 },
+  );
+// the address as stored: the country's name from its code
+const withCountry = (address, ctx) => ({ ...address, country_code: ctx.country, country: countryName(ctx.country) });
+// decision 16: a market charges only in an allowlisted currency, with the tick
+const marketChargeable = (m) => !m || (RAZORPAY_CURRENCIES.includes(m.currency) && m.international === true);
+const shippingConfigFor = (market) => (market ? marketShipping(market, tenantShippingConfig()) : tenantShippingConfig());
+// PIN-code zones are Indian PIN prefixes: a market prices without them
+const pincodeFor = (market, address) => (market ? null : address?.pincode || null);
+const setMarketCookie = (res, ctx) => {
+  res.cookies.set(MARKET_COOKIE, ctx.country, MARKET_COOKIE_OPTS);
+  return res;
+};
+
 // A store without its own link secret can't sign the confirmation link, so in
 // production it takes no order at all: refused before dedup or createOrder,
 // never an order written and then a failed answer (lib/orders.js storeLinkSecret).
@@ -71,7 +115,7 @@ const conflictResponse = () => NextResponse.json({ error: CONFLICT_MESSAGE, code
 // key on another cart's order is a 409 with no order fields. Returns null (no
 // dup), a NextResponse to send, or the order. `expectedTotal` is goods+shipping
 // for THIS submission (order.total includes shipping since Session 13).
-async function dedupByKey(key, cartId, cart, expectedTotal) {
+async function dedupByKey(key, cartId, cart, expectedTotal, currency = cart?.currency || "INR") {
   if (!cartId) return null;
   let existing;
   try {
@@ -83,7 +127,7 @@ async function dedupByKey(key, cartId, cart, expectedTotal) {
   if (!existing) return null;
   // Same key but a different (non-empty) cart ⇒ not a retry: the client must
   // rotate its key. 409 tells it to.
-  if (cart?.items?.length && !sameAmount(expectedTotal, existing.total)) return conflictResponse();
+  if (cart?.items?.length && !sameAmount(expectedTotal, existing.total, currency)) return conflictResponse();
   return existing;
 }
 
@@ -92,15 +136,45 @@ async function dedupByKey(key, cartId, cart, expectedTotal) {
 // cart, the store's saved rates and payment rules. Every action prices with
 // this; nothing in the request body (prepaidDiscount, nudge, payment_discount)
 // is ever read.
-const termsFor = (cart, address) =>
+// Phase 8 line 4: in the market's money, with the market's shipping; cash on
+// delivery only in the base market; online payment only when the market can be
+// charged (decision 16).
+const termsFor = (cart, address, market = null) =>
   paymentTerms({
     cart,
-    shippingConfig: tenantShippingConfig(),
-    paymentConfig: currentTenant()?.config?.payment_config ?? null,
-    pincode: address?.pincode || null,
-    prepaidAvailable: razorpayConfigured(),
+    shippingConfig: shippingConfigFor(market),
+    paymentConfig: marketPaymentConfig(storeConfig()?.payment_config ?? null, market),
+    pincode: pincodeFor(market, address),
+    prepaidAvailable: razorpayConfigured() && marketChargeable(market),
     smsAvailable: smsAvailable(),
+    outsideBase: Boolean(market),
   });
+
+// The 409 in the new currency (decision 17): the cart, rates and quote of the
+// address country's market, the amount the pressed method would now cost, and
+// the cookie moved there. Same code as a price change, so the page redraws.
+async function marketChangedResponse(cartId, address, ctx, action) {
+  const cart = await getCart(cartId, { market: ctx.market });
+  const terms = termsFor(cart, address, ctx.market);
+  const total = action === "cod" || action === "cod_otp_send" || action === "cod_otp_verify" ? terms.cod.total : terms.prepaid.total;
+  const currency = cart.currency || "INR";
+  slog("market_mismatch", { action, market: ctx.market?.id ?? "base" });
+  const res = NextResponse.json(
+    {
+      ok: false,
+      code: PRICE_CHANGED,
+      marketChanged: true,
+      error: `Your country changed — your new total is ${formatMoney(total, currency)}. Review and place order.`,
+      total,
+      currency,
+      cart: shopperCart(cart),
+      shippingConfig: shippingConfigFor(ctx.market),
+      quote: terms,
+    },
+    { status: 409 },
+  );
+  return setMarketCookie(res, ctx);
+}
 
 const codUnavailable = (terms) =>
   NextResponse.json({ ok: false, code: "COD_UNAVAILABLE", error: terms.cod.reason, quote: terms }, { status: 409 });
@@ -248,10 +322,22 @@ export const POST = tenantHandler(async (request) => {
 
   try {
     // Phase 8 line 2: a read of this cart cookie's cart only; no order, no write.
+    // Phase 8 line 4: priced in the address country's market; a country that
+    // moves the market answers with the new cart and rates, and moves the cookie.
+    const ctx = checkoutMarket(request, address);
     if (action === "quote") {
-      const cart = cartId ? await getCart(cartId) : { items: [], subtotal: 0, discountTotal: 0, total: 0 };
-      return NextResponse.json({ ok: true, quote: termsFor(cart, address) });
+      if (!ctx.supported) return unsupportedCountry(ctx);
+      const cart = await getCart(cartId || null, { market: ctx.market });
+      const quote = termsFor(cart, address, ctx.market);
+      if (!ctx.changed) return NextResponse.json({ ok: true, quote });
+      return setMarketCookie(NextResponse.json({ ok: true, quote, marketChanged: true, currency: cart.currency, cart: shopperCart(cart), shippingConfig: shippingConfigFor(ctx.market) }), ctx);
     }
+    if (["cod", "razorpay_create", "cod_otp_send", "cod_otp_verify"].includes(action)) {
+      if (!ctx.supported) return unsupportedCountry(ctx);
+      if (address?.pincode && !postalCodeValid(address.pincode, ctx.country)) return postalInvalid(ctx);
+      if (ctx.changed && cartId) return await marketChangedResponse(cartId, address, ctx, action);
+    }
+    const market = ctx.market;
 
     // Phase 8 line 2 (decision 13): send or check the COD code. The challenge
     // is bound to this cart cookie, this key, this phone and this COD amount.
@@ -260,18 +346,18 @@ export const POST = tenantHandler(async (request) => {
       if (disabled) return disabled;
       if (!idempotencyKey) return NextResponse.json({ error: "idempotencyKey is required" }, { status: 400 });
       if (!cartId) return NextResponse.json({ error: "No cart session" }, { status: 400 });
-      const cart = await getCart(cartId);
+      const cart = await getCart(cartId, { market });
       if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
       if (!validate(contact, address)) return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
       if (!e164(contact.phone)) return phoneInvalid();
-      const terms = termsFor(cart, address);
+      const terms = termsFor(cart, address, market);
       if (!terms.cod.available) return codUnavailable(terms);
       const bind = { cartId, key: String(idempotencyKey), phone: contact.phone, amount: terms.cod.total, currency: cart.currency || "INR", cart };
       try {
         if (action === "cod_otp_verify") return NextResponse.json({ ok: true, ...(await verifyCodOtp({ ...bind, challengeId: body.challengeId, code: body.code })) });
         if (!terms.cod.otpRequired) return NextResponse.json({ ok: true, required: false });
-        const shippingConfig = tenantShippingConfig();
-        const shipping = computeShipping({ subtotal: cart.subtotal || 0, discountTotal: cart.discountTotal || 0, paymentMethod: "cod", pincode: address?.pincode, config: shippingConfig });
+        const shippingConfig = shippingConfigFor(market);
+        const shipping = computeShipping({ subtotal: cart.subtotal || 0, discountTotal: cart.discountTotal || 0, paymentMethod: "cod", pincode: pincodeFor(market, address), config: shippingConfig });
         const changed = priceCheck(body, cart, shipping, shippingConfig, terms);
         if (changed) return changed;
         const { reply, deliver } = await sendCodOtp({ ...bind, email: contact.email, channel: terms.cod.otpChannel });
@@ -291,21 +377,21 @@ export const POST = tenantHandler(async (request) => {
       if (disabled) return disabled;
       if (!idempotencyKey)
         return NextResponse.json({ error: "idempotencyKey is required" }, { status: 400 });
-      const cart = cartId ? await getCart(cartId) : { items: [] };
+      const cart = cartId ? await getCart(cartId, { market }) : { items: [] };
 
       // Authoritative shipping: same pure engine the drawer/checkout UI use,
       // now with the real payment method + destination pincode. One read of the
       // rates for the whole request (the row was read fresh, see POST below).
-      const shippingConfig = tenantShippingConfig();
+      const shippingConfig = shippingConfigFor(market);
       const shipping = computeShipping({
         subtotal: cart.subtotal || 0,
         discountTotal: cart.discountTotal || 0,
         paymentMethod: "cod",
-        pincode: address?.pincode,
+        pincode: pincodeFor(market, address),
         config: shippingConfig,
       });
 
-      const terms = termsFor(cart, address);
+      const terms = termsFor(cart, address, market);
       const dup = await dedupByKey(idempotencyKey, cartId, cart, terms.cod.total);
       if (dup instanceof NextResponse) return dup;
       if (dup) {
@@ -341,7 +427,7 @@ export const POST = tenantHandler(async (request) => {
         cartId,
         cart,
         contact,
-        address,
+        address: withCountry(address, ctx),
         paymentMethod: "cod",
         idempotencyKey,
         shipping,
@@ -371,19 +457,22 @@ export const POST = tenantHandler(async (request) => {
         return NextResponse.json({ error: "Online payment isn't available for this store right now." }, { status: 400 });
       if (!idempotencyKey)
         return NextResponse.json({ error: "idempotencyKey is required" }, { status: 400 });
-      const cart = cartId ? await getCart(cartId) : { items: [] };
+      // decision 16: a market Razorpay can't charge takes no online payment
+      if (!marketChargeable(market))
+        return NextResponse.json({ error: "Online payment isn't available for this country right now." }, { status: 400 });
+      const cart = cartId ? await getCart(cartId, { market }) : { items: [] };
 
-      const shippingConfig = tenantShippingConfig();
+      const shippingConfig = shippingConfigFor(market);
       const shipping = computeShipping({
         subtotal: cart.subtotal || 0,
         discountTotal: cart.discountTotal || 0,
         paymentMethod: "prepaid",
-        pincode: address?.pincode,
+        pincode: pincodeFor(market, address),
         config: shippingConfig,
       });
 
       // Phase 8 line 2: the prepaid discount, priced by the server only.
-      const terms = termsFor(cart, address);
+      const terms = termsFor(cart, address, market);
       const paymentDiscount = terms.prepaid.discount;
       // Dedup BEFORE creating a Razorpay order, so a retry reopens the SAME
       // payment instead of minting a parallel one.
@@ -403,20 +492,25 @@ export const POST = tenantHandler(async (request) => {
 
       // One getCart + one shipping compute → the SAME amount for the Razorpay
       // order, our order row, and (later) the Shopify shipping line.
+      // Phase 8 line 4: minted in the market's currency, in its minor units
+      // (lib/money.js toMinor: USD cents, JPY whole yen).
+      const currency = cart.currency || "INR";
       const rzOrder = await createRazorpayOrder({
-        amountPaise: toMinor(terms.prepaid.total, cart.currency || "INR"),
+        amountPaise: toMinor(terms.prepaid.total, currency),
         receipt: `cart_${cartId.slice(0, 12)}`,
+        currency,
       });
       const order = await createOrder({
         cartId,
         cart,
         contact,
-        address,
+        address: withCountry(address, ctx),
         paymentMethod: "razorpay",
         idempotencyKey,
         razorpayOrderId: rzOrder.id,
         shipping,
         paymentDiscount,
+        base: baseFigures({ cart, market, shippingTotal: shipping.total, paymentDiscount, paymentConfig: storeConfig()?.payment_config ?? null }),
         consent: request.cookies.get(CONSENT_COOKIE)?.value || null,
       });
       slog(order.deduped ? "order_deduped" : "order_created", {

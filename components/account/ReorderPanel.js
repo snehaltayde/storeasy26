@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useCart } from "@/components/cart/CartContext";
 import { formatMoney } from "@/lib/format";
+import { useMoney } from "@/components/MarketContext";
 
 // Reorder with LIVE revalidation (S45 / SF12): the old order is rebuilt
 // against today's catalog and every line says honestly whether it can come
 // back as-is, changed price, or is gone — BEFORE anything hits the cart.
 export default function ReorderPanel({ orderId }) {
+  const { money } = useMoney(); // Phase 8 line 4: today's catalog price, in the shopper's market
   const { addItem, setOpen } = useCart();
   const [state, setState] = useState("idle"); // idle | loading | ready | adding | done | error
   const [data, setData] = useState(null);
@@ -66,7 +68,7 @@ export default function ReorderPanel({ orderId }) {
             <span className={`rounded-sf-2xs px-1.5 py-0.5 text-sf-3xs font-bold uppercase ${CHIP[l.state]}`}>{l.state.replace("_", " ")}</span>
             <span className="min-w-0 flex-1 truncate">{l.title}</span>
             <span className="text-xs text-sf-text-faint">×{l.quantity}</span>
-            {l.price_now != null && <span className="text-xs font-semibold">{formatMoney(l.price_now, data.currency)}</span>}
+            {l.price_now != null && <span className="text-xs font-semibold">{money(l.price_now, data.currency)}</span>}
             {l.note && <span className="w-full text-xs text-sf-text-faint">{l.note}</span>}
           </li>
         ))}

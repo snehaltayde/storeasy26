@@ -18,14 +18,14 @@ import { emptyForm, applyAddress, addressValid } from "./checkoutModel";
 
 const STEPS = ["Address", "Review", "Payment"];
 
-export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeName = "Store", logo = null, policies = [], shippingConfig: pageShippingConfig, paymentConfig = null, timeZone }) {
+export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeName = "Store", logo = null, policies = [], shippingConfig: pageShippingConfig, paymentConfig = null, timeZone, countries = [], initialCountry = "IN" }) {
   const [step, setStep] = useState(0);
   // P1-RATES: the cart and rates this page prices with. They start as the
   // page's and are replaced by the server's when it refuses a total that has
   // changed, so the summary and the button show what the server will charge.
   const [cart, setCart] = useState(pageCart);
   const [shippingConfig, setShippingConfig] = useState(pageShippingConfig);
-  const [form, setForm] = useState(emptyForm());
+  const [form, setForm] = useState(() => emptyForm(initialCountry));
   const [method, setMethod] = useState("cod");
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState("");
@@ -44,20 +44,32 @@ export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeNam
     city: form.city,
     state: form.state,
     pincode: form.pincode,
-    country: "India",
+    // Phase 8 line 4: the chosen country decides the market (the server names it)
+    country_code: form.country_code,
+    country: countries.find((c) => c.country === form.country_code)?.name || "India",
+  };
+  // Phase 8 line 4: a cart priced in another market carries `market`; COD and
+  // the PIN-code zones are the store's own country's only.
+  const outsideBase = Boolean(cart.market);
+  // the quote moved the market (a new country): redraw from its cart and rates
+  const marketMoved = (data) => {
+    if (data.cart?.items) setCart(data.cart);
+    setShippingConfig(data.shippingConfig ?? undefined);
+    paymentKey(true);
+    setChallenge(null);
   };
 
   // Phase 8 line 2 (decision 10): every amount on this page is the server's
   // quote for this cart and PIN code. Until it lands, the same pure function
   // draws with the store's own rates and payment rules from the server (GEN-03:
   // `config: shippingConfig` is this store's, never the code default).
-  const quote = useQuote({ cart, address });
-  const terms = quote.terms || paymentTerms({ cart, shippingConfig, paymentConfig, pincode: form.pincode || null, prepaidAvailable: razorpayEnabled });
+  const quote = useQuote({ cart, address, onMarket: marketMoved });
+  const terms = quote.terms || paymentTerms({ cart, shippingConfig, paymentConfig, pincode: outsideBase ? null : form.pincode || null, prepaidAvailable: razorpayEnabled, outsideBase });
   // COD hidden here (zone or limit) → paying online is the method
   const chosen = method === "cod" && !terms.cod.available ? "razorpay" : method;
   const selected = chosen === "cod" ? terms.cod : terms.prepaid;
   // Phase 8 line 1: the store's delivery estimate for this PIN (lib/shipping.js), shown in the summary
-  const estimate = computeShipping({ subtotal: 0, pincode: form.pincode || null, config: shippingConfig ?? undefined }).estimate ?? null;
+  const estimate = outsideBase ? null : computeShipping({ subtotal: 0, pincode: form.pincode || null, config: shippingConfig ?? undefined }).estimate ?? null;
   const shipping = { total: selected.shipping, codFee: chosen === "cod" ? terms.cod.fee : 0, estimate };
   const grandTotal = selected.total;
 
@@ -196,7 +208,7 @@ export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeNam
       <div className="grid gap-10 lg:grid-cols-[1fr_380px]">
         {/* main column */}
         <div>
-          {step === 0 && <AddressStep form={form} valid={valid} onAddress={changeAddress} onContinue={() => setStep(1)} />}
+          {step === 0 && <AddressStep form={form} valid={valid} onAddress={changeAddress} onContinue={() => setStep(1)} countries={countries} />}
 
           {step === 1 && (
             <section>

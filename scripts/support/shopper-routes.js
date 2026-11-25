@@ -27,6 +27,7 @@ export const SHOPPER_ROUTES = Object.freeze([
   { path: "wishlist", methods: ["POST"], class: "public-read", suite: "test-shopper-reads.js", note: "resolves a guest's local handles against the catalog; no account data" },
   { path: "media/[id]", methods: ["GET"], class: "public-read", suite: "test-shopper-reads.js" },
   { path: "pincode", methods: ["GET"], class: "public-read", suite: "test-pincode.js", note: "Phase 8 line 1: a PIN's place and this store's public delivery facts; no shopper data" },
+  { path: "market", methods: ["GET"], class: "public-read", suite: "test-markets.js", note: "Phase 8 line 4: stores the Ship to country in the _market cookie (this store's base or enabled markets only) and returns to a path on this site; no shopper data" },
   { path: "track", methods: ["POST"], class: "collector", suite: null },
   { path: "exp", methods: ["POST"], class: "collector", suite: null },
   { path: "contact", methods: ["POST"], class: "collector", suite: "test-commerce.js" },

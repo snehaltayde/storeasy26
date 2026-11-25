@@ -27,6 +27,7 @@
     "order:trace": "node --env-file=.env.local scripts/trace-order.js",
     "test:hardening": "node scripts/test-hardening.js",
     "test:offers": "node scripts/test-offers.js",
+    "test:markets": "node scripts/test-markets.js",
     "test:offer-progress": "node scripts/test-offer-progress.js",
     "test:mobile-buy": "node scripts/test-mobile-buy.js",
     "test:db-retry": "node scripts/test-db-retry.js",
