@@ -4,7 +4,7 @@
 // and its data are never touched: a drill seeds and wipes only the worktree's
 // own folders, and this runner fails if the owner's seed files change anyway.
 //
-//   node scripts/drills/run-isolated.mjs <p5|p6|orders|smoke|agency-gone|shell|flags-incidents|editor|signup|connect|operator-onboarding|operator-create-store|platform-shell|store-lifecycle|sf-styles|console-styles|all> [stage,…] [--keep] [--headed]
+//   node scripts/drills/run-isolated.mjs <p5|p6|orders|smoke|agency-gone|shell|flags-incidents|support-access|editor|signup|connect|operator-onboarding|operator-create-store|platform-shell|store-lifecycle|sf-styles|console-styles|all> [stage,…] [--keep] [--headed]
 //   (pnpm drill:p5, drill:p6, drill:smoke, drill:agency-gone, drill:shell, drill:signup, drill:sf-styles,
 //   drill:console-styles, drill:all; sf-styles and console-styles are not in all)
 //
@@ -467,6 +467,10 @@ export const DRILLS = {
   // settings, integrations and billing (Phase 2 line 7): the roles store; the
   // drill opens an operator's support grant in its control plane for the banner check
   settings: { id: "SETTINGS", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/settings/run.mjs", ...c.headed])) },
+  // Phase 3 line 5: support access across hosts (the operator console on
+  // localhost, the roles store on roles.localhost); the stray pass reads the
+  // roles store's Next log, as drill:shell does
+  "support-access": { id: "SUPPORT-ACCESS", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/support-access/run.mjs", ...c.headed])) },
   // a founder connects Shopify from onboarding step 1 (Phase 1 line 4 §5 item 14):
   // the roles store plus the Roles Annex; the drill starts the Shopify stand-in
   // on SHOPIFY_FAKE_PORT (a free slot in this run's block), and the harness gets
@@ -549,9 +553,8 @@ export const DRILLS = {
 };
 // Phase 2 line 11 (phase end): every merchant console screen's drill joins the block suite
 export const ALL = ["smoke", "p5", "p6", "agency-gone", "shell", "signup", "connect", "operator-onboarding", "operator-create-store", "dashboard", "orders", "catalog", "offers", "media", "editor", "settings", "team", "growth", "quizzes", "console-styles",
-  // Phase 3 line 7 (phase end): every operator console screen's drill joins it too. support-access
-  // is line 5's drill; it joins as soon as line 5's branch (which adds it to DRILLS) is merged.
-  "platform-shell", "platform-stores", "store-lifecycle", "platform-billing", "flags-incidents", ...(Object.hasOwn(DRILLS, "support-access") ? ["support-access"] : []), "platform-ops"];
+  // Phase 3 line 7 (phase end): every operator console screen's drill joins it too (line 5's support-access included)
+  "platform-shell", "platform-stores", "store-lifecycle", "platform-billing", "flags-incidents", "support-access", "platform-ops"];
 
 const git = (root, args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
 

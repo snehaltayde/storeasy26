@@ -229,6 +229,11 @@ Each Phase 3 line fills only its own sub-heading.
 
 ### Support access (line 5)
 
+- **Store page card** (`components/platform/support/SupportAccessCard.js`, at StoreDetail's `line 5` anchor). Closed: a Reason field (5+ characters, the team sees it), a For select (1, 4, 8, 24 or 72 hours) and Open access; a muted line says when email is off on the server. Open: Status (an info badge "Open until …"), Opened by (the operator's name), Reason, then "Enter store console (read-only)" (`EnterConsole.js`: mints the 60-second token and posts it to the store's own host in the same tab) and Close now (a destructive AlertDialog). Under both, History: the last 20 grants (operator name, Open/Closed/Expired badge, reason, opened, closed by whom or expired when). Results show as one Alert above.
+- **Every open grant** (`/platform/support-access`, `components/platform/support/OpenGrants.js`): a PageHeader and the kit's DataTable (store linking to its page, opened by, reason, opened, ends; soonest to end first) with Close per row (a destructive AlertDialog), and the kit's EmptyState.
+- **The store's team.** The console banner (ConsoleNotices) names the operator ("Name from Storeasy, reason …, until …") and says an owner or admin can end it from Settings, Team. Settings, Team shows a "Support access" card under the team (owners and admins: `components/admin/team/SupportAccessCard.js`): the open grant in a warning strip with "End support access now" (AlertDialog) and the last 20 times.
+- **Design pass pending** (the ui-designer runs after the build).
+
 ### Operations (line 6)
 
 - **Page.** `/platform/operations` (`components/platform/operations/OperationsTabs.js`): the kit's PageHeader, then line tabs (Queues, Provisioning runs, Privacy requests, Themes, Case studies) with the open tab in `?tab=`; a tab loads its data when opened. Each tab has a heading row (title, one sentence, Refresh and its own actions), a skeleton while loading, a destructive Alert with Try again on a load failure, and the kit's EmptyState. Results of a write show as one plain sentence in an Alert above the list (`opsShared.js` Notice); there is no toast on the operator side yet.
