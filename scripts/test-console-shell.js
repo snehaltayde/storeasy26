@@ -373,8 +373,11 @@ await t("consoleNotices(): only operator, reason, expires_at of a grant and id, 
 console.log("— the shell, rendered");
 // an old route: the first support page not yet on the new UI (a detail page
 // while orders is old, so the nav's prefix rule is exercised)
-const OLD_PATH = ["/admin/orders/ord_1", ...Nav.navItems(Nav.navFor("support")).map((i) => `${i.href}/x`)].find((p) => !isNewUiRoute(p) && !p.startsWith("/admin/onboarding"));
-const OLD_ITEM = Nav.activeItem(OLD_PATH, Nav.navItems(Nav.navFor("support"))).href;
+// Phase 2 line 6: once the editor and Publishing are new, every page in
+// support's nav is; the old route is then one outside it (an owner's page
+// still on the old screens), and no support item is current there
+const OLD_PATH = ["/admin/orders/ord_1", ...Nav.navItems(Nav.navFor("support")).map((i) => `${i.href}/x`), ...Nav.navItems(Nav.navFor("owner")).map((i) => `${i.href}/x`)].find((p) => !isNewUiRoute(p) && !p.startsWith("/admin/onboarding"));
+const OLD_ITEM = Nav.activeItem(OLD_PATH, Nav.navItems(Nav.navFor("support")))?.href ?? null;
 let pathname = OLD_PATH;
 const shellStubs = {
   "next/navigation": { usePathname: () => pathname, useRouter: () => ({ push() {}, refresh() {}, replace() {} }) },
@@ -431,7 +434,7 @@ await t("support's shell: outside [data-legacy] only nav links and the allowlist
     eq(ALLOWED_CONTROLS.filter((c) => !out.includes(`data-shell-control="${c}"`)), [], `${label}: every shell control is there:`);
     eq([...out.matchAll(/data-nav-item="([\w-]+)"/g)].map((m) => m[1]), READ_IDS, `${label}: the nav links are support's:`);
     ok(out.includes(`data-shell="read-only"`) && out.includes(words.replace("·", "&#183;")) || out.includes(words), `${label}: the read-only label "${words}":`);
-    ok(out.includes(`href="${OLD_ITEM}"`) && new RegExp(`<a [^>]*href="${OLD_ITEM}"[^>]*aria-current="page"|<a [^>]*aria-current="page"[^>]*href="${OLD_ITEM}"`).test(out), `${label}: ${OLD_ITEM} is current on ${OLD_PATH}:`);
+    if (OLD_ITEM) ok(out.includes(`href="${OLD_ITEM}"`) && new RegExp(`<a [^>]*href="${OLD_ITEM}"[^>]*aria-current="page"|<a [^>]*aria-current="page"[^>]*href="${OLD_ITEM}"`).test(out), `${label}: ${OLD_ITEM} is current on ${OLD_PATH}:`);
     ok(/<main [^>]*id="console-content"[^>]*>\s*<div data-legacy="true" class="contents">/.test(html), `${label}: main > [data-legacy] on the old route ${OLD_PATH}:`);
   }
   const owner = outsideLegacy(render("owner", { kind: "merchant", role: "owner" }));

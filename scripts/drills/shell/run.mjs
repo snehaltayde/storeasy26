@@ -37,7 +37,7 @@ import { runDrill, settle } from "../p3/lib.mjs";
 import { navFor, navItems } from "../../../lib/admin/nav.js";
 import { isNewUiRoute } from "../../../lib/admin/new-ui-routes.js";
 import { RANGES, rangeHref } from "../../../lib/admin/dashboard-ranges.js";
-import * as RC from "../../support/read-controls.js";
+import { readPost } from "../../support/read-post-match.js";
 
 const DRILL_ID = "SHELL";
 const WIDTHS = [1280, 900, 375];
@@ -84,7 +84,9 @@ const seed = () => JSON.parse(readFileSync(join(ROOT, ".design-data-roles", "rol
 // sheet, select or dialog) are not controls; anything else in a portal is.
 function strayControls([allowed, newUi]) {
   const q = 'a[href], button, input, select, textarea, summary, label[for], [contenteditable]:not([contenteditable="false"]), [role="button"], [role="menuitem"], [role="link"], [role="switch"], [role="checkbox"], [role="tab"], [role="option"], [onclick], [tabindex]:not([tabindex="-1"])';
-  const passes = (el) => newUi && (el.hasAttribute("data-read-control") || el.disabled === true || (el.getAttribute("aria-disabled") === "true" && el.getAttribute("data-role-gate") === "disabled"));
+  const own = (el) => newUi && (el.hasAttribute("data-read-control") || el.disabled === true || (el.getAttribute("aria-disabled") === "true" && el.getAttribute("data-role-gate") === "disabled"));
+  // Phase 2 line 6: a label[for] does what its control does: it passes when that control passes (a disabled field, a marked read)
+  const passes = (el) => own(el) || (newUi && el.matches("label[for]") && Boolean(document.getElementById(el.htmlFor)) && own(document.getElementById(el.htmlFor)));
   const focusGuard = (el) => el.matches("span[data-radix-focus-guard]") && el.getAttribute("tabindex") === "0" && el.textContent === "" && el.children.length === 0;
   return [...document.querySelectorAll(q)]
     .filter((el) => (newUi || !el.closest("[data-legacy]")) && !el.closest("[data-nav-item]") && !allowed.some((c) => el.closest(`[data-shell-control="${c}"]`)) && !passes(el) && !focusGuard(el))
@@ -163,7 +165,6 @@ function implicitSubmits() {
 //     has stopped growing, and the pass must find its own GET <target> line
 //     there (a log format drift or a missing log fails loudly).
 // Returns what it found; the caller checks.
-const READ_POSTS = RC.READ_POSTS ?? [];
 const NEXT_LOG = process.env.DRILL_LOG_DIR ? join(process.env.DRILL_LOG_DIR, "design-data-roles-next.log") : null;
 const logSize = () => {
   try {
@@ -177,10 +178,11 @@ const logSize = () => {
 // when the response is sent, as Next writes its line.
 const SELFTEST_SERVER_LOG = [];
 const serverMark = () => ({ next: logSize(), own: SELFTEST_SERVER_LOG.length });
-// next dev's request lines (colour codes stripped): [{ method, path }]
-const LOG_LINE = /^\s*(GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS) (\/\S*) \d{3} in \d/gm;
+// next dev's request lines (colour codes stripped): [{ method, path, status }]
+// (Phase 2 line 6: the status, so a READ_POSTS row with ops passes only a 2xx)
+const LOG_LINE = /^\s*(GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS) (\/\S*) (\d{3}) in \d/gm;
 function parseNextLog(text) {
-  return [...text.replace(/\u001b\[[0-9;]*m/g, "").matchAll(LOG_LINE)].map((m) => ({ method: m[1], path: m[2].split("?")[0] }));
+  return [...text.replace(/\u001b\[[0-9;]*m/g, "").matchAll(LOG_LINE)].map((m) => ({ method: m[1], path: m[2].split("?")[0], status: Number(m[3]) }));
 }
 // Lines from a real Next 16.2.9 dev log (a drill:shell run's server.log,
 // 2026-11-24), byte for byte: parseNextLog must read each.
@@ -189,7 +191,7 @@ const CAPTURED_NEXT_LOG = [
   " POST /api/admin/login 200 in 39ms (next.js: 833µs, application-code: 38ms)",
   " PUT /api/admin/documents 200 in 9ms (next.js: 785µs, application-code: 9ms)",
 ].join("\n");
-const CAPTURED_PARSED = [{ method: "GET", path: "/admin/dashboard" }, { method: "POST", path: "/api/admin/login" }, { method: "PUT", path: "/api/admin/documents" }];
+const CAPTURED_PARSED = [{ method: "GET", path: "/admin/dashboard", status: 200 }, { method: "POST", path: "/api/admin/login", status: 200 }, { method: "PUT", path: "/api/admin/documents", status: 200 }];
 function nextLogLines(from, to) {
   if (!NEXT_LOG || to <= from) return [];
   const buf = Buffer.alloc(to - from);
@@ -204,8 +206,10 @@ function nextLogLines(from, to) {
 // the server's request lines between two marks: [{ method, path }]
 const loggedRequests = (from, to) => [...nextLogLines(from.next, to.next), ...SELFTEST_SERVER_LOG.slice(from.own, to.own)];
 const WRITE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-// body: the request's raw body; a row with a body rule needs it (a server-log line has none, so never matches one)
-const readPost = (page, method, path, body) => READ_POSTS.some((r) => RC.routeMatches(r.page, page) && r.method === method && r.path === path && RC.bodyMatches(r, body));
+// readPost (scripts/support/read-post-match.js, tested in test-drills): a row
+// with ops passes the browser's body only as one of its ops (never
+// saveDraft), and a server line only with a 2xx (a 400, 403, 0 or missing
+// status is a write)
 // Each document's first request: an init script on the tab under test asks
 // for DOC_SENTINEL with its path; page.route answers it (it never reaches the
 // server). Once per tab.
@@ -257,7 +261,7 @@ async function supportNewUiControls(page, href) {
       } catch {}
     }
   };
-  const skip = (method, path, body) => (devServer && path.startsWith("/__nextjs")) || readPost(target, method, path, body);
+  const skip = (method, path, body, status) => (devServer && path.startsWith("/__nextjs")) || readPost(target, method, path, body, status);
   const onSocket = (ws) => {
     if (/\/_next\/webpack-hmr/.test(ws.url())) devServer = true;
   };
@@ -387,7 +391,7 @@ async function supportNewUiControls(page, href) {
       if (!WRITE.has(l.method)) continue;
       const i = unmatched.findIndex((x) => x.method === l.method && x.path === l.path);
       if (i >= 0) unmatched.splice(i, 1);
-      else if (!skip(l.method, l.path)) writes.push(`${l.method} ${l.path} (server log, not seen by the browser)`);
+      else if (!skip(l.method, l.path, null, l.status ?? 0)) writes.push(`${l.method} ${l.path} (server log, not seen by the browser)`);
     }
   } finally {
     page.off("websocket", onSocket);

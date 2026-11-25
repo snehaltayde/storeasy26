@@ -788,13 +788,13 @@ await t("the shell drill's read-POST matcher on real bodies: one read op passes;
   // the server log: a status, no body
   ok(rp(null, 200) && rp(null, 204), "a 2xx in the log is a read");
   for (const st of [403, 400, 401, 500, 0]) ok(!rp(null, st), `a ${st} in the log is a write`);
-  // the drill passes w.status ?? 0, so a missing status is a 0
+  // the drill passes l.status ?? 0, so a missing status is a 0
   ok(!rp(null, undefined ?? 0), "a missing status is a write");
   // a row without ops only matches its page, method and path
   ok(readPost("/admin/editor", "POST", "/api/admin/preview-session", JSON.stringify({ create: true })), "the preview session row");
   ok(!readPost("/admin/orders", "PUT", DOCS, JSON.stringify({ listDocuments: true })), "another page's request is not this row's");
   const src = readFileSync(join(ROOT, "scripts/drills/shell/run.mjs"), "utf8");
-  ok(/from "\.\.\/\.\.\/support\/read-post-match\.js"/.test(src) && !/const bodyOp =/.test(src) && /w\.status \?\? 0/.test(src), "the drill uses this matcher, and passes a missing status as 0");
+  ok(/from "\.\.\/\.\.\/support\/read-post-match\.js"/.test(src) && !/const bodyOp =/.test(src) && /l\.status \?\? 0/.test(src) && /req\.postData\(\)/.test(src), "the drill uses this matcher, and passes a missing status as 0");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);
