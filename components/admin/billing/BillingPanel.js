@@ -108,7 +108,7 @@ export function BillingPanel({ initial, role }) {
           )}
           {data.entitlements?.override && (
             <p className="text-sm text-muted-foreground">
-              Storeasy's team adjusted {data.entitlements.override.fields.join(", ")} for you ({data.entitlements.override.reason})
+              Storeasy's team adjusted {data.entitlements.override.fields.join(", ")} for you
               {data.entitlements.override.expiresAt ? `, until ${day(data.entitlements.override.expiresAt)}` : ""}.
             </p>
           )}

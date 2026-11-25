@@ -619,6 +619,21 @@ await t("merchant audit log: the store sees operator billing actions but never t
   ok(!auditChanges(JSON.stringify({ truncated: true, preview: long.slice(0, 2000) + "\"operator_only\":{\"reason\":\"TRUNC_CANARY\"}" })).join(" ").includes("TRUNC_CANARY"), "a truncated preview is cut too");
 });
 
+await t("merchant billing: the store sees its override and what it grants, never the operator's reason", async () => {
+  const future = new Date(Date.now() + 86400000).toISOString();
+  eq((await op({ action: "override", tenant: A, features: { staff_seats: 4 }, reason: "MERCHANT_BILLING_REASON_CANARY", expiresAt: future })).status, 200, "override");
+  for (const caller of ["owner", "support"]) {
+    const r = await store.call(caller, "billing", "GET");
+    ok(!r.text.includes("MERCHANT_BILLING_REASON_CANARY"), `${caller} (${r.status}) sees the reason`);
+    if (r.status === 200) {
+      eq(JSON.stringify(r.body.entitlements?.override?.fields), JSON.stringify(["staff_seats"]), `${caller} sees what it grants`);
+      eq(r.body.entitlements?.override?.reason, undefined, `${caller}: no reason field`);
+    }
+  }
+  eq((await store.call("owner", "billing", "GET")).status, 200, "the owner reads billing");
+  await op({ action: "clear_override", tenant: A });
+});
+
 await t("least trusted: signed out and merchant callers get 401 on every billing view and action, with no store data", async () => {
   const views = ["", "view=subscriptions", "view=events", `view=subscriptions&store=${A}`];
   const actions = [

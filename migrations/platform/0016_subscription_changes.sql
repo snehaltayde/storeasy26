@@ -20,7 +20,7 @@ SET replaced_by = (
       ORDER BY s2.created_at DESC, s2.id DESC LIMIT 1
     ),
     cancel_state = CASE WHEN razorpay_subscription_id IS NOT NULL THEN 'failed' END,
-    cancel_error = CASE WHEN razorpay_subscription_id IS NOT NULL THEN 'still live when migration 0017 ran: cancel it' END
+    cancel_error = CASE WHEN razorpay_subscription_id IS NOT NULL THEN 'still live when migration 0016 ran: cancel it' END
 WHERE replaced_by IS NULL
   AND status NOT IN ('cancelled', 'completed', 'expired')
   AND id <> (
