@@ -34,7 +34,7 @@ without asking the owner are marked so they are easy to review.
 - **Storefront:** installing changes nothing; each block's placement starts Off. Slots render Storeasy-owned server-component primitives with validated props only (no iframe or script kinds; `lib/types/ecosystem.ts` changes to match); five slots, at most 3 blocks each.
 - **Webhooks:** an outbox in store-database rows delivered by the existing job queue (ids only in job payloads), Standard Webhooks v1 signing, 8 attempts over about 45 h, auto-pause after 72 h failing; endpoint failures never page operators. An SSRF guard on Node built-ins (HTTPS 443 only, no redirects, DNS-checked against private ranges) with a per-plugin host allowlist; Shopify hosts always refused. Events and deliveries are kept 30 days; the privacy erase redacts them.
 - **Kill switch:** the existing feature flag `ff_plugin-<id>`. Phase 4 ships one real first-party plugin, Trust badges.
-- **Order:** line 1 → lines 2 and 3 side by side → line 4. Plan: `docs/plans/phase-4.md`. Line 4 waits on two owner questions (public API scope, `customers.read`).
+- **Order:** line 1 → lines 2 and 3 side by side → line 4. Plan: `docs/plans/phase-4.md`. Line 4: read-only tokens and no `customers.read` (owner, 2026-11-25).
 - **Decided by:** Claude
 - **Slice:** Phase 4 plan
 
