@@ -27,6 +27,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join, relative, resolve as resolvePath } from "node:path";
 import { existsSync } from "node:fs";
+import { FONT_MODULE_IDS, fontModule } from "./font-stub.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const require = createRequire(import.meta.url);
@@ -96,8 +97,6 @@ export async function makePageHarness({ tenant }) {
   const storefrontRequestStub = { tfetch: async (fn) => withTenant(await tenant(), fn), storeCurtain: async () => null };
   // after() dropped; the rest read on use (a require at setup can cycle with
   // route-harness's own next/server stub)
-  // next/font: every font is a loader answering the class names Next would
-  const fontStub = new Proxy({}, { get: (_, k) => (k === "__esModule" ? true : k === "default" ? fontStub.font : () => ({ className: "", variable: "", style: {} })) });
   const nextServerStub = new Proxy({}, { get: (_, k) => (k === "after" ? () => {} : k === "__esModule" ? false : require("next/server")[k]) });
 
   const loaded = new Map();
@@ -129,7 +128,7 @@ export async function makePageHarness({ tenant }) {
       else if (id === "@/lib/tenant-request") deps.set(id, tenantRequestStub);
       else if (id === "next/server") deps.set(id, nextServerStub);
       else if (/\.css$/.test(id)) deps.set(id, {}); // a layout's stylesheet
-      else if (id === "next/font/google" || id === "next/font/local") deps.set(id, fontStub);
+      else if (FONT_MODULE_IDS.includes(id)) deps.set(id, fontModule); // next/font and app/fonts/fonts.js
       else if (isComponentImport(id)) deps.set(id, stubModule(id));
       else if (id.startsWith("@/") || id.startsWith(".")) {
         const base = id.startsWith("@/") ? join(ROOT, id.slice(2)) : resolvePath(dirname(file), id);

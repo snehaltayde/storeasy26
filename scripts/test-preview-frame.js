@@ -22,6 +22,7 @@
 // tests compare (run once on the base commit to record BEFORE below).
 // request-cache must load before any app module that imports react.
 import "./support/request-cache.js";
+import { fontModule } from "./support/font-stub.js";
 import { readFile, rm } from "node:fs/promises";
 import { createRequire, registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -812,13 +813,13 @@ async function loadJsx(file, stubs) {
 }
 const nothing = { __esModule: true, default: () => null };
 const passthrough = ({ children }) => React.createElement(React.Fragment, null, children);
-const font = () => ({ variable: "" });
 const realNav = require("next/navigation.js");
 // The bridge renders nothing in a real page (its work is in an effect); here
 // it renders its props, so a test can see what the layout handed it.
 const bridgeMarker = { __esModule: true, default: (props) => React.createElement("i", { "data-bridge": JSON.stringify(props) }) };
 const STUBS = {
-  "next/font/google": { Geist: font, Geist_Mono: font, Fraunces: font },
+  "next/font/local": fontModule,
+  "@/app/fonts/fonts": fontModule,
   "../globals.css": {},
   "next/link": { __esModule: true, default: ({ href, children, prefetch, ...rest }) => React.createElement("a", { href, ...rest }, children) },
   "next/navigation": { ...realNav, usePathname: () => globalThis.__framePath || "/" },

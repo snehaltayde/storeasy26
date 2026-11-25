@@ -27,6 +27,7 @@
 // request-cache must load before any app module that imports react
 // (P6-LOGO-REG: the storefront getters run in simulated requests below).
 import "./support/request-cache.js";
+import { fontModule } from "./support/font-stub.js";
 import { readFile, readdir, rm } from "node:fs/promises";
 import { registerHooks, createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -1035,7 +1036,6 @@ async function loadJsx(file, stubs = {}, seen = new Map()) {
 }
 const nothingC = { __esModule: true, default: () => null };
 const passthroughC = ({ children }) => React.createElement(React.Fragment, null, children);
-const fontC = () => ({ variable: "" });
 const LINK_STUB = { __esModule: true, default: ({ href, children, prefetch, ...rest }) => React.createElement("a", { href, ...rest }, children) };
 const CHROME_STUBS = { "next/link": LINK_STUB, "./SearchBox": nothingC, "./cart/CartButton": nothingC };
 const HeaderMod = await loadJsx(join(ROOT, "components/Header.js"), CHROME_STUBS);
@@ -1116,7 +1116,8 @@ const handed = [];
 const RealHeader = HeaderMod.default;
 const LAYOUT_STUBS = {
   ...CHROME_STUBS,
-  "next/font/google": { Geist: fontC, Geist_Mono: fontC, Fraunces: fontC },
+  "next/font/local": fontModule,
+  "@/app/fonts/fonts": fontModule,
   "../globals.css": {},
   "@/components/Header": { __esModule: true, default: (props) => (handed.push(props), React.createElement(RealHeader, props)) },
   "@/components/cart/CartContext": { CartProvider: passthroughC },

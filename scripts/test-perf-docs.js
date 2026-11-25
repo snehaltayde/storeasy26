@@ -17,6 +17,7 @@
 //   pnpm test:perf-docs
 // request-cache must load before any app module that imports react.
 import "./support/request-cache.js";
+import { fontModule } from "./support/font-stub.js";
 import { copyFile, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { createRequire, registerHooks } from "node:module";
@@ -262,10 +263,10 @@ async function loadJsx(file, stubs = {}, seen = new Map()) {
 }
 const nothing = { __esModule: true, default: () => null };
 const passthrough = ({ children }) => React.createElement(React.Fragment, null, children);
-const font = () => ({ variable: "" });
 const NOT_FOUND = "NEXT_NOT_FOUND";
 const STUBS = {
-  "next/font/google": { Geist: font, Geist_Mono: font, Fraunces: font },
+  "next/font/local": fontModule,
+  "@/app/fonts/fonts": fontModule,
   "../globals.css": {},
   "next/link": { __esModule: true, default: ({ href, children, prefetch, ...rest }) => React.createElement("a", { href, ...rest }, children) },
   "next/navigation": {
