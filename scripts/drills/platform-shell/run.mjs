@@ -155,7 +155,7 @@ async function platformShell(drill) {
   await settle(page);
   const navIds = await page.locator("[data-nav-item]").evaluateAll((els) => els.map((e) => e.getAttribute("data-nav-item")));
   // Phase 3 line 7: the full list, in order (no Old console)
-  drill.check(navIds.join(",") === "stores,onboarding,new-store,flags,incidents,billing,operations", "the nav: Stores, Signups & onboarding, New store, Flags, Incidents, Billing, Operations", navIds);
+  drill.check(navIds.join(",") === "stores,onboarding,new-store,flags,incidents,billing,operations,support-access", "the nav: Stores, Signups & onboarding, New store, Flags, Incidents, Billing, Operations, Support access", navIds);
   drill.check((await page.locator('[data-nav-item="stores"][aria-current="page"]').count()) === 1, "on /platform, Stores is the current item", null);
   // Phase 3 line 1: /platform is the Stores list (line 7 removed the old console at /platform/legacy)
   drill.check((await page.locator(`${SHELL} [data-screen="platform-stores"]`).count()) === 1 && !ERROR_TEXT.test(await text(page)), "/platform is the Stores list inside the shell", null);

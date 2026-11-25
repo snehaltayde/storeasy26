@@ -67,6 +67,7 @@ await t("nav: the full operator nav, in this exact order, each a /platform path;
       ["incidents", "Incidents", "/platform/incidents"],
       ["billing", "Billing", "/platform/billing"],
       ["operations", "Operations", "/platform/operations"],
+      ["support-access", "Support access", "/platform/support-access"],
     ])
   );
   eq(new Set(NAV.PLATFORM_NAV.map((i) => i.id)).size, NAV.PLATFORM_NAV.length, "unique ids");
