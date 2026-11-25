@@ -22,6 +22,7 @@ export const ADMIN_PAGES = Object.freeze([
   { page: "editor", action: "storefront.read" },
   { page: "editor/templates", action: "storefront.read" },
   { page: "experiments", action: "storefront.read" },
+  { page: "experiments/[slug]", action: "storefront.read", params: { slug: "exp-missing" }, note: "an unknown slug is a not-found (Phase 2 line 9)" },
   { page: "insights", action: "storefront.read" },
   { page: "integrations", action: "settings.read" },
   { page: "media", action: "storefront.read" },

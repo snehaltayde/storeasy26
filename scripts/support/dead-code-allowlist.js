@@ -28,4 +28,6 @@ export const ALLOWLIST = [
   // Phase 2 line 9: the analytics and insights pages stopped importing these
   { path: "components/admin/ExportCsv.js", reason: "removed by Phase 2 line 11" },
   { path: "components/admin/InsightsAdmin.js", reason: "removed by Phase 2 line 11" },
+  { path: "components/admin/ExperimentsAdmin.js", reason: "removed by Phase 2 line 11" },
+  { path: "components/admin/AutomationsAdmin.js", reason: "removed by Phase 2 line 11" },
 ];

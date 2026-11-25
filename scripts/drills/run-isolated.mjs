@@ -477,6 +477,8 @@ export const DRILLS = {
       return seeded !== 0 ? seeded : c.node(["scripts/drills/operator-onboarding/run.mjs", ...c.headed]);
     },
   },
+  // Phase 2 line 9: analytics, experiments, insights and automations on the roles store (admin, staff, support); evidence in docs/cms-reviews/drills/GROWTH/
+  growth: { id: "GROWTH", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/growth/run.mjs", ...c.headed])) },
   // an operator creates a store for a founder (Phase 1 line 9 §5 item 21), on
   // the --p3 design store like operator-onboarding
   "operator-create-store": {

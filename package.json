@@ -94,6 +94,7 @@
     "test:dashboard": "node scripts/test-dashboard.js",
     "drill:dashboard": "node scripts/drills/run-isolated.mjs dashboard",
     "test:growth-ui": "node scripts/test-growth-ui.js",
+    "drill:growth": "node scripts/drills/run-isolated.mjs growth",
     "test:tenant-ops": "node scripts/test-tenant-ops.js",
     "test:marketing": "node scripts/test-marketing.js",
     "test:customers": "node scripts/test-customers.js",

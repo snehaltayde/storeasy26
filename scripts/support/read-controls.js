@@ -53,6 +53,8 @@ export const READ_CONTROLS = [
   { path: "components/admin/analytics/AnalyticsTables.js", reason: "the 7/30/90-day links only change ?days= on the analytics page, and Try again reloads it (GETs)", marks: 2 },
   { path: "components/admin/analytics/CsvButton.js", reason: "CSV builds a file in the browser from the aggregated rows on screen; nothing is sent", marks: 1 },
   { path: "components/admin/insights/InsightsList.js", reason: "Try again re-reads GET /api/admin/insights; \"Show the numbers\" opens a <details>; \"Open in editor\" is a link to the editor", marks: 3 },
+  { path: "components/admin/experiments/ExperimentsList.js", reason: "the status tabs (and their list, which Radix makes focusable) filter the loaded experiments; Try again re-renders the page (router.refresh(), a GET)", marks: 3 },
+  { path: "components/admin/experiments/AnalysisPanel.js", reason: "\"Open in editor\" after keeping a variant is a link to the editor", marks: 1 },
 ];
 
 // Reads sent as a non-GET request: { page, method, path, reason }. page is a
