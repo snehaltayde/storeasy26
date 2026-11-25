@@ -203,6 +203,70 @@ for (let n = 0; n < 500; n++) {
 }
 check(`property: over 500 random carts (bundles, BXGY, tiers, gifts, coupons; a third in USD with cents) every shown nudge (${shown}) really applies when done, whatever is added, no target value in the output`, broken.length === 0 && shown > 300, broken.slice(0, 3));
 
+// ---- brute force: every whole-unit way to do a nudge (the reviewer's probe, ported) -------------
+// 3,000 random carts; each spend or coupon nudge is done every way a shopper
+// could, in whole units: 1–40 more of a line already in the cart (the first
+// count that reaches the amount, and every one after), a sibling variant of a
+// line, or a new plain product at a few prices (the count that reaches it, one
+// more, five more). Every way must really give what the nudge says.
+{
+  let bs = 11;
+  const r2 = () => ((bs = (bs * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
+  const i2 = (a, b) => a + Math.floor(r2() * (b - a + 1));
+  const p2 = (a) => a[Math.floor(r2() * a.length)];
+  const T2 = ["x", "y"];
+  const bad = [];
+  let done = 0;
+  const giftsWorth = (x) => x.appliedOffers.reduce((s, a) => s + (a.gift ? a.giftValue || 0 : 0), 0);
+  for (let n = 0; n < 3000; n++) {
+    const offers = [];
+    if (r2() < 0.5) offers.push({ id: "t", type: "TIERED_QTY", scope: "line", priority: i2(1, 9), title: "T", target: { kind: "tag", value: p2(T2) }, tiers: [{ minQty: 2, percent: 10 }, { minQty: 4, percent: 30 }] });
+    if (r2() < 0.3) offers.push({ id: "b", type: "BXGY", scope: "line", priority: i2(1, 9), title: "B", target: { kind: "tag", value: p2(T2) }, buy: 2, free: 1 });
+    if (r2() < 0.6) offers.push({ id: "g", type: "FREE_GIFT", scope: "gift", priority: 1, title: "G", threshold: i2(200, 2000) + (r2() < 0.3 ? 0.5 : 0), gift: { variantId: "vg", title: "Gift", value: i2(0, 400) } });
+    const code = p2([null, "SAVE", "SOLO", "FLAT", "SOLOF"]);
+    offers.push({ id: "c1", type: "COUPON", scope: "order", priority: 50, code: "SAVE", discount: { kind: "percent", value: i2(5, 40) }, minSubtotal: i2(0, 2500), combinable: true });
+    offers.push({ id: "c2", type: "COUPON", scope: "order", priority: 50, code: "SOLO", discount: { kind: "percent", value: i2(5, 40) }, minSubtotal: i2(0, 2500), combinable: false });
+    offers.push({ id: "c3", type: "COUPON", scope: "order", priority: 50, code: "FLAT", discount: { kind: "fixed", value: i2(50, 400) }, minSubtotal: i2(0, 2500), combinable: true });
+    offers.push({ id: "c4", type: "COUPON", scope: "order", priority: 50, code: "SOLOF", discount: { kind: "fixed", value: i2(50, 400) }, minSubtotal: i2(0, 2500), combinable: false });
+    const cur = r2() < 0.2 ? "USD" : "INR";
+    const items = Array.from({ length: i2(1, 3) }, (_, i) => ({ variantId: "v" + i, productId: "p" + i, handle: "h" + i, tags: r2() < 0.7 ? [p2(T2)] : [], productType: null, price: i2(1, 80) * 10 + (r2() < 0.3 ? 0.99 : 0), quantity: i2(1, 3), currency: cur }));
+    const rates = { ...SHIPPING_CONFIG, basis: r2() < 0.5 ? "net" : "gross", freeThreshold: i2(300, 3000), flatRate: 79, zones: [] };
+    const p = offerProgress(items, { offers, coupon: code, shippingConfig: rates });
+    const now = evaluateOffers(items, { offers, coupon: code });
+    for (const nd of p.nudges) {
+      if (nd.kind === "tier") continue; // proved on the exact cart above
+      const ways = [];
+      for (const it of items) {
+        const first = Array.from({ length: 40 }, (_, k) => k + 1).find((k) => it.price * k >= nd.remaining);
+        if (!first) continue;
+        for (let k = first; k <= 40; k++) ways.push(items.map((i) => (i === it ? { ...i, quantity: i.quantity + k } : i)));
+        ways.push([...items, { ...it, variantId: `${it.variantId}-sib`, quantity: first }]);
+      }
+      for (const q of [1, 7, 49.99, 100, 333, nd.remaining]) {
+        const k = Math.ceil(nd.remaining / q);
+        for (const kk of [k, k + 1, k + 5]) ways.push([...items, { variantId: "new", productId: "pn", handle: "hn", tags: [], productType: null, price: q, quantity: kk, currency: cur }]);
+      }
+      for (const w of ways) {
+        done++;
+        const r = evaluateOffers(w, { offers, coupon: code });
+        let ok;
+        if (nd.kind === "coupon") {
+          ok = r.couponStatus?.valid && r.couponStatus.applied > 0;
+          if (ok && offers.find((o) => o.id === nd.id).combinable === false) {
+            const wo = evaluateOffers(w, { offers });
+            ok = r.total - giftsWorth(r) < wo.total - giftsWorth(wo) && now.gifts.every((g) => r.gifts.some((x) => x.offerId === g.offerId)) && wo.gifts.every((g) => r.gifts.some((x) => x.offerId === g.offerId));
+          }
+        } else ok = nd.id === "shipping" ? computeShipping({ subtotal: r.subtotal, discountTotal: r.discountTotal, config: rates }).free : r.gifts.some((g) => g.offerId === nd.id);
+        if (!ok) {
+          bad.push({ n, nudge: nd.text, code, cart: w.map((i) => [i.variantId, i.price, i.quantity]) });
+          break;
+        }
+      }
+    }
+  }
+  check(`brute force: 3,000 carts, every whole-unit way to do each spend or coupon nudge (${done} ways) really gives it`, bad.length === 0 && done > 10000, bad.slice(0, 3));
+}
+
 // ---- cost: it runs on every cart read --------------------------------------------------------
 {
   const offers = Array.from({ length: 40 }, (_, k) => ({ id: "t" + k, type: "TIERED_QTY", scope: "line", priority: k, title: "T" + k, target: { kind: "tag", value: "w" }, tiers: [{ minQty: 50 + k, percent: 10 }] }));
