@@ -2,10 +2,17 @@
   "id": "SHELL",
   "part": "main",
   "title": "SHELL — the new console shell, every role and width",
+<<<<<<< HEAD
   "ranAt": "2026-11-25T00:24:45.727Z",
   "harness": "http://localhost:6300",
   "chrome": "158.0.8127.37",
   "passed": 297,
+=======
+  "ranAt": "2026-11-25T01:51:32.465Z",
+  "harness": "http://localhost:6300",
+  "chrome": "158.0.8127.37",
+  "passed": 294,
+>>>>>>> f16b22a (docs(drills): ORDERS and SHELL evidence for Phase 2 line 2)
   "failed": 0,
   "knownFailures": 0,
   "checks": [
@@ -145,7 +152,7 @@
     },
     {
       "ok": true,
-      "label": "owner 1280px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+      "label": "owner 1280px: /admin/orders opens (200, no error, new UI: content in main, no [data-legacy] but the notices', aria-current)",
       "detail": {
         "status": 200,
         "error": false,
@@ -428,7 +435,7 @@
     },
     {
       "ok": true,
-      "label": "owner 900px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+      "label": "owner 900px: /admin/orders opens (200, no error, new UI: content in main, no [data-legacy] but the notices', aria-current)",
       "detail": {
         "status": 200,
         "error": false,
@@ -721,7 +728,7 @@
     },
     {
       "ok": true,
-      "label": "owner 375px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+      "label": "owner 375px: /admin/orders opens (200, no error, new UI: content in main, no [data-legacy] but the notices', aria-current)",
       "detail": {
         "status": 200,
         "error": false,
@@ -999,7 +1006,7 @@
     },
     {
       "ok": true,
-      "label": "admin 1280px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+      "label": "admin 1280px: /admin/orders opens (200, no error, new UI: content in main, no [data-legacy] but the notices', aria-current)",
       "detail": {
         "status": 200,
         "error": false,
@@ -1282,7 +1289,7 @@
     },
     {
       "ok": true,
-      "label": "admin 900px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+      "label": "admin 900px: /admin/orders opens (200, no error, new UI: content in main, no [data-legacy] but the notices', aria-current)",
       "detail": {
         "status": 200,
         "error": false,
@@ -1575,7 +1582,7 @@
     },
     {
       "ok": true,
-      "label": "admin 375px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+      "label": "admin 375px: /admin/orders opens (200, no error, new UI: content in main, no [data-legacy] but the notices', aria-current)",
       "detail": {
         "status": 200,
         "error": false,
@@ -1845,7 +1852,11 @@
     },
     {
       "ok": true,
+<<<<<<< HEAD
       "label": "staff 1280px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+=======
+      "label": "staff 1280px: /admin/orders opens (200, no error, new UI: content in main, no [data-legacy] but the notices', aria-current)",
+>>>>>>> f16b22a (docs(drills): ORDERS and SHELL evidence for Phase 2 line 2)
       "detail": {
         "status": 200,
         "error": false,
@@ -2072,7 +2083,11 @@
     },
     {
       "ok": true,
+<<<<<<< HEAD
       "label": "staff 900px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+=======
+      "label": "staff 900px: /admin/orders opens (200, no error, new UI: content in main, no [data-legacy] but the notices', aria-current)",
+>>>>>>> f16b22a (docs(drills): ORDERS and SHELL evidence for Phase 2 line 2)
       "detail": {
         "status": 200,
         "error": false,
@@ -2309,7 +2324,11 @@
     },
     {
       "ok": true,
+<<<<<<< HEAD
       "label": "staff 375px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+=======
+      "label": "staff 375px: /admin/orders opens (200, no error, new UI: content in main, no [data-legacy] but the notices', aria-current)",
+>>>>>>> f16b22a (docs(drills): ORDERS and SHELL evidence for Phase 2 line 2)
       "detail": {
         "status": 200,
         "error": false,
@@ -2528,7 +2547,11 @@
     },
     {
       "ok": true,
+<<<<<<< HEAD
       "label": "support 1280px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+=======
+      "label": "support 1280px: /admin/orders opens (200, no error, new UI: content in main, no [data-legacy] but the notices', aria-current)",
+>>>>>>> f16b22a (docs(drills): ORDERS and SHELL evidence for Phase 2 line 2)
       "detail": {
         "status": 200,
         "error": false,
@@ -2540,7 +2563,32 @@
     },
     {
       "ok": true,
-      "label": "support 1280px: /admin/orders: outside [data-legacy] only nav links and shell controls",
+      "label": "support 1280px: /admin/orders: anywhere only nav links and shell controls",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/orders: no marked read control submits a form (submit, image, form=, formaction, a non-GET form)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/orders: no form support can submit with Enter (a text field needs a gated or disabled default submit, or method=\"get\")",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/orders: clicking support's 16 marked read(s) reveals no write control anywhere (menus and popovers included)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/orders: support's reads, 0 gated control(s) (click, Enter, Space) and 1 field(s) (Enter) send no non-GET request",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/orders: support's gated controls do not navigate",
       "detail": []
     },
     {
@@ -2777,7 +2825,11 @@
     },
     {
       "ok": true,
+<<<<<<< HEAD
       "label": "support 900px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+=======
+      "label": "support 900px: /admin/orders opens (200, no error, new UI: content in main, no [data-legacy] but the notices', aria-current)",
+>>>>>>> f16b22a (docs(drills): ORDERS and SHELL evidence for Phase 2 line 2)
       "detail": {
         "status": 200,
         "error": false,
@@ -2996,7 +3048,11 @@
     },
     {
       "ok": true,
+<<<<<<< HEAD
       "label": "support 375px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
+=======
+      "label": "support 375px: /admin/orders opens (200, no error, new UI: content in main, no [data-legacy] but the notices', aria-current)",
+>>>>>>> f16b22a (docs(drills): ORDERS and SHELL evidence for Phase 2 line 2)
       "detail": {
         "status": 200,
         "error": false,
@@ -3088,6 +3144,110 @@
         "current": [
           "/admin/insights"
         ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "self-test: a write item a marked read reveals in a menu is caught",
+      "detail": {
+        "unsafe": [],
+        "implicit": [],
+        "revealed": [
+          "after read #0: button \"Delete store\""
+        ],
+        "moved": [],
+        "writes": [],
+        "reads": 1,
+        "gated": 0,
+        "fields": 0
+      }
+    },
+    {
+      "ok": true,
+      "label": "self-test: a fake gate's mouse click that POSTs is caught",
+      "detail": {
+        "unsafe": [],
+        "implicit": [],
+        "revealed": [],
+        "moved": [],
+        "writes": [
+          "POST /__shell-drill-selftest/w",
+          "POST /__shell-drill-selftest/w",
+          "POST /__shell-drill-selftest/w"
+        ],
+        "reads": 0,
+        "gated": 1,
+        "fields": 0
+      }
+    },
+    {
+      "ok": true,
+      "label": "self-test: form=, formaction, type=image and a form without method=get are caught",
+      "detail": [
+        "button \"A\"",
+        "button \"B\"",
+        "input \"C\"",
+        "button \"D\""
+      ]
+    },
+    {
+      "ok": true,
+      "label": "self-test: a form that submits on Enter is caught (statically and by pressing Enter)",
+      "detail": {
+        "unsafe": [],
+        "implicit": [
+          "form#q (1 fields)"
+        ],
+        "revealed": [],
+        "moved": [],
+        "writes": [
+          "POST /__shell-drill-selftest/w"
+        ],
+        "reads": 0,
+        "gated": 0,
+        "fields": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "self-test: a GET search and a gated save pass",
+      "detail": {
+        "unsafe": [],
+        "implicit": [],
+        "revealed": [],
+        "moved": [],
+        "writes": [],
+        "reads": 2,
+        "gated": 1,
+        "fields": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "self-test: a form whose default submit is gated does not submit on Enter",
+      "detail": {
+        "unsafe": [],
+        "implicit": [],
+        "revealed": [],
+        "moved": [],
+        "writes": [],
+        "reads": 0,
+        "gated": 1,
+        "fields": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "self-test: its editable field is still a stray control for support",
+      "detail": {
+        "unsafe": [],
+        "implicit": [],
+        "revealed": [],
+        "moved": [],
+        "writes": [],
+        "reads": 0,
+        "gated": 1,
+        "fields": 1
       }
     },
     {
@@ -3398,6 +3558,7 @@
       "detail": {
         "status": 200,
         "locs": 1
+<<<<<<< HEAD
       }
     },
     {
@@ -3552,6 +3713,8 @@
       "detail": {
         "url": "http://roles.localhost:6301/platform",
         "body": "Platform console\nNot configured — set PLATFORM_ADMIN_PASSWORD in the environment."
+=======
+>>>>>>> f16b22a (docs(drills): ORDERS and SHELL evidence for Phase 2 line 2)
       }
     },
     {
@@ -3601,7 +3764,11 @@
     }
   ],
   "notes": [
+<<<<<<< HEAD
     "support still sees 45 write control(s) inside the old screens (support-write-controls.json)"
+=======
+    "support still sees 35 write control(s) inside the old screens (support-write-controls.json)"
+>>>>>>> f16b22a (docs(drills): ORDERS and SHELL evidence for Phase 2 line 2)
   ],
   "screenshots": []
 }

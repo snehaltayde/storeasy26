@@ -1,0 +1,208 @@
+{
+  "id": "ORDERS",
+  "part": "main",
+  "title": "ORDERS — list, search, open, push and cancel, every role",
+  "ranAt": "2026-11-25T01:44:37.692Z",
+  "harness": "http://localhost:6300",
+  "chrome": "158.0.8127.37",
+  "passed": 22,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "support: no console error or warning while using the list's reads",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "support: the order page opens",
+      "detail": {
+        "status": 200,
+        "body": "Orders\n/\nROL-636FF7BB82478CC2\nROL-636FF7BB82478CC2\nCash on delivery\n\nCash on delivery · placed 25 Nov 2026, 07:13 am\n\nCustomer\n\nHidden for supportCustomer details are not shown with support access.\n\nP"
+      }
+    },
+    {
+      "ok": true,
+      "label": "support: no push, refresh or cancel control on the order page",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "support: the customer card says hidden; no shopper email or name on the page",
+      "detail": "Orders\n/\nROL-636FF7BB82478CC2\nROL-636FF7BB82478CC2\nCash on delivery\n\nCash on delivery · placed 25 Nov 2026, 07:13 am\n\nCustomer\n\nHidden for supportCustomer details are not shown with support access.\n\nPayment and sync\nPlaced\n25 Nov 2026, 07:13 am\nPaid\n—\nRazorpay\n—\nShopify order\nNot sent yet\nPush attempts\n0\nItems (2)\n\nFixture product 1\n\nDefault Title · × 2\n\n₹200\n\nFixture product 2\n\nDefault Title · × "
+    },
+    {
+      "ok": true,
+      "label": "support: searching by the shopper's email lists nothing",
+      "detail": "Orders\n\nEvery checkout lands here. Shopify stays the record for payments, shipping and refunds.\n\nOrders\n0\nReturns\nAll\n0\nPending payment\n0\nCOD pending\n0\nPaid\n0\nPushing\n0\nPushed\n0\nPush failed\n0\nCancelled\n0\nAny payment\nCash on delivery\nOnline\n\nSupport access searches by order id only; customer details "
+    },
+    {
+      "ok": true,
+      "label": "support: searching by the order id finds it, customer masked",
+      "detail": "Orders\n\nEvery checkout lands here. Shopify stays the record for payments, shipping and refunds.\n\nOrders\n1\nReturns\nAll\n1\nPending payment\n0\nCOD pending\n1\nPaid\n0\nPushing\n0\nPushed\n0\nPush failed\n0\nCancelled\n0\nAny payment\nCash on delivery\nOnline\n\nSupport access searches by order id only; customer details "
+    },
+    {
+      "ok": true,
+      "label": "support: the Returns tab opens",
+      "detail": "Orders\n\nEvery checkout lands here. Shopify stays the record for payments, shipping and refunds.\n\nOrders\n1\nReturns\n\nApproving a return authorises the shopper to send items back. It moves no money: refu"
+    },
+    {
+      "ok": true,
+      "label": "staff: no console error or warning while using the list's reads",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "staff: the order page opens",
+      "detail": {
+        "status": 200,
+        "body": "Orders\n/\nROL-636FF7BB82478CC2\nROL-636FF7BB82478CC2\nCash on delivery\n\nCash on delivery · placed 25 Nov 2026, 07:13 am\n\nCustomer\nName\nMeera Shopper\nEmail\nshopper@roles.test\nPhone\n9800000001\nAddress\n12 K"
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff: no push, refresh or cancel control on the order page",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "staff: the Returns tab opens",
+      "detail": "Orders\n\nEvery checkout lands here. Shopify stays the record for payments, shipping and refunds.\n\nOrders\n1\nReturns\n\nApproving a return authorises the shopper to send items back. It moves no money: refu"
+    },
+    {
+      "ok": true,
+      "label": "admin: Push to Shopify is offered on a cash-on-delivery order",
+      "detail": [
+        "Push to Shopify",
+        "Cancel order"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "admin: the push answers without a 5xx",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "admin: the push answer is in plain words, no codes",
+      "detail": "The push didn't go through. The reason is on this page; try again once it's fixed."
+    },
+    {
+      "ok": true,
+      "label": "admin: after the push the page shows where the order is",
+      "detail": "Orders\n/\nROL-636FF7BB82478CC2\nROL-636FF7BB82478CC2\nShopify push failed\n\nCash on delivery · placed 25 Nov 2026, 07:13 am\n\nPush to Shopify\nCancel order\n\nThis order didn't reach Shopify\n\nNo SHOPIFY_ADMIN_TOKEN, and SHOPIFY_CLIENT_ID/SECRET not set either\n\n1 attempt so far. Fix the cause in Shopify, the"
+    },
+    {
+      "ok": true,
+      "label": "owner: the orders list shows the seeded order",
+      "detail": "Orders\n\nEvery checkout lands here. Shopify stays the record for payments, shipping and refunds.\n\nOrders\n1\nReturns\nAll\n1\nPending payment\n0\nCOD pending\n0\nPaid\n0\nPushing\n0\nPushed\n0\nPush failed\n1\nCancelled\n0\nAny payment\nCash on delivery\nOnline\nOrder\tPlaced\tCustomer\tPayment\tStatus\tTotal\tShopify\n\nROL-636F"
+    },
+    {
+      "ok": true,
+      "label": "owner: search by the shopper's email keeps ?q= in the address and finds the order",
+      "detail": {
+        "url": "http://roles.localhost:6301/admin/orders?q=shopper%40roles.test"
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner: the order opens from the list with the customer's details",
+      "detail": {
+        "url": "http://roles.localhost:6301/admin/orders/ROL-636FF7BB82478CC2"
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner: Cancel order is offered",
+      "detail": [
+        "Push to Shopify",
+        "Cancel order"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "owner: after cancelling the order reads Cancelled and offers no more writes",
+      "detail": {
+        "writes": [],
+        "body": "Orders\n/\nROL-636FF7BB82478CC2\nROL-636FF7BB82478CC2\nCancelled\n\nCash on delivery · placed 25 Nov 2026, 07:13 am\n\nCustomer\nName\nMeera Shopper\nEmail\nshopper@roles.test\nPhone\n9800000001\nAddress\n12 Koregaon Park Road, Flat 4B, Pune, Maharashtra, 411001\nPayment and sync\nPlaced\n25 Nov 2026, 07:13 am\nPaid\n—\n"
+      }
+    },
+    {
+      "ok": true,
+      "label": "owner: an unknown order id is the not-found page",
+      "detail": "We couldn't find that order\n\nCheck the order id, or search for it from Orders.\n\nBack to orders"
+    },
+    {
+      "ok": true,
+      "label": "owner: the orders list at 375 wide has no sideways page scroll",
+      "detail": 0
+    }
+  ],
+  "notes": [],
+  "screenshots": [
+    {
+      "name": "support-order",
+      "file": "docs/cms-reviews/drills/ORDERS/support-order.png",
+      "bytes": 31622,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/orders/ROL-636FF7BB82478CC2"
+    },
+    {
+      "name": "staff-order",
+      "file": "docs/cms-reviews/drills/ORDERS/staff-order.png",
+      "bytes": 32859,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/orders/ROL-636FF7BB82478CC2"
+    },
+    {
+      "name": "admin-push",
+      "file": "docs/cms-reviews/drills/ORDERS/admin-push.png",
+      "bytes": 41971,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/orders/ROL-636FF7BB82478CC2"
+    },
+    {
+      "name": "owner-search",
+      "file": "docs/cms-reviews/drills/ORDERS/owner-search.png",
+      "bytes": 28234,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/orders"
+    },
+    {
+      "name": "owner-cancel-dialog",
+      "file": "docs/cms-reviews/drills/ORDERS/owner-cancel-dialog.png",
+      "bytes": 48662,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/orders/ROL-636FF7BB82478CC2"
+    },
+    {
+      "name": "owner-cancelled",
+      "file": "docs/cms-reviews/drills/ORDERS/owner-cancelled.png",
+      "bytes": 35859,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/orders/ROL-636FF7BB82478CC2"
+    },
+    {
+      "name": "owner-list-375",
+      "file": "docs/cms-reviews/drills/ORDERS/owner-list-375.png",
+      "bytes": 16778,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/admin/orders"
+    }
+  ]
+}
