@@ -233,6 +233,36 @@ await t("redactCustomer matches by phone digits too", async () => {
   eq(r.orders, 1, "phone-matched");
 });
 
+// Phase 8 line 3: saved addresses are account data; redaction deletes them.
+await t("redactCustomer deletes the account's saved addresses (a real delete), and no one else's", async () => {
+  const now = new Date().toISOString();
+  const addr = (id, cus) => ({ id, customer_id: cus, name: "N", phone: "9811100001", line1: `${id} line`, city: "Pune", state: "MH", pincode: "411001", is_default: 1, created_at: now, updated_at: now, address_key: `${id}-key` });
+  await inT(async () => {
+    await db.insertInto("customers").values([{ id: "cus_redadr", email: "adr@x.com", created_at: now, last_login_at: now }, { id: "cus_keepadr", email: "keep@x.com", created_at: now, last_login_at: now }]).execute();
+    await db.insertInto("customer_addresses").values([addr("adr_red1", "cus_redadr"), addr("adr_red2", "cus_redadr"), addr("adr_keep", "cus_keepadr")]).execute();
+  });
+  await inT(() => P.redactCustomer({ email: "ADR@x.com" }));
+  const left = await inT(() => db.selectFrom("customer_addresses").select(["id"]).orderBy("id").execute());
+  eq(JSON.stringify(left.map((r) => r.id)), JSON.stringify(["adr_keep"]), "only the other account's address is left");
+});
+
+await t("redactCustomer: a real error deleting addresses stops before the account row goes (only a missing table is skipped)", async () => {
+  const now = new Date().toISOString();
+  await inT(async () => {
+    await db.insertInto("customers").values({ id: "cus_trig", email: "trig@x.com", created_at: now, last_login_at: now }).execute();
+    await db.insertInto("customer_addresses").values({ id: "adr_trig", customer_id: "cus_trig", name: "N", phone: "9811100001", line1: "t", city: "Pune", state: "MH", pincode: "411001", is_default: 1, created_at: now, updated_at: now, address_key: "trig" }).execute();
+  });
+  const raw = createClient({ url: "file:.test-priv-t1.db" });
+  await raw.execute("CREATE TRIGGER no_adr_delete BEFORE DELETE ON customer_addresses BEGIN SELECT RAISE(ABORT, 'disk full'); END");
+  const err = await inT(() => P.redactCustomer({ email: "trig@x.com" })).then(() => null, (e) => e);
+  await raw.execute("DROP TRIGGER no_adr_delete");
+  ok(err && /disk full/.test(String(err.message) + String(err.cause?.message || "")), `the error surfaces: ${err?.message}`);
+  const left = await inT(() => db.selectFrom("customers").select(["id"]).where("id", "=", "cus_trig").execute());
+  eq(left.length, 1, "the account row is kept, so the addresses aren't orphaned");
+  await inT(() => P.redactCustomer({ email: "trig@x.com" }));
+  raw.close();
+});
+
 await t("compliance router: data_request → manual+alert; customers/redact executes; shop/redact → critical manual", async () => {
   const dr = await quiet(() => inT(() => W.applyWebhook("customers/data_request", { shop_domain: "s.myshopify.com", customer: { email: "dr@x.com" }, orders_requested: [1] })));
   ok(dr.recorded && dr.manual, "data_request recorded manual");

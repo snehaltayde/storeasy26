@@ -1,5 +1,6 @@
 "use client";
 
+import SavedAddressPicker from "./SavedAddressPicker";
 import PincodeField from "./PincodeField";
 
 // Phase 8 step 0: checkout step 1, split out of CheckoutFlow. The form lives
@@ -36,6 +37,7 @@ export default function AddressStep({ form, valid, onAddress, onContinue }) {
     <section>
       <h2 className="mb-4 text-lg font-bold">Contact &amp; shipping address</h2>
       {/* saved-addresses */}
+      <SavedAddressPicker form={form} onAddress={onAddress} />
       <PincodeField form={form} onAddress={onAddress}>
         {(chip) => (
           <div className="grid grid-cols-2 gap-3">

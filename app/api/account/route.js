@@ -2,6 +2,7 @@ import { NextResponse, after } from "next/server";
 import { requestOtp, verifyOtp, customerFromToken, revokeCustomerSession, updateCustomerProfile, customerOrders, buildReorder, validEmail, CUSTOMER_COOKIE } from "@/lib/customers";
 import { requestReturn } from "@/lib/returns";
 import { mergeWishlist, accountWishlist, removeWishlistItem } from "@/lib/wishlist";
+import { listAddresses, saveAddress, deleteAddress, setDefaultAddress } from "@/lib/addresses";
 import { rateLimitAsync } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
 import { shopperErrorMessage } from "@/lib/shopper-errors";
@@ -14,8 +15,14 @@ import { tenantHandler } from "@/lib/tenant-request";
 //   POST {action:"request_otp", email}
 //   POST {action:"verify", email, code}  → sets _customer cookie
 //   POST {action:"logout"}
-//   POST {action:"profile", name?, phone?, address?}   (authed)
+//   POST {action:"profile", name?, phone?}              (authed)
 //   GET  ?view=me | orders | reorder&order=<id>        (authed)
+// Saved addresses (Phase 8 line 3), the shopper's own only: signed out → 401
+// with no data; another shopper's id → 404, the same as a missing one; writes
+// 30 per 10 minutes.
+//   GET  ?view=addresses
+//   POST {action:"address_save", address:{id?, label?, name, phone, line1, …}, makeDefault?}
+//   POST {action:"address_delete", id} | {action:"address_default", id}
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -24,11 +31,19 @@ const COOKIE_OPTS = { httpOnly: true, sameSite: "lax", path: "/", maxAge: 30 * 2
 
 const me = (request) => customerFromToken(request.cookies.get(COOKIE)?.value);
 
+const SIGN_IN = { error: "sign in first" };
+const ADDRESS_NOT_FOUND = { error: "address not found" };
+const ADDRESS_ACTIONS = new Set(["address_save", "address_delete", "address_default"]);
+
 export const GET = tenantHandler(async (request) => {
   const customer = await me(request);
-  if (!customer) return NextResponse.json({ ok: true, authenticated: false });
   const url = new URL(request.url);
   const view = url.searchParams.get("view") || "me";
+  if (view === "addresses") {
+    if (!customer) return NextResponse.json(SIGN_IN, { status: 401 });
+    return NextResponse.json({ ok: true, email: customer.email, addresses: await listAddresses(customer.id) });
+  }
+  if (!customer) return NextResponse.json({ ok: true, authenticated: false });
   if (view === "orders") return NextResponse.json({ ok: true, authenticated: true, customer, orders: await customerOrders(customer.id) });
   if (view === "wishlist") return NextResponse.json({ ok: true, authenticated: true, items: await accountWishlist(customer.id) });
   if (view === "reorder") {
@@ -99,10 +114,24 @@ export const POST = tenantHandler(async (request) => {
       await removeWishlistItem(customer.id, body.handle);
       return NextResponse.json({ ok: true, items: await accountWishlist(customer.id) });
     }
+    if (ADDRESS_ACTIONS.has(body.action)) {
+      const customer = await me(request);
+      if (!customer) return NextResponse.json(SIGN_IN, { status: 401 });
+      const limited = await rateLimitAsync(request, { name: "account_address", limit: 30, windowMs: 10 * 60 * 1000 });
+      if (limited) return limited;
+      if (body.action === "address_save") {
+        const r = await saveAddress(customer.id, { ...(body.address || {}), makeDefault: Boolean(body.makeDefault) });
+        if (!r) return NextResponse.json(ADDRESS_NOT_FOUND, { status: 404 });
+        return NextResponse.json({ ok: true, ...r, addresses: await listAddresses(customer.id) });
+      }
+      const done = body.action === "address_delete" ? await deleteAddress(customer.id, body.id) : await setDefaultAddress(customer.id, body.id);
+      if (!done) return NextResponse.json(ADDRESS_NOT_FOUND, { status: 404 });
+      return NextResponse.json({ ok: true, addresses: await listAddresses(customer.id) });
+    }
     if (body.action === "profile") {
       const customer = await me(request);
       if (!customer) return NextResponse.json({ error: "sign in first" }, { status: 401 });
-      const updated = await updateCustomerProfile(customer.id, { name: body.name, phone: body.phone, address: body.address });
+      const updated = await updateCustomerProfile(customer.id, { name: body.name, phone: body.phone });
       return NextResponse.json({ ok: true, customer: updated });
     }
     return NextResponse.json({ error: "unknown action" }, { status: 400 });
