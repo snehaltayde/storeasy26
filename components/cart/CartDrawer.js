@@ -225,7 +225,7 @@ export default function CartDrawer() {
                       data-nudge-add
                       onClick={() => setQty(it.variantId, it.quantity + tierNudge.add)}
                       disabled={pending}
-                      className="mt-1 self-start rounded-sf-small border border-sf-accent-border bg-sf-accent-subtle px-2 py-0.5 text-xs font-semibold text-sf-on-accent-soft disabled:opacity-50"
+                      className="sf-focus mt-1 inline-flex min-h-11 items-center self-start rounded-sf-small border border-sf-accent-border bg-sf-accent-subtle px-3 text-xs font-semibold text-sf-on-accent-soft disabled:opacity-50 sm:min-h-8"
                     >
                       Add {tierNudge.add} more
                     </button>

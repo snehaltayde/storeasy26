@@ -11,7 +11,7 @@ export default function OfferProgress({ progress }) {
   const unlocked = progress?.unlocked || [];
   const empty = nudges.length === 0 && unlocked.length === 0;
   return (
-    <div data-offer-progress aria-live="polite" className={empty ? "" : "border-b border-sf-border-soft bg-sf-surface px-5 py-3"}>
+    <div data-offer-progress aria-live="polite" className={empty ? "" : "border-b border-sf-border-soft bg-sf-surface px-5 py-3.5"}>
       {nudges.map((n) =>
         n.kind === "spend" ? (
           <div key={`spend-${n.id}`} data-nudge="spend" className="mb-2 last:mb-0">
@@ -22,21 +22,21 @@ export default function OfferProgress({ progress }) {
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={n.percent}
-              className="relative mt-2 h-2 rounded-full bg-sf-surface-sunken"
+              className="relative mt-2.5 h-2.5 rounded-full border border-sf-border-strong bg-sf-surface-sunken"
             >
-              <div data-progress-fill className="h-full rounded-full bg-sf-accent transition-[width] duration-500 motion-reduce:transition-none" style={{ width: `${n.percent}%` }} />
+              <div data-progress-fill className="h-full rounded-full bg-sf-accent-strong transition-[width] duration-500 motion-reduce:transition-none" style={{ width: `${n.percent}%` }} />
               {n.milestones.map((m) => (
                 <span
                   key={m.id}
                   title={m.label}
                   aria-hidden="true"
-                  className="absolute top-1/2 h-3 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sf-text-subtle"
+                  className="absolute top-1/2 h-4 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sf-text ring-2 ring-sf-surface"
                   style={{ left: `${m.position}%` }}
                 />
               ))}
             </div>
             {n.milestones.length > 1 && (
-              <p className="mt-1 text-xs text-sf-text-subtle">{n.milestones.map((m) => m.label).join(" · ")}</p>
+              <p className="mt-1.5 text-xs text-sf-text-subtle">{n.milestones.map((m) => m.label).join(" · ")}</p>
             )}
           </div>
         ) : (

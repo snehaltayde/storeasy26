@@ -347,3 +347,12 @@ body {
     animation: none;
   }
 }
+
+/* Phase 7 design sweep: one visible keyboard focus ring for storefront
+   controls (accent-strong, offset). Used by search filters, buy bar, cart. */
+@utility sf-focus {
+  &:focus-visible {
+    outline: 2px solid var(--sf-accent-strong);
+    outline-offset: 2px;
+  }
+}

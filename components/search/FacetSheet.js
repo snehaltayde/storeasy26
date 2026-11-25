@@ -66,7 +66,7 @@ export default function FacetSheet({ active, total, children }) {
         aria-haspopup="dialog"
         aria-expanded={open}
         data-facet-sheet-open
-        className="inline-flex items-center gap-2 rounded-sf-control border border-sf-border bg-sf-surface px-3 py-2 text-sm font-medium text-sf-text-soft hover:border-sf-border-hover"
+        className="sf-focus inline-flex min-h-11 items-center gap-2 rounded-sf-control border border-sf-border bg-sf-surface px-4 py-2 text-sm font-semibold text-sf-text-soft hover:border-sf-border-hover"
       >
         <svg viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
           <path d="M2 4h12M4.5 8h7M7 12h2" />
@@ -79,15 +79,15 @@ export default function FacetSheet({ active, total, children }) {
             <h2 id="facet-sheet-title" className="text-base font-semibold text-sf-text">
               Filters{active ? ` (${active})` : ""}
             </h2>
-            <button type="button" onClick={() => setOpen(false)} data-sheet-close aria-label="Close filters" className="rounded-sf-small p-2 text-sf-text-subtle hover:text-sf-text">
+            <button type="button" onClick={() => setOpen(false)} data-sheet-close aria-label="Close filters" className="sf-focus -mr-2 flex size-11 items-center justify-center rounded-sf-small text-sf-text-subtle hover:text-sf-text">
               <svg viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
                 <path d="M4 4l8 8M12 4l-8 8" />
               </svg>
             </button>
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-4">{children}</div>
-          <div className="border-t border-sf-border p-4">
-            <button type="button" onClick={() => setOpen(false)} data-sheet-show className="w-full rounded-sf-control bg-sf-accent px-4 py-3 text-sm font-semibold text-sf-on-accent hover:bg-sf-accent-hover">
+          <div className="border-t border-sf-border p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            <button type="button" onClick={() => setOpen(false)} data-sheet-show className="sf-focus min-h-12 w-full rounded-sf-control bg-sf-accent px-4 py-3 text-sm font-semibold text-sf-on-accent hover:bg-sf-accent-hover">
               {label}
             </button>
           </div>

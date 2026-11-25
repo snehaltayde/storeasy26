@@ -30,7 +30,7 @@ export default function StickyBuyBar({ visible, title, image, variantLabel, pric
       data-state={state}
       aria-hidden={visible ? undefined : true}
       inert={!visible}
-      className={`fixed inset-x-0 bottom-0 z-30 border-t border-sf-border bg-sf-surface/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-sf-bar backdrop-blur transition-transform duration-300 motion-reduce:transition-none lg:hidden ${
+      className={`fixed inset-x-0 bottom-0 z-30 border-t border-sf-border bg-sf-surface/95 pt-3 pr-[max(1rem,env(safe-area-inset-right))] pb-[calc(0.75rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] shadow-sf-bar backdrop-blur transition-transform duration-300 motion-reduce:transition-none lg:hidden ${
         visible ? "translate-y-0" : "invisible translate-y-full"
       }`}
     >
@@ -55,7 +55,7 @@ export default function StickyBuyBar({ visible, title, image, variantLabel, pric
           disabled={disabled}
           aria-disabled={busy ? true : undefined}
           aria-busy={busy ? true : undefined}
-          className="shrink-0 rounded-sf-control bg-sf-accent px-5 py-3 text-sm font-bold text-sf-on-accent transition enabled:hover:bg-sf-accent-hover disabled:cursor-not-allowed disabled:bg-sf-surface-strong disabled:text-sf-text-faint aria-busy:opacity-70"
+          className="sf-focus min-h-11 shrink-0 rounded-sf-control bg-sf-accent px-5 py-3 text-sm font-bold text-sf-on-accent transition enabled:hover:bg-sf-accent-hover disabled:cursor-not-allowed disabled:bg-sf-surface-strong disabled:text-sf-text-faint aria-busy:opacity-70"
         >
           {label}
         </button>

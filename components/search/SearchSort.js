@@ -20,7 +20,7 @@ export default function SearchSort({ sort, keep }) {
           key={sort}
           defaultValue={sort}
           onChange={() => form.current?.requestSubmit()}
-          className="rounded-sf-small border border-sf-border bg-sf-surface px-2.5 py-1.5 text-sm font-medium text-sf-text-soft outline-none focus:border-sf-border-hover"
+          className="min-h-11 rounded-sf-small border border-sf-border bg-sf-surface px-2.5 py-1.5 text-base font-medium text-sf-text-soft outline-none focus:border-sf-accent-strong focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sf-accent-strong lg:min-h-9 lg:text-sm"
         >
           {Object.entries(LABELS).map(([v, l]) => (
             <option key={v} value={v}>

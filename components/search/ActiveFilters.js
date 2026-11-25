@@ -23,7 +23,7 @@ export default function ActiveFilters({ state, labels }) {
     <ul className="flex flex-wrap items-center gap-2" data-active-filters aria-label="Active filters">
       {chips.map((c) => (
         <li key={c.href + c.label}>
-          <Link href={c.href} scroll={false} data-chip={c.label} className="inline-flex items-center gap-1.5 rounded-full border border-sf-border bg-sf-surface-muted px-3 py-1 text-sm text-sf-text-body hover:border-sf-border-hover">
+          <Link href={c.href} scroll={false} data-chip={c.label} className="sf-focus inline-flex min-h-11 items-center gap-1.5 rounded-full border border-sf-border bg-sf-surface-muted px-3.5 py-1 text-sm text-sf-text-body hover:border-sf-border-hover lg:min-h-9">
             {c.label}
             <span aria-hidden="true" className="text-sf-text-faint">
               ×
@@ -33,7 +33,7 @@ export default function ActiveFilters({ state, labels }) {
         </li>
       ))}
       <li>
-        <Link href={facetHref(clearedFilters(state))} scroll={false} data-clear-all className="text-sm font-medium text-sf-accent-text hover:underline">
+        <Link href={facetHref(clearedFilters(state))} scroll={false} data-clear-all className="sf-focus inline-flex min-h-11 items-center rounded-sf-small px-1 text-sm font-medium text-sf-accent-text hover:underline lg:min-h-9">
           Clear all
         </Link>
       </li>

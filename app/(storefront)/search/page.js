@@ -105,14 +105,14 @@ export default async function SearchPage({ searchParams }) {
                   {filters ? (
                     <>
                       <p className="font-medium text-sf-text-body">No products match these filters.</p>
-                      <Link href={facetHref(clearedFilters(s))} className="mt-3 inline-block text-sm text-sf-accent-text hover:underline">
+                      <Link href={facetHref(clearedFilters(s))} className="mt-3 inline-block sf-focus inline-flex min-h-11 items-center text-sm text-sf-accent-text hover:underline">
                         Clear all filters
                       </Link>
                     </>
                   ) : (
                     <>
                       <p className="font-medium text-sf-text-body">No products match “{s.q}”.</p>
-                      <Link href="/collections" className="mt-3 inline-block text-sm text-sf-accent-text hover:underline">
+                      <Link href="/collections" className="mt-3 inline-block sf-focus inline-flex min-h-11 items-center text-sm text-sf-accent-text hover:underline">
                         Browse all collections →
                       </Link>
                     </>
@@ -146,7 +146,7 @@ export default async function SearchPage({ searchParams }) {
                       key={n}
                       href={facetHref(s, { page: n })}
                       aria-current={n === s.page ? "page" : undefined}
-                      className={`min-w-9 rounded-sf-small px-3 py-1.5 text-center text-sm tabular-nums ${n === s.page ? "bg-sf-inverse text-sf-on-inverse" : "text-sf-text-soft hover:bg-sf-surface-muted"}`}
+                      className={`sf-focus inline-flex min-h-11 min-w-11 items-center justify-center rounded-sf-small px-3 py-1.5 text-center text-sm tabular-nums ${n === s.page ? "bg-sf-inverse text-sf-on-inverse" : "text-sf-text-soft hover:bg-sf-surface-muted"}`}
                     >
                       {n}
                     </Link>

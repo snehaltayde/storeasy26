@@ -362,3 +362,12 @@ Each Phase 3 line fills only its own sub-heading.
 - **Drawer on a phone:** full width and full height (`100dvh`), a modal dialog (`aria-modal`); focus moves to Close on open, Tab and Shift+Tab stay inside, Escape closes it and puts focus back on what opened it (the bar's button, the header's cart button). The page behind doesn't scroll. The footer (coupon, totals, Checkout) stays at the bottom with the safe-area inset.
 - **Offer progress** (`components/cart/OfferProgress.js`), under the drawer's header, outside the scrolling lines, `aria-live="polite"`: at most two nudges from the server. A spend goal ("Add ₹600 more for a free Shaker", or free shipping when the store chose its rates) with a progress bar and a tick per goal; the nearest quantity tier ("Add 1 more for 10% off · Tee Tiers") with an "Add 1 more" button on the line it was checked on; the shopper's own coupon short of its minimum ("Add ₹200 more to use SAVE10"). Reached goals read "Free Shaker · Unlocked" with a tick. Copy uses offer and gift titles and money, never what an offer targets.
 - Needs the design pass (`ui-designer`): the buy bar, the progress block (bar, milestones, unlocked ticks) and the "Add 1 more" button on the line.
+
+### Design sweep (Phase 7)
+
+- **Focus:** one storefront ring, the `sf-focus` utility in `app/globals.css` (2px accent-strong outline, 2px offset), on the facet values, In stock, Show all, chips, Clear all, page links, price fields and button, the Filters button, sheet close and Show N, the buy bar button and "Add 1 more". Fields and the sort select also darken their border.
+- **Tap targets:** below `lg`, every filter control, chip, page link and the "Add 1 more" button is at least 44px high; from `lg` they tighten to 32-36px. Price and sort fields are 16px on phones so iOS doesn't zoom.
+- **Facet rail:** group titles are small caps over a hairline; a selected value is medium weight in the text colour; "In stock only" is semibold so the rail opens with one clear control. The sheet's footer clears the safe-area inset.
+- **Buy bar:** padding also clears the left and right safe-area insets (landscape), bottom inset unchanged; the button is 44px.
+- **Progress bar:** the fill uses accent-strong on a bordered track so it reads in pulse and glow and with each flagship's accent; goal ticks are dark with a surface ring so they show on the fill and on the track.
+- Unchanged: copy, `data-*` attributes, behaviour, console components (the kit's own focus ring already applies).

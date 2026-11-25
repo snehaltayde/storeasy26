@@ -15,7 +15,7 @@ function ValueLink({ state, group, v }) {
         scroll={false}
         data-facet-value={v.value}
         data-selected={v.selected ? "true" : undefined}
-        className="flex items-center gap-2.5 rounded-sf-small py-1.5 text-sm text-sf-text-body hover:text-sf-text"
+        className="sf-focus flex min-h-11 items-center gap-2.5 rounded-sf-small py-1.5 text-sm text-sf-text-body hover:text-sf-text lg:min-h-8 data-[selected=true]:font-medium data-[selected=true]:text-sf-text"
       >
         <span
           aria-hidden="true"
@@ -47,7 +47,7 @@ export default function FacetRail({ state, groups, price, full = false, idPrefix
           scroll={false}
           data-facet-instock
           data-selected={state.instock ? "true" : undefined}
-          className="flex items-center gap-2.5 text-sm font-medium text-sf-text-body"
+          className="sf-focus flex min-h-11 items-center gap-2.5 rounded-sf-small text-sm font-semibold text-sf-text lg:min-h-8"
         >
           <span aria-hidden="true" className={`flex size-4 items-center justify-center rounded-[4px] border ${state.instock ? "border-sf-accent bg-sf-accent text-sf-on-accent" : "border-sf-border-strong bg-sf-surface"}`}>
             {state.instock ? (
@@ -70,17 +70,17 @@ export default function FacetRail({ state, groups, price, full = false, idPrefix
         const more = g.values.slice(SHOWN_VALUES);
         return (
           <section key={g.key} data-facet-group={g.key} aria-labelledby={`${idPrefix}-facet-${i}`}>
-            <h2 id={`${idPrefix}-facet-${i}`} className="text-xs font-semibold uppercase tracking-wide text-sf-text-muted">
+            <h2 id={`${idPrefix}-facet-${i}`} className="border-b border-sf-border-soft pb-1.5 text-xs font-semibold uppercase tracking-wide text-sf-text-muted">
               {g.title}
             </h2>
-            <ul className="mt-2">
+            <ul className="mt-1.5">
               {shown.map((v) => (
                 <ValueLink key={v.value} state={state} group={g.key} v={v} />
               ))}
             </ul>
             {more.length ? (
               <details open={more.some((v) => v.selected)} className="group">
-                <summary className="mt-1 cursor-pointer list-none text-sm font-medium text-sf-accent-text hover:underline group-open:hidden">Show all ({g.values.length})</summary>
+                <summary className="sf-focus mt-1 flex min-h-11 cursor-pointer list-none items-center rounded-sf-small text-sm font-medium text-sf-accent-text hover:underline group-open:hidden lg:min-h-8">Show all ({g.values.length})</summary>
                 <ul>
                   {more.map((v) => (
                     <ValueLink key={v.value} state={state} group={g.key} v={v} />
