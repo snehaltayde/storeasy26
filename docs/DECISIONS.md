@@ -3,6 +3,17 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Phase 3 least-trusted audit fixes (on the owner's behalf)
+
+- **Schema:** platform migration `0018_export_links.sql` (additive): one row per export link.
+- **Export links:** single-use and valid for 15 minutes; the spend and its `tenant.export_downloaded` audit row are one write batch, so a download that can't be audited answers 503 and leaves the link usable. Expired rows are pruned after a day.
+- **Errors:** every operator route answers through `lib/platform/operator-error.js`: library refusals (`refuse()`, 4xx) keep their words, anything else gets fixed words and is logged through `scrubSecrets` with the store's address and token. A static guard in `test-platform-permissions` forbids raw `String(e…)`/`e.message` in operator answers.
+- **Other:** an incident with no public message keeps its title operator-only; signing out of `/platform` ends that operator's support sessions and unused entry tokens (only theirs); operator paging is clamped (limit 1–200, offset ≤ 1,000,000); the denied-caller tests include support sessions and support-entry tokens.
+- **Follow-up (Later):** `isRefusal` recognises refusals by shape, so a `TursoApiError` with a 4xx status shows its (scrubbed) words to operators; give `refuse()` an explicit marker.
+- **Audit:** `docs/cms-reviews/PHASE-3-AUDIT.md`.
+- **Decided by:** Claude
+- **Slice:** Phase 3 audit
+
 ## 2026-11-25 Phase 4 by midnight: 5 heavy slots and one design sweep (owner decision)
 
 - Heavy commands run in up to 5 machine-wide slots (was 3) until Phase 4 closes; `~/.claude/bin/heavy` defaults to 5. Revert to 3 afterwards.

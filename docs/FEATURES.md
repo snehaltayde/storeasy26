@@ -108,6 +108,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 
 ## Later (not planned yet)
 
+- `lib/platform/operator-error.js` `isRefusal` decides by shape: mark `refuse()` errors explicitly so a `TursoApiError` with a 4xx status never shows its text to operators (Phase 3 audit re-read, low, operator-only).
 - `customers.read` for external apps (customer contact details to a third party): left out of Phase 4 by the owner; revisit only when a real app needs it.
 - Support access hardening (line 5 review nits): the support-access drill skips the onboarding page entirely; keep its server-log write check there and skip only the stray-control scan. The `/platform` CSP's open `form-action` also applies if `/platform` is ever served on a store host; set it per request naming the store's origin if that matters.
 - **Flaky under the full suite's load (2026-11-25):** `test:editor-store` ("409 stops autosave": status `saving`, not `conflict`) and `test:design-doc` ("a failing pin write does not change the publish result") each failed once in a full `pnpm test` while three heavy jobs ran, and pass alone every time. Find the timing they depend on and wait on a real signal.
