@@ -49,9 +49,12 @@ stage("markets", async (drill) => {
   await page.goto(`${ORIGIN}/products/${item.handle}`, { waitUntil: "load" });
   const picker = page.locator('[data-part="market-picker"] select');
   drill.check((await picker.count()) === 1, "the footer has the Ship to picker");
-  await Promise.all([page.waitForURL(`${ORIGIN}/products/${item.handle}`, { waitUntil: "load" }), picker.selectOption("US")]);
-  drill.check((await picker.inputValue()) === "US", "the shopper chose United States ($)");
-  drill.check((await page.getByText(usd, { exact: true }).count()) > 0, `the product page shows ${usd}`);
+  // the choice submits the form: /api/market answers 303 back to this page
+  await Promise.all([page.waitForResponse((r) => r.url().includes("/api/market?") && r.status() === 303), picker.selectOption("US")]);
+  await page.waitForLoadState("load");
+  const shown = await page.getByText(usd, { exact: true }).first().waitFor({ timeout: 15_000 }).then(() => true, () => false);
+  drill.check(page.url() === `${ORIGIN}/products/${item.handle}` && (await picker.inputValue()) === "US", "the shopper chose United States ($) and is back on the product page", page.url());
+  drill.check(shown, `the product page shows ${usd}`);
   await drill.shoot(page, "markets-pdp");
 
   const added = await page.evaluate(
