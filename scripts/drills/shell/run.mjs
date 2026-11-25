@@ -537,6 +537,72 @@ async function anonymousPass(drill, ctx) {
   await page.close();
 }
 
+// Phase 1 least-trusted audit (docs/cms-reviews/PHASE-1-AUDIT.md), browser pass.
+// Support: every onboarding step opens read-only (no enabled write, no Shopify
+// address on the page); the Phase 1 write APIs and the founder's Shopify
+// callback refuse it; the operator's onboarding and New store screens are the
+// operator sign-in. Anonymous: the handoff and accept-invite routes refuse a
+// made-up token with their generic words, the Shopify callback is 401, the
+// operator onboarding APIs are 401, and signup on a store host is 404.
+const STEPS = ["connect", "import", "brand", "open"];
+const OPERATOR_PAGES = ["/platform/onboarding", "/platform/stores/new"];
+
+async function operatorPagesClosed(drill, page, who) {
+  for (const path of OPERATOR_PAGES) {
+    await page.goto(ORIGIN + path, { waitUntil: "load" });
+    await settle(page);
+    const body = await page.locator("body").innerText().catch(() => "");
+    drill.check(new URL(page.url()).pathname === "/platform" && !/Signups & onboarding|Create store/.test(body) && ((await page.locator("#pl-password").count()) === 1 || /Not configured/.test(body)), `${who} at ${path}: sent to the operator sign-in, never the screen`, { url: page.url(), body: body.slice(0, 160) });
+  }
+}
+
+async function phase1Support(drill, page) {
+  await page.setViewportSize({ width: 1280, height: HEIGHT });
+  for (const step of STEPS) {
+    const r = await page.goto(`${ORIGIN}${ONBOARDING}?step=${step}`, { waitUntil: "load" });
+    await settle(page);
+    const body = await page.locator("body").innerText().catch(() => "");
+    const ob = await onboardingShell(page);
+    drill.check(r?.status() === 200 && !ERROR_TEXT.test(body) && ob.step === step && ob.enabledWrites.length === 0 && !/[a-z0-9-]+\.myshopify\.com/i.test(body), `support at onboarding step ${step}: read-only, no enabled write, no Shopify address`, { status: r?.status(), ...ob });
+  }
+  const api = (method, path, data) => page.request.fetch(`${ORIGIN}/api/admin/${path}`, { method, data, headers: { origin: ORIGIN }, maxRedirects: 0 }).then((x) => x.status());
+  const refusals = {
+    "POST shopify/connect": await api("POST", "shopify/connect", { shop: "audit-probe.myshopify.com" }),
+    "GET shopify/callback": await api("GET", "shopify/callback?state=x&code=y&shop=audit-probe.myshopify.com"),
+    "POST brand-step": await api("POST", "brand-step", { paletteId: "x" }),
+    "POST policy-start": await api("POST", "policy-start", { kind: "privacy" }),
+    "POST first-run": await api("POST", "first-run", {}),
+    "POST sync": await api("POST", "sync", {}),
+    "PUT settings identity": await api("PUT", "settings", { identity: { support_email: "audit@probe.test" } }),
+    "DELETE media": await api("DELETE", "media", { id: "med_missing" }),
+  };
+  drill.check(Object.values(refusals).every((x) => x === 403), "support: Connect, the Shopify callback, brand, policy start, starter store, import, the contact form and media delete answer 403", refusals);
+  await operatorPagesClosed(drill, page, "support");
+}
+
+async function phase1Anonymous(drill, ctx) {
+  const page = await ctx.newPage();
+  await page.setViewportSize({ width: 1280, height: HEIGHT });
+  const req = (method, url, data) => ctx.request.fetch(url, { method, data, headers: { origin: new URL(url).origin }, maxRedirects: 0 });
+  const handoff = await req("POST", `${ORIGIN}/api/admin/handoff`, { token: "ab".repeat(16) });
+  const handoffBody = await handoff.json().catch(() => ({}));
+  drill.check(handoff.status() === 400 && /expired or was already used/.test(handoffBody.error || "") && !handoff.headers()["set-cookie"], "anonymous: a made-up handoff token is 400 with the generic words and no session", { status: handoff.status(), body: handoffBody });
+  const peek = await req("GET", `${ORIGIN}/api/admin/accept-invite?token=${"cd".repeat(16)}`);
+  drill.check(peek.status() === 400, "anonymous: a made-up invite token's peek is 400", peek.status());
+  await page.goto(`${ORIGIN}/admin/accept-invite?token=${"cd".repeat(16)}`, { waitUntil: "load" });
+  await settle(page);
+  const inviteBody = await page.locator("body").innerText().catch(() => "");
+  drill.check(/invalid, expired, or already used/.test(inviteBody) && !ERROR_TEXT.test(inviteBody), "anonymous: the accept page with a made-up token says the invitation is invalid, no error", inviteBody.slice(0, 200));
+  const cb = await req("GET", `${ORIGIN}/api/admin/shopify/callback?state=x&code=y&shop=audit-probe.myshopify.com`);
+  drill.check(cb.status() === 401, "anonymous: the founder's Shopify callback is 401", cb.status());
+  const ops = { onboarding: (await req("GET", `${ORIGIN}/api/platform/onboarding`)).status(), stores: (await req("GET", `${ORIGIN}/api/platform/stores?check=1`)).status(), "onboarding POST": (await req("POST", `${ORIGIN}/api/platform/onboarding`, { action: "note", subject: "tenant:x", text: "hi" })).status() };
+  drill.check(Object.values(ops).every((x) => x === 401), "anonymous: the operator onboarding and New store APIs are 401", ops);
+  const signup = { page: (await page.goto(`${ORIGIN}/signup`, { waitUntil: "load" }))?.status(), api: (await req("POST", `${ORIGIN}/api/signup`, { name: "A", email: "a@probe.test", password: "x", storeName: "A" })).status(), status: (await req("POST", `${ORIGIN}/api/signup/status`, {})).status() };
+  drill.check(signup.page === 404 && signup.api === 404 && signup.status === 404, "anonymous: signup's page and APIs on a store host are 404", signup);
+  await operatorPagesClosed(drill, page, "anonymous");
+  await page.close();
+}
+
 async function shell(drill) {
   if (!port) throw new Error("drill:shell needs ROLES_PORT (run it as pnpm drill:shell).");
   const s = seed();
@@ -558,6 +624,8 @@ async function shell(drill) {
   const anonCtx = await drill.browser.newContext({ viewport: { width: 1280, height: HEIGHT }, deviceScaleFactor: 1 });
   anonCtx.setDefaultTimeout(60_000);
   await anonymousPass(drill, anonCtx);
+  await phase1Support(drill, pages.support);
+  await phase1Anonymous(drill, anonCtx);
   await ownerFlows(drill, pages.owner);
   const dir = drill.dir;
   writeFileSync(join(dir, "support-write-controls.json"), `${JSON.stringify({ id: DRILL_ID, note: "Write controls support still sees inside the old screens: Phase 2's list, not a failure.", total: out.supportWrites.reduce((n, p) => n + p.controls.length, 0), pages: out.supportWrites }, null, 2)}\n`);
