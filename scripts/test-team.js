@@ -432,6 +432,33 @@ await t("mail set up but the send fails (network blocked): the link is still sho
   }
 });
 
+// P2-G: an invite only ever raises a role, so one for a member already at or
+// above it is refused before anything is written or sent
+await t("P2-G inviting an existing member at or above the invited role is 409 ALREADY_MEMBER: no invitation row, no mail, no audit row", async () => {
+  process.env.RESEND_API_KEY = "re_test_blocked"; // mail set up: a send would show as a call and a platform_mail row
+  try {
+    for (const [have, invited] of [["staff", "staff"], ["staff", "support"], ["admin", "staff"], ["admin", "admin"], ["owner", "admin"]]) {
+      const m = await member(have);
+      const callsBefore = netCalls.length;
+      const r = await post("owner", { action: "invite", email: m.user.email.toUpperCase(), role: invited });
+      eq([r.status, r.body?.code], [409, "ALREADY_MEMBER"], `${have} invited as ${invited}:`);
+      ok(r.body?.error && !r.body.inviteUrl, `${have} as ${invited}: plain words, no link`);
+      eq(await one("SELECT id FROM invitations WHERE email = ?", [m.user.email]), null, `${have} as ${invited}: invitation row`);
+      eq(await one("SELECT id FROM platform_mail WHERE recipient = ?", [m.user.email]), null, `${have} as ${invited}: mail row`);
+      eq(netCalls.length, callsBefore, `${have} as ${invited}: a mail send was tried`);
+      eq(await lastAudit(`invite:${m.user.email}`), null, `${have} as ${invited}: audit row`);
+      eq(await roleOf(m.user.id), have, `${have} as ${invited}: the role is unchanged`);
+    }
+    // a raise is still an invite (the positive control)
+    const m = await member("support");
+    const up = await post("owner", { action: "invite", email: m.user.email, role: "staff" });
+    eq(up.status, 200, "support invited as staff:");
+    ok(await one("SELECT id FROM invitations WHERE email = ?", [m.user.email]), "the raise's invitation row:");
+  } finally {
+    process.env.RESEND_API_KEY = "";
+  }
+});
+
 console.log("— 5. audit");
 await t("every write writes an audit row; owner-related writes are team.owner, the rest team.manage", async () => {
   const m = await member("staff");

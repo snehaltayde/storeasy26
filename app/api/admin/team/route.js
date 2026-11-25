@@ -35,6 +35,7 @@ const view = teamView; // lib/admin/team.js, shared with the team page
 const LAST_OWNER_WORDS = "A store needs at least one owner, so the last owner can't be changed or removed. Make someone else an owner first.";
 const NOT_MEMBER_WORDS = "That person isn't on this store's team any more. Reload the page to see the team as it is now.";
 const fail = (error, status) => NextResponse.json({ error }, { status });
+const ALREADY_MEMBER_WORDS = "That person is already on this store's team with this role or a higher one. To change their role, use Change role on the team list.";
 
 // The invite email, only when mail is set up (lib/mail.js). The link is in
 // the answer either way; a failed send never undoes the invite.
@@ -113,6 +114,11 @@ export const POST = tenantHandler(async (request) => {
       const email = String(body.email || "").trim().toLowerCase();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return fail("Enter a full email address, like name@example.com.", 422);
       if (!ROLES.includes(body.role)) return fail(`Pick a role: ${ROLES.join(", ")}.`, 422);
+      // P2-G: an invite only raises a role (acceptInvite never lowers one), so a
+      // member already at or above it is refused before any row or mail
+      const existing = await platformDb().execute({ sql: "SELECT m.role FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.tenant_id = ? AND lower(u.email) = ?", args: [tenant.id, email] });
+      const have = existing.rows[0]?.role;
+      if (have && ROLES.indexOf(have) <= ROLES.indexOf(body.role)) return NextResponse.json({ error: ALREADY_MEMBER_WORDS, code: "ALREADY_MEMBER" }, { status: 409 });
       const inv = await createInvite({ email, tenantId: tenant.id, role: body.role, invitedBy: auth.actor.id });
       slog("team_invited", { email, role: body.role });
       await audit({ actor: auth.actor, action: auditAction, resource: `invite:${email}`, diff: { role: body.role } });
