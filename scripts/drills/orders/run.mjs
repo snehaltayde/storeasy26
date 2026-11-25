@@ -46,8 +46,33 @@ async function open(page, path) {
 
 const writeButtons = (page) => page.locator("main button").evaluateAll((els, re) => els.map((e) => e.innerText.trim()).filter((t) => new RegExp(re).test(t)), WRITES.source);
 
+// console errors and uncaught page errors while a role uses the list's reads
+async function consoleClean(drill, page, role) {
+  const errors = [];
+  const onConsole = (m) => (m.type() === "error" || m.type() === "warning") && errors.push(`${m.type()}: ${m.text().slice(0, 400)}`);
+  const onError = (e) => errors.push(`pageerror: ${String(e?.message || e).slice(0, 400)}`);
+  page.on("console", onConsole);
+  page.on("pageerror", onError);
+  await open(page, "/admin/orders");
+  const links = await page.locator("main a[data-read-control]").count();
+  for (let i = 0; i < Math.min(links, 6); i++) {
+    await open(page, "/admin/orders");
+    await page.locator("main a[data-read-control]").nth(i).click();
+    await page.waitForTimeout(500);
+    await settle(page);
+  }
+  await open(page, "/admin/orders");
+  await page.getByRole("searchbox").press("Enter");
+  await page.waitForTimeout(800);
+  await settle(page);
+  page.off("console", onConsole);
+  page.off("pageerror", onError);
+  drill.check(errors.length === 0, `${role}: no console error or warning while using the list's reads`, errors);
+}
+
 async function readOnlyRole(drill, page, role, s) {
   const orderId = s.shopper.orderId;
+  await consoleClean(drill, page, role);
   const d = await open(page, `/admin/orders/${orderId}`);
   drill.check(d.status === 200 && !ERROR_TEXT.test(d.body) && d.body.includes(orderId), `${role}: the order page opens`, { status: d.status, body: d.body.slice(0, 200) });
   drill.check((await writeButtons(page)).length === 0, `${role}: no push, refresh or cancel control on the order page`, await writeButtons(page));
