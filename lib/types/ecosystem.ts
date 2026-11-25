@@ -1,13 +1,10 @@
 // Canonical Ecosystem contracts for Phase 2+:
 //   A) Two-Tier Plugin System (Tier 1 Declarative / Tier 2 Remote App & Webhooks)
-//   B) Open Uploadable Theme Engine (Full UI Freedom, Zero Logic Access)
+//   B) Uploadable themes: data-only packages, format storeasy-theme/1
 //
 // Security invariant: neither plugins nor uploaded themes EVER execute arbitrary
 // JavaScript inside Storeasy's Next.js runtime, nor can they access tenant DBs,
 // secrets, auth cookies, or commerce pricing/checkout logic.
-
-import type { BrandTokens } from "./tenant";
-import type { EffectiveProduct, Cart, ShippingQuote } from "./commerce";
 
 // ============================================================================
 // A. PLUGIN SYSTEM CONTRACTS
@@ -135,180 +132,137 @@ export interface AppToken {
 }
 
 // ============================================================================
-// B. OPEN UPLOADABLE THEME ENGINE CONTRACTS (Full UI Freedom, Zero Logic Access)
+// B. UPLOADABLE THEME PACKAGES (Phase 5: data only, format storeasy-theme/1)
 // ============================================================================
+// One JSON file (≤ 256 KB) checked by the package scanner and validators;
+// constants in lib/themes/package-format.js, styles compiled by
+// lib/themes/styles.js. Unknown keys anywhere are refused. No templates of
+// markup, no CSS files, no scripts, no assets (image fields stay empty).
 
-export type ThemeTemplateSurface =
-  | "layout"
-  | "home"
-  | "product"
-  | "collection"
-  | "collections_index"
-  | "cart"
-  | "page"
-  | "campaign"
-  | "journal"
-  | "search"
-  | "404";
+export type ThemeFormat = "storeasy-theme/1";
 
-export interface ThemeSettingField {
-  id: string;
-  type:
-    | "color"
-    | "font_picker"
-    | "range"
-    | "select"
-    | "checkbox"
-    | "text"
-    | "textarea"
-    | "image_picker"
-    | "url"
-    | "header";
-  label: string;
-  info?: string;
-  default?: unknown;
-  min?: number;
-  max?: number;
-  step?: number;
-  unit?: string;
-  options?: Array<{ value: string; label: string }>;
-  /** Optional CSS custom property name mapped onto :root, e.g. "--theme-hero-pad" */
-  cssVar?: string;
+/** A built-in kit a package rides on (lib/themes/kits.js). */
+export type ThemeBase = "pulse" | "glow";
+
+/** Exactly the keys validateBrand() (lib/brand.js) accepts. */
+export interface ThemeTokens {
+  accent?: string; // #rrggbb
+  background?: string; // #rrggbb
+  foreground?: string; // #rrggbb
+  radius?: "sm" | "md" | "lg" | "xl";
+  type_scale?: "compact" | "regular" | "large";
+  button_shape?: "pill" | "rounded" | "square";
+  section_spacing?: "compact" | "regular" | "airy";
 }
 
-export interface ThemeSettingsGroup {
+/** A dark surface's colours; fg and muted need 4.5:1 against bg. */
+export interface ThemeSurface {
+  bg: string;
+  fg: string;
+  muted: string;
+}
+
+/** A registry home section (lib/registry/sections.js; product_main excluded). */
+export interface ThemeHomeSection {
+  kind: string;
+  settings: Record<string, unknown>;
+}
+
+export interface ThemeTemplates {
+  pdp?: "classic" | "editorial";
+  collection?: "standard" | "sidebar";
+  header?: "standard" | "centered";
+  footer?: "columns" | "minimal";
+  home?: { sections: ThemeHomeSection[] };
+}
+
+/** PARTS in lib/themes/package-format.js; none inside buy box, cart or checkout. */
+export type ThemePart =
+  | "header"
+  | "header-link"
+  | "announcement"
+  | "footer"
+  | "footer-link"
+  | "hero"
+  | "hero-title"
+  | "hero-subtitle"
+  | "section"
+  | "section-heading"
+  | "product-card"
+  | "product-card-title"
+  | "product-card-price"
+  | "collection-card"
+  | "badge";
+
+/** PROPS in lib/themes/package-format.js, each value matched whole. */
+export interface ThemeStyleSet {
+  color?: string; // #rgb | #rrggbb | role:<ROLE_IDS>
+  "background-color"?: string;
+  "border-color"?: string;
+  "border-width"?: string; // 0px–4px
+  "border-radius"?: string; // 0px–48px
+  "font-weight"?: number | string; // 300–900, step 100
+  "font-style"?: "normal" | "italic";
+  "letter-spacing"?: string; // -0.05em–0.3em | normal
+  "text-transform"?: "none" | "uppercase" | "lowercase" | "capitalize";
+  "text-align"?: "left" | "center" | "right" | "start" | "end";
+  "padding-block"?: string; // 0rem–8rem
+  "padding-inline"?: string; // 0rem–8rem
+  gap?: string; // 0rem–4rem
+  "box-shadow"?: "none" | "sm" | "md" | "lg";
+}
+
+/** Compiled to :where([data-theme="<id>"]) [data-part="<part>"]{…}. ≤ 60 rules. */
+export interface ThemeStyleRule {
+  part: ThemePart;
+  set: ThemeStyleSet;
+}
+
+export interface ThemePackage {
+  format: ThemeFormat;
+  id: string; // /^[a-z0-9-]{1,40}$/, the data-theme attribute
   name: string;
-  settings: ThemeSettingField[];
+  version: string; // x.y.z
+  author?: { name: string };
+  description?: string; // ≤ 300 chars
+  base: ThemeBase;
+  tokens?: ThemeTokens;
+  surfaces?: { header?: ThemeSurface; hero?: ThemeSurface };
+  templates?: ThemeTemplates;
+  styles?: ThemeStyleRule[];
 }
 
-export interface ThemeSectionSchema {
-  kind: string; // e.g. "hero", "product_rail", or custom "theme:lookbook_split"
+export type ThemePackageStatus = "installed" | "archived";
+
+/** A theme_packages row (migrations/tenant/0034_theme_packages.sql). */
+export interface ThemePackageRow {
+  id: string; // "thm_" + 16 hex, immutable
+  slug: string; // ThemePackage.id
+  version: string;
   name: string;
-  surfaces: Array<"home" | "page" | "campaign" | "product" | "collection">;
-  maxBlocks?: number;
-  settings: ThemeSettingField[];
-  blocks?: Array<{
-    type: string;
-    name: string;
-    limit?: number;
-    settings: ThemeSettingField[];
-  }>;
-  presets?: Array<{
-    name: string;
-    settings?: Record<string, unknown>;
-    blocks?: Array<{ type: string; settings?: Record<string, unknown> }>;
-  }>;
+  author: string | null;
+  description: string | null;
+  base_kit: ThemeBase;
+  package: string; // normalised, validated JSON of a ThemePackage
+  sha256: string;
+  size_bytes: number;
+  status: ThemePackageStatus;
+  uploaded_by: string;
+  uploaded_at: string; // ISO 8601 UTC
+  archived_by: string | null;
+  archived_at: string | null;
 }
 
-export interface ThemePackageManifest {
-  schemaVersion: 1;
-  id: string; // slug: /^[a-z0-9][a-z0-9-]{1,48}$/
-  name: string;
-  version: string; // semver
-  author: {
-    name: string;
-    url?: string;
-  };
-  description?: string;
-  previewImage?: string; // relative path inside zip, e.g. "assets/preview.webp"
-  engineRange: string; // e.g. ">=1.0.0 <2.0.0"
-  defaultBrand: BrandTokens;
-  /** File map inside `.storeasy-theme.zip` */
-  entry: {
-    styles: string[]; // scoped CSS files, e.g. ["assets/theme.css"]
-    settingsSchema: string; // "config/settings_schema.json"
-    settingsData?: string; // "config/settings_data.json"
-    layout: string; // "layout/theme.stml"
-    templates: Partial<Record<Exclude<ThemeTemplateSurface, "layout">, string>>;
-    sectionsDir?: string; // "sections/"
-    snippetsDir?: string; // "snippets/"
-  };
+/** doc_design.body.settings.theme (lib/registry/settings.js). */
+export interface ThemeSelection {
+  kit: ThemeBase;
+  version: number;
+  applied_at?: string;
+  package?: string; // /^thm_[0-9a-f]{16}$/
 }
 
-/**
- * Logic-free compiled template AST node (compiled on upload, never eval'd at runtime).
- * Supports only safe interpolation, conditionals, loops, snippets, and protected
- * `<storeasy:*>` commerce primitives.
- */
-export type TemplateAstNode =
-  | { type: "text"; value: string }
-  | { type: "expr"; path: string[]; filters?: Array<{ name: string; args?: unknown[] }> }
-  | { type: "element"; tag: string; attrs: Record<string, string | TemplateAstNode[]>; children: TemplateAstNode[] }
-  | { type: "primitive"; name: ProtectedPrimitiveName; props: Record<string, unknown>; children?: TemplateAstNode[] }
-  | { type: "if"; test: TemplateCondition; consequent: TemplateAstNode[]; alternate?: TemplateAstNode[] }
-  | { type: "for"; itemName: string; indexName?: string; iterablePath: string[]; body: TemplateAstNode[]; empty?: TemplateAstNode[] }
-  | { type: "slot"; name: string };
-
-export type TemplateCondition =
-  | { op: "truthy"; path: string[] }
-  | { op: "not"; expr: TemplateCondition }
-  | { op: "eq" | "neq" | "gt" | "gte" | "lt" | "lte"; left: string[]; right: unknown }
-  | { op: "and" | "or"; items: TemplateCondition[] };
-
-/**
- * Protected platform commerce primitives that themes can position and style
- * via CSS variables/parts, but NEVER override the internal logic of.
- */
-export type ProtectedPrimitiveName =
-  | "storeasy:add-to-cart"
-  | "storeasy:variant-selector"
-  | "storeasy:buy-box"
-  | "storeasy:cart-drawer"
-  | "storeasy:checkout-button"
-  | "storeasy:bundle-add"
-  | "storeasy:search-box"
-  | "storeasy:wishlist-button"
-  | "storeasy:pincode-check"
-  | "storeasy:plugin-slot"
-  | "storeasy:section-outlet";
-
-/**
- * Read-only view model injected into logic-free theme templates during SSR.
- * Contains ZERO secrets, ZERO DB handles, ZERO server functions, and ZERO
- * raw Shopify-only fields (`catalog_title`, `sku` stripped from cart).
- */
-export interface StorefrontDataContext {
-  shop: {
-    name: string;
-    tagline: string;
-    currency: string;
-    logo: { url: string; alt: string } | null;
-    wordmark: { text1: string; text2: string };
-  };
-  theme: {
-    id: string;
-    version: string;
-    settings: Record<string, unknown>;
-  };
-  page: {
-    surface: ThemeTemplateSurface;
-    path: string;
-    title: string;
-    description: string;
-    preview: boolean;
-  };
-  nav: {
-    header: Array<{ label: string; href: string; children?: Array<{ label: string; href: string }> }>;
-    footer: Array<{ label: string; href: string }>;
-  };
-  announcement: { enabled: boolean; text: string; href: string } | null;
-  cart: Pick<Cart, "count" | "subtotal" | "discountTotal" | "total" | "grandTotal" | "currency"> & {
-    shipping: ShippingQuote | null;
-  };
-  product?: EffectiveProduct;
-  collection?: {
-    id: string;
-    handle: string;
-    title: string;
-    description: string | null;
-    image: string | null;
-    products: EffectiveProduct[];
-    total: number;
-  };
-  sections?: Array<{
-    id: string;
-    kind: string;
-    settings: Record<string, unknown>;
-    data?: Record<string, unknown>;
-  }>;
+/** One refusal or check failure, "<plain words> (at <path>)" when shown. */
+export interface ThemeIssue {
+  path: string;
+  message: string;
 }

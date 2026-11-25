@@ -1,0 +1,155 @@
+{
+  "format": "storeasy-theme/1",
+  "id": "aurora",
+  "name": "Aurora",
+  "version": "1.2.0",
+  "author": {
+    "name": "Storeasy Studio"
+  },
+  "description": "Cool and calm: slate surfaces, an indigo accent, a centred header and an editorial product page.",
+  "base": "pulse",
+  "tokens": {
+    "accent": "#4f46e5",
+    "background": "#f8fafc",
+    "foreground": "#0f172a",
+    "radius": "lg",
+    "type_scale": "regular",
+    "button_shape": "rounded",
+    "section_spacing": "airy"
+  },
+  "surfaces": {
+    "header": {
+      "bg": "#0f172a",
+      "fg": "#f8fafc",
+      "muted": "#cbd5e1"
+    },
+    "hero": {
+      "bg": "#1e1b4b",
+      "fg": "#ffffff",
+      "muted": "#c7d2fe"
+    }
+  },
+  "templates": {
+    "pdp": "editorial",
+    "collection": "sidebar",
+    "header": "centered",
+    "footer": "minimal",
+    "home": {
+      "sections": [
+        {
+          "kind": "hero",
+          "settings": {
+            "title": "Calm, every day.",
+            "highlight": "Calm",
+            "subtitle": "Everyday essentials in a quieter light.",
+            "primary": {
+              "label": "Shop all collections",
+              "link": {
+                "type": "url",
+                "href": "/collections"
+              }
+            },
+            "image": null
+          }
+        },
+        {
+          "kind": "rich_text",
+          "settings": {
+            "title": "Made to last",
+            "html": "<p>Video</p><IFRAME src=\"/x\"></iframe>"
+          }
+        }
+      ]
+    }
+  },
+  "styles": [
+    {
+      "part": "hero-title",
+      "set": {
+        "letter-spacing": "-0.02em",
+        "font-weight": 800,
+        "color": "role:hero-fg"
+      }
+    },
+    {
+      "part": "hero-subtitle",
+      "set": {
+        "color": "role:hero-muted",
+        "font-style": "italic"
+      }
+    },
+    {
+      "part": "header-link",
+      "set": {
+        "text-transform": "uppercase",
+        "letter-spacing": "0.08em",
+        "font-weight": 600
+      }
+    },
+    {
+      "part": "announcement",
+      "set": {
+        "background-color": "#312e81",
+        "color": "#eef2ff",
+        "text-align": "center"
+      }
+    },
+    {
+      "part": "section-heading",
+      "set": {
+        "font-weight": 700,
+        "letter-spacing": "-0.01em",
+        "text-align": "start"
+      }
+    },
+    {
+      "part": "product-card",
+      "set": {
+        "border-radius": "16px",
+        "border-width": "1px",
+        "border-color": "role:border-soft",
+        "box-shadow": "sm"
+      }
+    },
+    {
+      "part": "product-card-title",
+      "set": {
+        "font-weight": 600
+      }
+    },
+    {
+      "part": "product-card-price",
+      "set": {
+        "color": "role:accent-text"
+      }
+    },
+    {
+      "part": "collection-card",
+      "set": {
+        "border-radius": "24px",
+        "box-shadow": "md"
+      }
+    },
+    {
+      "part": "badge",
+      "set": {
+        "text-transform": "uppercase",
+        "letter-spacing": "0.1em",
+        "border-radius": "4px"
+      }
+    },
+    {
+      "part": "section",
+      "set": {
+        "padding-block": "4rem",
+        "gap": "1.5rem"
+      }
+    },
+    {
+      "part": "footer-link",
+      "set": {
+        "color": "role:text-muted"
+      }
+    }
+  ]
+}
