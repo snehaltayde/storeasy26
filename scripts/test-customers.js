@@ -171,10 +171,12 @@ console.log("— profile + orders (SF11)");
 
 await t("profile updates validate; order reads are ownership-scoped", async () => {
   const cA = await inA(() => K.customerFromToken(tokenA));
+  // Phase 8 line 3: the profile is name and phone; addresses are lib/addresses.js
+  // (scripts/test-addresses.js), and an address here is ignored.
   const updated = await inA(() => K.updateCustomerProfile(cA.id, { name: "Pat S", address: { line1: "12 Lake Rd", city: "Mumbai", pincode: "400001", state: "MH", country: "India" } }));
   eq(updated.name, "Pat S");
-  eq(updated.address.city, "Mumbai");
-  await throws(() => inA(() => K.updateCustomerProfile(cA.id, { address: { line1: "", city: "", pincode: "" } })), /at least/);
+  eq(updated.address, undefined, "no address on the profile:");
+  eq((await inA(() => libsql.execute({ sql: "SELECT default_address FROM customers WHERE id = ?", args: [cA.id] }))).rows[0].default_address, null, "default_address not written:");
   eq(await inA(() => K.customerOrder(cA.id, "O-B")), null, "someone else's order id = not found:");
   ok(await inA(() => K.customerOrder(cA.id, "O-A")), "own order found");
 });

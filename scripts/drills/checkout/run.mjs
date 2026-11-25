@@ -12,6 +12,7 @@ import { STAGES, consoleErrors, port, shopperErrors } from "./lib.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const STAGE_FILES = ["stage-baseline.mjs", "stage-cod.mjs"];
+const STAGE_FILES = ["stage-baseline.mjs", "stage-addresses.mjs"];
 for (const file of STAGE_FILES) {
   const path = join(HERE, file);
   if (existsSync(path)) await import(pathToFileURL(path).href);

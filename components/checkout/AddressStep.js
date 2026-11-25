@@ -1,5 +1,7 @@
 "use client";
 
+import SavedAddressPicker from "./SavedAddressPicker";
+
 // Phase 8 step 0: checkout step 1, split out of CheckoutFlow. Stateless: the
 // form lives in CheckoutFlow and changes only through applyAddress
 // (./checkoutModel), which `onAddress(patch, source)` calls.
@@ -31,6 +33,7 @@ export default function AddressStep({ form, valid, onAddress, onContinue }) {
     <section>
       <h2 className="mb-4 text-lg font-bold">Contact &amp; shipping address</h2>
       {/* saved-addresses */}
+      <SavedAddressPicker form={form} onAddress={onAddress} />
       <div className="grid grid-cols-2 gap-3">
         {FIELDS.map((f) => (
           <div key={f.key} className={f.half ? "col-span-1" : "col-span-2"}>

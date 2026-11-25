@@ -825,6 +825,11 @@ const flowStubs = {
 // Phase 8 step 0: CheckoutFlow's own parts, loaded with the same stubs.
 // Phase 8 line 2: and the nudge, the code dialog, the quote hook and placeOrder.
 for (const part of ["checkoutModel", "AddressStep", "PrepaidNudge", "PaymentStep", "OrderSummary", "CodOtpDialog", "useQuote", "placeOrder"]) {
+// Phase 8 line 3: AddressStep's SavedAddressPicker keeps its own hooks and
+// fetches, which this stand-in can't run; it renders nothing here (its copy is
+// still in the source scan, and scripts/test-addresses.js scans it too).
+flowStubs["./SavedAddressPicker"] = nothing;
+for (const part of ["checkoutModel", "AddressStep", "PaymentStep", "OrderSummary"]) {
   flowStubs[`./${part}`] = await loadComponent(sources.get(`components/checkout/${part}.js`), flowStubs);
 }
 const realFlow = () => loadComponent(sources.get("components/checkout/CheckoutFlow.js"), flowStubs);
@@ -1220,6 +1225,7 @@ await t("account API: a real database error reaches the shopper as plain words",
     "@/lib/customers": await import("../lib/customers.js"),
     "@/lib/returns": await import("../lib/returns.js"),
     "@/lib/wishlist": await import("../lib/wishlist.js"),
+    "@/lib/addresses": await import("../lib/addresses.js"),
     "@/lib/shopper-errors": shopperErrors,
   });
   const res = await route.POST(jsonPost("broken.test", "/api/account", { action: "verify", email: "a@b.test", code: "123456" }));
@@ -1235,6 +1241,7 @@ await t("account API: a plain error with internal text never reaches the shopper
     "@/lib/customers": { ...customers, verifyOtp: async () => { throw new Error("SQLITE_BUSY: database is locked"); } },
     "@/lib/returns": await import("../lib/returns.js"),
     "@/lib/wishlist": await import("../lib/wishlist.js"),
+    "@/lib/addresses": await import("../lib/addresses.js"),
     "@/lib/shopper-errors": shopperErrors,
   });
   const res = await route.POST(jsonPost("own.test", "/api/account", { action: "verify", email: "a@b.test", code: "123456" }));
@@ -1270,7 +1277,9 @@ await t("account errors: what the sign-in, profile and returns code throws still
   await inOwn(async () => {
     eq(await shown(() => customers.requestOtp("not-an-email")), "That email doesn't look right.", "bad email:");
     eq(await shown(() => customers.verifyOtp("nobody@b.test", "123456")), "No active code — request a new one.", "no code:");
-    eq(await shown(() => customers.updateCustomerProfile("nobody", { address: { line1: "" } })), "An address needs at least line 1, city and pincode.", "bad address:");
+    // Phase 8 line 3: addresses are saved through lib/addresses.js
+    const { saveAddress } = await import("../lib/addresses.js");
+    eq(await shown(() => saveAddress("nobody", { line1: "" })), "Fill in your name, phone, address, city, state and PIN code.", "bad address:");
     eq(await shown(() => requestReturn({ customerId: "nobody", orderId: "nope", reason: "x" })), returnEligibility(null).reason, "no such order:");
   });
   // Every throw in the shopper's account code is one a shopper may read.
@@ -1318,6 +1327,8 @@ async function accountBadges(src = accountSrc) {
     "@/lib/format": format,
     "@/components/account/AccountAuth": nothing,
     "@/components/account/ProfileForm": nothing,
+    "@/components/account/AddressBook": nothing,
+    "@/lib/addresses": { listAddresses: async () => [] },
     "@/lib/tenant-request": { tfetch: inOwn },
     "@/lib/storefront-request": { tfetch: inOwn },
   });

@@ -298,6 +298,7 @@ const CNY = {
   aReturn: "cnyareturn0 please take it back",
   aWish: "cnyawish0",
   aKey: "cnyakey0",
+  aAdrLine: "cnyaadrline0",
   bEmail: "cnybmail0@example.test",
   bPhone: "9822200002",
   bName: "cnybname0",
@@ -352,6 +353,10 @@ await t("fixture: shoppers A and B place orders and sign in on store A; store B 
   eq(wish.status, 200, "A's wishlist");
   const prof = await call("account", "POST", { cookies: { _customer: A.token }, body: { action: "profile", name: CNY.aName, phone: CNY.aPhone, address: addressOf("a") } });
   eq(prof.status, 200, "A's profile");
+  // Phase 8 line 3: a saved address with its own canary
+  const adr = await call("account", "POST", { cookies: { _customer: A.token }, body: { action: "address_save", address: { label: "cnyaadrlabel0", name: CNY.aName, phone: CNY.aPhone, line1: CNY.aAdrLine, city: "Pune", state: "MH", pincode: "411001" } } });
+  eq(adr.status, 200, `A's saved address (${adr.text.slice(0, 160)})`);
+  A.adr = adr.body.address.id;
   // B: a revoked session (signed in, then logged out) and an expired one
   B.revoked = (await signIn(CNY.bEmail)).token;
   eq((await call("account", "POST", { cookies: { _customer: B.revoked }, body: { action: "logout" } })).status, 200, "logout");
@@ -371,7 +376,7 @@ if (!fixture.ok) {
 }
 
 // A's canaries: everything a non-owner must never see
-const A_CANARIES = () => [CNY.aEmail, CNY.aPhone, CNY.aName, CNY.aLine1, CNY.aRzPay, CNY.aRzOrder, CNY.aCoupon, "cnyareturn0", CNY.aWish, CNY.aKey, A.order, A.rzPaid, A.rzPending, A.cart, A.id, A.token];
+const A_CANARIES = () => [CNY.aEmail, CNY.aPhone, CNY.aName, CNY.aLine1, CNY.aAdrLine, "cnyaadrlabel0", A.adr, CNY.aRzPay, CNY.aRzOrder, CNY.aCoupon, "cnyareturn0", CNY.aWish, CNY.aKey, A.order, A.rzPaid, A.rzPending, A.cart, A.id, A.token];
 const SB_CANARIES = [CNY.sbEmail, CNY.sbName, CNY.sbLine1];
 function leaks(text, canaries) {
   const hay = [String(text), String(text).toLowerCase(), decodeURIComponent(String(text).replace(/%(?![0-9a-f]{2})/gi, "%25"))].join("\n").toLowerCase();
@@ -418,6 +423,35 @@ await t("GET view=me|orders|wishlist: every other caller gets B's own data or ex
       if (UNAUTHED.includes(who)) same(r.body, { ok: true, authenticated: false }, `${who} ${view}`);
     }
   }
+});
+
+// Phase 8 line 3: saved addresses. Signed out answers 401 with no data (not
+// the {authenticated:false} of the other views); B gets B's own (none).
+await t("GET view=addresses: A sees A's; signed-out callers get 401 and nothing; B and A-on-store-B see none of A's", async () => {
+  const own = await call("account", "GET", { cookies: { _customer: A.token }, query: "view=addresses" });
+  ok(own.status === 200 && own.text.includes(CNY.aAdrLine), `A's own: ${own.text.slice(0, 200)}`);
+  for (const [who, c] of Object.entries(CALLERS())) {
+    const r = await call("account", "GET", { ...c, query: "view=addresses" });
+    noLeak(r, `${who} addresses`);
+    if (UNAUTHED.includes(who)) same([r.status, r.body], [401, { error: "sign in first" }], `${who} addresses`);
+    else same([r.status, r.body.addresses], [200, []], `${who} addresses`);
+  }
+});
+
+await t("POST address_save|address_delete|address_default with A's address id: B gets 404 like a missing id; signed out gets 401; A's row unchanged", async () => {
+  const before = await q(sA, "SELECT * FROM customer_addresses WHERE id = ?", [A.adr]);
+  for (const action of ["address_save", "address_delete", "address_default"]) {
+    const body = (id) => ({ action, id, address: { id, name: "cnybname0", phone: "9822200002", line1: "cnybtakeover0", city: "Pune", state: "MH", pincode: "411001" } });
+    const theirs = await call("account", "POST", { cookies: { _customer: B.token }, body: body(A.adr) });
+    const none = await call("account", "POST", { cookies: { _customer: B.token }, body: body("adr_0000000000000000") });
+    same([theirs.status, theirs.text], [404, none.text], `${action}: A's id vs a missing one`);
+    for (const who of UNAUTHED) {
+      const r = await call("account", "POST", { ...CALLERS()[who], body: body(A.adr) });
+      eq(r.status, 401, `${who} ${action}`);
+      noLeak(r, `${who} ${action}`);
+    }
+  }
+  same(await q(sA, "SELECT * FROM customer_addresses WHERE id = ?", [A.adr]), before, "A's row unchanged");
 });
 
 await t("GET view=reorder&order=<A's>: B gets 404 with the same body as an order that does not exist", async () => {

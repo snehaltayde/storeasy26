@@ -121,6 +121,7 @@
     "test:tenant-ops": "node scripts/test-tenant-ops.js",
     "test:marketing": "node scripts/test-marketing.js",
     "test:customers": "node scripts/test-customers.js",
+    "test:addresses": "node scripts/test-addresses.js",
     "test:commerce-exp": "node scripts/test-commerce-exp.js",
     "test:growth": "node scripts/test-growth.js",
     "test:agency-removed": "node scripts/test-agency-removed.js",

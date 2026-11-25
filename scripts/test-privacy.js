@@ -233,6 +233,19 @@ await t("redactCustomer matches by phone digits too", async () => {
   eq(r.orders, 1, "phone-matched");
 });
 
+// Phase 8 line 3: saved addresses are account data; redaction deletes them.
+await t("redactCustomer deletes the account's saved addresses (a real delete), and no one else's", async () => {
+  const now = new Date().toISOString();
+  const addr = (id, cus) => ({ id, customer_id: cus, name: "N", phone: "9811100001", line1: `${id} line`, city: "Pune", state: "MH", pincode: "411001", is_default: 1, created_at: now, updated_at: now });
+  await inT(async () => {
+    await db.insertInto("customers").values([{ id: "cus_redadr", email: "adr@x.com", created_at: now, last_login_at: now }, { id: "cus_keepadr", email: "keep@x.com", created_at: now, last_login_at: now }]).execute();
+    await db.insertInto("customer_addresses").values([addr("adr_red1", "cus_redadr"), addr("adr_red2", "cus_redadr"), addr("adr_keep", "cus_keepadr")]).execute();
+  });
+  await inT(() => P.redactCustomer({ email: "ADR@x.com" }));
+  const left = await inT(() => db.selectFrom("customer_addresses").select(["id"]).orderBy("id").execute());
+  eq(JSON.stringify(left.map((r) => r.id)), JSON.stringify(["adr_keep"]), "only the other account's address is left");
+});
+
 await t("compliance router: data_request → manual+alert; customers/redact executes; shop/redact → critical manual", async () => {
   const dr = await quiet(() => inT(() => W.applyWebhook("customers/data_request", { shop_domain: "s.myshopify.com", customer: { email: "dr@x.com" }, orders_requested: [1] })));
   ok(dr.recorded && dr.manual, "data_request recorded manual");

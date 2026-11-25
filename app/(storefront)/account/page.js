@@ -4,6 +4,8 @@ import { customerFromToken, customerOrders, CUSTOMER_COOKIE, safeReturnPath } fr
 import { formatMoney } from "@/lib/format";
 import AccountAuth from "@/components/account/AccountAuth";
 import ProfileForm from "@/components/account/ProfileForm";
+import AddressBook from "@/components/account/AddressBook";
+import { listAddresses } from "@/lib/addresses";
 import { tfetch } from "@/lib/storefront-request";
 
 // Account home (S45 / SF10 + SF11): sign-in (passwordless) or the dashboard
@@ -33,9 +35,10 @@ const orderBadge = (o) => FULFILLMENT_LABEL[o.fulfillment] || STATUS_LABEL[o.sta
 export default async function AccountPage({ searchParams }) {
   const sp = await searchParams;
   const jar = await cookies();
-  const { customer, orders } = await tfetch(async () => {
+  const { customer, orders, addresses } = await tfetch(async () => {
     const customer = await customerFromToken(jar.get(CUSTOMER_COOKIE)?.value);
-    return { customer, orders: customer ? await customerOrders(customer.id) : [] };
+    if (!customer) return { customer, orders: [], addresses: [] };
+    return { customer, orders: await customerOrders(customer.id), addresses: await listAddresses(customer.id) };
   });
 
   if (!customer) {
@@ -81,6 +84,10 @@ export default async function AccountPage({ searchParams }) {
           </ul>
         )}
       </section>
+
+      <div className="mt-8">
+        <AddressBook initial={addresses} />
+      </div>
 
       <section className="mt-8">
         <ProfileForm customer={customer} />
