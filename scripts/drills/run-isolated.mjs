@@ -240,6 +240,9 @@ export function drillEnv(base, worktree, ports) {
     // Phase 4 line 3: drill:apps stage webhooks sends to a receiver on
     // 127.0.0.1 (lib/plugins/egress.js refuses this flag in production)
     STOREASY_PLUGIN_EGRESS_LOCAL: "1",
+    // Phase 8 line 1: the pincode route reads the hand-written fixture
+    // (lib/pincode/offline.js ignores this in production)
+    PINCODE_DATA_FILE: join(worktree, "scripts", "fixtures", "pincodes-sample.json"),
   };
 }
 

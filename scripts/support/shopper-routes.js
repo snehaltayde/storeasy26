@@ -26,6 +26,7 @@ export const SHOPPER_ROUTES = Object.freeze([
   { path: "upsell", methods: ["GET"], class: "public-read", suite: "test-shopper-reads.js" },
   { path: "wishlist", methods: ["POST"], class: "public-read", suite: "test-shopper-reads.js", note: "resolves a guest's local handles against the catalog; no account data" },
   { path: "media/[id]", methods: ["GET"], class: "public-read", suite: "test-shopper-reads.js" },
+  { path: "pincode", methods: ["GET"], class: "public-read", suite: "test-pincode.js", note: "Phase 8 line 1: a PIN's place and this store's public delivery facts; no shopper data" },
   { path: "track", methods: ["POST"], class: "collector", suite: null },
   { path: "exp", methods: ["POST"], class: "collector", suite: null },
   { path: "contact", methods: ["POST"], class: "collector", suite: "test-commerce.js" },

@@ -48,6 +48,9 @@ const nextConfig = {
   // and the catch-all 404 at once; see docs/DECISIONS.md). The drill runner
   // turns it off with STOREASY_TURBOPACK_DEV_CACHE=off; everyone else keeps it.
   experimental: { turbopackFileSystemCacheForDev: process.env.STOREASY_TURBOPACK_DEV_CACHE !== "off" },
+  // Phase 8 line 1: the pincode route reads the bundled dataset with node:fs
+  // (lib/pincode/offline.js), which the tracer can't see; ship it with that route.
+  outputFileTracingIncludes: { "/api/pincode": ["./data/in-pincodes.json"] },
   images: {
     remotePatterns,
   },

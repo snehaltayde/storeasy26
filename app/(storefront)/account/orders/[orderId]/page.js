@@ -8,6 +8,9 @@ import ReturnRequest from "@/components/account/ReturnRequest";
 import { returnForOrder, returnEligibility, returnsWindowDays } from "@/lib/returns";
 import { db } from "@/lib/db";
 import { tfetch } from "@/lib/storefront-request";
+import { tenantCfg } from "@/lib/tenant-context";
+import { DEFAULT_TIME_ZONE } from "@/lib/delivery-estimate";
+import DeliveryEstimate from "@/components/checkout/DeliveryEstimate";
 import PluginSlot from "@/components/plugins/PluginSlot";
 
 // Account order detail (S45 / SF11 + SF12): ownership-checked server-side
@@ -38,7 +41,7 @@ export default async function AccountOrderPage({ params }) {
       returnForOrder(customer.id, order.id),
     ]);
     const elig = ret ? { ok: false } : returnEligibility(order, { windowDays: returnsWindowDays() });
-    return { customer, order, fulfillments, refunds, ret, elig };
+    return { customer, order, fulfillments, refunds, ret, elig, timeZone: tenantCfg("timezone", null, DEFAULT_TIME_ZONE) };
   });
 
   if (!data.customer) redirect(`/account?return=${encodeURIComponent(`/account/orders/${orderId}`)}`);
@@ -60,6 +63,10 @@ export default async function AccountOrderPage({ params }) {
         Placed {new Date(o.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} ·{" "}
         {o.payment_method === "cod" ? "Cash on delivery" : "Paid online"}
       </p>
+      {/* Phase 8 line 1: until it ships, the estimate the order was placed with */}
+      {data.fulfillments.length === 0 && o.status !== "cancelled" && (
+        <DeliveryEstimate kind="expected" estimate={snap.shipping?.estimate} from={o.created_at} timeZone={data.timeZone} className="mt-1" />
+      )}
 
       <section className="mt-6 rounded-sf-card border border-sf-border p-5">
         <ul className="divide-y divide-sf-border-soft text-sm">

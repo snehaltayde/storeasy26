@@ -133,7 +133,9 @@ t("dispatch and delivery days: coerced, stored after the old keys, and the engin
     for (const paymentMethod of ["cod", "prepaid"]) {
       const a = computeShipping({ subtotal: 700, paymentMethod, pincode, config: base });
       const b = computeShipping({ subtotal: 700, paymentMethod, pincode, config: res.value });
-      eq(b, a, `${pincode} ${paymentMethod}:`);
+      // Phase 8 line 1: only the estimate and the zone's COD flag may differ
+      const money = ({ estimate, zoneCod, ...rest }) => rest;
+      eq(money(b), money(a), `${pincode} ${paymentMethod}:`);
     }
   }
 });
@@ -144,12 +146,14 @@ t("zone cod: true or false is kept; anything else is refused", () => {
   ok(!("cod" in validateShippingConfig({ ...STORED[1], zones: [{ prefixes: "11", cod: "" }] }).value.zones[0]), "a blank cod was stored");
 });
 
-t("days: whole numbers 0–90, both ends of a range, max not below min", () => {
+t("days: dispatch 0–10, delivery 1–30, both ends of a range, max not below min", () => {
   const bad = [
     { dispatchDays: -1 },
     { dispatchDays: 1.5 },
     { dispatchDays: "soon" },
-    { dispatchDays: 91 },
+    { dispatchDays: 11 },
+    { deliveryDays: { min: 0, max: 2 } },
+    { deliveryDays: { min: 1, max: 31 } },
     { deliveryDays: { min: 3 } },
     { deliveryDays: { max: 3 } },
     { deliveryDays: { min: 5, max: 2 } },
@@ -157,9 +161,11 @@ t("days: whole numbers 0–90, both ends of a range, max not below min", () => {
     { zones: [{ prefixes: "11", deliveryDays: { min: 1, max: 0 } }] },
   ];
   for (const extra of bad) ok(!validateShippingConfig({ ...STORED[1], ...extra }).ok, `${JSON.stringify(extra)} passed`);
-  const zero = validateShippingConfig({ ...STORED[1], dispatchDays: 0, deliveryDays: { min: 0, max: 0 } });
-  ok(zero.ok, zero.errors.join("; "));
-  eq([zero.value.dispatchDays, zero.value.deliveryDays], [0, { min: 0, max: 0 }], "same-day dispatch and delivery:");
+  const edge = validateShippingConfig({ ...STORED[1], dispatchDays: 0, deliveryDays: { min: 1, max: 1 } });
+  ok(edge.ok, edge.errors.join("; "));
+  eq([edge.value.dispatchDays, edge.value.deliveryDays], [0, { min: 1, max: 1 }], "same-day dispatch, next-day delivery:");
+  const top = validateShippingConfig({ ...STORED[1], dispatchDays: 10, deliveryDays: { min: 30, max: 30 } });
+  ok(top.ok, top.errors.join("; "));
 });
 
 // ---- validatePaymentConfig --------------------------------------------------------

@@ -39,3 +39,17 @@ export function addressValid(form) {
     ["name", "line1", "city", "state", "pincode"].every((k) => form[k].trim())
   );
 }
+
+// Phase 8 line 1: what a pincode lookup may write. City and state are filled
+// only when they are empty or still hold the lookup's own earlier values
+// (`filled`, the { city, state } it last wrote); a value the shopper typed or
+// picked is never overwritten. → a patch for applyAddress(form, patch, "pincode").
+export function pincodePatch(form, place, filled = {}) {
+  const patch = {};
+  if (!place) return patch;
+  for (const k of ["city", "state"]) {
+    const now = form[k].trim();
+    if (place[k] && (!now || (filled[k] && now === filled[k]))) patch[k] = place[k];
+  }
+  return patch;
+}

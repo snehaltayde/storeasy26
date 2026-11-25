@@ -3,6 +3,18 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-26 Phase 8 line 1: pincode lookup and delivery estimates (on the owner's behalf)
+
+- **Schema:** none. Delivery days live in `shipping_config` (`dispatchDays`, `deliveryDays {min,max}`, `zone.deliveryDays`, `zone.cod`); blank stays absent, so an existing store's JSON is unchanged. The order snapshot keeps `shipping.estimate {minDays, maxDays}` and `shipping.zoneCod` because `createOrder` already stores the whole `computeShipping` result.
+- **Permissions:** no new action. `/api/pincode` is a public read (anonymous and signed-in shoppers alike) that returns only the place and this store's public rates; the store comes from the host. Shipping settings stay `settings.read` / `settings.write`.
+- **Limits:** dispatch 0–10 days, delivery 1–30 days (step 0 allowed 0–90; the plan's line 1 numbers win). The estimate counts calendar days from today in the store's `timezone` (default Asia/Kolkata): dispatch + the zone's delivery days, else the store's; dispatch alone gives no estimate.
+- **Dataset path:** `lib/pincode/offline.js` reads `data/in-pincodes.json` with `node:fs` from the Node route only; `next.config.mjs` `outputFileTracingIncludes` ships the file with `/api/pincode`. `PINCODE_DATA_FILE` swaps in the hand-written fixture (`scripts/fixtures/pincodes-sample.json`) for tests and drills, and is ignored in production. A missing or broken file means every pin is "not found".
+- **Builder rules:** `scripts/build-pincodes.js` title-cases names, maps old state names (Orissa, Pondicherry, Jammu & Kashmir …) and moves Leh/Kargil to Ladakh and the ten original Telangana districts out of Andhra Pradesh; a pin with offices in two districts takes the most common one.
+- **Fill rule:** `pincodePatch` (in `checkoutModel.js`) fills city and state only when empty or still holding the lookup's own last values; `applyAddress` itself is unchanged. While both hold the lookup's values they show as a chip with Change.
+- **Rate limit:** 30 lookups per minute per IP (`rateLimitAsync`, name `pincode`). The `pincode_lookup` log line carries `{found}` only, never the pin.
+- **Order summary estimate:** `OrderSummary.js` belongs to line 2; line 2 renders `DeliveryEstimate` from `shipping.estimate` there. Line 1 shows the estimate under the PIN, on the product page and on the order pages.
+- **Attribution (GODL):** "Contains pincode data from India Post, All India Pincode Directory (data.gov.in), published under the Government Open Data License – India (GODL)." The same line is written into the JSON header (`attribution`).
+
 ## 2026-11-26 Phase 8 line 2: prepaid nudge and COD code (on the owner's behalf)
 
 - **Schema:** migration 0036 as planned (`cod_otps`; `orders.payment_discount`, `orders.cod_verified_at`), plus `cod_otps.cart_hash` from the review. `createOrder` writes the two columns only after `hasColumns`; the prepaid discount is also in the snapshot's `totals.paymentDiscount`. Order total = subtotal − discount_total − payment_discount + shipping_total, rounded to the currency's minor unit.

@@ -6,6 +6,9 @@ import { getOrder, orderStatusPath, verifyOrderStatusToken } from "@/lib/orders"
 import { formatMoney } from "@/lib/format";
 import { numericId } from "@/lib/ids";
 import { tfetch } from "@/lib/storefront-request";
+import { tenantCfg } from "@/lib/tenant-context";
+import { DEFAULT_TIME_ZONE } from "@/lib/delivery-estimate";
+import DeliveryEstimate from "@/components/checkout/DeliveryEstimate";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Order confirmed", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -21,6 +24,8 @@ export default async function ConfirmationPage({ params, searchParams }) {
   const order = await tfetch(() => getOrder(orderId));
   if (!order) notFound();
 
+  // Phase 8 line 1: "Expected by …" from the estimate the order was placed with
+  const timeZone = await tfetch(() => tenantCfg("timezone", null, DEFAULT_TIME_ZONE));
   const cod = order.payment_method === "cod";
   const paid = order.payment_status === "paid";
   // The checkout sends a customer here when it couldn't yet record their payment.
@@ -124,6 +129,7 @@ export default async function ConfirmationPage({ params, searchParams }) {
               {order.pincode}
             </p>
             <p className="text-sf-text-muted">{order.phone}</p>
+            <DeliveryEstimate kind="expected" estimate={order.snapshot?.shipping?.estimate} from={order.created_at} timeZone={timeZone} className="mt-1 font-medium" />
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-sf-text-faint">Payment</p>

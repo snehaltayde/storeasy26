@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "@/components/cart/CartContext";
 import { formatMoney, discountPercent } from "@/lib/format";
 import StickyBuyBar from "@/components/pdp/StickyBuyBar";
+import DeliveryCheck from "@/components/pdp/DeliveryCheck";
 
 // Phase 4 line 2: underPrice and underAtc are server-rendered plugin slots
 // (components/plugins/PluginSlot.js) passed in by the PDP layouts.
@@ -242,6 +243,9 @@ export default function ProductPurchase({ product, underPrice = null, underAtc =
           Added ✓ — View cart
         </button>
       )}
+
+      {/* Phase 8 line 1: PIN code → delivery estimate, cash on delivery, free shipping */}
+      <DeliveryCheck currency={currency} />
 
       {/* S38 (SF04) → Phase 7 line 3: the phone buy bar (components/pdp/StickyBuyBar.js) */}
       <StickyBuyBar
