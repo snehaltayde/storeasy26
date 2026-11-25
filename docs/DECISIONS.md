@@ -3,6 +3,17 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Phase 4 shape: plugin system (on the owner's behalf)
+
+- **Schema:** plugin state lives in each store's own database: tenant migrations 0030 (installs), 0031 (placements), 0032 (endpoints, events, deliveries), 0033 (tokens), all additive; platform 0018 adds an `audit_log(tenant_id, actor, at)` index. One install table for first-party plugins and custom apps; uninstall archives the row; one live install per plugin.
+- **Permissions:** `apps.read` for every merchant role, `apps.manage` for owner and admin (install, on/off, uninstall, settings, placements, webhooks, custom apps, tokens); an app's call list needs `audit.read`. App scopes are a separate `APP_SCOPES` table in `authz.js` with `<area>.<verb>` names, read-only in v1 (`storefront.read`, `offers.read`, `orders.read`, and `customers.read`, separate and off by default); a call's scopes are the token's ∩ the app's current approval. Tokens are SHA-256-hashed 256-bit secrets, shown once, 90-day default expiry, valid only on `/api/apps/v1/*` (Bearer, GET, no CORS); every call is audited and fails closed.
+- **Storefront:** installing changes nothing; each block's placement starts Off. Slots render Storeasy-owned server-component primitives with validated props only (no iframe or script kinds; `lib/types/ecosystem.ts` changes to match); five slots, at most 3 blocks each.
+- **Webhooks:** an outbox in store-database rows delivered by the existing job queue (ids only in job payloads), Standard Webhooks v1 signing, 8 attempts over about 45 h, auto-pause after 72 h failing; endpoint failures never page operators. An SSRF guard on Node built-ins (HTTPS 443 only, no redirects, DNS-checked against private ranges) with a per-plugin host allowlist; Shopify hosts always refused. Events and deliveries are kept 30 days; the privacy erase redacts them.
+- **Kill switch:** the existing feature flag `ff_plugin-<id>`. Phase 4 ships one real first-party plugin, Trust badges.
+- **Order:** line 1 → lines 2 and 3 side by side → line 4. Plan: `docs/plans/phase-4.md`. Line 4 waits on two owner questions (public API scope, `customers.read`).
+- **Decided by:** Claude
+- **Slice:** Phase 4 plan
+
 ## 2026-11-25 Time-boxed support access across hosts (on the owner's behalf)
 
 - **Schema:** platform migration `0017_support_sessions.sql` adds `sessions.grant_id`, `sessions.entry_origin` and an index; additive. "Closed by whom" is read from `audit_log` (no new column on `support_grants`).
