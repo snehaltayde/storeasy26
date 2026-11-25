@@ -134,7 +134,7 @@ async function billing(drill) {
   await pv.waitFor();
   await pv.getByRole("button", { name: "A new plan" }).click();
   await pv.getByLabel("Plan", { exact: true }).fill(PLAN);
-  await pv.getByLabel("Name").fill("Drill Scale");
+  await pv.getByLabel("Name", { exact: true }).fill("Drill Scale");
   await pv.getByLabel(/Price in rupees/).fill("4,999.50");
   drill.check(/₹4,999\.50 a month/.test(await pv.innerText()), "the price typed in rupees is read back in rupees", null);
   await pv.getByLabel("Feature 1 name").fill("orders_per_month");

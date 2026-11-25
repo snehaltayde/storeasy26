@@ -223,7 +223,7 @@ async function supportPass(drill, page, made) {
   const missing = [];
   for (const path of ["/admin/offers/off_missing", "/admin/bundles/bun-missing"]) {
     await open(page, path);
-    if (!/404 — not found/.test(await page.locator("body").innerText().catch(() => ""))) missing.push(path);
+    if (!/Page not found|404 — not found/.test(await page.locator("body").innerText().catch(() => ""))) missing.push(path);
   }
   drill.check(missing.length === 0, "an unknown offer or bundle id shows the not-found page", missing);
 }
