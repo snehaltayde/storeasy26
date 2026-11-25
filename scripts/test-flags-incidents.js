@@ -127,8 +127,10 @@ await t("flags: the key rule is checked (400) and a new flag lists with its stat
   eq((await flags({ flag: { key: "not-a-key" } })).status, 400, "a bad key");
   eq((await flags({ flag: { key: "ff_Upper" } })).status, 400, "upper case");
   eq((await flags({ flag: { key: "ff_x", expires_at: "not a date" } })).status, 400, "a bad expiry");
-  const r = await flags({ flag: { key: "ff_new-search", description: "New search", default_on: false, critical: false, expires_at: "2099-01-01T00:00:00Z" } });
+  const r = await flags({ flag: { key: "ff_new-search", description: "New search", default_on: false, critical: false, expires_at: "2099-01-01T00:00:00Z", create: true } });
   eq(r.status, 200, r.text);
+  const again = await flags({ flag: { key: "ff_new-search", description: "Clobber", default_on: true, create: true } });
+  eq(again.status, 409, "creating a key that exists");
   const list = await listFlags();
   ok(list.stores.some((s) => s.id === store.a.id) && list.stores.some((s) => s.id === store.b.id), "the store choices");
   const f = list.flags.find((x) => x.key === "ff_new-search");
@@ -160,6 +162,34 @@ await t("flags: an edit keeps the overrides; emergency disable turns it off ever
   const off = await flagRow("ff_new-search");
   eq([off.default_on, off.tenants], [false, {}], "off and no overrides");
   eq(await F.flagEnabled("ff_new-search", store.a.id, { fallback: true }), false, "a critical flag is off on the next read");
+});
+
+await t("flags: an edit never writes overrides, and interleaved edits and overrides keep every change", async () => {
+  eq((await flags({ flag: { key: "ff_race", description: "race", create: true } })).status, 200);
+  const stale = await flagRow("ff_race"); // operator 1's form, loaded before any override
+  const [o1, o2, edit] = await Promise.all([
+    flags({ override: { key: "ff_race", tenant: store.a.id, on: true } }),
+    flags({ override: { key: "ff_race", tenant: store.b.id, on: false } }),
+    flags({ flag: { key: "ff_race", description: "edited", default_on: true, tenants: stale.tenants } }),
+  ]);
+  eq([o1.status, o2.status, edit.status], [200, 200, 200]);
+  const after = await flagRow("ff_race");
+  eq([after.description, after.default_on, after.tenants], ["edited", true, { [store.a.id]: 1, [store.b.id]: 0 }], "the edit and both overrides kept");
+  eq((await flags({ flag: { key: "ff_race", description: "again", tenants: {} } })).status, 200, "an edit sending no overrides");
+  eq((await flagRow("ff_race")).tenants, { [store.a.id]: 1, [store.b.id]: 0 }, "still kept");
+  eq((await flags({ flag: { key: "ff_race", tenants: { [store.a.id]: 0 }, create: true } })).status, 409, "create can't reset them either");
+  eq((await flags({ remove: { key: "ff_race" } })).status, 200);
+});
+
+await t("flags: a kill switch (a key in FLAG_FALLBACKS) refuses an expiry with plain words; ff_checkout stays on", async () => {
+  for (const create of [true, false]) {
+    const r = await flags({ flag: { key: "ff_checkout", default_on: true, critical: true, expires_at: "2020-01-01T00:00:00Z", create } });
+    eq(r.status, 422, `${create ? "create" : "edit"}: ${r.text.slice(0, 120)}`);
+    ok(/can't expire/.test(r.body?.error || ""), "plain words");
+  }
+  eq(await flagRow("ff_checkout"), undefined, "nothing written");
+  eq(await F.flagEnabled("ff_checkout", store.a.id, { fallback: true }), true, "checkout stays on");
+  eq((await flags({ flag: { key: "ff_self-signup", expires_at: "2099-01-01T00:00:00Z", create: true } })).status, 422, "the signup switch too");
 });
 
 await t("flags: history from audit_log, newest first, with the operator's name and no store on the rows", async () => {
@@ -214,6 +244,21 @@ await t("incidents: post an update, edit the note, resolve with a closing messag
   eq((await incidents({ action: "resolve", id: platformInc.id, closingMessage: "All done" })).status, 200);
   eq((await incidents({ action: "resolve", id: platformInc.id })).status, 409, "resolved twice");
   eq((await incidents({ action: "update", id: platformInc.id, publicMessage: "late" })).status, 409, "update after resolve");
+});
+
+await t("incidents: two concurrent resolves: one wins (one audit row, its closing message stays), the other gets 409", async () => {
+  const inc = (await incidents({ action: "open", title: "Race", publicMessage: "racing" })).body.incident;
+  const [a, b] = await Promise.all([incidents({ action: "resolve", id: inc.id, closingMessage: "first close" }), incidents({ action: "resolve", id: inc.id, closingMessage: "second close" })]);
+  eq([a.status, b.status], [200, 409], "first wins");
+  const rows = (await db().execute({ sql: "SELECT action, diff FROM audit_log WHERE resource = ? AND action = 'incident.resolve'", args: [`incident:${inc.id}`] })).rows;
+  eq(rows.length, 1, "one resolve audit row");
+  eq(JSON.parse(rows[0].diff), { closing_message: "first close" });
+  eq((await db().execute({ sql: "SELECT public_message FROM incidents WHERE id = ?", args: [inc.id] })).rows[0].public_message, "first close", "the first closing message stays");
+  const open2 = (await incidents({ action: "open", title: "Race 2" })).body.incident;
+  const [u, res] = await Promise.all([incidents({ action: "update", id: open2.id, publicMessage: "late update" }), incidents({ action: "resolve", id: open2.id })]);
+  ok(u.status === 200 || u.status === 409, `an update racing a resolve: ${u.status}`);
+  eq(res.status, 200, "the resolve");
+  await db().execute({ sql: "DELETE FROM incidents WHERE title IN ('Race', 'Race 2')" }); // keep the list counts below as they were
 });
 
 await t("incidents: audit rows are incident.*, carry the incident's store, name the operator, and never the note", async () => {
@@ -306,12 +351,12 @@ await t("least trusted: a merchant token in _platform gets 401 on every flag and
     for (const [path, body] of writes) {
       const r = await call(caller, path, "POST", { body });
       eq(r.status, 401, `${caller} ${path} ${JSON.stringify(body).slice(0, 40)}`);
-      ok(!r.text.includes(NOTE2), "no note in the 401");
+      ok(!r.text.includes(NOTE) && !r.text.includes(NOTE2), "no note in the 401");
     }
     for (const [path, query] of [["flags", ""], ["flags", "history=ff_guarded"], ["incidents", ""], ["incidents", `timeline=${storeInc.id}`]]) {
       const r = await call(caller, path, "GET", { query });
       eq(r.status, 401, `${caller} GET ${path}?${query}`);
-      ok(!r.text.includes(NOTE2) && !r.text.includes(store.a.tenant.name), "nothing in the 401");
+      ok(!r.text.includes(NOTE) && !r.text.includes(NOTE2) && !r.text.includes(store.a.tenant.name), "nothing in the 401");
     }
   }
   eq(await count(), before, "flags, incidents and the audit log are unchanged");

@@ -401,7 +401,7 @@ function FlagDialog({ flag, onClose, onSave, onCloseAutoFocus }) {
     e.preventDefault();
     if (!keyOk) return;
     setBusy(true);
-    const ok = await onSave({ key: f.key, description: f.description, default_on: f.default_on, critical: f.critical, expires_at: fromLocalInput(f.expires), tenants: flag.tenants || {} }, isNew);
+    const ok = await onSave({ key: f.key, description: f.description, default_on: f.default_on, critical: f.critical, expires_at: fromLocalInput(f.expires), create: isNew }, isNew);
     setBusy(false);
     if (ok) onClose();
   }
