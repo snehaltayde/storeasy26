@@ -3,6 +3,14 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 The editor and Publishing on the new UI (on the owner's behalf)
+
+- **Permissions:** support's editor store is read-only: every write op (saveDraft and its keepalive, discard, restore, undo, take offline, publish, publishSet, archive, create, keep-live/keep-earlier, backups) returns `READ_ONLY` in the browser, and `DocumentEditor`'s direct calls go through one read-only guard; the server's 403s stay the real gate. Staff and support see the publish reason, never a publish/undo/take-offline button; support gets no Restore. The first-store generator runs only with `can.write`. `READ_POSTS` rows may list allowed body `ops` (document reads only); the shared matcher lives in `scripts/support/read-post-match.js` and is tested on real bodies: a body rule (Test, not Revoke) and ops both hold, and a server-log line counts as a read only on a 2xx.
+- **Templates:** "Insert into a page" reads the target draft and saves on its revision; sections over a kind's per-page limit or outside its allowed place are left out with words (the server refuses a second hero with 422); a revision conflict offers a reload.
+- **UI:** one editor route, full-bleed; panes rebalanced so the preview is useful at 1280 (a tablet frame wider than the pane is scaled to fit, with the scale shown); the publish panel opens over the panes; Take offline confirms in place. `fields/parts.js` keeps the old part names on `components/ui` for ~100 call sites (line 11 decides whether it stays). `rounded-card` is the console's card radius (the test no longer bans it).
+- **Decided by:** Claude
+- **Slice:** Phase 2 line 6
+
 ## 2026-11-25 Settings, integrations and billing on the new UI (on the owner's behalf)
 
 - **Permissions:** no new actions. Staff and support get only a no-access page on every settings tab, integrations and billing, with no settings data (`test-support-reads` S2, Team included). The support-access banner is shown only to signed-in members. Secrets are write-only: only `has_*` flags reach pages, answers or audit; an empty secret field keeps the stored one. The integrations Test is the only non-GET read, matched on its body (`action: "test"`), so Revoke never passes.

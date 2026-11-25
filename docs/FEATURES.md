@@ -49,7 +49,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - [x] A merchant can browse products and collections and open a product's content in the editor, on the new UI
 - [x] A merchant can create and edit offers and bundles on the new UI; support sees them read-only
 - [x] A merchant can upload, find, archive and delete media on the new UI
-- [ ] A merchant uses the editor (page list, section tree, inspector, preview, publish panel) in the new shell
+- [x] A merchant uses the editor (page list, section tree, inspector, preview, publish panel) in the new shell
 - [x] An admin can manage settings (store details, checkout and payments, shipping, domains), integrations and billing on the new UI; staff and support cannot reach them, and signed-out visitors never see the support-access banner
 - [x] An admin can invite a team member with a role and remove one; only the owner can grant or transfer ownership
 - [x] A merchant can see analytics, experiments, insights and automations on the new UI (the Publishing page is built with the editor line)
