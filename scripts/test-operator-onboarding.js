@@ -499,19 +499,26 @@ await t("owner invite: a store with no owner gets a 7-day invite to the founder'
   eq(typeof OPS.mailOwnerInvite, "function", "mailOwnerInvite exported");
 });
 
-await t("owner invite with no signup on file falls back to the store's support email; a failed send keeps the earlier invite usable", async () => {
+await t("owner invite with no signup on file is refused: the store's support email (which an admin can set) is never the recipient (Phase 1 audit); a failed send keeps the earlier invite usable", async () => {
   await db.execute("DELETE FROM memberships WHERE tenant_id = 'resumed-store'");
   await db.execute("UPDATE signups SET tenant_id = NULL WHERE tenant_id = 'resumed-store'");
   const tn = await C.getTenant("resumed-store", { fresh: true });
   await C.patchTenant("resumed-store", { config: { site: { ...(tn.config.site || {}), support_email: "Support@Resumed.test" } } });
+  eq(OPS.ownerInviteEmail(null, await C.getTenant("resumed-store", { fresh: true })), null, "ownerInviteEmail: no signup, no address");
   const sheet = (await api("GET", { query: "subject=tenant:resumed-store" })).body;
-  eq(sheet.actions.inviteEmail, "support@resumed.test", "the sheet names the support email");
+  eq(sheet.actions.inviteEmail, null, "the sheet names no address");
   const r = await post({ action: "owner_invite", subject: "tenant:resumed-store", email: "typed@evil.test" });
-  eq(r.status, 200, r.text);
-  eq(r.body.sentTo, "support@resumed.test", "sent to the support email on file");
-  const live = await one("SELECT id FROM invitations WHERE tenant_id = 'resumed-store' AND email = 'support@resumed.test' AND role = 'owner' AND expires_at > ? ORDER BY created_at DESC LIMIT 1", [iso(Date.now())]);
+  eq(r.status, 409, r.text);
+  ok(/no email on file/.test(r.body.error), r.body.error);
+  eq(await count("SELECT COUNT(*) AS n FROM invitations WHERE tenant_id = 'resumed-store' AND email IN ('support@resumed.test', 'typed@evil.test')"), 0, "no invite to the support email or a typed one");
+  // the signup on file again: its email gets the invite; a failed send keeps it usable
+  await db.execute("UPDATE signups SET tenant_id = 'resumed-store' WHERE slug = 'resumed-store'");
+  const to = (await one("SELECT email FROM signups WHERE slug = 'resumed-store' ORDER BY created_at DESC LIMIT 1")).email;
+  const sent = await post({ action: "owner_invite", subject: "tenant:resumed-store" });
+  eq(sent.status, 200, sent.text);
+  eq(sent.body.sentTo, to, "sent to the signup's email");
+  const live = await one("SELECT id FROM invitations WHERE tenant_id = 'resumed-store' AND email = ? AND role = 'owner' AND expires_at > ? ORDER BY created_at DESC LIMIT 1", [to, iso(Date.now())]);
   ok(live, "a live invite");
-  // a failed send: production never mocks, so the mail is recorded failed
   const env = process.env.NODE_ENV;
   process.env.NODE_ENV = "production";
   let failed;
@@ -524,8 +531,7 @@ await t("owner invite with no signup on file falls back to the store's support e
   eq(failed.status, 502, "failed send: refused");
   const still = await one("SELECT expires_at FROM invitations WHERE id = ?", [live.id]);
   ok(Date.parse(still.expires_at) > Date.now(), "the earlier invite stays usable");
-  eq(await count("SELECT COUNT(*) AS n FROM invitations WHERE tenant_id = 'resumed-store' AND email = 'support@resumed.test' AND role = 'owner' AND accepted_at IS NULL AND expires_at > ?", [iso(Date.now())]), 1, "and the failed one is not left live");
-  await db.execute("UPDATE signups SET tenant_id = 'resumed-store' WHERE slug = 'resumed-store'");
+  eq(await count("SELECT COUNT(*) AS n FROM invitations WHERE tenant_id = 'resumed-store' AND email = ? AND role = 'owner' AND accepted_at IS NULL AND expires_at > ?", [to, iso(Date.now())]), 1, "and the failed one is not left live");
 });
 
 await t("the sheet offers sign-in help only to active owners", async () => {
