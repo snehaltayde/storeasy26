@@ -88,7 +88,7 @@ exists); writes same-origin first, audited with the operator's id; no answer hol
 | Entry point | Check | Anonymous / another user gets | Proof |
 |---|---|---|---|
 | `accept-invite` GET (peek, never spends) | token, kind `invite`, this store; 20/min | another store's token, a used or expired one: 400 one message; a handoff or reset token: 400 (probe, this audit) | OC "accept: the page's peek shows the store and the invited email; user B signed in posting the token gets nothing; store B's host refuses it without spending it", "the accept page's peek is rate-limited"; DS "anonymous: a made-up invite token's peek is 400" (new) |
-| `accept-invite` POST | token; an existing account proves its password before the token is spent, sharing login's lockout; only an active account | user B's session is never used; wrong password leaves the invite usable; expired 400; **a member already at the invite's role or above: 409, unspent (gap P1-A)** | OC "an existing account accepts with its current password …", "review 1: an existing account accepting an invite shares login's lockout …", "an expired invite is refused", **OC "Phase 1 audit gap P1-A: …" (new)** |
+| `accept-invite` POST | token; an existing account proves its password before the token is spent, sharing login's lockout; only an active account | user B's session is never used; wrong password leaves the invite usable; expired 400; **a member already at the invite's role or above: 409, the token spent; the write is raise-only in SQL; a team role change or removal expires that member's pending invites (gap P1-A)** | OC "an existing account accepts with its current password …", "review 1: an existing account accepting an invite shares login's lockout …", "an expired invite is refused", **OC "Phase 1 audit gap P1-A: …", "P1-A review: every held role x invited role …", "P1-A review: a 409'd token can't be replayed after a demotion …", "P1-A review (race): two accepts at once never lower a role …" (new)** |
 | `/admin/accept-invite` page + `(invite)` layout | the POST/GET above | a made-up token: "invalid, expired, or already used" | DS "anonymous: the accept page with a made-up token says the invitation is invalid, no error" (new) |
 | `recover` POST (changed: an invited account may reset) | exempt; same body for every email | PR "exempt recover: … an unknown email 200 with the generic body" |
 
@@ -126,15 +126,15 @@ exists); writes same-origin first, audited with the operator's id; no answer hol
 
 | Gap | Scenario | Test (red first, `d199840`) | Fix |
 |---|---|---|---|
-| P1-A | Line 9 lets an existing account accept an invite with its password, and `acceptInvite` then ran `addMembership`, which overwrites the role. An admin (`team.manage`) could invite an owner's email as support: a second owner who accepted was silently demoted (a side door around Phase 0 F1, "an admin can neither demote nor remove an owner"); the sole owner got the token spent and the raw guard text "cannot demote the last owner — grant owner to someone else first" in the 400. | OC "Phase 1 audit gap P1-A: an invite never lowers an existing member's role …" | `0ad0332`: `acceptInvite` refuses a member already at the invite's role or above before the token is spent (409 `ALREADY_MEMBER`, "You're already on this store's team …"); an invite still adds a member or raises a role. The route's catch-all answers the generic invalid-invite words and logs the raw error. |
+| P1-A | Line 9 lets an existing account accept an invite with its password, and `acceptInvite` then ran `addMembership`, which overwrites the role. An admin (`team.manage`) could invite an owner's email as support: a second owner who accepted was silently demoted (a side door around Phase 0 F1, "an admin can neither demote nor remove an owner"); the sole owner got the token spent and the raw guard text "cannot demote the last owner — grant owner to someone else first" in the 400. | OC "Phase 1 audit gap P1-A: an invite never lowers an existing member's role …" | `0ad0332`: `acceptInvite` refuses a member already at the invite's role or above (409 `ALREADY_MEMBER`, "You're already on this store's team …"); an invite still adds a member or raises a role. The route's catch-all answers the generic invalid-invite words and logs the raw error. Review fixes (`12e03a4` red, `7c8c03e`): the 409 spends the token, so it can't undo a later demotion; the write is `addInviteMembership`, raise-only in one statement (`ON CONFLICT … DO UPDATE … WHERE rank(new) < rank(held)`; the team route keeps `addMembership`); the team route's role change and removal expire that member's pending invites to the store. Tested over the full 4 × 4 grid of held × invited role, an account with no membership here, a replay after a demotion, and two accepts at once. |
+| P1-B (was open item 2) | An operator's owner invite for a store with no owner and no signup on file went to the store's support email, which an admin can set in Settings: an admin could make themselves owner of an ownerless store by asking Storeasy support for an owner invite. | OO "owner invite with no signup on file is refused: the store's support email … is never the recipient (Phase 1 audit) …" (red `d78d7f7`) | `5f8eed9`: `ownerInviteEmail` returns only the signup's email; a store with none gets the existing "no email on file" refusal. |
 
 ## Open gaps (not fixed here)
 
 | # | Scenario | Why not fixed |
 |---|---|---|
 | 1 | Phase 0 open gaps 1 to 4 stand (quiz email to any address, login timing, legacy write buttons, collector route suites). | Unchanged by Phase 1. |
-| 2 | An operator's owner invite for a store with no owner and no signup on file goes to the store's support email, which an admin can set in Settings: an admin could make themselves owner of an ownerless store by asking support for an owner invite. | Needs an operator to act and a store with no owner; a product call on where that email comes from. Recorded for the owner. |
-| 3 | The team route still lets an admin create a support invite for an existing member's email (the accept now refuses it, so it does nothing). | Harmless after P1-A; tidier refusal at invite time is Phase 2's team screen. |
+| 2 | The team route still lets an admin create a support invite for an existing member's email (the accept now refuses it, so it does nothing). | Harmless after P1-A; tidier refusal at invite time is Phase 2's team screen. |
 
 ## Not checked
 
@@ -164,3 +164,8 @@ old `[data-legacy]` screens (`support-write-controls.json`; Phase 0 open gap 3, 
 (test-permissions 110, test-support-reads 30, test-shopper-reads 35, test-security 19, all 0 failed);
 PASS changed suites (test-operator-create-store 34, test-signup 44, test-identity 23, test-tenant-ops 10,
 test-operator-onboarding 34, test-drills 35, test-shopify-boundary 42, all 0 failed).
+
+Review fixes, `~/.claude/bin/heavy steelthread-verify` at `5f8eed9`: PASS lint; PASS slice (test-permissions,
+test-support-reads, test-shopper-reads, test-security, 0 failed); PASS changed (test-operator-create-store 37,
+test-operator-onboarding 34, test-identity, test-tenant-ops, test-signup, test-shopify-boundary, 0 failed).
+drill:shell was not rerun (no screen or route changed).
