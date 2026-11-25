@@ -18,6 +18,7 @@ import {
 } from "@/lib/platform/billing";
 import { billingProviderConfigured } from "@/lib/platform/razorpay-billing";
 import { slog } from "@/lib/log";
+import { scrubSecrets } from "@/lib/platform/turso-api";
 import { audit, OPERATOR_ONLY } from "@/lib/platform/audit";
 
 // Operator billing (S40 / OP08; Phase 3 line 3): fleet subscriptions, MRR,
@@ -54,7 +55,9 @@ export async function GET(request) {
     }
     return NextResponse.json({ ok: true, ...(await summary()) });
   } catch (e) {
-    return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
+    // P3-G: fixed words; the scrubbed error goes to the log
+    slog("billing_read_failed", { error: scrubSecrets(e?.message || e).slice(0, 300) });
+    return NextResponse.json({ error: "We couldn't read billing just now. Try again." }, { status: 422 });
   }
 }
 

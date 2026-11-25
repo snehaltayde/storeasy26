@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireOperator } from "@/lib/platform/require-operator";
+import { scrubSecrets } from "@/lib/platform/turso-api";
+import { slog } from "@/lib/log";
 import { listIncidents, openIncident, postIncidentUpdate, editInternalNote, resolveIncident, incidentTimeline, storeChoices } from "@/lib/platform/incidents";
 
 // Incidents (S43 / OP12; the /platform/incidents screen, Phase 3 line 4):
@@ -16,7 +18,14 @@ import { listIncidents, openIncident, postIncidentUpdate, editInternalNote, reso
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const failed = (e) => NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: e?.status || 422 });
+// P3-G: the library's own refusals (they carry a status) keep their words; any
+// other error (a driver's, which can name a database) becomes fixed words and
+// goes to the log scrubbed.
+const failed = (e) => {
+  if (e?.status) return NextResponse.json({ error: String(e.message).slice(0, 300) }, { status: e.status });
+  slog("incident_action_failed", { error: scrubSecrets(e?.message || e).slice(0, 300) });
+  return NextResponse.json({ error: "We couldn't do that just now. Try again." }, { status: 422 });
+};
 
 async function listing(p) {
   const [list, stores] = await Promise.all([listIncidents({ scope: p.get("scope") || "all", page: p.get("page") || 1 }), storeChoices()]);

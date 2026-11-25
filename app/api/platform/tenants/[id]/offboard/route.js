@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireOperator } from "@/lib/platform/require-operator";
 import { offboardTenant } from "@/lib/platform/export";
 import { getTenant } from "@/lib/platform/control";
+import { scrubSecrets } from "@/lib/platform/turso-api";
 
 // Offboard a tenant (S43 / BE29): suspend → revoke keys → cancel local
 // billing → purge platform-side derived rows. The tenant DATABASE and
@@ -15,7 +16,8 @@ export async function POST(request, { params }) {
   const auth = await requireOperator(request, { write: true });
   if (auth instanceof Response) return auth;
   const { id } = await params;
-  if (!(await getTenant(id))) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const tenant = await getTenant(id);
+  if (!tenant) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const body = await request.json().catch(() => ({}));
   if (body.confirm !== id) {
     return NextResponse.json({ error: `type the tenant id ("${id}") as confirm to offboard` }, { status: 400 });
@@ -24,6 +26,7 @@ export async function POST(request, { params }) {
     const r = await offboardTenant(id, { actor: auth.operator });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
-    return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
+    // P3-G: a driver error can name the store's database
+    return NextResponse.json({ error: scrubSecrets(e?.message || e, [tenant.dbUrl, tenant.dbToken]).slice(0, 300) }, { status: 422 });
   }
 }

@@ -387,6 +387,126 @@ await t("export link: a link signed with \"dev-only\" is refused; with no PLATFO
   }
 });
 
+// --- Phase 3 audit fixes (docs/cms-reviews/PHASE-3-AUDIT.md) ---------------------------
+const exportGet = (id, token) => call("signed-out", "tenants/[id]/export", "GET", { params: { id }, query: `token=${encodeURIComponent(token)}` });
+async function mintLink(id = store.a.id) {
+  const res = await call("operator", "tenants/[id]/export", "POST", { params: { id } });
+  eq(res.status, 200, `mint ${res.text.slice(0, 120)}`);
+  return { res, token: new URL(res.body.url, "http://x").searchParams.get("token") };
+}
+const downloads = async (id) => (await db().execute({ sql: "SELECT actor, actor_kind, tenant_id FROM audit_log WHERE action = 'tenant.export_downloaded' AND tenant_id = ?", args: [id] })).rows;
+
+await t("P3-A export link: valid for 15 minutes, and the mint says so", async () => {
+  const { res, token } = await mintLink();
+  eq(res.body.expires_in, "15 minutes", "the words");
+  const exp = Number(String(token).split(".")[1]);
+  const left = exp - Date.now() / 1000;
+  ok(left > 14 * 60 && left <= 15 * 60 + 1, `the token's end is 15 minutes out (${Math.round(left)} s)`);
+});
+
+await t("P3-A export link: single use: the first GET 200, the second 401 with no export", async () => {
+  const { token } = await mintLink();
+  eq((await exportGet(store.a.id, token)).status, 200, "first");
+  const again = await exportGet(store.a.id, token);
+  eq(again.status, 401, "second");
+  ok(!/"manifest"/.test(again.text), "no export on the second use");
+});
+
+await t("P3-A export link: after 15 minutes it gets 401 (the token's end and the row's end)", async () => {
+  const X = await import("../lib/platform/export.js");
+  const old = await X.mintExportToken(store.a.id, { now: Date.now() - 15 * 60_000 - 5_000 });
+  eq((await exportGet(store.a.id, old)).status, 401, "a link minted 15 minutes ago");
+  const { token } = await mintLink();
+  await db().execute({ sql: "UPDATE export_links SET expires_at = ? WHERE used_at IS NULL", args: [new Date(Date.now() - 1000).toISOString()] });
+  eq((await exportGet(store.a.id, token)).status, 401, "a link whose row has passed its end");
+});
+
+await t("P3-A export link: one tenant.export_downloaded row per download, with the store and the minting operator", async () => {
+  const before = (await downloads(store.a.id)).length;
+  const { token } = await mintLink();
+  eq((await exportGet(store.a.id, token)).status, 200, "download");
+  eq((await exportGet(store.a.id, token)).status, 401, "reuse");
+  eq((await exportGet(store.b.id, token)).status, 401, "another store");
+  const rows = await downloads(store.a.id);
+  eq(rows.length, before + 1, "one new row");
+  const last = rows[rows.length - 1];
+  eq(`${last.actor}/${last.actor_kind}/${last.tenant_id}`, `${operatorId}/operator/${store.a.id}`, "actor and store");
+});
+
+await t("P3-A export link: concurrent uses, exactly one succeeds", async () => {
+  const before = (await downloads(store.a.id)).length;
+  const { token } = await mintLink();
+  const results = await Promise.all(Array.from({ length: 6 }, () => exportGet(store.a.id, token)));
+  eq(results.map((r) => r.status).sort().join(","), "200,401,401,401,401,401", "statuses");
+  eq((await downloads(store.a.id)).length, before + 1, "one audit row");
+});
+
+// a store whose database can't be opened: the driver's error names its address
+const GONE_DIR = "/nonexistent-platperm-canary-dir";
+const GONE_TOKEN = "platperm-canary-db-token-9f3a";
+const gone = "platperm-gone";
+await C.upsertTenant({ id: gone, name: "Platperm Gone", domains: ["platperm-gone.test"], dbUrl: `file:${GONE_DIR}/store.db`, dbToken: GONE_TOKEN, config: {}, secrets: {} });
+const GONE_CANARIES = [GONE_DIR, GONE_TOKEN, "nonexistent-platperm-canary"];
+const holdsGone = (text) => GONE_CANARIES.filter((c) => text.includes(c));
+
+await t("P3-B export GET on an unreachable store: 422 in fixed words, no db_url", async () => {
+  const { token } = await mintLink(gone);
+  const res = await exportGet(gone, token);
+  eq(res.status, 422, res.text.slice(0, 200));
+  eq(holdsGone(res.text).join(","), "", "canaries in the answer");
+  ok(/couldn't build/i.test(res.body?.error || ""), `fixed words: ${res.body?.error}`);
+});
+
+await t("P3-G privacy redact on an unreachable store: no db_url or token in the answer", async () => {
+  const res = await call("operator", "privacy", "POST", { body: { action: "redact", tenant: gone, requestId: "pr_x" } });
+  eq(res.status, 422, res.text.slice(0, 200));
+  eq(holdsGone(res.text).join(","), "", "canaries in the answer");
+});
+
+await t("P3-G offboard on an unreachable store: no db_url or token in the answer", async () => {
+  const res = await call("operator", "tenants/[id]/offboard", "POST", { params: { id: gone }, body: { confirm: gone } });
+  eq(holdsGone(res.text).join(","), "", `canaries in the ${res.status} answer`);
+});
+
+await t("P3-G the queues list scrubs last_error with the store's address and token", async () => {
+  const now = new Date().toISOString();
+  await db().execute({ sql: "INSERT INTO jobs (id, type, tenant_id, status, last_error, created_at, updated_at) VALUES ('job_platperm_gone', 'x', ?, 'dead', ?, ?, ?)", args: [gone, `ConnectionFailed("Unable to open connection to local database ${GONE_DIR}/store.db: 14") auth ${GONE_TOKEN}`, now, now] });
+  const res = await call("operator", "queues", "GET", { query: "status=dead" });
+  eq(res.status, 200);
+  const job = res.body.jobs.find((j) => j.id === "job_platperm_gone");
+  ok(job && job.last_error, "the job is listed with its error");
+  eq(holdsGone(res.text).join(","), "", "canaries in the list");
+});
+
+await t("P3-F paging: queues ?limit=-1 returns at most 200 rows; huge page and offset values give 200 and an empty page", async () => {
+  const now = new Date().toISOString();
+  for (let i = 0; i < 210; i++) await db().execute({ sql: "INSERT INTO jobs (id, type, status, created_at, updated_at) VALUES (?, 'x', 'done', ?, ?)", args: [`job_page${String(i).padStart(4, "0")}`, now, now] });
+  const q = await call("operator", "queues", "GET", { query: "limit=-1" });
+  eq(q.status, 200);
+  ok(q.body.jobs.length <= 200 && q.body.jobs.length > 0, `jobs: ${q.body.jobs.length}`);
+  for (const query of ["limit=1e300", "limit=Infinity"]) {
+    const r = await call("operator", "queues", "GET", { query });
+    ok(r.status === 200 && r.body.jobs.length <= 200, `${query}: ${r.status} ${r.body?.jobs?.length}`);
+  }
+  for (const page of ["1e20", "Infinity", "-5"]) {
+    const r = await call("operator", "incidents", "GET", { query: `page=${page}` });
+    eq(r.status, 200, `incidents page=${page} ${r.text.slice(0, 120)}`);
+    if (page !== "-5") eq(r.body.incidents.length, 0, `incidents page=${page} is empty`);
+  }
+  const B = await import("../lib/platform/billing.js");
+  await B.ensureDefaultPlans();
+  await B.startSubscription(store.b.id, "free");
+  await db().execute({ sql: "INSERT INTO billing_events (id, provider_event_id, tenant_id, type, amount, occurred_at, applied_at) VALUES ('bev_platperm', 'pe_platperm', ?, 'payment.captured', 100, ?, ?)", args: [store.b.id, now, now] });
+  for (const view of ["subscriptions", "events"]) {
+    ok((await call("operator", "billing", "GET", { query: `view=${view}` })).body.rows.length > 0, `billing ${view} has a first page`);
+    for (const offset of ["1e300", "Infinity"]) {
+      const r = await call("operator", "billing", "GET", { query: `view=${view}&offset=${offset}` });
+      eq(r.status, 200, `billing ${view} offset=${offset} ${r.text.slice(0, 120)}`);
+      eq(r.body.rows.length, 0, `billing ${view} offset=${offset} is empty`);
+    }
+  }
+});
+
 await t("no network: no route reached fetch()", () => {
   eq(network.length, 0, `fetch calls: ${network.join(", ")}`);
 });

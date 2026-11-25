@@ -128,6 +128,17 @@ await t("export tokens: expiring + tenant-bound + tamper-proof", async () => {
   eq(await X.verifyExportToken("ta", old), false, "expired rejected:");
 });
 
+await t("P3-A export links: migration 0018 is additive; a link is spent once, never by another store, and names its operator", async () => {
+  const src = await readFile(join(here, "../migrations/platform/0018_export_links.sql"), "utf8");
+  ok(!/\b(DROP|DELETE|UPDATE|ALTER)\b/i.test(src.replace(/--.*$/gm, "")), "nothing destructive");
+  const tok = await X.mintExportToken("ta", { operator: { kind: "operator", id: "u_ops" } });
+  ok(Math.abs(Number(tok.split(".")[1]) * 1000 - Date.now() - X.EXPORT_LINK_TTL_MS) < 2000, "15 minutes");
+  eq(await X.spendExportToken("tb", tok), null, "another store:");
+  eq(JSON.stringify(await X.spendExportToken("ta", tok)), JSON.stringify({ operator: { kind: "operator", id: "u_ops" } }), "first use:");
+  eq(await X.spendExportToken("ta", tok), null, "second use:");
+  eq(await X.verifyExportToken("ta", tok), true, "the signature alone still checks");
+});
+
 console.log("— BE29: offboarding");
 
 await t("offboard: suspend + key revocation + billing cancel + platform purge; DB and row kept", async () => {

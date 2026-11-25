@@ -4,7 +4,8 @@ import { forEachActiveTenant, runAsTenant } from "@/lib/platform/ops";
 import { listPrivacyRequests, redactCustomer } from "@/lib/privacy";
 import { db } from "@/lib/db";
 import { audit, operatorActor } from "@/lib/platform/audit";
-import { listTenants, platformConfigured } from "@/lib/platform/control.js";
+import { getTenant, listTenants, platformConfigured } from "@/lib/platform/control.js";
+import { scrubSecrets } from "@/lib/platform/turso-api";
 import { slog } from "@/lib/log";
 
 // Operator privacy ops (S43 / OP11): the fleet's privacy requests in one
@@ -81,6 +82,8 @@ export async function POST(request) {
     if (!result?.already) await audit({ actor: operatorActor(auth.operator), action: "privacy.redact", resource: `privacy:${String(body.requestId)}`, tenantId: tenant, diff: { orders: result?.orders ?? 0, events: result?.events ?? 0 } });
     return NextResponse.json({ ok: true, result });
   } catch (e) {
-    return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
+    // P3-G: a driver error can name the store's database
+    const t = await getTenant(tenant).catch(() => null);
+    return NextResponse.json({ error: scrubSecrets(e?.message || e, [t?.dbUrl, t?.dbToken]).slice(0, 300) }, { status: 422 });
   }
 }
