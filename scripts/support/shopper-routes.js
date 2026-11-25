@@ -11,6 +11,8 @@
 //   operator     the platform console (lib/platform/admin-auth.js)
 //   webhook      signed provider callbacks
 //   job          cron / health, behind the job secret
+//   app-token    API v1 for custom apps (Phase 4 line 4): a Bearer token in
+//                plugin_tokens, its scopes ∩ the app's approval; cookies ignored
 // Page classes: shopper (reads the shopper's cookies or an order link) or public.
 //
 // suite: the suite that owns the route's behaviour (null: no suite calls the
@@ -65,10 +67,11 @@ export const SHOPPER_ROUTES = Object.freeze([
   { path: "jobs/sync-shopify", methods: ["GET", "POST"], class: "job", suite: null },
   { path: "jobs/tick", methods: ["GET", "POST"], class: "job", suite: "test-first-sync.js" },
   { path: "health", methods: ["GET"], class: "job", suite: null },
+  ...["me", "products", "products/[handle]", "collections", "offers", "orders", "orders/[id]"].map((p) => ({ path: `apps/v1/${p}`, methods: ["GET"], class: "app-token", suite: "test-app-tokens.js" })),
   { path: "[...unmatched]", methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], class: "public-read", suite: "test-api-unmatched.js", note: "an /api/* path with no route: 404 JSON, open or closed store" },
 ]);
 
-export const ROUTE_CLASSES = Object.freeze(["shopper", "public-read", "collector", "token", "operator", "webhook", "job"]);
+export const ROUTE_CLASSES = Object.freeze(["shopper", "public-read", "collector", "token", "operator", "webhook", "job", "app-token"]);
 
 // app/(storefront)/**/page.js and layout.js, by folder ("" is the store root).
 // sweep: how test-shopper-reads.js covers it ("harness": run through

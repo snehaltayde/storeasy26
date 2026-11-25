@@ -94,7 +94,9 @@ export const CONSOLE_ORIGIN = "https://operator.console.test";
 // operator-support: an operator under store A's grant with its _platform
 // cookie (same host); operator-support-entry (Phase 3 line 5): the same
 // operator's support session from the cross-host entry, in a __Host-support cookie.
-export const CALLERS = Object.freeze([...CALLER_ROLES, "signed-out", "owner-b", "operator-support", "operator-support-entry"]);
+// app-token (Phase 4 line 4): a live API token of a custom app on store A with
+// every scope, sent as Authorization: Bearer and no cookies (admin routes ignore it).
+export const CALLERS = Object.freeze([...CALLER_ROLES, "signed-out", "owner-b", "operator-support", "operator-support-entry", "app-token"]);
 
 // Store A (owner, admin, staff and support members, a legacy admin_password
 // secret, an operator support grant) and store B (its own owner), both in
@@ -106,6 +108,23 @@ export const CALLERS = Object.freeze([...CALLER_ROLES, "signed-out", "owner-b", 
 // search string ("product=x") added to the URL. origin null sends none;
 // the default is the store's own origin on non-GET calls. Body strings "$owner",
 // "$admin", … are swapped for that user's id.
+// A custom app on store t (no webhook endpoint: written straight to its
+// database, so no egress check runs) and a token for it with every scope.
+// -> { installId, tokenId, secret }
+export async function mintHarnessToken(t, ownerId, { name = "Harness app", scopes = ["offers.read", "orders.read", "storefront.read"] } = {}) {
+  const { db } = await import("../../lib/db.js");
+  const { newId } = await import("../../lib/platform/sessions.js");
+  const { mintToken } = await import("../../lib/plugins/tokens.js");
+  return t.run(async () => {
+    const at = new Date().toISOString();
+    const installId = newId("pin");
+    const by = `merchant:${ownerId}`;
+    await db.insertInto("plugin_installs").values({ id: installId, plugin_id: `custom:${installId.slice(4)}`, kind: "custom", name, version: "1.0.0", status: "enabled", granted_scopes: JSON.stringify(scopes), settings: "{}", secrets_enc: null, installed_by: by, installed_at: at, updated_by: by, updated_at: at }).execute();
+    const m = await mintToken(installId, { name: `${name} token`, scopes, days: 90 }, { actor: { kind: "merchant", id: ownerId, role: "owner" } });
+    return { installId, tokenId: m.token.id, secret: m.secret };
+  });
+}
+
 export async function makeRoleStore({ name = "perm", a: aOpts = {}, b: bOpts = {} } = {}) {
   const F = await import("./tenant-fixture.js");
   const platform = await F.makePlatform({ name });
@@ -133,18 +152,21 @@ export async function makeRoleStore({ name = "perm", a: aOpts = {}, b: bOpts = {
   if (!supportSession) throw new Error("route-harness: the support entry was refused");
   const cookies = { "signed-out": {}, "operator-support": { _platform: await session("operator", "operator") }, "operator-support-entry": { "__Host-support": supportSession.token } };
   for (const role of [...CALLER_ROLES, "owner-b"]) cookies[role] = { _admin: await session(role) };
+  cookies["app-token"] = {};
+  const appToken = await mintHarnessToken(a, users.owner.id);
+  const callerHeaders = { "app-token": { authorization: `Bearer ${appToken.secret}` } };
   const ids = Object.fromEntries(Object.entries(users).map(([k, u]) => [`$${k}`, u.id]));
   const swap = (v) => JSON.parse(JSON.stringify(v), (_, x) => (typeof x === "string" && Object.hasOwn(ids, x) ? ids[x] : x));
 
   const { NextRequest } = await import("./next-server-stub.js");
-  async function call(caller, path, method, { body, form, params, query, origin, cookies: jar, host = a.tenant.domains[0] } = {}) {
+  async function call(caller, path, method, { body, form, params, query, origin, cookies: jar, headers: extra, host = a.tenant.domains[0] } = {}) {
     const file = ["route.js", "route.ts", "route.mjs"].map((f) => join(root, "app/api/admin", path, f)).find((f) => existsSync(f));
     if (!file) throw new Error(`route-harness: no route file for ${path}`);
     const route = await import(pathToFileURL(file).href);
     const handler = route[method];
     if (typeof handler !== "function") throw new Error(`route-harness: ${path} has no ${method}`);
     const concrete = path.replace(/\[(\w+)\]/g, (_, k) => encodeURIComponent(params?.[k] ?? k));
-    const headers = { host };
+    const headers = { host, ...(callerHeaders[caller] ?? {}), ...(extra ?? {}) };
     const o = origin === undefined ? (method === "GET" ? null : `http://${host}`) : origin;
     if (o) headers.origin = o;
     const jarFor = jar ?? cookies[caller] ?? {};
@@ -177,6 +199,28 @@ export async function makeRoleStore({ name = "perm", a: aOpts = {}, b: bOpts = {
     return { status: res.status, body: json, text, headers: res.headers, setCookie: res.headers.getSetCookie(), asked: [...asked] };
   }
 
+  // API v1 (app/api/apps/v1/<path>), GET: { token, cookies, host, params, query, headers }
+  async function v1(path, { token, cookies: jar = {}, host = a.tenant.domains[0], params, query, headers: extra, method = "GET" } = {}) {
+    const file = join(root, "app/api/apps/v1", path, "route.js");
+    if (!existsSync(file)) throw new Error(`route-harness: no v1 route for ${path}`);
+    const route = await import(pathToFileURL(file).href);
+    const handler = route[method];
+    if (typeof handler !== "function") return { status: 405, body: null, text: "", headers: new Headers() };
+    const concrete = path.replace(/\[(\w+)\]/g, (_, k) => encodeURIComponent(params?.[k] ?? k));
+    const headers = { host, ...(token ? { authorization: `Bearer ${token}` } : {}), ...(extra ?? {}) };
+    if (Object.keys(jar).length) headers.cookie = Object.entries(jar).map(([k, v]) => `${k}=${v}`).join("; ");
+    const request = new NextRequest(`http://${host}/api/apps/v1/${concrete}${query ? `?${query}` : ""}`, { method, headers });
+    const res = await handler(request, { params: Promise.resolve(params ?? {}) });
+    const text = await res.text();
+    let json = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      // empty
+    }
+    return { status: res.status, body: json, text, headers: res.headers };
+  }
+
   return {
     platform,
     a,
@@ -184,6 +228,8 @@ export async function makeRoleStore({ name = "perm", a: aOpts = {}, b: bOpts = {
     users,
     cookies,
     ids,
+    appToken,
+    v1,
     call,
     session,
     cleanup: async () => {

@@ -93,6 +93,24 @@ export interface PluginInstall {
   updatedAt: string;
 }
 
+/** Phase 4 line 4: what an app token may be limited to (APP_PERMISSIONS keys; read-only). */
+export type AppTokenScope = PluginScope;
+
+export type AppTokenStatus = "active" | "expiring" | "expired" | "revoked";
+
+/** A token as the console lists it: never the secret or its hash. */
+export interface AppToken {
+  id: string; // "tok_" + 16 hex, also inside the token string "sea_<id>.<secret>"
+  name: string;
+  scopes: AppTokenScope[];
+  createdByName: string | null;
+  createdAt: string;
+  expiresAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+  status: AppTokenStatus;
+}
+
 // ============================================================================
 // B. OPEN UPLOADABLE THEME ENGINE CONTRACTS (Full UI Freedom, Zero Logic Access)
 // ============================================================================

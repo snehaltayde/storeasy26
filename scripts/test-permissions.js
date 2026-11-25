@@ -259,7 +259,8 @@ await t("setup: outside services blank, only file: databases, fetch blocked", ()
 
 // --- 1.4 every gated row as every caller -----------------------------------------
 const expectFor = (caller, action) => {
-  if (caller === "signed-out" || caller === "owner-b") return "401";
+  // app-token: a Bearer token is never a console session (Phase 4 line 4)
+  if (caller === "signed-out" || caller === "owner-b" || caller === "app-token") return "401";
   const role = caller.startsWith("operator-support") ? "support" : caller;
   return roleAllows(role, action) ? "allowed" : "403";
 };
@@ -396,7 +397,7 @@ await t("exempt recover: cross-origin 403; {} 400; an unknown email 200 with the
 // would outlive the grant); it lifts the curtain only while the grant is open
 await t("exempt maintenance-pass: always 302 to /admin/login; _mx only for a verified member or operator session, never a support session", async () => {
   ok(a.tenant.secrets.order_link_secret, "the store has its pass secret (order_link_secret)");
-  const want = { owner: true, admin: true, staff: true, support: true, "operator-support": true, "operator-support-entry": false, "signed-out": false, "owner-b": false };
+  const want = { owner: true, admin: true, staff: true, support: true, "operator-support": true, "operator-support-entry": false, "signed-out": false, "owner-b": false, "app-token": false };
   for (const caller of H.CALLERS) {
     const res = await call(caller, "maintenance-pass", "GET");
     eq(res.status, 302, `${caller} status`);

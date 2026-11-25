@@ -44,6 +44,14 @@ export const ADMIN_ROUTES = Object.freeze([
     action: "apps.manage",
     probe: { params: { id: "pin_0000000000000000" }, body: { [v]: v === "endpoint" ? { url: "https://example.com/hook" } : v === "resend" ? "dlv_0000000000000000" : true } },
   })),
+  // Phase 4 line 4: a custom app's API tokens and its call list (probes find no app)
+  { path: "apps/[id]/tokens", method: "GET", action: "apps.read", probe: { params: { id: "pin_0000000000000000" } } },
+  ...[
+    ["create", { name: "probe", scopes: [], days: 90 }],
+    ["revoke", "tok_0000000000000000"],
+    ["scopes", { scopes: [] }],
+  ].map(([v, arg]) => ({ path: "apps/[id]/tokens", method: "POST", variant: v, action: "apps.manage", probe: { params: { id: "pin_0000000000000000" }, body: { [v]: arg } } })),
+  { path: "apps/[id]/calls", method: "GET", action: "audit.read", probe: { params: { id: "pin_0000000000000000" } } },
   { path: "audit", method: "GET", action: "audit.read" },
   { path: "automations", method: "GET", action: "settings.read" },
   { path: "automations", method: "POST", action: "settings.write", probe: { body: {} } },

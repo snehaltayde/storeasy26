@@ -404,8 +404,9 @@ await t("the sitemap and every catalog-returning shopper API are gated", async (
     eq(src.includes("storefrontHandler(") && !src.includes("tenantHandler"), true, `/api/${r}:`);
   }
 });
-await t("webhooks, jobs and console APIs are NOT gated", async () => {
-  const routes = (await walk("app/api")).filter((f) => /app\/api\/(razorpay|shopify|jobs|admin|platform|connect)\//.test(f) && f.endsWith("route.js"));
+// apps (Phase 4 line 4): API v1 answers a closed store as tenantHandler does, never the curtain
+await t("webhooks, jobs, console and app APIs are NOT gated", async () => {
+  const routes = (await walk("app/api")).filter((f) => /app\/api\/(razorpay|shopify|jobs|admin|platform|connect|apps)\//.test(f) && f.endsWith("route.js"));
   eq(routes.length > 20, true, "found the routes:");
   for (const f of routes) eq((await source(f)).includes("storefrontHandler"), false, `${f} gated:`);
 });
