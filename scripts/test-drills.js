@@ -793,6 +793,10 @@ await t("the shell drill's read-POST matcher on real bodies: one read op passes;
   // a row without ops only matches its page, method and path
   ok(readPost("/admin/editor", "POST", "/api/admin/preview-session", JSON.stringify({ create: true })), "the preview session row");
   ok(!readPost("/admin/orders", "PUT", DOCS, JSON.stringify({ listDocuments: true })), "another page's request is not this row's");
+  const INT = "/api/admin/integrations";
+  ok(readPost("/admin/integrations", "POST", INT, JSON.stringify({ action: "test", provider: "razorpay" })), "a body-rule row passes the integrations Test");
+  ok(!readPost("/admin/integrations", "POST", INT, JSON.stringify({ action: "revoke", provider: "razorpay" })), "the same path's Revoke is a write");
+  ok(!readPost("/admin/integrations", "POST", INT, undefined, 200), "a server-log line (no body) never matches a body-rule row");
   const src = readFileSync(join(ROOT, "scripts/drills/shell/run.mjs"), "utf8");
   ok(/from "\.\.\/\.\.\/support\/read-post-match\.js"/.test(src) && !/const bodyOp =/.test(src) && /l\.status \?\? 0/.test(src) && /req\.postData\(\)/.test(src), "the drill uses this matcher, and passes a missing status as 0");
 });
