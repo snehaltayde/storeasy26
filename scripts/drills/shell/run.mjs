@@ -131,7 +131,7 @@ function implicitSubmits() {
 //     until the tab navigates to a different path: a read link's destination
 //     gets its own pass. Skipped only: an exact READ_POSTS row
 //     (scripts/support/read-controls.js, a read sent as POST: { page, method,
-//     path, reason }; none yet), and Next's dev error overlay (POST
+//     path, reason }), and Next's dev error overlay (POST
 //     /__nextjs_*) when the server is a dev server (its page opened the HMR
 //     socket), never against a production build.
 //   - and, as a second witness, the server's own request log (the roles
@@ -204,7 +204,7 @@ async function supportNewUiControls(page, href) {
   const onPage = (p) => {
     if (p !== page) popups.push(p);
   };
-  const found = { at: [], unsafe: [], implicit: [], revealed: [], moved: [], writes, reads: 0, gated: 0, fields: 0 };
+  const found = { at: [], unsafe: [], implicit: [], revealed: [], moved: [], writes, reads: 0, dialogReads: 0, gated: 0, fields: 0 };
   const fresh = async () => {
     await page.goto(ORIGIN + href, { waitUntil: "load" });
     await settle(page);
@@ -229,6 +229,22 @@ async function supportNewUiControls(page, href) {
       // a link to another path: that page gets its own pass; the same path
       // (a menu, a popover, or a new ?query) is checked again here
       if (new URL(page.url()).pathname === target) for (const x of await page.evaluate(strayControls, [CONTROLS, true])) found.revealed.push(`after read #${i} (${page.url().slice(ORIGIN.length)}): ${x}`);
+      // a read that opened a dialog (a sheet, a details panel): each marked
+      // read inside it is clicked once, from a fresh open, and the document
+      // checked again (Phase 2 line 5)
+      const inDialog = new URL(page.url()).pathname === target ? await page.locator('[role="dialog"] [data-read-control]').count() : 0;
+      for (let j = 0; j < inDialog; j++) {
+        await fresh();
+        await page.locator("main [data-read-control]").nth(i).click({ timeout: 5000 }).catch(() => {});
+        await page.locator('[role="dialog"]').first().waitFor({ timeout: 5000 }).catch(() => {});
+        const inner = page.locator('[role="dialog"] [data-read-control]').nth(j);
+        if (!(await inner.isVisible().catch(() => false)) || (await inner.isDisabled().catch(() => true))) continue;
+        await inner.click({ timeout: 5000 }).catch(() => {});
+        await page.waitForTimeout(500);
+        await settle(page);
+        found.dialogReads++;
+        if (new URL(page.url()).pathname === target) for (const x of await page.evaluate(strayControls, [CONTROLS, true])) found.revealed.push(`after read #${i}, dialog read #${j} (${page.url().slice(ORIGIN.length)}): ${x}`);
+      }
     }
     await fresh();
     found.gated = await page.locator('main [data-role-gate="disabled"]').count();
@@ -274,7 +290,7 @@ const checkNewUi = (check, href, f) => {
   check(f.at.length === 0, `${href}: the page under test is ${href} after loading it`, f.at);
   check(f.unsafe.length === 0, `${href}: no marked read control submits a form (submit, image, form=, formaction, a non-GET form)`, f.unsafe);
   check(f.implicit.length === 0, `${href}: no form support can submit with Enter (a text field needs a gated or disabled default submit, or method="get")`, f.implicit);
-  check(f.revealed.length === 0, `${href}: clicking support's ${f.reads} marked read(s) reveals no write control anywhere (menus and popovers included)`, f.revealed);
+  check(f.revealed.length === 0, `${href}: clicking support's ${f.reads} marked read(s) and ${f.dialogReads} read(s) inside the dialogs they open reveals no write control anywhere (menus and popovers included)`, f.revealed);
   check(f.writes.length === 0, `${href}: support's reads, ${f.gated} gated control(s) (click, Enter, Space) and ${f.fields} field(s) (Enter) send no non-GET request`, f.writes);
   check(f.moved.length === 0, `${href}: support's gated controls do not navigate`, f.moved);
 };
@@ -728,6 +744,18 @@ async function phase1Anonymous(drill, ctx) {
   await page.close();
 }
 
+// One image in the roles store's library before the role passes, so
+// support's pass on /admin/media reaches a card and its details sheet
+// (Phase 2 line 5). The owner uploads it through the real route.
+const ONE_PIXEL_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+async function seedMedia(drill, page) {
+  const res = await page.context().request.post(`${ORIGIN}/api/admin/media`, {
+    headers: { origin: ORIGIN },
+    multipart: { file: { name: "shell-drill.png", mimeType: "image/png", buffer: Buffer.from(ONE_PIXEL_PNG, "base64") }, width: "1", height: "1" },
+  });
+  drill.check(res.status() === 200, "one media file is in the library before the support pass (the owner's upload)", res.status());
+}
+
 async function shell(drill) {
   if (!port) throw new Error("drill:shell needs ROLES_PORT (run it as pnpm drill:shell).");
   const s = seed();
@@ -739,6 +767,7 @@ async function shell(drill) {
     ctx.setDefaultTimeout(60_000);
     pages[role] = role === "owner" ? await signInForm(drill, ctx, m) : await signInApi(ctx, m);
   }
+  await seedMedia(drill, pages.owner);
   for (const role of ROLES) for (const w of WIDTHS) await roleAtWidth(drill, pages[role], role, w, out);
   await supportSelfTest(drill, pages.support.context());
   await supportMenus(drill, pages.support);

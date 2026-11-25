@@ -28,6 +28,9 @@ export const READ_CONTROLS = [
 // Reads sent as a non-GET request: { page, method, path, reason }, an exact
 // match (the shell drill's readPost; scripts/drills/offers/run.mjs reads a
 // page's [id] as one path segment). Phase 2 lines append rows; keep both sides.
+// test:media-library proves the media row is the usage read: storefront.read, writes nothing.
 export const READ_POSTS = [
   { page: "/admin/offers/[id]", method: "POST", path: "/api/admin/offers/simulate", reason: "the offer simulator (Phase 2 line 4): offers.read, example carts worked out in memory, nothing stored (scripts/support/admin-routes.js marks it a read)" },
+  // Phase 2 line 5
+  { page: "/admin/media", method: "PUT", path: "/api/admin/media", reason: "\"Where it's used\" in a file's details: the usage list (mediaUsage), gated on storefront.read; it writes nothing" },
 ];

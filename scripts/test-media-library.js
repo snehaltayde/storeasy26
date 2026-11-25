@@ -235,6 +235,33 @@ await t("DELETE of an id this store doesn't have (gone, or store B's): 404 MEDIA
   eq(Number((await c.execute("SELECT count(*) AS n FROM media WHERE id = 'med_bonly'")).rows[0].n), 1, "store B's file stays:");
   c.close();
 });
+await t("READ_POSTS: its one /admin/media row is the usage PUT, gated on storefront.read, and it writes nothing (store, control plane, audit)", async () => {
+  const { READ_POSTS } = await import("./support/read-controls.js");
+  const { ADMIN_ROUTES } = await import("./support/admin-routes.js");
+  const rows = READ_POSTS.filter((r) => r.page === "/admin/media");
+  eq(rows.map(({ page, method, path }) => ({ page, method, path })), [{ page: "/admin/media", method: "PUT", path: "/api/admin/media" }]);
+  ok(rows.every((r) => typeof r.reason === "string" && r.reason.length >= 10), "a reason:");
+  eq(ADMIN_ROUTES.filter((r) => r.path === "media" && r.method === "PUT").map((r) => r.action), ["storefront.read"], "admin-routes row:");
+  const src = read("app/api/admin/media/route.js");
+  const put = src.slice(src.indexOf("export const PUT"));
+  ok(/requireAdmin\(request, "storefront\.read"\)/.test(put) && /mediaUsage\(/.test(put) && !/audit\(|slog\("media_|saveMedia|setMediaAlt|archiveMedia|deleteMedia|\.execute\(/.test(put), "the PUT handler only reads the usage:");
+  const { createHash } = await import("node:crypto");
+  const dump = async (t) => {
+    const c = t.client();
+    try {
+      const h = createHash("sha256");
+      const tables = (await c.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")).rows.map((r) => String(r.name));
+      for (const name of tables) h.update(name + JSON.stringify((await c.execute(`SELECT * FROM "${name}"`)).rows.map((r) => Object.values(r).map(String)).sort()));
+      return h.digest("hex");
+    } finally {
+      c.close();
+    }
+  };
+  const { listAudit } = await import("../lib/platform/audit.js");
+  const before = [await dump(a), (await listAudit({ tenantId: a.id, limit: 200 })).length];
+  for (const caller of ["support", "operator-support", "owner"]) for (const id of ["med_a001", "med_a058", "med_nothere"]) eq((await call(caller, "media", "PUT", { body: { id } })).status, 200, `${caller} ${id}:`);
+  eq([await dump(a), (await listAudit({ tenantId: a.id, limit: 200 })).length], before, "the store's database and the audit log are unchanged:");
+});
 await t("a bad query is 400 INVALID_QUERY in plain words; the old GET shape is unchanged", async () => {
   const r = await call("support", "media", "GET", { query: `${LIB}&sort=random` });
   eq([r.status, r.body.code], [400, "INVALID_QUERY"]);
