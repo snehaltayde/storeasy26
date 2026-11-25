@@ -169,11 +169,32 @@ await t("keys: onClick / ONLOAD keys, every data-only key, __proto__, constructo
   refusedAs(withPatch((p) => (p.templates.home.sections[0].settings.html = "<p>x</p>")), "data-only", "html on a hero");
 });
 
-await t("external addresses are allowed only in a registry link field", () => {
-  const linked = withPatch((p) => (p.templates.home.sections[0].settings.primary.link = { type: "url", href: "https://example.com/sale" }));
-  ok(!codes(linked).includes("external"), `a link href may be outside: ${JSON.stringify(V.parseThemePackage(linked).issues)}`);
+await t("links: only a page on the store, as a founder's Publish allows (outside, protocol-relative, backslash and data: links refused)", () => {
+  const link = (href) => withPatch((p) => (p.templates.home.sections[0].settings.primary.link = { type: "url", href }));
+  for (const href of ["https://evil.com", "//evil.com", "/\\evil.com", "\\\\evil.com", "data:text/plain,x"]) {
+    const issues = V.parseThemePackage(link(href)).issues;
+    ok(issues?.some((i) => i.code === "external" || i.code === "javascript"), `${href}: ${JSON.stringify(issues)}`);
+  }
+  ok(V.parseThemePackage(link("/collections/new")).pkg, "a store page is fine");
   refusedAs(withPatch((p) => (p.templates.home.sections[0].settings.primary.label = "https://example.com")), "external", "a label");
   refusedAs(withPatch((p) => (p.templates.home.sections[0].settings.primary.link = { type: "url", href: "javascript:alert(1)" })), "javascript", "a javascript: link");
+});
+
+await t("review fixes: long zero-padded entities, CSS escapes, inline styles, pictures and srcdoc in rich_text html are refused", () => {
+  const html = (s) => withPatch((p) => (p.templates.home.sections[1].settings.html = s));
+  refusedAs(html('<p><a href="&#00000000106;avascript:alert(1)">x</a></p>'), "javascript", "decimal zeros in html");
+  refusedAs(inSubtitle("&#x000000006a;avascript:x"), "javascript", "hex zeros");
+  refusedAs(withPatch((p) => (p.templates.home.sections[0].settings.primary.link = { type: "url", href: "java&#0000000115;cript:x" })), "javascript", "hero link");
+  refusedAs(html('<p style="position:fixed">x</p>'), "inline-style", "style=");
+  refusedAs(html("<p>\\75 rl(/x.png)</p>"), "url", "CSS-escaped url(");
+  refusedAs(html('<p srcdoc="x">x</p>'), "assets", "srcdoc=");
+  refusedAs(html('<img src="/x.png">'), "assets", "<img>");
+});
+
+await t("stored home sections are the registry's sanitised settings", () => {
+  const { pkg } = V.parseThemePackage(AURORA_TEXT);
+  ok(pkg.templates.home.sections.every((s) => s.settings && typeof s.settings === "object"), "settings kept");
+  eq(pkg.templates.home.sections[1].settings.html, "<p>Small batches, honest materials, fast delivery.</p>", "html sanitised as the registry writes it:");
 });
 
 await t("depth over 12 and more than 5,000 values are refused; at most 20 issues", () => {
@@ -398,8 +419,10 @@ await t("archive: staff, support and operator support get 403; a live or drafted
   eq((await call("support", "themes/[id]", "GET", { params: { id: auroraId } })).status, 200, "its page still opens:");
   const row = (await auditRows()).find((x) => x.action === "themes.archive");
   ok(row && row.resource === `theme:${auroraId}`, "audit row");
-  // archived rows still count for slug + version
-  eq((await upload("owner", aurora())).status, 409, "archived 1.2.0 can't be uploaded again:");
+  // archived rows still count for slug + version, and the refusal says so
+  const again = await upload("owner", aurora());
+  eq(again.status, 409, "archived 1.2.0 can't be uploaded again:");
+  eq(again.body.error, "Aurora 1.2.0 was archived. Raise the version to upload it again.", "words:");
 });
 
 await t("the kill switch ff_theme-packages refuses uploads for store A only", async () => {
@@ -424,6 +447,10 @@ await t("at most 30 installed packages per store", async () => {
   for (let i = have; i < F.LIMITS.installed; i++) eq((await upload("owner", { ...aurora(), id: `bulk-${i}` })).status, 200, `upload ${i}:`);
   const r = await upload("owner", { ...aurora(), id: "one-too-many" });
   eq(r.status, 409, "31st:");
+  // two at once at the cap: the guarded insert lets neither past 30
+  const both = await Promise.all([upload("owner", { ...aurora(), id: "race-a" }), upload("admin", { ...aurora(), id: "race-b" })]);
+  eq(both.map((x) => x.status).join(","), "409,409", "both refused at the cap:");
+  eq((await call("owner", "themes", "GET")).body.packages.length, F.LIMITS.installed, "still 30:");
   eq(r.body.code, "TOO_MANY", "code:");
   ok(r.body.error.includes("30"), r.body.error);
 });
