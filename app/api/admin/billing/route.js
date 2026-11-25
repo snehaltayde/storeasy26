@@ -34,10 +34,24 @@ export const POST = tenantHandler(async (request) => {
   try {
     if (body.action !== "subscribe") return NextResponse.json({ error: "action must be subscribe" }, { status: 400 });
     const B = await import("@/lib/platform/billing.js");
-    const r = await B.startSubscription(tenant.id, String(body.plan || ""));
+    let r;
+    try {
+      r = await B.startSubscription(tenant.id, String(body.plan || ""));
+    } catch (e) {
+      // a start that failed part way (Razorpay refused, or a change at the same moment) is audited as it happened
+      if (["PROVIDER_ERROR", "BILLING_CONFLICT"].includes(e?.code) || e?.detail?.provider_subscription) {
+        await B.auditStartFailed({ actor: auth.actor, tenantId: tenant.id, plan: String(body.plan || ""), error: e });
+        const words = e.code ? String(e.message).slice(0, 300) : "The plan couldn't start. Try again in a few minutes.";
+        return NextResponse.json({ error: words }, { status: e.code === "BILLING_CONFLICT" ? 409 : 502 });
+      }
+      throw e;
+    }
     slog("billing_subscribe_requested", { plan: body.plan, status: r.status });
     await audit({ actor: auth.actor, action: "settings.write", resource: `billing:subscribe:${body.plan}`, diff: { status: r.status } });
-    return NextResponse.json({ ok: true, result: r, ...(await buildBillingView()) });
+    await B.auditStart({ actor: auth.actor, tenantId: tenant.id, result: r });
+    // only what the founder needs: never Razorpay's error text about the old subscription
+    const result = { id: r.id, plan: r.plan, status: r.status, local: Boolean(r.local), shortUrl: r.shortUrl || null, previousEnded: r.previous.every((p) => p.ended != null) };
+    return NextResponse.json({ ok: true, result, ...(await buildBillingView()) });
   } catch (e) {
     if (e?.code === "BILLING_UNCONFIGURED") return NextResponse.json({ error: String(e.message).slice(0, 300) }, { status: 503 });
     const infra = infraResponse(e, { route: "admin/billing" }); // DOC-04: a database failure is never a 4xx

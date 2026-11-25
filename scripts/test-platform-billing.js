@@ -553,7 +553,9 @@ await t("razorpay errors: a failed cancel during a change is flagged, then retri
   const ov = (await call("operator", "billing", "GET")).body;
   ok(ov.exceptions.some((x) => x.kind === "cancel_failed" && x.tenant === C3), "in the exception queue");
   const [a] = await audited(since, "billing.start", { tenant: C3 });
-  ok(/"cancel_failed":true/.test(a.diff) && /RZP_CANARY/.test(a.diff), "the audit says what happened");
+  ok(/"cancel_failed":true/.test(a.diff), "billing.start says the old one was not cancelled");
+  const [cf] = await audited(since, "billing.cancel_failed", { tenant: C3 });
+  ok(/RZP_CANARY/.test(cf.diff) && /"operator_only"/.test(cf.diff), "billing.cancel_failed keeps the error operator-only");
   const calls = razorpay.length;
   await tick();
   const again = await op({ action: "start", tenant: C3, plan: "starter" });
@@ -632,6 +634,115 @@ await t("merchant billing: the store sees its override and what it grants, never
   }
   eq((await store.call("owner", "billing", "GET")).status, 200, "the owner reads billing");
   await op({ action: "clear_override", tenant: A });
+});
+
+// --- second review: merchant path, race loser, authorised-not-paid, the 0016 backfill ----
+await t("merchant subscribe: Razorpay's error about the old subscription never reaches the founder; audited on the merchant path", async () => {
+  providerOn();
+  await tick();
+  const paid = await op({ action: "start", tenant: A, plan: "starter" });
+  eq(paid.status, 200, paid.text.slice(0, 160));
+  const rp = (await db().execute({ sql: "SELECT razorpay_subscription_id r FROM subscriptions WHERE id = ?", args: [paid.body.result.id] })).rows[0].r;
+  await rpEvent("subscription.activated", rp, { current_end: Math.floor(Date.now() / 1000) + 10 * 86400 });
+  const since = new Date().toISOString();
+  failNext.push(/\/cancel$/);
+  await tick();
+  const r = await store.call("owner", "billing", "POST", { body: { action: "subscribe", plan: "growth" } });
+  eq(r.status, 200, r.text.slice(0, 200));
+  ok(!r.text.includes("RZP_CANARY"), "no Razorpay error text in the founder's answer");
+  eq(r.body.result.previousEnded, false, "the founder's answer says only that the old one is not ended yet");
+  eq(r.body.result.previous, undefined, "no raw previous");
+  const failed = await auditSince(since, "billing.cancel_failed");
+  ok(failed.length === 1 && failed[0].actor_kind === "merchant" && failed[0].tenant_id === A, "billing.cancel_failed on the merchant path");
+  ok(/RZP_CANARY/.test(failed[0].diff) && /"operator_only"/.test(failed[0].diff), "the error is kept operator-only");
+  ok((await auditSince(since, "billing.start")).some((x) => x.actor_kind === "merchant"), "billing.start on the merchant path");
+  const log = await store.call("owner", "audit", "GET", { query: "limit=200" });
+  ok(!log.text.includes("RZP_CANARY") && log.body.entries.some((e) => e.action === "billing.cancel_failed"), "the store's audit log shows the action, not the text");
+  // a refused new subscription on the merchant path
+  failNext.push(/^\/v1\/subscriptions$/);
+  const f = await store.call("owner", "billing", "POST", { body: { action: "subscribe", plan: "starter" } });
+  eq(f.status, 502, f.text.slice(0, 160));
+  ok(!f.text.includes("RZP_CANARY"), "no provider text");
+  const sf = await auditSince(since, "billing.start_failed");
+  ok(sf.some((x) => x.actor_kind === "merchant" && x.tenant_id === A && /PROVIDER_ERROR/.test(x.diff)), "billing.start_failed on the merchant path");
+});
+
+const D4 = "platbill-d";
+await C.upsertTenant({ id: D4, name: "Platbill D", domains: ["platbill-d.test"], dbUrl: "file:.test-platbill-d-tenant.db", config: {}, secrets: {} });
+await t("race loser: when its new Razorpay subscription can't be cancelled it is kept as a replaced row, flagged, and retried", async () => {
+  providerOn();
+  gate = { n: 0, of: 2 };
+  gate.opened = new Promise((r) => (gate.open = r));
+  failNext.push(/\/cancel$/);
+  const [x, y] = await Promise.all([op({ action: "start", tenant: D4, plan: "starter" }), op({ action: "start", tenant: D4, plan: "growth" })]);
+  gate = null;
+  eq([x.status, y.status].sort().join(","), "200,409", `${x.status} / ${y.status}`);
+  const lost = (x.status === 409 ? x : y).body.detail;
+  const won = (x.status === 200 ? x : y).body.result;
+  eq(lost.provider_cancelled, false, "the cancel failed");
+  ok(lost.kept_as, "kept as a row");
+  const row = (await db().execute({ sql: "SELECT * FROM subscriptions WHERE id = ?", args: [lost.kept_as] })).rows[0];
+  eq(`${row.replaced_by}/${row.cancel_state}`, `${won.id}/failed`, "replaced by the winner, cancel failed");
+  eq((await liveRows(D4)).length, 1, "one current row");
+  ok((await call("operator", "billing", "GET")).body.exceptions.some((e) => e.kind === "cancel_failed" && e.tenant === D4), "in the exception queue");
+  const calls = razorpay.length;
+  await tick();
+  eq((await op({ action: "start", tenant: D4, plan: "free" })).status, 200, "the next change");
+  const retry = razorpay.slice(calls).find((c) => c.path === `/v1/subscriptions/${lost.provider_subscription}/cancel`);
+  eq(retry?.body.cancel_at_cycle_end, false, "retried, now (it was never paid for)");
+  eq((await db().execute({ sql: "SELECT cancel_state s FROM subscriptions WHERE id = ?", args: [lost.kept_as] })).rows[0].s, "now", "confirmed");
+});
+
+await t("in force: an authenticated row is not paid, even with a period ahead; a failing row counts only inside a charged period", async () => {
+  const E5 = "platbill-e";
+  await C.upsertTenant({ id: E5, name: "Platbill E", domains: ["platbill-e.test"], dbUrl: "file:.test-platbill-e-tenant.db", config: {}, secrets: {} });
+  const now = new Date().toISOString();
+  const ahead = new Date(Date.now() + 20 * 86400000).toISOString();
+  await db().execute({ sql: "INSERT INTO subscriptions (id, tenant_id, plan_id, plan_version, razorpay_subscription_id, status, current_end, created_at, updated_at) VALUES ('sub_e_auth', ?, 'growth', 1, 'rz_e_auth', 'authenticated', ?, ?, ?)", args: [E5, ahead, now, now] });
+  eq((await B.entitlementsFor(E5)).plan, "free", "authenticated: not in force");
+  await db().execute({ sql: "UPDATE subscriptions SET status = 'halted', grace_until = NULL WHERE id = 'sub_e_auth'" });
+  eq((await B.entitlementsFor(E5)).plan, "free", "halted, never charged: not in force");
+  await db().execute({ sql: "INSERT INTO billing_events (id, provider_event_id, subscription_id, tenant_id, type, amount, payment_id, occurred_at, applied_at) VALUES ('bev_e1', 'evt_e1', 'sub_e_auth', ?, 'subscription.charged', 299900, 'pay_e1', ?, ?)", args: [E5, now, now] });
+  eq((await B.entitlementsFor(E5)).plan, "growth", "halted inside a charged period: in force");
+  await db().execute({ sql: "UPDATE subscriptions SET status = 'active' WHERE id = 'sub_e_auth'" });
+  eq((await B.entitlementsFor(E5)).plan, "growth", "active");
+});
+
+await t("migration 0016: on a database with duplicates the paid-up row survives; the rest are replaced and stop counting", async () => {
+  const { createClient } = await import("@libsql/client");
+  const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
+  const { rm } = await import("node:fs/promises");
+  const file = join(ROOT, ".test-platbill-mig.db");
+  await rm(file, { force: true });
+  const c = createClient({ url: "file:.test-platbill-mig.db" });
+  try {
+    await c.executeMultiple(await readFile(join(ROOT, "lib/platform/schema.sql"), "utf8"));
+    const all = await loadMigrations("platform");
+    await runMigrations(c, all.filter((m) => m.id < "0016"), {});
+    const t0 = new Date(Date.now() - 86400000).toISOString();
+    const t1 = new Date().toISOString();
+    const ahead = new Date(Date.now() + 20 * 86400000).toISOString();
+    await c.batch([
+      { sql: "INSERT INTO subscriptions (id, tenant_id, plan_id, plan_version, razorpay_subscription_id, status, current_end, created_at, updated_at) VALUES ('sub_paid', 'm1', 'starter', 1, 'rz_paid', 'active', ?, ?, ?)", args: [ahead, t0, t0] },
+      { sql: "INSERT INTO subscriptions (id, tenant_id, plan_id, plan_version, razorpay_subscription_id, status, created_at, updated_at) VALUES ('sub_unpaid', 'm1', 'growth', 1, 'rz_unpaid', 'created', ?, ?)", args: [t1, t1] },
+      { sql: "INSERT INTO subscriptions (id, tenant_id, plan_id, plan_version, status, created_at, updated_at) VALUES ('sub_local', 'm1', 'free', 1, 'active', ?, ?)", args: [t0, t0] },
+      { sql: "INSERT INTO subscriptions (id, tenant_id, plan_id, plan_version, status, created_at, updated_at) VALUES ('sub_alone', 'm2', 'free', 1, 'active', ?, ?)", args: [t1, t1] },
+    ]);
+    const r = await runMigrations(c, all, {});
+    ok(JSON.stringify(r).includes("0016_subscription_changes"), "0016 applied");
+    const rows = Object.fromEntries((await c.execute("SELECT * FROM subscriptions")).rows.map((x) => [x.id, x]));
+    eq(rows.sub_paid.replaced_by, null, "the paid row is kept");
+    eq(`${rows.sub_unpaid.replaced_by}/${rows.sub_unpaid.cancel_state}`, "sub_paid/failed", "the unpaid Razorpay row is replaced and flagged");
+    eq(`${rows.sub_local.replaced_by}/${rows.sub_local.status}`, "sub_paid/cancelled", "the extra local row ends");
+    eq(rows.sub_alone.replaced_by, null, "a store with one row is untouched");
+    const counted = (await c.execute("SELECT plan_id, COUNT(*) n FROM subscriptions WHERE replaced_by IS NULL AND status NOT IN ('cancelled','completed','expired') GROUP BY plan_id")).rows.map((x) => `${x.plan_id}:${x.n}`).sort().join(" ");
+    eq(counted, "free:1 starter:1", "replaced rows stop counting as subscribers");
+    const dup = await c.execute({ sql: "INSERT INTO subscriptions (id, tenant_id, plan_id, plan_version, status, created_at, updated_at) VALUES ('sub_x', 'm1', 'free', 1, 'active', ?, ?)", args: [t1, t1] }).then(() => "inserted", (e) => e.message);
+    ok(/UNIQUE/.test(dup), "the index holds");
+  } finally {
+    c.close();
+    await rm(file, { force: true });
+  }
 });
 
 await t("least trusted: signed out and merchant callers get 401 on every billing view and action, with no store data", async () => {

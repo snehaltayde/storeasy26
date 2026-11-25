@@ -13,6 +13,8 @@ import {
   cancelSubscription,
   listSubscriptions,
   listBillingEvents,
+  auditStart,
+  auditStartFailed,
 } from "@/lib/platform/billing";
 import { billingProviderConfigured } from "@/lib/platform/razorpay-billing";
 import { slog } from "@/lib/log";
@@ -86,10 +88,7 @@ export async function POST(request) {
       result = { plan: p.id, version: p.version, status: "retired" };
     } else if (body.action === "start") {
       const r = await startSubscription(tenantOf(body), String(body.plan || ""));
-      // what happened to each row it ended; a provider's error text is operator-only
-      const previous = r.previous.map(({ id, ended, retried = false }) => ({ id, ended, retried, cancel_failed: ended == null }));
-      const errors = r.previous.filter((p) => p.error).map(({ id, error }) => ({ id, error }));
-      await audit({ actor, action: "billing.start", resource: `subscription:${r.id}`, tenantId: tenantOf(body), diff: { plan: r.plan, status: r.status, previous, ...(errors.length ? { [OPERATOR_ONLY]: { errors } } : {}) } });
+      await auditStart({ actor, tenantId: tenantOf(body), result: r });
       // the founder's payment link is shown to the operator once, here
       result = { id: r.id, plan: r.plan, status: r.status, local: Boolean(r.local), shortUrl: r.shortUrl || null, previous: r.previous };
     } else if (body.action === "grace") {
@@ -107,12 +106,13 @@ export async function POST(request) {
     return NextResponse.json({ ok: true, result, ...(await summary()) });
   } catch (e) {
     // a start or cancel that failed part way is audited as it happened
-    if (["PROVIDER_ERROR", "BILLING_CONFLICT"].includes(e?.code) && ["start", "cancel"].includes(body.action)) {
-      const { error = null, ...detail } = e.detail || {};
-      const tenantId = body.action === "start" ? tenantOf(body) : detail.tenant || null;
-      const resource = body.action === "start" ? `store:${tenantId}` : `subscription:${detail.subscription}`;
-      await audit({ actor, action: `billing.${body.action}_failed`, resource, tenantId, diff: { code: e.code, plan: body.plan || null, ...detail, [OPERATOR_ONLY]: { error, reason: reasonOf(body) || null } } });
-      return NextResponse.json({ error: String(e.message).slice(0, 300), code: e.code, detail: e.detail || null }, { status: e.code === "BILLING_CONFLICT" ? 409 : 502 });
+    if ((["PROVIDER_ERROR", "BILLING_CONFLICT"].includes(e?.code) || e?.detail?.provider_subscription) && ["start", "cancel"].includes(body.action)) {
+      if (body.action === "start") await auditStartFailed({ actor, tenantId: tenantOf(body), plan: body.plan, error: e });
+      else {
+        const { error = null, ...detail } = e.detail || {};
+        await audit({ actor, action: "billing.cancel_failed", resource: `subscription:${detail.subscription}`, tenantId: detail.tenant || null, diff: { code: e.code, ...detail, [OPERATOR_ONLY]: { error, reason: reasonOf(body) || null } } });
+      }
+      return NextResponse.json({ error: String(e.message).slice(0, 300), code: e.code || null, detail: e.detail || null }, { status: e.code === "BILLING_CONFLICT" ? 409 : 502 });
     }
     if (e?.code === "BILLING_UNCONFIGURED") return NextResponse.json({ error: String(e.message).slice(0, 300), code: e.code }, { status: 503 });
     return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
