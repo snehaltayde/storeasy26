@@ -14,8 +14,11 @@ export function AppActivity({ rows }) {
           <ol className="divide-y divide-border text-sm">
             {rows.map((r) => (
               <li key={r.id} className="flex flex-wrap justify-between gap-2 py-2" data-activity={r.action}>
-                <span className="text-foreground">{`${ACTION_WORDS[r.action] || r.action} · ${r.who}`}</span>
-                <time dateTime={r.at} className="text-muted-foreground">
+                <span className="min-w-0 text-foreground">
+                  {ACTION_WORDS[r.action] || r.action}
+                  <span className="text-muted-foreground">{` by ${r.who}`}</span>
+                </span>
+                <time dateTime={r.at} className="shrink-0 tabular-nums text-muted-foreground">
                   {shortDate(r.at)}
                 </time>
               </li>

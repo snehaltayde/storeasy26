@@ -17,7 +17,20 @@ import { installState, shortDate } from "@/components/admin/apps/app-words";
 export function AppsList({ installs, catalog, role }) {
   const [tab, setTab] = useState(installs.length ? "installed" : "browse");
   const columns = [
-    { key: "name", header: "App" },
+    {
+      key: "name",
+      header: "App",
+      cell: (r) => (
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate">{r.name}</span>
+          {r.kind === "custom" && (
+            <Badge variant="outline" className="shrink-0">
+              Custom
+            </Badge>
+          )}
+        </span>
+      ),
+    },
     {
       key: "status",
       header: "Status",

@@ -31,7 +31,7 @@ export const ACTION_WORDS = Object.freeze({
   "apps.secret_rotated": "Changed the signing secret",
   "apps.endpoint_paused": "Paused webhooks",
   "apps.endpoint_resumed": "Resumed webhooks",
-  "apps.endpoint_auto_paused": "Webhooks paused by Storeasy",
+  "apps.endpoint_auto_paused": "Webhooks paused automatically",
   "apps.test_event_sent": "Sent a test event",
   "apps.delivery_resent": "Sent a delivery again",
   // Phase 4 line 4: API access

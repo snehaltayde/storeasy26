@@ -33,7 +33,7 @@ const plainOf = (settings, values) => Object.fromEntries(settings.filter((s) => 
 function FieldError({ id, children }) {
   if (!children) return null;
   return (
-    <p id={id} className="text-xs text-destructive" data-field-error>
+    <p id={id} className="text-[13px] text-destructive" data-field-error>
       {children}
     </p>
   );
@@ -170,7 +170,7 @@ export function AppSettingsForm({ install, settings, role, onSaved }) {
                       {x.clear ? "Removed when you save" : isSet ? "Saved" : "Not set"}
                     </Badge>
                   </div>
-                  {s.help && <p className="text-xs text-muted-foreground">{s.help}</p>}
+                  {s.help && <p className="text-[13px] text-muted-foreground">{s.help}</p>}
                   {x.editing ? (
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <Input id={id} type="password" autoComplete="off" value={x.value || ""} maxLength={s.max ?? 500} onChange={(e) => setSecrets((m) => ({ ...m, [s.key]: { editing: true, value: e.target.value } }))} aria-describedby={errors[s.key] ? `${id}-error` : undefined} aria-invalid={Boolean(errors[s.key])} />
@@ -203,7 +203,7 @@ export function AppSettingsForm({ install, settings, role, onSaved }) {
               return (
                 <fieldset key={s.key} className="space-y-3" data-setting={s.key}>
                   <legend className="text-sm font-medium text-foreground">{labelOf(s)}</legend>
-                  <p className="text-xs text-muted-foreground">{`${items.length} of ${s.max}`}</p>
+                  <p className="text-[13px] text-muted-foreground">{`${items.length} of ${s.max}`}</p>
                   <FieldError id={`${id}-error`}>{errors[s.key]}</FieldError>
                   <ol className="space-y-3">
                     {items.map((item, i) => (
@@ -239,10 +239,25 @@ export function AppSettingsForm({ install, settings, role, onSaved }) {
                 </fieldset>
               );
             }
+            if (s.kind === "boolean") {
+              // label and help on the left, the switch on the right, the problem under both
+              return (
+                <div key={s.key} className="space-y-1" data-setting={s.key}>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 space-y-1">
+                      <Label htmlFor={id}>{labelOf(s)}</Label>
+                      {s.help && <p className="text-[13px] text-muted-foreground">{s.help}</p>}
+                    </div>
+                    <PlainControl s={s} id={id} value={values[s.key]} onChange={(v) => set(s.key, v)} disabled={!canManage} error={errors[s.key]} />
+                  </div>
+                  <FieldError id={`${id}-error`}>{errors[s.key]}</FieldError>
+                </div>
+              );
+            }
             return (
-              <div key={s.key} className={s.kind === "boolean" ? "flex items-center justify-between gap-4" : "space-y-1"} data-setting={s.key}>
+              <div key={s.key} className="space-y-1.5" data-setting={s.key}>
                 <Label htmlFor={id}>{labelOf(s)}</Label>
-                {s.help && <p className="text-xs text-muted-foreground">{s.help}</p>}
+                {s.help && <p className="text-[13px] text-muted-foreground">{s.help}</p>}
                 <PlainControl s={s} id={id} value={values[s.key]} onChange={(v) => set(s.key, v)} disabled={!canManage} error={errors[s.key]} />
                 <FieldError id={`${id}-error`}>{errors[s.key]}</FieldError>
               </div>

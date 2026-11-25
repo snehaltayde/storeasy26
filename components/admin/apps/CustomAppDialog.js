@@ -65,7 +65,7 @@ export function CustomAppDialog({ role }) {
         </Button>
       </RoleGate>
       <Dialog open={open} onOpenChange={(v) => !busy && change(v)}>
-        <DialogContent data-apps="custom-dialog" className="sm:max-w-lg">
+        <DialogContent data-apps="custom-dialog" className="sm:max-w-lg" onInteractOutside={made ? (e) => e.preventDefault() : undefined}>
           {made ? (
             <>
               <DialogHeader>
@@ -100,7 +100,7 @@ export function CustomAppDialog({ role }) {
                 <Label htmlFor="custom-app-name">Name</Label>
                 <Input id="custom-app-name" value={form.name} maxLength={60} onChange={(e) => setForm({ ...form, name: e.target.value })} aria-invalid={Boolean(errors.name) || undefined} aria-describedby={errors.name ? "custom-app-name-error" : undefined} />
                 {errors.name && (
-                  <p id="custom-app-name-error" className="text-sm text-destructive">
+                  <p id="custom-app-name-error" className="text-[13px] text-destructive">
                     {errors.name}
                   </p>
                 )}
@@ -108,7 +108,7 @@ export function CustomAppDialog({ role }) {
               <div className="space-y-1.5">
                 <Label htmlFor="custom-app-url">Webhook address</Label>
                 <Input id="custom-app-url" type="url" inputMode="url" placeholder="https://example.com/webhooks" className="font-mono" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} aria-invalid={Boolean(errors.url) || undefined} aria-describedby="custom-app-url-hint" />
-                <p id="custom-app-url-hint" className={errors.url ? "text-sm text-destructive" : "text-[13px] text-muted-foreground"}>
+                <p id="custom-app-url-hint" className={errors.url ? "text-[13px] text-destructive" : "text-[13px] text-muted-foreground"}>
                   {errors.url || "A public HTTPS address. Storeasy only ever sends to this host."}
                 </p>
               </div>
@@ -123,7 +123,7 @@ export function CustomAppDialog({ role }) {
                     </Label>
                   </div>
                 ))}
-                {errors.topics && <p className="text-sm text-destructive">{errors.topics}</p>}
+                {errors.topics && <p className="text-[13px] text-destructive">{errors.topics}</p>}
               </fieldset>
               <section aria-labelledby="custom-perms" className="space-y-2">
                 <h3 id="custom-perms" className="text-sm font-medium text-foreground">

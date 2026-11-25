@@ -69,9 +69,9 @@ export function AppDangerZone({ install, role, onChanged }) {
         <CardTitle>Danger zone</CardTitle>
         <CardDescription>Turning an app off keeps its settings. Uninstalling clears them.</CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-wrap gap-2">
+      <CardContent className="flex flex-wrap items-center gap-2">
         {blockedOn ? (
-          <Button type="button" variant="outline" disabled data-apps-action="enable">
+          <Button type="button" variant="outline" disabled aria-describedby="app-turn-on-blocked" data-apps-action="enable">
             Turn on
           </Button>
         ) : (
@@ -86,6 +86,11 @@ export function AppDangerZone({ install, role, onChanged }) {
             Uninstall
           </Button>
         </RoleGate>
+        {blockedOn && (
+          <p id="app-turn-on-blocked" className="basis-full text-[13px] text-muted-foreground">
+            You can turn it on again once Storeasy allows it.
+          </p>
+        )}
       </CardContent>
       <AlertDialog open={Boolean(asking)} onOpenChange={(v) => !v && !busy && setAsking(null)}>
         <AlertDialogContent data-apps="confirm">

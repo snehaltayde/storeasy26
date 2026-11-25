@@ -9,12 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
 import { RoleGate } from "@/components/kit/role-gate";
 import { useToast } from "@/components/kit/toast";
+import { roleAllows } from "@/lib/platform/authz";
 import { AppRefusal } from "@/components/admin/apps/AppRefusal";
 import { SecretOnce } from "@/components/admin/apps/SecretOnce";
 import { DeliveriesTable } from "@/components/admin/apps/DeliveriesTable";
+import { CardLoading } from "@/components/admin/apps/CardLoading";
 import { NO_MANAGE, postApp, shortDate } from "@/components/admin/apps/app-words";
 
 // An app's Webhooks card (Phase 4 line 3), read from
@@ -96,12 +97,13 @@ export function WebhooksCard({ install, role }) {
         </CardContent>
       </Card>
     ) : install.kind === "custom" ? (
-      <Skeleton className="h-48 w-full" />
+      <CardLoading title="Webhooks" />
     ) : null;
   }
   const ep = view.endpoint;
   if (!ep && !view.deliveries.length && !filters.status && !filters.topic) return null;
   const paused = ep?.status === "paused";
+  const testWhy = roleAllows(role, "apps.manage") && (paused || install.status !== "enabled");
 
   return (
     <Card data-apps="webhooks">
@@ -188,7 +190,7 @@ export function WebhooksCard({ install, role }) {
                 </Button>
               </RoleGate>
               <RoleGate role={role} action="apps.manage" reason={NO_MANAGE}>
-                <Button type="button" variant="outline" size="sm" disabled={paused || install.status !== "enabled" || busy === "test"} data-webhooks-action="test" onClick={() => act("test", { test: true }, "A test event is on its way.")}>
+                <Button type="button" variant="outline" size="sm" disabled={paused || install.status !== "enabled" || busy === "test"} aria-describedby={testWhy ? "webhook-test-why" : undefined} data-webhooks-action="test" onClick={() => act("test", { test: true }, "A test event is on its way.")}>
                   <Send aria-hidden="true" />
                   {busy === "test" ? "Sending…" : "Send test event"}
                 </Button>
@@ -206,6 +208,11 @@ export function WebhooksCard({ install, role }) {
                 </Button>
               </RoleGate>
             </div>
+            {testWhy && (
+              <p id="webhook-test-why" className="text-[13px] text-muted-foreground">
+                {paused ? "Resume sending to send a test event." : "Turn the app on to send a test event."}
+              </p>
+            )}
           </div>
         )}
         <DeliveriesTable view={view} installId={install.id} role={role} filters={filters} onFilter={filter} onChanged={() => load()} loading={loading} />

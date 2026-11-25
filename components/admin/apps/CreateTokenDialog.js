@@ -57,7 +57,7 @@ export function CreateTokenDialog({ open, onOpenChange, installId, view, onCreat
 
   return (
     <Dialog open={open} onOpenChange={(v) => !busy && change(v)}>
-      <DialogContent data-apps="token-dialog" className="sm:max-w-lg">
+      <DialogContent data-apps="token-dialog" className="sm:max-w-lg" onInteractOutside={made ? (e) => e.preventDefault() : undefined}>
         {made ? (
           <>
             <DialogHeader>
@@ -68,7 +68,7 @@ export function CreateTokenDialog({ open, onOpenChange, installId, view, onCreat
               <Alert variant="warning">
                 <KeyRound aria-hidden="true" />
                 <AlertTitle>Copy the token now</AlertTitle>
-                <AlertDescription>This is the only time it's shown. Storeasy keeps only a fingerprint of it, so it can't be shown again. If you lose it, revoke it and create a new one.</AlertDescription>
+                <AlertDescription>You won't see it again after you close this. Storeasy keeps only a fingerprint of it. If you lose it, revoke it and create a new one.</AlertDescription>
               </Alert>
               <CopyButton value={made.secret} label="the API token" id="api-token" />
             </div>

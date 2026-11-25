@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
 import { DataTable } from "@/components/kit/data-table";
 import { EmptyState } from "@/components/kit/empty-state";
 import { RoleGate } from "@/components/kit/role-gate";
@@ -17,6 +16,7 @@ import { roleAllows } from "@/lib/platform/authz";
 import { AppRefusal } from "@/components/admin/apps/AppRefusal";
 import { CreateTokenDialog } from "@/components/admin/apps/CreateTokenDialog";
 import { CallLog } from "@/components/admin/apps/CallLog";
+import { CardLoading } from "@/components/admin/apps/CardLoading";
 import { NO_MANAGE, postApp, shortDate } from "@/components/admin/apps/app-words";
 
 // A custom app's API access (Phase 4 line 4), read from
@@ -111,7 +111,7 @@ export function ApiAccessCard({ install, role }) {
         </CardContent>
       </Card>
     ) : (
-      <Skeleton className="h-48 w-full" />
+      <CardLoading title="API access" />
     );
   }
 
@@ -127,7 +127,16 @@ export function ApiAccessCard({ install, role }) {
         </span>
       ),
     },
-    { key: "createdAt", header: "Created", cell: (k) => `${when(k.createdAt)}${k.createdByName ? ` by ${k.createdByName}` : ""}` },
+    {
+      key: "createdAt",
+      header: "Created",
+      cell: (k) => (
+        <span className="block leading-snug">
+          {when(k.createdAt)}
+          {k.createdByName && <span className="block text-xs text-muted-foreground">{`by ${k.createdByName}`}</span>}
+        </span>
+      ),
+    },
     { key: "expiresAt", header: "Expires", cell: (k) => when(k.expiresAt) },
     { key: "lastUsedAt", header: "Last used", cell: (k) => (k.lastUsedAt ? when(k.lastUsedAt) : <span className="text-muted-foreground">Never</span>) },
     {
@@ -235,7 +244,7 @@ export function ApiAccessCard({ install, role }) {
             rowActions={(k) =>
               k.status === "revoked" ? null : (
                 <RoleGate role={role} action="apps.manage" reason={NO_MANAGE}>
-                  <Button type="button" variant="ghost" size="sm" data-token-revoke={k.id} onClick={() => setRevoking(k)}>
+                  <Button type="button" variant="ghost" size="sm" className="text-destructive hover:text-destructive" data-token-revoke={k.id} onClick={() => setRevoking(k)}>
                     Revoke
                   </Button>
                 </RoleGate>
