@@ -1,3 +1,12 @@
+// A READ_POSTS row's page is a route pattern: a [name] segment matches one
+// path segment (/admin/offers/[id] matches /admin/offers/ofr_1, never
+// /admin/offers or /admin/offers/a/b); every other part matches exactly.
+export function routeMatches(pattern, path) {
+  if (typeof pattern !== "string" || typeof path !== "string") return false;
+  const re = pattern.split(/(\[[^\]/]+\])/).map((part) => (/^\[[^\]/]+\]$/.test(part) ? "[^/]+" : part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))).join("");
+  return new RegExp(`^${re}$`).test(path);
+}
+
 // Files outside components/kit/ that may mark a control data-read-control
 // (support's stray-control rule on a new-UI route lets a marked control pass).
 // test:console-kit fails a mark outside components/kit/ without a row here,
@@ -40,9 +49,11 @@ export const READ_CONTROLS = [
   { path: "components/admin/catalog/CollectionsTable.js", reason: "a collection's title opens its products in a sheet, and Try again re-reads the list: GET reads", marks: 2 },
 ];
 
-// Reads sent as a non-GET request: { page, method, path, reason }, an exact
-// match (the shell drill's readPost; scripts/drills/offers/run.mjs reads a
-// page's [id] as one path segment). Phase 2 lines append rows; keep both sides.
+// Reads sent as a non-GET request: { page, method, path, reason }. page is a
+// route pattern (routeMatches above); method and path match exactly (the
+// shell drill's readPost). test:console-kit refuses a row without a reason, a
+// GET row, and one whose path is the page itself (that would let a Server
+// Action POST to the page through). Phase 2 lines append rows; keep both sides.
 // test:media-library proves the media row is the usage read: storefront.read, writes nothing.
 export const READ_POSTS = [
   { page: "/admin/offers/[id]", method: "POST", path: "/api/admin/offers/simulate", reason: "the offer simulator (Phase 2 line 4): offers.read, example carts worked out in memory, nothing stored (scripts/support/admin-routes.js marks it a read)" },

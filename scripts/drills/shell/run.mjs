@@ -74,8 +74,9 @@ const ORIGIN = `http://roles.localhost:${port}`;
 const ANNEX = `http://annex.localhost:${port}`;
 const seed = () => JSON.parse(readFileSync(join(ROOT, ".design-data-roles", "roles-seed.json"), "utf8"));
 
-// In the page: interactive elements that are not nav links or allowlisted
-// shell controls, outside [data-legacy] (an old route) or anywhere (a new-UI
+// In the page: interactive elements (contenteditable regions and ARIA
+// switches, checkboxes, tabs and options count, native buttons or not) that
+// are not nav links or allowlisted shell controls, outside [data-legacy] (an old route) or anywhere (a new-UI
 // route, lib/admin/new-ui-routes.js: the rule covers the whole of main). On a
 // new-UI route a control also passes when it carries data-read-control itself
 // (never through an ancestor), is natively disabled, or is RoleGate's
@@ -83,7 +84,7 @@ const seed = () => JSON.parse(readFileSync(join(ROOT, ".design-data-roles", "rol
 // guards (an empty span[data-radix-focus-guard] with tabindex="0" around a
 // sheet, select or dialog) are not controls; anything else in a portal is.
 function strayControls([allowed, newUi]) {
-  const q = 'a[href], button, input, select, textarea, summary, label[for], [role="button"], [role="menuitem"], [role="link"], [onclick], [tabindex]:not([tabindex="-1"])';
+  const q = 'a[href], button, input, select, textarea, summary, label[for], [contenteditable]:not([contenteditable="false"]), [role="button"], [role="menuitem"], [role="link"], [role="switch"], [role="checkbox"], [role="tab"], [role="option"], [onclick], [tabindex]:not([tabindex="-1"])';
   const passes = (el) => newUi && (el.hasAttribute("data-read-control") || el.disabled === true || (el.getAttribute("aria-disabled") === "true" && el.getAttribute("data-role-gate") === "disabled"));
   const focusGuard = (el) => el.matches("span[data-radix-focus-guard]") && el.getAttribute("tabindex") === "0" && el.textContent === "" && el.children.length === 0;
   return [...document.querySelectorAll(q)]
@@ -127,20 +128,31 @@ function implicitSubmits() {
 //   - each RoleGate-disabled control: mouse-click it and press Enter and Space
 //     on it: no non-GET request, no navigation
 //   - each enabled text field: press Enter in it: no non-GET request
-//   - every non-GET request any page of the context sends during the pass
-//     counts (workers, popups and new tabs included; no Referer is trusted),
-//     until the tab navigates to a different path: a read link's destination
-//     gets its own pass. Skipped only: an exact READ_POSTS row
-//     (scripts/support/read-controls.js, a read sent as POST: { page, method,
-//     path, reason }), and Next's dev error overlay (POST
-//     /__nextjs_*) when the server is a dev server (its page opened the HMR
-//     socket), never against a production build.
+//   - every non-GET request any page of the context sends counts (workers,
+//     popups and new tabs included; no Referer is trusted) while the tab's
+//     document is the page under test: from that document's first request
+//     until the next document's first request. A same-document pushState or
+//     replaceState (a Next <Link> soft navigation included) does not end it:
+//     a control could pushState away, POST and pushState back, and anything a
+//     soft navigation sends was started by this page's own click. Each
+//     document's first request is the drill's sentinel (an init script's GET
+//     /__shell-drill-doc?p=<path>, answered by page.route, never by Next), so a
+//     write the old document sends while it unloads still counts. A read link
+//     that loads another document gets its own pass. Skipped only: a
+//     READ_POSTS row for this page (scripts/support/read-controls.js, a read
+//     sent as POST: { page (a route pattern), method, path, reason }), and
+//     Next's dev error overlay (POST /__nextjs_*) when the server is a dev
+//     server (its page opened the HMR socket), never against a production build.
 //   - and, as a second witness, the server's own request log (the roles
-//     store's Next log in DRILL_LOG_DIR, when the server logs requests, as
-//     next dev does): every non-GET line written while the tab is on the page
-//     under test counts too. It sees what the browser events can miss: a
-//     request from a dedicated worker, or from a popup before Playwright
-//     attaches to it.
+//     store's Next log in DRILL_LOG_DIR; drill:shell refuses to run without
+//     it): every non-GET line written during the pass that the browser did
+//     not see sent counts too. It sees what the browser events miss: a
+//     sendBeacon or keepalive fetch sent from pagehide (Chromium reports
+//     neither, and they bypass page.route), a request from a dedicated
+//     worker, or from a popup before Playwright attaches to it. Before the
+//     pass reads the log it waits until no request is pending and the log
+//     has stopped growing, and the pass must find its own GET <target> line
+//     there (a log format drift or a missing log fails loudly).
 // Returns what it found; the caller checks.
 const READ_POSTS = RC.READ_POSTS ?? [];
 const NEXT_LOG = process.env.DRILL_LOG_DIR ? join(process.env.DRILL_LOG_DIR, "design-data-roles-next.log") : null;
@@ -152,14 +164,24 @@ const logSize = () => {
   }
 };
 // The self-test pages never reach Next: the drill's own route answers them,
-// so it is their server and keeps their log here ({ method, path }).
+// so it is their server and keeps their log here ({ method, path }), written
+// when the response is sent, as Next writes its line.
 const SELFTEST_SERVER_LOG = [];
 const serverMark = () => ({ next: logSize(), own: SELFTEST_SERVER_LOG.length });
-// the server's non-GET request lines between two marks: [{ method, path }]
-function loggedWrites(from, to) {
-  return [...nextLogWrites(from.next, to.next), ...SELFTEST_SERVER_LOG.slice(from.own, to.own).filter((w) => w.method !== "GET" && w.method !== "HEAD")];
+// next dev's request lines (colour codes stripped): [{ method, path }]
+const LOG_LINE = /^\s*(GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS) (\/\S*) \d{3} in \d/gm;
+function parseNextLog(text) {
+  return [...text.replace(/\u001b\[[0-9;]*m/g, "").matchAll(LOG_LINE)].map((m) => ({ method: m[1], path: m[2].split("?")[0] }));
 }
-function nextLogWrites(from, to) {
+// Lines from a real Next 16.2.9 dev log (a drill:shell run's server.log,
+// 2026-11-24), byte for byte: parseNextLog must read each.
+const CAPTURED_NEXT_LOG = [
+  " GET /admin/dashboard 200 in 674ms (next.js: 40ms, application-code: 635ms)",
+  " POST /api/admin/login 200 in 39ms (next.js: 833µs, application-code: 38ms)",
+  " PUT /api/admin/documents 200 in 9ms (next.js: 785µs, application-code: 9ms)",
+].join("\n");
+const CAPTURED_PARSED = [{ method: "GET", path: "/admin/dashboard" }, { method: "POST", path: "/api/admin/login" }, { method: "PUT", path: "/api/admin/documents" }];
+function nextLogLines(from, to) {
   if (!NEXT_LOG || to <= from) return [];
   const buf = Buffer.alloc(to - from);
   const fd = openSync(NEXT_LOG, "r");
@@ -168,52 +190,80 @@ function nextLogWrites(from, to) {
   } finally {
     closeSync(fd);
   }
-  // strip colour codes; next dev logs " POST /api/x 403 in 12ms"
-  const text = buf.toString("utf8").replace(/\u001b\[[0-9;]*m/g, "");
-  return [...text.matchAll(/^\s*(POST|PUT|PATCH|DELETE) (\/\S*) \d{3}\b/gm)].map((m) => ({ method: m[1], path: m[2].split("?")[0] }));
+  return parseNextLog(buf.toString("utf8"));
 }
-const readPost = (page, method, path) => READ_POSTS.some((r) => r.page === page && r.method === method && r.path === path);
+// the server's request lines between two marks: [{ method, path }]
+const loggedRequests = (from, to) => [...nextLogLines(from.next, to.next), ...SELFTEST_SERVER_LOG.slice(from.own, to.own)];
+const WRITE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const readPost = (page, method, path) => READ_POSTS.some((r) => RC.routeMatches(r.page, page) && r.method === method && r.path === path);
+// Each document's first request: an init script on the tab under test asks
+// for DOC_SENTINEL with its path; page.route answers it (it never reaches the
+// server). Once per tab.
+const DOC_SENTINEL = "/__shell-drill-doc";
+const sentinelled = new WeakSet();
+async function addDocSentinel(page) {
+  if (sentinelled.has(page)) return;
+  sentinelled.add(page);
+  await page.route((u) => u.pathname === DOC_SENTINEL, (route) => route.fulfill({ status: 204, body: "" }));
+  await page.addInitScript((path) => {
+    if (window.top === window && location.protocol.startsWith("http")) fetch(`${path}?p=${encodeURIComponent(location.pathname)}`, { cache: "no-store" }).catch(() => {});
+  }, DOC_SENTINEL);
+}
+async function untilQuiet(page, pending) {
+  for (let t = 0; pending.size && t < 100; t++) await page.waitForTimeout(100);
+  let size = logSize();
+  for (let t = 0; t < 50; t++) {
+    await page.waitForTimeout(250);
+    const now = logSize();
+    if (now === size && t >= 1) break;
+    size = now;
+  }
+}
 async function supportNewUiControls(page, href) {
   const writes = [];
   const target = new URL(ORIGIN + href).pathname;
   const ctx = page.context();
-  let counting = false;
+  await addDocSentinel(page);
+  let counting = false; // the tab's current document is the page under test
   let devServer = false;
   const popups = [];
-  let logFrom = null; // the server log's offset when the tab came onto the page under test
+  const seen = []; // every non-GET request the browser reported during the pass: { method, path }
+  const pending = new Set();
+  const passFrom = serverMark();
   const skip = (method, path) => (devServer && path.startsWith("/__nextjs")) || readPost(target, method, path);
-  const closeLogWindow = () => {
-    if (logFrom == null) return;
-    for (const w of loggedWrites(logFrom, serverMark())) if (!skip(w.method, w.path)) writes.push(`${w.method} ${w.path} (server log)`);
-    logFrom = null;
-  };
-  const onNavigated = (frame) => {
-    if (frame !== page.mainFrame()) return;
-    counting = new URL(frame.url()).pathname === target;
-    if (counting && logFrom == null) logFrom = serverMark();
-    if (!counting) closeLogWindow();
-  };
   const onSocket = (ws) => {
     if (/\/_next\/webpack-hmr/.test(ws.url())) devServer = true;
   };
   const onRequest = (req) => {
-    if (!counting || req.method() === "GET" || req.method() === "HEAD") return;
-    const path = new URL(req.url()).pathname;
-    if (skip(req.method(), path)) return;
-    writes.push(`${req.method()} ${path}`);
+    const url = new URL(req.url());
+    if (url.pathname === DOC_SENTINEL) {
+      let main = false;
+      try {
+        main = req.frame() === page.mainFrame();
+      } catch {}
+      if (main) counting = url.searchParams.get("p") === target;
+      return;
+    }
+    pending.add(req);
+    if (req.method() === "GET" || req.method() === "HEAD") return;
+    seen.push({ method: req.method(), path: url.pathname });
+    if (!counting || skip(req.method(), url.pathname)) return;
+    writes.push(`${req.method()} ${url.pathname}`);
   };
+  const onDone = (req) => pending.delete(req);
   const onPage = (p) => {
     if (p !== page) popups.push(p);
   };
-  const found = { at: [], unsafe: [], implicit: [], revealed: [], moved: [], writes, reads: 0, dialogReads: 0, gated: 0, fields: 0 };
+  const found = { at: [], unsafe: [], implicit: [], revealed: [], moved: [], writes, reads: 0, dialogReads: 0, gated: 0, fields: 0, logged: [], logSeen: false, pending: [] };
   const fresh = async () => {
     await page.goto(ORIGIN + href, { waitUntil: "load" });
     await settle(page);
     if (page.url() !== ORIGIN + href) found.at.push(page.url());
   };
-  page.on("framenavigated", onNavigated);
   page.on("websocket", onSocket);
   ctx.on("request", onRequest);
+  ctx.on("requestfinished", onDone);
+  ctx.on("requestfailed", onDone);
   ctx.on("page", onPage);
   try {
     await fresh();
@@ -276,12 +326,29 @@ async function supportNewUiControls(page, href) {
       await page.keyboard.press("Enter");
       await page.waitForTimeout(500);
     }
-    await page.waitForTimeout(300); // a write sent on the way out still lands in the count
-    closeLogWindow();
+    // the pass's window closes once nothing is in flight and the log is still;
+    // leaving for about:blank first lets the page's own pagehide writes land
+    // in this pass, not the next one's
+    await untilQuiet(page, pending);
+    await page.goto("about:blank");
+    await untilQuiet(page, pending);
+    found.pending = [...pending].map((r) => `${r.method()} ${new URL(r.url()).pathname}`);
+    const own = target.startsWith(SELFTEST);
+    found.logged = own ? SELFTEST_SERVER_LOG.slice(passFrom.own) : nextLogLines(passFrom.next, logSize());
+    found.logSeen = found.logged.some((l) => l.method === "GET" && l.path === target);
+    // a server line the browser saw sent was counted (or excused) above; the rest are writes it could not see
+    const unmatched = [...seen];
+    for (const l of loggedRequests(passFrom, serverMark())) {
+      if (!WRITE.has(l.method)) continue;
+      const i = unmatched.findIndex((x) => x.method === l.method && x.path === l.path);
+      if (i >= 0) unmatched.splice(i, 1);
+      else if (!skip(l.method, l.path)) writes.push(`${l.method} ${l.path} (server log, not seen by the browser)`);
+    }
   } finally {
-    page.off("framenavigated", onNavigated);
     page.off("websocket", onSocket);
     ctx.off("request", onRequest);
+    ctx.off("requestfinished", onDone);
+    ctx.off("requestfailed", onDone);
     ctx.off("page", onPage);
     for (const p of popups) await p.close().catch(() => {});
   }
@@ -294,6 +361,8 @@ const checkNewUi = (check, href, f) => {
   check(f.revealed.length === 0, `${href}: clicking support's ${f.reads} marked read(s) and ${f.dialogReads} read(s) inside the dialogs they open reveals no write control anywhere (menus and popovers included)`, f.revealed);
   check(f.writes.length === 0, `${href}: support's reads, ${f.gated} gated control(s) (click, Enter, Space) and ${f.fields} field(s) (Enter) send no non-GET request`, f.writes);
   check(f.moved.length === 0, `${href}: support's gated controls do not navigate`, f.moved);
+  check(f.logSeen, `${href}: the pass found its own GET ${new URL(ORIGIN + href).pathname} line in the Next log (${NEXT_LOG})`, f.logged.slice(0, 20));
+  check(f.pending.length === 0, `${href}: no request was still pending when the pass closed`, f.pending);
 };
 
 // New-UI routes whose query changes what the page shows: support's pass runs
@@ -329,16 +398,37 @@ const SELFTEST_PAGES = {
   "window-open": `<main><button type="button" data-read-control onclick="window.open('${SELFTEST}/posts-on-load','_blank')">Open</button></main>`,
   // a Radix portal: its empty focus guards are not controls; a button in it is,
   // and so is a "guard" with text
+  // pushState away, POST, pushState back (one document all along): caught
+  "push-round-trip": `<main><button type="button" data-read-control onclick="history.pushState({},'','${SELFTEST}/elsewhere');fetch('${SELFTEST}/w',{method:'POST'}).then(()=>history.pushState({},'','${SELFTEST}/push-round-trip'))">Open</button></main>`,
+  // a write sent while the page unloads: Chromium reports neither to
+  // Playwright and both bypass page.route, so they reach Next (a 404 line in
+  // its log), the only witness
+  beacon: `<main><a href="${SELFTEST}/landing" data-read-control>Open</a><script>addEventListener('pagehide',()=>navigator.sendBeacon('${SELFTEST}/w'))</script></main>`,
+  "keepalive-pagehide": `<main><a href="${SELFTEST}/landing" data-read-control>Open</a><script>addEventListener('pagehide',()=>fetch('${SELFTEST}/w',{method:'POST',keepalive:true}))</script></main>`,
+  landing: `<main><p>Landed</p></main>`,
+  // Enter in the field (the pass's last step) starts a write the server
+  // answers (and logs) 2 s later: the pass waits for it
+  "slow-write": `<main><input name="n" onkeydown="if(event.key==='Enter')fetch('${SELFTEST}/slow',{method:'POST'})"></main>`,
+  // controls with no tabindex the finder must still see; contenteditable=false is not one
+  "finder": `<main><button type="button" data-read-control onclick="document.body.insertAdjacentHTML('beforeend','<div contenteditable>Bio</div><div role=switch>On</div><div role=checkbox>Pick</div><div role=tab>Tab</div><div role=option>Opt</div><div contenteditable=false>No</div>')">More</button></main>`,
   "radix-portal": `<main><button type="button" data-read-control onclick="document.body.insertAdjacentHTML('beforeend','<div data-radix-portal><span data-radix-focus-guard tabindex=0></span><div role=dialog><button>Delete store</button><span data-radix-focus-guard tabindex=0>x</span></div><span data-radix-focus-guard tabindex=0></span></div>')">More</button></main>`,
 };
 async function supportSelfTest(drill, ctx) {
   const page = await ctx.newPage();
-  await ctx.route(`${ORIGIN}${SELFTEST}/**`, (route) => {
-    SELFTEST_SERVER_LOG.push({ method: route.request().method(), path: new URL(route.request().url()).pathname });
-    const name = new URL(route.request().url()).pathname.split("/").pop();
-    return route.fulfill(SELFTEST_PAGES[name] ? { status: 200, contentType: "text/html", body: `<!doctype html><html><body>${SELFTEST_PAGES[name]}</body></html>` } : { status: 204, body: "" });
+  await ctx.route(`${ORIGIN}${SELFTEST}/**`, async (route) => {
+    const entry = { method: route.request().method(), path: new URL(route.request().url()).pathname };
+    const name = entry.path.split("/").pop();
+    if (name === "slow") await new Promise((r) => setTimeout(r, 2000));
+    await route.fulfill(SELFTEST_PAGES[name] ? { status: 200, contentType: "text/html", body: `<!doctype html><html><body>${SELFTEST_PAGES[name]}</body></html>` } : { status: 204, body: "" }).catch(() => {});
+    SELFTEST_SERVER_LOG.push(entry);
   });
-  const run = (name) => supportNewUiControls(page, `${SELFTEST}/${name}`);
+  drill.check(JSON.stringify(parseNextLog(CAPTURED_NEXT_LOG)) === JSON.stringify(CAPTURED_PARSED), "self-test: the log reader reads real Next 16 dev log lines", parseNextLog(CAPTURED_NEXT_LOG));
+  const passes = [];
+  const run = async (name) => {
+    const f = await supportNewUiControls(page, `${SELFTEST}/${name}`);
+    passes.push([name, f.logSeen, f.pending]);
+    return f;
+  };
   const menu = await run("menu");
   drill.check(menu.revealed.some((x) => x.includes("Delete store")), "self-test: a write item a marked read reveals in a menu is caught", menu);
   const fake = await run("fake-gate");
@@ -361,6 +451,17 @@ async function supportSelfTest(drill, ctx) {
   }
   const portal = await run("radix-portal");
   drill.check(portal.revealed.length === 2 && portal.revealed.some((x) => x.includes("Delete store")) && portal.revealed.some((x) => x.includes('span "x"')), "self-test: in a Radix portal a real button (and a focus guard with text) is caught; the empty focus guards are not", portal.revealed);
+  const push = await run("push-round-trip");
+  drill.check(push.writes.includes(`POST ${SELFTEST}/w`), "self-test: a POST between a pushState away and a pushState back is caught (only a new document ends the count)", push);
+  for (const name of ["beacon", "keepalive-pagehide"]) {
+    const f = await run(name);
+    drill.check(f.writes.some((x) => x.startsWith(`POST ${SELFTEST}/w (server log`)), `self-test: a ${name === "beacon" ? "sendBeacon" : "keepalive fetch"} sent on pagehide is caught (by the Next log)`, f);
+  }
+  const slow = await run("slow-write");
+  drill.check(slow.pending.length === 0 && slow.logged.some((l) => l.method === "POST" && l.path === `${SELFTEST}/slow`), "self-test: the pass waits for a write still in flight and for its server log line", slow);
+  const finder = await run("finder");
+  drill.check(["Bio", "On", "Pick", "Tab", "Opt"].every((n) => finder.revealed.some((x) => x.endsWith(`"${n}"`))) && !finder.revealed.some((x) => x.endsWith('"No"')), "self-test: contenteditable and role=switch, checkbox, tab and option (not native buttons) are controls; contenteditable=false is not", finder.revealed);
+  drill.check(passes.every(([, logSeen, pending]) => logSeen && pending.length === 0), "self-test: every pass found its own GET line in its server's log, with nothing pending at its close", passes);
   drill.check(gatedForm.revealed.length === 0 && (await (async () => { await page.goto(`${ORIGIN}${SELFTEST}/gated-form`); return (await page.evaluate(strayControls, [CONTROLS, true])).length; })()) === 1, "self-test: its editable field is still a stray control for support", gatedForm);
   await page.close();
 }
@@ -764,6 +865,7 @@ async function seedMedia(drill, page) {
 
 async function shell(drill) {
   if (!port) throw new Error("drill:shell needs ROLES_PORT (run it as pnpm drill:shell).");
+  if (!NEXT_LOG) throw new Error("drill:shell needs DRILL_LOG_DIR (the roles store's Next log is the support pass's second witness; run it as pnpm drill:shell).");
   const s = seed();
   const out = { rows: [], supportWrites: [] };
   const pages = {};

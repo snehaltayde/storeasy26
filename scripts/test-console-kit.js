@@ -24,7 +24,10 @@
 //      not method="get"; outside components/kit/ only in a file with a reasoned
 //      row in scripts/support/read-controls.js
 //      (a submit or image type, a dynamic type, a spread, form=/formAction
-//      are unsafe too)
+//      are unsafe too); a mark moved to another file is caught by the rows'
+//      counts (one moved within a file is not: only drill:shell's click pass
+//      sees that); every READ_POSTS row has a reason, a non-GET method, a page
+//      pattern (routeMatches) and a path that is never the page itself
 //   9. every <RoleGate> in app/ and components/ wraps a child that forwards
 //      onClick and aria-disabled (<button>, <a>, Button, Link); the string
 //      data-role-gate appears nowhere but components/kit/role-gate.js (a fake
@@ -330,7 +333,7 @@ await t("components/kit holds the six parts and imports only components/ui, lib/
 });
 
 // ---------- 8. data-read-control ----------
-const { READ_CONTROLS } = await import("./support/read-controls.js");
+const { READ_CONTROLS, READ_POSTS, routeMatches } = await import("./support/read-controls.js");
 const walk = (rel) => readdirSync(join(ROOT, rel), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(`${rel}/${e.name}`) : /\.(js|jsx|tsx?)$/.test(e.name) ? [`${rel}/${e.name}`] : []));
 const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
 // each mark: its opening tag, whether it submits, whether it sits in a form that isn't method="get"
@@ -378,26 +381,89 @@ await t("data-read-control: never on a submit button or in a non-GET form; outsi
     bad('<Link href="/admin/orders" data-read-control>Orders</Link>'),
   ], [0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0], "the rule bites (submit, default submit, non-GET form, form=, formAction, type=image, dynamic type, spread, method post, dynamic method):");
   for (const r of READ_CONTROLS) ok(r && typeof r.path === "string" && typeof r.reason === "string" && r.reason.trim().length >= 10 && Number.isInteger(r.marks) && r.marks > 0, `read-controls row ${JSON.stringify(r)} needs a path, a reason and its number of marks:`);
-  const problems = [];
   const files = [...walk("app"), ...walk("components")];
+  const { problems, marks } = markProblems(files.map((f) => [f, read(f)]), READ_CONTROLS);
+  ok(marks >= 5, `found ${marks} marks (the kit's own):`);
+  for (const r of READ_CONTROLS) ok(files.includes(r.path) && stripComments(read(r.path)).includes("data-read-control"), `${r.path} is listed but marks nothing: remove the row:`);
+  eq(problems, [], "found:");
+});
+
+// files: [[path, source]]; rows: READ_CONTROLS. A mark moved from one file to
+// another changes both files' counts, so it is caught here. The count rule
+// cannot see a mark moved within one file (from a read to a write control
+// beside it): the count stays the same. drill:shell clicks every mark as
+// support and counts the requests, which is where that move shows.
+function markProblems(files, rows) {
+  const problems = [];
   let marks = 0;
-  for (const f of files) {
-    const src = stripComments(read(f));
-    if (!src.includes("data-read-control")) continue;
+  for (const [f, raw] of files) {
+    const src = stripComments(raw);
+    const row = rows.find((r) => r.path === f);
+    // a listed file whose marks all moved away still has its row's count
+    if (!src.includes("data-read-control") && !row) continue;
     const found = readMarks(src);
     marks += found.length;
     for (const r of found) {
       if (r.submits) problems.push(`${f}: a submit control is marked a read: ${r.open}`);
       if (r.postForm) problems.push(`${f}: a marked control sits in a form that is not method="get": ${r.open}`);
     }
-    const row = READ_CONTROLS.find((r) => r.path === f);
     if (!f.startsWith(`${KIT}/`) && !row) problems.push(`${f}: data-read-control outside components/kit/ needs a row in scripts/support/read-controls.js`);
     // a row counts its marks: a new mark in a listed file needs the row (and its reason) updated
     else if (row && row.marks !== found.length) problems.push(`${f}: ${found.length} data-read-control mark(s), but its read-controls row says ${row.marks}: give the new mark its reason and update the count`);
   }
-  ok(marks >= 5, `found ${marks} marks (the kit's own):`);
-  for (const r of READ_CONTROLS) ok(files.includes(r.path) && stripComments(read(r.path)).includes("data-read-control"), `${r.path} is listed but marks nothing: remove the row:`);
-  eq(problems, [], "found:");
+  return { problems, marks };
+}
+
+await t("a data-read-control mark moved to another file is caught by the rows' counts", () => {
+  const rows = [
+    { path: "components/admin/x/List.js", reason: "the tabs filter the loaded list", marks: 1 },
+    { path: "components/admin/x/Editor.js", reason: "Cancel is a link to the list", marks: 1 },
+  ];
+  const read1 = '<Link href="/admin/x" data-read-control>Back</Link>';
+  const write = '<Button type="button" onClick={save}>Save</Button>';
+  const before = [["components/admin/x/List.js", `<Tabs data-read-control />`], ["components/admin/x/Editor.js", `${read1}${write}`]];
+  eq(markProblems(before, rows).problems, [], "as listed:");
+  const toListed = [["components/admin/x/List.js", `<Tabs data-read-control /><Button type="button" data-read-control onClick={del}>Delete</Button>`], ["components/admin/x/Editor.js", write]];
+  eq(markProblems(toListed, rows).problems.length, 2, "moved into another listed file (both counts change):");
+  const toUnlisted = [...before.slice(0, 1), ["components/admin/x/Editor.js", write], ["components/admin/y/Danger.js", '<Button type="button" data-read-control onClick={del}>Delete</Button>']];
+  eq(markProblems(toUnlisted, rows).problems.length, 2, "moved into a file with no row:");
+  // the limit: within one file the count holds, so this rule passes it
+  const within = [...before.slice(0, 1), ["components/admin/x/Editor.js", '<Link href="/admin/x">Back</Link><Button type="button" data-read-control onClick={save}>Save</Button>']];
+  eq(markProblems(within, rows).problems, [], "moved within a file (not visible to the count; drill:shell's click pass is the check):");
+});
+
+// READ_POSTS: the shell drill lets each row's request through on its page
+const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+function readPostProblems(rows) {
+  const problems = [];
+  for (const r of rows) {
+    const tag = JSON.stringify(r);
+    if (!r || typeof r.page !== "string" || !r.page.startsWith("/") || typeof r.path !== "string" || !r.path.startsWith("/")) problems.push(`${tag}: needs a page pattern and a path, each starting with /`);
+    else if (r.path === r.page || routeMatches(r.page, r.path)) problems.push(`${tag}: its path is the page itself, which would let a Server Action POST to the page through`);
+    if (!WRITE_METHODS.has(r?.method)) problems.push(`${tag}: method must be POST, PUT, PATCH or DELETE (a GET needs no row)`);
+    if (typeof r?.reason !== "string" || r.reason.trim().length < 10) problems.push(`${tag}: needs a reason`);
+  }
+  return problems;
+}
+await t("READ_POSTS: every row has a reason, a non-GET method and a path that is never its page; page is a route pattern", () => {
+  eq([routeMatches("/admin/offers/[id]", "/admin/offers/ofr_1"), routeMatches("/admin/offers/[id]", "/admin/offers"), routeMatches("/admin/offers/[id]", "/admin/offers/a/b"), routeMatches("/admin/media", "/admin/media"), routeMatches("/admin/media", "/admin/media/x")], [true, false, false, true, false], "routeMatches: [id] is one segment, the rest exact:");
+  const ok1 = { page: "/admin/offers/[id]", method: "POST", path: "/api/admin/offers/simulate", reason: "the offer simulator stores nothing" };
+  eq(readPostProblems([ok1]), [], "a good row passes:");
+  eq(
+    [
+      { ...ok1, path: "/admin/offers/[id]" },
+      { ...ok1, path: "/admin/offers/ofr_1" },
+      { ...ok1, page: "/admin/media", path: "/admin/media" },
+      { ...ok1, method: "GET" },
+      { ...ok1, method: undefined },
+      { ...ok1, reason: "" },
+      { page: ok1.page, method: "POST", path: ok1.path },
+    ].map((r) => readPostProblems([r]).length),
+    [1, 1, 1, 1, 1, 1, 1],
+    "the rule bites (path is the page, as a pattern and as a match; GET; no method; no reason):",
+  );
+  ok(READ_POSTS.length > 0, "there are rows:");
+  eq(readPostProblems(READ_POSTS), [], "rows:");
 });
 
 // ---------- 9. RoleGate's child forwards the props; no fake gates ----------
