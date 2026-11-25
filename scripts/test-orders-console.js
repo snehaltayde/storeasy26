@@ -447,6 +447,14 @@ await t("P2-A support's order page: the failed-push banner and timeline say fixe
   ok(owner.text.includes(PUSH_CNY.mail) && owner.text.includes(PUSH_CNY.token), "the owner sees the raw text:");
 });
 
+await t("P2-A support's orders list (?status=sync_failed): the failed row is there with fixed words, no raw push text", async () => {
+  const run = await pages.run(LIST, { cookies: cookies.support, searchParams: { status: "sync_failed" } });
+  ok(!run.error && !run.redirect, `ran: ${run.error?.message} ${run.redirect}`);
+  ok(propsOf(run, "OrdersList")[0]?.orders?.some((o) => o.id === FAILED_ID), "the failed order is listed:");
+  for (const c of PUSH_CANARIES) ok(!run.text.includes(c), `support list page leaks ${c}`);
+  ok(run.text.includes(view.SUPPORT_PUSH_ERROR), "the fixed words:");
+});
+
 await t("staff's order page: no push, reconcile or cancel; admin and owner get what the state allows", async () => {
   for (const role of ["staff", "admin", "owner"]) {
     const cod = propsOf(await pages.run(DETAIL, { cookies: cookies[role], params: { id: ids[12] } }), "OrderActions")[0];

@@ -290,14 +290,19 @@ await t("store A's admin filtering the audit log by store B's user, action or fa
   const aIds = new Set((await AUD.listAudit({ tenantId: a.id, limit: 200 })).map((r) => r.id));
   const bIds = new Set((await AUD.listAudit({ tenantId: store.b.id, limit: 200 })).map((r) => r.id));
   ok(bIds.size >= 1 && bUser.email, "B has an audit row and a member email:");
-  for (const query of [`actor=${bUser.id}`, "action=drill.bonly", `actor=${bUser.id}&action=drill.bonly`, "facets=1&limit=200", `facets=1&actor=${bUser.id}`]) {
+  for (const query of [`actor=${bUser.id}`, "action=drill.bonly", `actor=${bUser.id}&action=drill.bonly`, "facets=1&limit=200", `facets=1&actor=${bUser.id}`, `limit=200&facets=1&tenant=${store.b.id}&tenantId=${store.b.id}`]) {
     const r = await call("admin", "audit", "GET", { query });
     eq(r.status, 200, `${query} status:`);
     const entries = r.body.entries ?? [];
     ok(entries.every((e) => aIds.has(e.id) && !bIds.has(e.id)), `${query}: a row that is not A's`);
     if (query.includes("actor=") || query.includes("action=")) eq(entries.length, 0, `${query} rows:`);
     for (const c of [bUser.email, "cnybaudres0", "drill.bonly"]) ok(!r.text.includes(c), `${query} leaks ${c}`);
-    if (r.body.facets) ok(!r.body.facets.actors.some((x) => x.actor === bUser.id), `${query}: B's user in the facets`);
+    if (query.includes("facets=1")) {
+      ok(r.body.facets?.actors && r.body.facets?.actions, `${query}: facets answered`);
+      ok(!r.body.facets.actors.some((x) => x.actor === bUser.id), `${query}: B's user in the facets`);
+      ok(!r.body.facets.actions.some((x) => (x.action ?? x) === "drill.bonly"), `${query}: B's action in the facets`);
+    }
+    if (query.includes("tenant=")) ok(entries.length > 0, `${query}: A's own rows still come back`);
   }
 });
 

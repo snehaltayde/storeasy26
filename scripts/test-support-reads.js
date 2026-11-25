@@ -593,6 +593,21 @@ await t("P2-F guard: every page whose row action isn't storefront.read checks ro
 
 const { makePageHarness } = await import("./support/page-harness.js");
 const pages = await makePageHarness({ tenant: () => C.getTenant(a.id, { fresh: true }) });
+
+// P2-F: the gate's NoAccess branch, rendered: a roleAllows that withholds
+// orders.read from every role, so even the owner gets the no-access page on
+// Analytics and the page reads none of its data
+await t("P2-F analytics: a role without orders.read gets NoAccess (page words) and no analytics data", async () => {
+  const gated = await makePageHarness({ tenant: () => C.getTenant(a.id, { fresh: true }), stubs: { "@/lib/platform/authz": { roleAllows: (role, action) => action !== "orders.read" && roleAllows(role, action) } } });
+  const run = await gated.run(pageRel("analytics"), { cookies: cookies.owner });
+  ok(!run.error && !run.redirect, `ran: ${run.error?.message} ${run.redirect}`);
+  const names = [...new Set(run.props.map((p) => p.component))];
+  const na = run.props.find((p) => p.component.endsWith("#NoAccess"));
+  ok(na && na.props.page === true && na.props.role === "owner", `NoAccess with page words: ${names.join(",")}`);
+  ok(!names.some((n) => /SalesNumbers|FunnelCard|AnalyticsTables|CoverageNote/.test(n)), `no analytics data: ${names.join(",")}`);
+  const open = await pages.run(pageRel("analytics"), { cookies: cookies.owner });
+  ok(open.props.some((p) => p.component.endsWith("#SalesNumbers")) && !open.props.some((p) => p.component.endsWith("#NoAccess")), "the real roleAllows lets the owner in:");
+});
 const pageRuns = {};
 for (const r of ADMIN_PAGES) {
   // "$order", "$offer", "$bundle", "$experiment" and "$quiz" are the fixture's rows (P2-D)

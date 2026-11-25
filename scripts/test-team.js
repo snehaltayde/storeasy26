@@ -449,6 +449,14 @@ await t("P2-G inviting an existing member at or above the invited role is 409 AL
       eq(await lastAudit(`invite:${m.user.email}`), null, `${have} as ${invited}: audit row`);
       eq(await roleOf(m.user.id), have, `${have} as ${invited}: the role is unchanged`);
     }
+    // staff and support hold no team.manage: 403 before any membership lookup, never the 409
+    const existing = await member("staff");
+    for (const caller of ["staff", "support"]) {
+      const r = await post(caller, { action: "invite", email: existing.user.email, role: "staff" });
+      eq(r.status, 403, `${caller} inviting an existing member:`);
+      ok(r.body?.code !== "ALREADY_MEMBER" && !r.text.includes(existing.user.email), `${caller}: no membership answer`);
+    }
+    eq(await one("SELECT id FROM invitations WHERE email = ?", [existing.user.email]), null, "no row for the refused callers:");
     // a raise is still an invite (the positive control)
     const m = await member("support");
     const up = await post("owner", { action: "invite", email: m.user.email, role: "staff" });

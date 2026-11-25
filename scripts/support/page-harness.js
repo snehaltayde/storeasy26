@@ -4,7 +4,8 @@
 // A helper, not a suite: nothing runs on import. Import route-harness.js first
 // (its hooks resolve "@/" inside lib/).
 //
-//   makePageHarness({ tenant })  tenant: async () => the store the page runs in
+//   makePageHarness({ tenant, stubs })  tenant: async () => the store the page runs in;
+//     stubs (optional): { "<import id>": module } given to the page in place of that import
 //     -> { load(rel), run(rel, { cookies, params, searchParams }) }
 //   run() -> { redirect, notFound, error, unresolved, props: [{ component, props }], text }
 //     unresolved: every import the page asked for that the harness could not
@@ -62,7 +63,7 @@ function stubModule(id) {
 const isComponentImport = (id) =>
   id === "next/link" || id === "next/image" || id === "lucide-react" || id.startsWith("@/components/") || /(^|\/)components\//.test(id);
 
-export async function makePageHarness({ tenant }) {
+export async function makePageHarness({ tenant, stubs = {} }) {
   const swc = require("next/dist/build/swc/index.js");
   await swc.loadBindings();
   const React = require("react");
@@ -120,7 +121,8 @@ export async function makePageHarness({ tenant }) {
     ];
     for (const id of ids) {
       if (deps.has(id)) continue;
-      if (id === "react" || id === "react/jsx-runtime") deps.set(id, require(id));
+      if (Object.hasOwn(stubs, id)) deps.set(id, stubs[id]);
+      else if (id === "react" || id === "react/jsx-runtime") deps.set(id, require(id));
       else if (id === "next/headers") deps.set(id, headersStub);
       else if (id === "next/navigation") deps.set(id, navigationStub);
       else if (id === "@/lib/console-request") deps.set(id, consoleRequestStub);
