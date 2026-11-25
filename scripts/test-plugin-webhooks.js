@@ -277,7 +277,7 @@ const { db } = await import("../lib/db.js");
 const inA = (fn) => a.run(fn);
 const E = await import("../lib/plugins/events.js");
 const D = await import("../lib/plugins/deliveries.js");
-const { getJobByKey } = await import("../lib/platform/jobs.js");
+const { getJobByKey, makeJobDue } = await import("../lib/platform/jobs.js");
 const { runJobById } = await import("../lib/platform/worker.js");
 const auditRows = async () => listAudit({ tenantId: a.id, limit: 200 });
 const custom = (over = {}) => ({ create_custom: { name: "Order hooks", url: HOOK, topics: ["order.created", "order.fulfilled"], scopes: ["orders.read"], ...over } });
@@ -418,7 +418,8 @@ await t("claim: two runs of one due delivery at once send exactly once", async (
   const rs = await Promise.all([inA(() => D.deliver(d.id)), inA(() => D.deliver(d.id))]);
   eq(got.length, n + 1, "one request:");
   eq(rs.filter((r) => r.status === "delivered").length, 1, "one delivered:");
-  ok(rs.some((r) => r.busy || r.already), `the other stood down: ${JSON.stringify(rs)}`);
+  const loser = rs.find((r) => r.status !== "delivered");
+  ok((loser.requeue && loser.runAfter) || loser.already, `the other stood down and keeps its job (requeue): ${JSON.stringify(rs)}`);
 });
 
 await t("the job runner: plugin_delivery never runs without a budget (shopper after() runs); at most 2 sends per app per tick", async () => {
@@ -446,8 +447,59 @@ await t("the job runner: plugin_delivery never runs without a budget (shopper af
   eq(mine.length, 2, "two sent this tick:");
   eq(tick.filter((r) => r.deferred === "per_app_cap").length, 2, "two handed back:");
   eq(got.length, n + 2, "two requests:");
+  const held = await Promise.all(ids.map((id) => getJobByKey(`plugin_delivery:${a.id}:${id}`)));
+  const back = held.filter((j) => j.status === "pending" && j.run_after);
+  eq(back.length, 2, "the two held back wait:");
+  ok(back.every((j) => Date.parse(j.run_after) - Date.now() > 50_000), "about a minute");
+  for (const j of back) await makeJobDue(j.id);
   await W.runDueJobs({ limit: 25, budgetMs: 30_000 });
-  eq(got.length, n + 4, "the rest go on the next tick:");
+  eq(got.length, n + 4, "the rest go on a later tick:");
+});
+
+await t("a lost claim keeps its job: a runner that claimed and died leaves the delivery to the job, which sends it once the claim runs out", async () => {
+  const W = await import("../lib/platform/worker.js");
+  const ev = await inA(() => E.emitPluginEvent("order.created", { key: "claim-gap", data: { order: { id: "cg" } } }));
+  await inA(() => E.fanOut(ev.id));
+  const d = (await deliveriesOf(appId)).find((x) => x.event_id === ev.id);
+  // another runner's claim, then it dies before sending
+  const claimUntil = new Date(Date.now() + D.CLAIM_MS).toISOString();
+  await inA(() => db.updateTable("plugin_deliveries").set({ next_attempt_at: claimUntil }).where("id", "=", d.id).execute());
+  const key = `plugin_delivery:${a.id}:${d.id}`;
+  const n = got.length;
+  const r = await runJobById((await getJobByKey(key)).id);
+  ok(r?.requeued, `requeued, not completed: ${JSON.stringify(r)}`);
+  const job = await getJobByKey(key);
+  eq(job.status, "pending", "the job is kept:");
+  eq(job.run_after, claimUntil, "due when the claim runs out:");
+  eq(got.length, n, "nothing sent while claimed:");
+  await makeJobDue(job.id);
+  const later = await W.runJobById(job.id, { now: () => Date.now() + D.CLAIM_MS + 1000 });
+  ok(later?.ok, `ran: ${JSON.stringify(later)}`);
+  eq(got.length, n + 1, "sent once the claim ran out:");
+  eq((await deliveriesOf(appId)).find((x) => x.id === d.id).status, "delivered", "delivered:");
+});
+
+await t("starvation: 30 queued deliveries of one store don't hold back another store's shopify_push and send_notification; 4 sends per store per tick", async () => {
+  const W = await import("../lib/platform/worker.js");
+  const { enqueueJob } = await import("../lib/platform/jobs.js");
+  for (let i = 0; i < 20; i++) if (!(await W.runDueJobs({ limit: 25, budgetMs: 30_000 })).length) break;
+  const sent = [];
+  const handlers = { ...W.HANDLERS, plugin_delivery: async (p) => (sent.push(p.installId), { ok: true }), shopify_push: async () => ({ ran: "push" }), send_notification: async () => ({ ran: "mail" }) };
+  for (let i = 0; i < 32; i++) await enqueueJob({ type: "plugin_delivery", tenantId: a.id, payload: { deliveryId: `dlv_backlog${String(i).padStart(5, "0")}`, installId: `pin_backlog${i % 8}` }, idempotencyKey: `backlog-${i}` });
+  await new Promise((res) => setTimeout(res, 5));
+  await enqueueJob({ type: "shopify_push", tenantId: b.id, payload: { orderId: "BL-B1" }, idempotencyKey: "b-push" });
+  await enqueueJob({ type: "send_notification", tenantId: b.id, payload: { notificationId: "ntf_b1" }, idempotencyKey: "b-mail" });
+  const tick = await W.runDueJobs({ limit: 25, budgetMs: 30_000, handlers });
+  ok(tick.some((r) => r.type === "shopify_push" && r.ok) && tick.some((r) => r.type === "send_notification" && r.ok), `store B's push and email ran in the same tick: ${tick.map((r) => r.type).join(",")}`);
+  eq(sent.length, W.PLUGIN_SENDS_PER_STORE, "four sends for store A:");
+  ok(tick.filter((r) => r.deferred === "per_store_cap").length > 0, "the rest held by the per-store cap");
+  ok(tick.filter((r) => r.type === "plugin_delivery").length <= W.PLUGIN_LEASE_LIMIT, "deliveries leased apart, a few at a time");
+  const jobs = await Promise.all(Array.from({ length: 32 }, (_, i) => getJobByKey(`backlog-${i}`)));
+  const pushedBack = jobs.filter((j) => j.status === "pending" && j.run_after);
+  const bPush = await getJobByKey("b-push");
+  ok(pushedBack.length >= 1 && pushedBack.every((j) => Date.parse(j.run_after) - Date.now() > 50_000), "held back about a minute");
+  ok(pushedBack.every((j) => j.created_at > bPush.created_at), "and to the back of the line (created_at reset past store B's jobs)");
+  ok(W.PLUGIN_TICK_MS === 30_000 && W.PLUGIN_HOLD_MS === 60_000, "a 30 s delivery bound per tick; held back a minute");
 });
 
 await t("order.fulfilled: emitted once when the projection moves to fulfilled, never again", async () => {
