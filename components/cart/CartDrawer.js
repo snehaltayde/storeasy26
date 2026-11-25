@@ -180,7 +180,8 @@ export default function CartDrawer() {
           </button>
         </header>
 
-        {items.length > 0 && <OfferProgress progress={progress} />}
+        {/* always in the page, so the first nudge is announced (a live region must exist before it changes) */}
+        <OfferProgress progress={progress} />
 
         {items.length === 0 ? (
           pending ? (
