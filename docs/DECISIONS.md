@@ -3,6 +3,15 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Phase 2 merchant console: shape of the rebuild (on the owner's behalf)
+
+- **Schema:** tenant 0029 adds two orders indexes (`created_at, id` and `status, created_at, id`), nothing destructive; the orders cursor becomes `(created_at, id)` (old `before=<iso>` still accepted). New order ids carry 64 random bits (`PREFIX-` + 16 hex); old ids are never rewritten.
+- **Permissions:** no new actions or routes in lines 1–5 (lines 3 and 5 add GET query modes, old answers unchanged). Push and reconcile buttons need `orders.push`, cancel needs `orders.cancel` (staff and support no longer see them); push or reconcile on an unknown order answers 404 and the harness's `allowStatus` exception goes. On new-UI pages support may use only controls marked `data-read-control` on the element itself (outside `components/kit/` each needs a reasoned row in `scripts/support/read-controls.js`) or ones `RoleGate` disabled; `drill:shell` clicks, presses Enter/Space and opens menus as support and fails on any non-GET request.
+- **UI:** the shell decides new-UI regions from `lib/admin/new-ui-routes.js` (one prefix per rebuilt area). Our own console parts live in `components/kit/` (PageHeader, StatusBadge, EmptyState, MoneyCell with no default currency, RoleGate, a server-driven DataTable without TanStack); Card, Tabs, Select, Switch, Checkbox, Popover come from shadcn 4.23.0 on the existing `radix-ui` (no new dependency). Success uses the existing `useToast`; errors show inline. Bundles get their own page `/admin/bundles` under Growth with `offers.*`; quizzes stay in an old-screen tray on the catalog page until the new quizzes line. Old components stay until Phase 2's last line, each named in the dead-code allowlist.
+- **Why:** Phase 2 plan (`docs/plans/phase-2.md`), Line 0 review rounds.
+- **Decided by:** Claude
+- **Slice:** Phase 2
+
 ## 2026-11-25 Drill harness: reboot a broken Turbopack font build, serialize installs (on the owner's behalf)
 
 - **Decision:** every harness boot a drill starts first loads `/` and `/admin/login`; only Turbopack's `next/font/google` "Can't resolve ... internal/font/google/font" build error stops and reboots it (up to 3 times, then a plain failure); any other 500 still reaches the drill. Fonts are not mocked, since that would change how pages render. `pnpm install` in drill worktrees runs one at a time under a machine-wide lock folder (dead owner taken over, live owner waited for, never killed) rather than a shared `node_modules`. Each drill keeps its Next and sqld logs in `.drill-results/<stamp>/<drill>/server.log`.

@@ -20,6 +20,10 @@ orchestrating a phase. Keep it under about 80 lines: merge, reword or delete bef
 - Plan disjoint file lists for parallel builders and name the shared files with append-only anchors
   (`package.json`, `run-isolated.mjs`, `admin-routes.js`); Phase 1's conflicts were all in shared files
   and were resolved by keeping both sides, never by loosening a test.
+- A reviewer of a guard gets this escape list in its first brief, so one round covers it: marks on an
+  ancestor, faked marks or attributes, content revealed after a click (menus, portals), submits from
+  outside a form (`form=`, `formaction`, implicit Enter), test-only or drill-only reach, stale allowlist
+  rows, folder rows that hide a single unused file.
 
 ## Tests
 
