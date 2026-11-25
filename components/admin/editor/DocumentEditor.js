@@ -632,7 +632,7 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
   useEffect(() => () => storeRef.current?.dispose(), []);
 
   // P5-EDITOR: read the bundles again when the founder comes back to this
-  // tab (a bundle changed in Catalog > Bundles changes the live blocks at
+  // tab (a bundle changed on the Bundles page changes the live blocks at
   // once), and read by ids= any picked bundle the list doesn't hold yet (a
   // document opened after the first read, or a bundle past the first 50).
   useEffect(() => {

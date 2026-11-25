@@ -527,7 +527,7 @@ const reasonText = (r, currency) => reasonSentence(r, { currency }) || (typeof r
 //   status     context.bundles.status
 //   pending    context.bundles.pending: ids still being read (P5-FIX2)
 // -> { id, title, chip | null, line, overlap | null, canReplace }
-// `line` may name "Catalog > Bundles"; the control makes that a link.
+// `line` may name "Bundles"; the control makes that a link.
 export function bundleView(id, entry, { status = "ready", pending = [] } = {}) {
   const base = { id: typeof id === "string" ? id : null, title: null, chip: null, line: "", overlap: null, canReplace: true, price: null };
   if (status === "failed") return { ...base, line: BUNDLE_WORDS.cantSee, canReplace: false };
@@ -550,7 +550,7 @@ export function bundleView(id, entry, { status = "ready", pending = [] } = {}) {
   return { ...base, title, price, chip, line, overlap };
 }
 
-// A line split around "Catalog > Bundles", so that part can be a link.
+// A line split around "Bundles", so that part can be a link.
 export function linkParts(line) {
   const s = String(line ?? "");
   const out = [];

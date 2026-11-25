@@ -890,7 +890,7 @@ const inRequest = (host, cookies, fn) =>
     }),
   );
 const renderHomeIn = (host, cookies) => asRequest(host, cookies, () => runRequest(async () => htmlAsync(await Home())));
-const HIDDEN_WHY = "This bundle is turned off, so shoppers don't see it. Turn it on in Catalog > Bundles, or remove it.";
+const HIDDEN_WHY = "This bundle is turned off, so shoppers don't see it. Turn it on in Bundles, or remove it.";
 // the note's words go through escapeHtml into rich text (an apostrophe stays as typed)
 const HIDDEN_WHY_HTML = HIDDEN_WHY.replace(/>/g, "&gt;");
 // a throwaway kind that never shows; with or without the hook

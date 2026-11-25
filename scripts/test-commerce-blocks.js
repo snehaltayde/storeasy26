@@ -297,7 +297,7 @@ await t("a no_saving card (OQ-B, owner 2026-11-05) renders nothing live and, in 
   const r = await both([s], data);
   eq(r.live, "", "live:");
   const why = BW.stateLine("no_saving", data.get("sec_c4").bundle.reasons, { currency: "USD" });
-  eq(why, `The price no longer saves anything (the products add up to ${USD(700)}), so shoppers don't see it. Lower the price in Catalog > Bundles.`, "the words:");
+  eq(why, `The price no longer saves anything (the products add up to ${USD(700)}), so shoppers don't see it. Lower the price in Bundles.`, "the words:");
   ok(words(r.preview).includes(why) && r.preview.includes("Bundle card: hidden from shoppers") && r.preview.includes('data-hidden-reason=""'), `preview: ${r.preview.slice(0, 800)}`);
   ok(!r.preview.includes("Add the set to cart") && !r.preview.includes("Currently unavailable"), "preview: the card itself");
 });
@@ -314,7 +314,7 @@ await t("disabled and missing cards render nothing live and the bundle-words rea
     eq(r.live, "", `${id} live:`);
     ok(words(r.preview).includes(why) && r.preview.includes(`data-section-id="${id}"`), `${id} preview: ${r.preview.slice(0, 600)}`);
   }
-  eq(BW.stateLine("disabled"), "This bundle is turned off, so shoppers don't see it. Turn it on in Catalog > Bundles, or remove it.", "turned off words:");
+  eq(BW.stateLine("disabled"), "This bundle is turned off, so shoppers don't see it. Turn it on in Bundles, or remove it.", "turned off words:");
   eq(BW.stateLine("missing"), "This bundle was deleted, so shoppers don't see it. Pick another or remove it.", "deleted words:");
   // no entry at all (bundle_by_id resolves undefined for an id the read lacks)
   const bare = card("sec_c7", "bun-never");
@@ -378,7 +378,7 @@ await t("fix round 1 (OQ-B): a bundle that saves nothing is hidden even when it 
     const data = await dataOf([s]);
     const r = await both([s], data);
     eq(r.live, "", `${title} card live:`);
-    const why = `The price no longer saves anything (the products add up to ${sum}), so shoppers don't see it. Lower the price in Catalog > Bundles.`;
+    const why = `The price no longer saves anything (the products add up to ${sum}), so shoppers don't see it. Lower the price in Bundles.`;
     eq(BW.stateLine("no_saving", data.get(id).bundle.reasons, { currency: "USD" }), why, `${title} words:`);
     const p = words(r.preview);
     ok(p.includes(why) && p.includes("Bundle card: hidden from shoppers") && p.includes('data-hidden-reason=""'), `${title} card preview: ${p.slice(0, 800)}`);
@@ -573,7 +573,7 @@ await t("P5-FIX1: a card whose bundle lost a product to the catalog is shown 'Cu
     const b = data.get("sec_x1").bundle;
     same([b.state, b.reasons.map((r) => r.kind)], ["sold_out", ["missing"]], "the read:");
     const why = BW.stateLine("sold_out", b.reasons, { currency: "USD" });
-    eq(why, "A product in this bundle is no longer in your catalog: shoppers see Currently unavailable and can't add it. Replace it with another product in Catalog > Bundles.", "the words:");
+    eq(why, "A product in this bundle is no longer in your catalog: shoppers see Currently unavailable and can't add it. Replace it with another product in Bundles.", "the words:");
     const r = await both([s], data);
     for (const [mode, h] of Object.entries(r)) {
       const sec = sectionOf(h, "sec_x1");
@@ -599,7 +599,7 @@ await t("P5-FIX1: in a grid, the bundle that lost a product keeps its cell live 
     same([...r.preview.matchAll(/data-bundle-state="([^"]+)"/g)].map((m) => m[1]), ["available", "sold_out"], "preview cells:");
     ok(!/hidden from shoppers|data-bundle-cell/.test(r.preview), "preview: the cell is not dropped");
     const cell = r.preview.match(/<div data-bundle="[^"]+" data-bundle-state="sold_out"[\s\S]*$/)?.[0] || "";
-    ok(/data-bundle-note="missing-product"/.test(cell) && words(cell).includes("Replace it with another product in Catalog > Bundles."), `preview: the note in the cell: ${cell.slice(0, 900)}`);
+    ok(/data-bundle-note="missing-product"/.test(cell) && words(cell).includes("Replace it with another product in Bundles."), `preview: the note in the cell: ${cell.slice(0, 900)}`);
   });
 });
 

@@ -21,8 +21,8 @@
 // Picking writes { id } and nothing else, so picking again over an old
 // { id, title } clears it. Every picked bundle (the one, and each row of a
 // grid) shows its chip and the bundle-words status line
-// (inspectorModel.bundleView), and "Catalog > Bundles" in it is a link to
-// /admin/catalog#bundles in a new tab. When the bundles can't be read (a
+// (inspectorModel.bundleView), and "Bundles" in it is a link to
+// /admin/bundles in a new tab. When the bundles can't be read (a
 // failed or 403 read), a picked bundle shows its id with "You can't see
 // bundles here." and can be removed, not replaced.
 //
@@ -69,7 +69,7 @@ function Notes({ anchor, notes }) {
 }
 const described = (anchor, notes) => (notes.length ? notesId(anchor) : undefined);
 
-// A line, with "Catalog > Bundles" as a link that opens in a new tab.
+// A line, with "Bundles" as a link that opens in a new tab.
 export function LinkedLine({ line, ...rest }) {
   return (
     <p {...rest}>

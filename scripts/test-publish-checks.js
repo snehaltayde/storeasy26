@@ -1378,7 +1378,7 @@ await t("P6-OPEN (P5D-2): BUNDLE_MISSING never shows a raw bundle id: both delet
   ok(ALL_FOUR.issues.find((x) => x.code === "BUNDLE_DISABLED").message.startsWith("“Grid off kit”: "), "a turned-off bundle keeps its name");
 });
 
-await t("P5-CHECKS: a sold-out component gives BUNDLE_UNAVAILABLE saying shoppers see 'Currently unavailable'; no_saving names the live sum through formatMoney in the bundle's currency (USD) and says to lower the price in Catalog > Bundles, never 'Currently unavailable'", async () => {
+await t("P5-CHECKS: a sold-out component gives BUNDLE_UNAVAILABLE saying shoppers see 'Currently unavailable'; no_saving names the live sum through formatMoney in the bundle's currency (USD) and says to lower the price in Bundles, never 'Currently unavailable'", async () => {
   ok(ALL_FOUR, "needs the all-four publish");
   const sold = ALL_FOUR.issues.find((x) => x.code === "BUNDLE_UNAVAILABLE" && x.sectionId === "sec_csold");
   ok(sold.message.startsWith("“Sold kit”: ") && sold.message.includes("Currently unavailable") && sold.message.includes(Words.stateLine("sold_out")), `sold out: ${sold.message}`);
@@ -1390,7 +1390,7 @@ await t("P5-CHECKS: a sold-out component gives BUNDLE_UNAVAILABLE saying shopper
   const line = Words.stateLine("no_saving", b.reasons, { currency: "USD" });
   ok(line.includes(sum), `bundle-words names the sum: ${line}`);
   ok(pricey.message.startsWith("“Pricey kit”: ") && pricey.message.includes(line), `no saving, from bundle-words: ${pricey.message}`);
-  ok(pricey.message.includes(sum) && pricey.message.includes("Lower the price in Catalog > Bundles"), `names the sum and the fix: ${pricey.message}`);
+  ok(pricey.message.includes(sum) && pricey.message.includes("Lower the price in Bundles"), `names the sum and the fix: ${pricey.message}`);
   ok(!pricey.message.includes("Currently unavailable"), `no_saving is not 'Currently unavailable': ${pricey.message}`);
   // the owner's OQ-B words ("so shoppers don't see it") come with P5-BLOCKS'
   // change to bundle-words.js; this message is bundle-words' sentence as it

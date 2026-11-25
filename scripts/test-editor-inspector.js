@@ -876,9 +876,9 @@ const NO_SAVE = { kind: "no_saving", sum: 300, price: 350 };
 const WORDS_OF = {
   available: "Showing to shoppers.",
   sold_out: "A product in this bundle is sold out: shoppers see Currently unavailable and can't add it.",
-  no_saving: "The price no longer saves anything (the products add up to $300), so shoppers don't see it. Lower the price in Catalog > Bundles.",
-  not_ready: "This bundle isn't ready for the cart yet: shoppers can't add it. Open it in Catalog > Bundles and save it again.",
-  disabled: "This bundle is turned off, so shoppers don't see it. Turn it on in Catalog > Bundles, or remove it.",
+  no_saving: "The price no longer saves anything (the products add up to $300), so shoppers don't see it. Lower the price in Bundles.",
+  not_ready: "This bundle isn't ready for the cart yet: shoppers can't add it. Open it in Bundles and save it again.",
+  disabled: "This bundle is turned off, so shoppers don't see it. Turn it on in Bundles, or remove it.",
   missing: "This bundle was deleted, so shoppers don't see it. Pick another or remove it.",
 };
 const stateRows = {
@@ -1011,7 +1011,7 @@ await t("P5-EDITOR unit: bundle and bundle_list have controls, are not waiting, 
   for (const kind of ["bundle_card", "bundle_grid"]) ok(M.formOf({ kind }).fields.every((f) => f.control), `${kind}: every field has a control`);
 });
 
-await t("P5-EDITOR rendered: every picked bundle shows the bundle-words sentence for its state, with Catalog > Bundles as a new-tab link", () => {
+await t("P5-EDITOR rendered: every picked bundle shows the bundle-words sentence for its state, with Bundles as a new-tab link", () => {
   for (const [state, r] of Object.entries(stateRows)) {
     const v = M.bundleView(r.id, r);
     eq(v.line, WORDS_OF[state], `${state}: the line`);
@@ -1020,7 +1020,7 @@ await t("P5-EDITOR rendered: every picked bundle shows the bundle-words sentence
     const html = render(h(BC.BundleControl, { field: cardField("sec_bc1"), value: { id: r.id }, onChange: () => {}, issues: [], owner: "sec_bc1", context: ctxOf(Object.values(stateRows)) }));
     eq(textIn(html, "data-bundle-status"), WORDS_OF[state], `${state}: the card's rendered line`);
     ok(html.includes("data-bundle-chip"), `${state}: a chip`);
-    if (/Catalog > Bundles/.test(WORDS_OF[state])) ok(/<a href="\/admin\/catalog#bundles" target="_blank" rel="noopener noreferrer"[^>]*>Catalog &gt; Bundles<\/a>/.test(html), `${state}: the link`);
+    if (/Bundles/.test(WORDS_OF[state])) ok(/<a href="\/admin\/bundles" target="_blank" rel="noopener noreferrer"[^>]*>Bundles<\/a>/.test(html), `${state}: the link`);
     ok(!html.includes("₹") && !/\bINR\b/.test(html), `${state}: no rupee sign`);
   }
   // a picked id the ready list doesn't hold reads as deleted
@@ -1082,7 +1082,7 @@ await t("P5-EDITOR unit: the inspector's words follow the blocks' reasons-aware 
 await t("P5-EDITOR unit: a turned-off draft whose check fails is never offered as ready to turn on (the P5-BUNDLEREAD review)", () => {
   const draft = row("bun-dr", "disabled", { reasons: [{ kind: "sold_out", index: 0 }, NO_SAVE] });
   const v = M.bundleView(draft.id, draft);
-  eq(v.line, "This bundle is turned off, so shoppers don't see it. It can't be turned on yet: Sold out; Price must be lower than $300. Fix it in Catalog > Bundles, or remove it.", "the line");
+  eq(v.line, "This bundle is turned off, so shoppers don't see it. It can't be turned on yet: Sold out; Price must be lower than $300. Fix it in Bundles, or remove it.", "the line");
   ok(!/Turn it on/.test(v.line), "no 'Turn it on'");
   eq(v.chip.words, "Turned off, not ready", "the chip");
   eq(M.bundleOptions([draft])[0].label, "Kit bun-dr · $350 · Turned off, not ready", "the option");
@@ -1911,7 +1911,7 @@ await t("P6-FIX2 (R9, the bundleLate reset): two focus re-reads; the first merge
     release();
     await ed.settle(); // re-read 1 lands and merges the late bun-q row
     ok(ed.props.bundles.items.some((b) => b.id === "bun-q"), "re-read 1 kept the late row");
-    // the founder takes bun-q out again, and it is deleted from Catalog > Bundles
+    // the founder takes bun-q out again, and it is deleted from Bundles
     ed.docState.body = base;
     delete ed.S.rows["bun-q"];
     await ed.settle();

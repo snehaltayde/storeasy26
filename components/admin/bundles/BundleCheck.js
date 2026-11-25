@@ -70,7 +70,8 @@ export function BundleCheck({ check, price, currency, checking = false, error = 
   if (!check) return <p className="text-sm text-muted-foreground" data-bundle-check="none">{checking ? "Checking…" : "Pick at least two products and a price to see the saving."}</p>;
   const passes = check.state === "available";
   const saving = passes ? savingOf(check.componentsSum, price) : null;
-  const said = [...priceWords(check.reasons, currency), ...otherWords(check.reasons, currency)];
+  // [words, isPrice]: a price reason carries data-bundle-price-reason (the p5 drill reads it)
+  const said = [...priceWords(check.reasons, currency).map((w) => [w, true]), ...otherWords(check.reasons, currency).map((w) => [w, false])];
   const sum = Number(check.componentsSum) || 0;
   const cheaper = sum > 0 && Number(price) > 0 && Number(price) < sum;
   return (
@@ -100,8 +101,8 @@ export function BundleCheck({ check, price, currency, checking = false, error = 
         </p>
       ) : (
         <ul className="space-y-1 text-warning-text" data-bundle-reasons>
-          {(said.length ? said : ["Fix the products listed above before shoppers can see it."]).map((w, i) => (
-            <li key={i} className="flex items-start gap-2">
+          {(said.length ? said : [["Fix the products listed above before shoppers can see it.", false]]).map(([w, isPrice], i) => (
+            <li key={i} className="flex items-start gap-2" data-bundle-price-reason={isPrice ? "" : undefined}>
               <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
               {w}
             </li>

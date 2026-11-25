@@ -29,6 +29,7 @@ const DRILL_ID = "CATALOG";
 const port = String(process.env.ROLES_PORT || "").trim();
 const ORIGIN = `http://roles.localhost:${port}`;
 const PAGE = "/admin/catalog";
+const DEV_EVAL = /eval\(\) is not supported in this environment/;
 const ERROR_TEXT = /This page hit an error|Something went wrong|Application error|Unhandled Runtime Error/;
 const seed = () => JSON.parse(readFileSync(join(ROOT, ".design-data-roles", "roles-seed.json"), "utf8"));
 
@@ -39,16 +40,24 @@ async function signIn(drill, role) {
   const res = await ctx.request.post(`${ORIGIN}/api/admin/login`, { data: { email: m.email, password: m.password }, headers: { origin: ORIGIN }, maxRedirects: 0 });
   if (res.status() !== 200) throw new Error(`sign-in as ${role} answered ${res.status()}`);
   const page = await ctx.newPage();
-  const writes = [];
-  const errors = [];
-  page.on("request", (req) => {
-    if (!["GET", "HEAD"].includes(req.method())) writes.push(`${req.method()} ${new URL(req.url()).pathname}`);
+  // the shell drill's rule (scripts/drills/shell/run.mjs): every non-GET request
+  // counts, except Next's dev error overlay (POST /__nextjs_*) only when the
+  // server is a dev server (the page opened the HMR socket); React's dev-only
+  // eval() message is dropped on a dev server only, once the pass is over
+  const run = { page, writes: [], raw: [], devServer: false, devOverlay: 0 };
+  page.on("websocket", (ws) => {
+    if (/\/_next\/webpack-hmr/.test(ws.url())) run.devServer = true;
   });
-  // React's dev build warns when the page's CSP forbids eval (every dev page): not this page's error
-  const DEV_ONLY = /eval\(\) is not supported in this environment/;
-  page.on("console", (m) => m.type() === "error" && !DEV_ONLY.test(m.text()) && errors.push(m.text().slice(0, 300)));
-  page.on("pageerror", (e) => errors.push(String(e.message || e).slice(0, 300)));
-  return { page, writes, errors };
+  page.on("request", (req) => {
+    if (["GET", "HEAD"].includes(req.method())) return;
+    const path = new URL(req.url()).pathname;
+    if (run.devServer && path.startsWith("/__nextjs")) return void run.devOverlay++;
+    run.writes.push(`${req.method()} ${path}`);
+  });
+  page.on("console", (m) => m.type() === "error" && run.raw.push(m.text().slice(0, 300)));
+  page.on("pageerror", (e) => run.raw.push(String(e.message || e).slice(0, 300)));
+  Object.defineProperty(run, "errors", { get: () => run.raw.filter((e) => !(run.devServer && DEV_EVAL.test(e))) });
+  return run;
 }
 
 async function open(page, path = PAGE) {
@@ -188,6 +197,7 @@ async function catalog(drill) {
   drill.check(new URL(sup.page.url()).pathname === PAGE, "support: never left the catalog for the editor", sup.page.url());
   drill.check(sup.writes.length === 0, "support: no non-GET request in the whole pass", sup.writes);
   drill.check(sup.errors.length === 0, "support: no error in the browser console", sup.errors);
+  drill.note(`dev server: ${sup.devServer}; Next's dev overlay sent ${sup.devOverlay} request(s) to /__nextjs_* in support's pass (skipped only on a dev server)`);
   out.support = { facts: sf, writes: sup.writes };
 
   // --- staff: writes the storefront, can't sync ---

@@ -10,11 +10,11 @@
 //   create    COM-02: inline create, a failing price, one bundle, picked
 //   states    US-33: a component sold out through the sync writer
 //   nosaving  OQ-B: a bundle whose price no longer saves anything is hidden
-//   disabled  US-34 (bundle half): turned off in Catalog > Bundles
+//   disabled  US-34 (bundle half): turned off in Bundles
 //   grid      a grid of 4: available, sold out, turned off, deleted
 //   cart      the card's add equals the bundle page's; a COD test order,
 //             cancelled at once
-//   console   Catalog > Bundles: no slug or GID inputs; a price edit keeps a
+//   console   Bundles: no slug or GID inputs; a price edit keeps a
 //             live bundle on and the card shows the new price
 //   unknown   TREE-01: a draft with an unknown body source is refused 422
 import { stateLine } from "../../../lib/commerce/bundle-words.js";
@@ -337,7 +337,7 @@ export async function statesStage(drill) {
     return r?.note ? r : false;
   }, 90_000, 500);
   drill.check(lostPrev && lostPrev.note.includes(lostWords) && /Currently unavailable/.test(lostPrev.text) && lostPrev.items.some(([st, t]) => st === "missing" && /No longer available/i.test(t)), "states (lost product): the preview card says 'Currently unavailable', marks the product 'No longer available', and its founder note says to replace it", lostPrev);
-  drill.check((await inspectorLines(page))[0] === lostWords, "states (lost product): the inspector says the same (replace it in Catalog > Bundles)", (await inspectorLines(page))[0]);
+  drill.check((await inspectorLines(page))[0] === lostWords, "states (lost product): the inspector says the same (replace it in Bundles)", (await inspectorLines(page))[0]);
   await drill.screenshot(page, "states-lost-product-preview-1440");
   const pub2 = await publishAndRead(page);
   await closePanel(page);
@@ -364,20 +364,19 @@ export async function nosavingStage(drill) {
   const live0 = await liveHome(drill, base);
   drill.check(first.phase === "done" && live0.cards.some((x) => x.id === b.id && x.state === "available"), "nosaving: the card is live and available first", { phase: first.phase, cards: live0.cards.map((x) => [x.id, x.state]) });
 
-  // the founder raises the price above the products' sum in Catalog > Bundles
-  await page.goto("/admin/catalog#bundles", { waitUntil: "load", timeout: 120_000 });
+  // the founder raises the price above the products' sum on the bundle's page (/admin/bundles/<id>)
+  await page.goto(`/admin/bundles/${encodeURIComponent(b.id)}`, { waitUntil: "load", timeout: 120_000 });
   await settle(page);
-  const row = page.locator(`li[data-bundle-id="${b.id}"]`);
-  await row.getByRole("button", { name: "Edit", exact: true }).click();
-  const form = page.locator('[data-bundle-form="full"]');
+  const form = page.locator("main");
+  await form.locator("#bundle-price").waitFor({ timeout: 30_000 });
   await form.locator("#bundle-price").fill(String(Math.ceil(sum0) + 200));
-  await sleep(1500);
-  const priceReason = (await form.locator("[data-bundle-price-reason]").innerText().catch(() => "")).trim();
-  await form.getByRole("button", { name: "Save changes" }).click();
+  await waitFor(async () => (await form.locator("[data-bundle-price-reason]").count()) > 0, 15_000);
+  const priceReason = (await form.locator("[data-bundle-price-reason]").first().innerText().catch(() => "")).trim();
+  await form.locator("[data-bundle-save]").click();
   await sleep(2000);
   const refused = (await form.innerText()).replace(/\s+/g, " ");
   const stored = (await bundleRows()).find((x) => x.id === b.id);
-  drill.check(Number(stored.bundle_price) === price && Number(stored.enabled) === 1 && /Price must be lower than/.test(priceReason), "nosaving: raising a live bundle's price above its products' sum in Catalog > Bundles is refused with the reason, and nothing is saved (an edit that breaks a live bundle is refused: deviation 3.10)", { priceReason, stored: [stored.bundle_price, stored.enabled], said: refused.slice(0, 300) });
+  drill.check(Number(stored.bundle_price) === price && Number(stored.enabled) === 1 && /Price must be lower than/.test(priceReason), "nosaving: raising a live bundle's price above its products' sum in Bundles is refused with the reason, and nothing is saved (an edit that breaks a live bundle is refused: deviation 3.10)", { priceReason, stored: [stored.bundle_price, stored.enabled], said: refused.slice(0, 300) });
   await drill.screenshot(page, "nosaving-console-raise-refused-1440");
   drill.note("nosaving: a live bundle's price can't be raised above its sum through any writer (refused, deviation 3.10). So the drill makes the price stop saving the way it happens in a real store: the products get cheaper in a sync (lib/sync.js writeProduct), until they add up to less than the bundle's price.");
 
@@ -388,7 +387,7 @@ export async function nosavingStage(drill) {
   const sum1 = entry?.componentsSum;
   drill.check(s1.roundTrip && s2.roundTrip && entry?.state === "no_saving" && sum1 < price, `nosaving: both products' prices drop through the sync writer; the products now add up to ${INR(sum1)}, under the bundle's ${INR(price)}: state no_saving`, { state: entry?.state, sum: sum1, price, reasons: entry?.reasons });
   const sentence = words("no_saving", entry?.reasons || []);
-  drill.check(sentence === `The price no longer saves anything (the products add up to ${INR(sum1)}), so shoppers don't see it. Lower the price in Catalog > Bundles.`, "nosaving: the founder's words are the owner's OQ-B sentence, naming the sum", sentence);
+  drill.check(sentence === `The price no longer saves anything (the products add up to ${INR(sum1)}), so shoppers don't see it. Lower the price in Bundles.`, "nosaving: the founder's words are the owner's OQ-B sentence, naming the sum", sentence);
 
   const live1 = await liveHome(drill, base, { shot: "nosaving-live-home-1440" });
   drill.check(!live1.cards.length && !live1.text.includes("Value pair"), "nosaving: the live home has no card (hidden for shoppers, at once: bundles are not versioned)", { cards: live1.cards });
@@ -429,19 +428,19 @@ export async function disabledStage(drill) {
   const live0 = await liveHome(drill, base);
   drill.check(first.phase === "done" && live0.cards.some((x) => x.id === b.id), "disabled: the card is live first", { cards: live0.cards.map((x) => x.id) });
 
-  await page.goto("/admin/catalog#bundles", { waitUntil: "load", timeout: 120_000 });
+  await page.goto("/admin/bundles", { waitUntil: "load", timeout: 120_000 });
   await settle(page);
-  const row = page.locator(`li[data-bundle-id="${b.id}"]`);
+  const row = page.locator("tr", { has: page.locator(`[data-bundle-switch="${b.id}"]`) });
   await row.waitFor({ timeout: 30_000 });
   const rowText = (await row.innerText()).replace(/\s+/g, " ");
-  drill.check(/On your home page/.test(rowText), "disabled: Catalog > Bundles says the bundle is on the live home ('On your home page')", rowText.slice(0, 200));
-  await row.getByRole("button", { name: "Disable", exact: true }).click();
-  const confirm = page.locator("dialog[open]").last();
+  drill.check(/On your home page/.test(rowText), "disabled: Bundles says the bundle is on the live home ('On your home page')", rowText.slice(0, 200));
+  await row.locator(`[data-bundle-switch="${b.id}"]`).click();
+  const confirm = page.getByRole("alertdialog");
   await confirm.waitFor({ timeout: 15_000 });
   const confirmText = (await confirm.innerText()).replace(/\s+/g, " ");
   drill.check(/Shoppers will stop seeing this bundle on your home page right away\./.test(confirmText), "disabled: Disable asks first, saying shoppers stop seeing it on the home page right away", confirmText.slice(0, 300));
   await drill.screenshot(page, "disabled-confirm-1440");
-  await confirm.getByRole("button", { name: "Disable", exact: true }).click();
+  await confirm.getByRole("button", { name: "Turn off", exact: true }).click();
   const t0 = Date.now();
   await waitFor(async () => Number((await bundleRows()).find((x) => x.id === b.id)?.enabled) === 0, 15_000);
   let gone = false;
@@ -667,7 +666,7 @@ export async function cartStage(drill) {
 }
 
 // ---------------------------------------------------------------------------
-// console: Catalog > Bundles
+// console: Bundles
 // ---------------------------------------------------------------------------
 export async function consoleStage(drill) {
   await docStore(drill);
@@ -679,32 +678,35 @@ export async function consoleStage(drill) {
   const live0 = await liveHome(drill, base);
   drill.check(live0.cards.some((c) => c.id === b.id && c.text.includes(INR(b.bundle_price))), `console: the live card shows ${INR(b.bundle_price)} first`, live0.cards.map((c) => c.text.slice(0, 160)));
 
-  await page.goto("/admin/catalog#bundles", { waitUntil: "load", timeout: 120_000 });
+  await page.goto("/admin/bundles", { waitUntil: "load", timeout: 120_000 });
   await settle(page);
-  const card = page.locator("#bundles");
-  await card.waitFor({ timeout: 30_000 });
+  const card = page.locator("main");
+  await card.locator(`[data-bundle-switch="${b.id}"]`).waitFor({ timeout: 30_000 });
   const scan = async () =>
     card.evaluate((el) =>
       [...el.querySelectorAll("input, textarea, select")].map((i) => ({ id: i.id, name: i.name, type: i.type, placeholder: i.placeholder || "", label: (i.id && el.querySelector(`label[for="${i.id}"]`)?.innerText) || i.getAttribute("aria-label") || "" })),
     );
-  await card.getByRole("button", { name: "New bundle" }).click();
-  await card.locator('[data-bundle-form="full"]').waitFor({ timeout: 15_000 });
+  await card.getByRole("link", { name: "New bundle" }).first().click();
+  await page.waitForURL(/\/admin\/bundles\/new$/, { timeout: 60_000 });
+  await card.locator("#bundle-price").waitFor({ timeout: 30_000 });
   const newInputs = await scan();
-  await card.locator('[data-bundle-form="full"]').getByRole("button", { name: "Cancel" }).click();
-  await card.locator(`li[data-bundle-id="${b.id}"]`).getByRole("button", { name: "Edit", exact: true }).click();
-  const form = card.locator('[data-bundle-form="full"]');
-  await form.waitFor({ timeout: 15_000 });
+  await card.locator("[data-bundle-actions]").getByRole("link", { name: "Cancel" }).click();
+  await page.waitForURL(/\/admin\/bundles$/, { timeout: 60_000 });
+  await card.getByRole("link", { name: "Console pair" }).click();
+  await page.waitForURL(new RegExp(`/admin/bundles/${b.id}$`), { timeout: 60_000 });
+  const form = card;
+  await form.locator("#bundle-price").waitFor({ timeout: 30_000 });
   await waitFor(async () => (await form.locator("[data-bundle-saving]").count()) > 0, 15_000);
   const editInputs = await scan();
   const bad = [...newInputs, ...editInputs].filter((i) => /slug|gid|handle/i.test(`${i.id} ${i.name} ${i.placeholder} ${i.label}`));
   const text = await card.innerText();
-  drill.check(bad.length === 0 && !/gid:\/\//.test(text) && !/product-handle/.test(text), "console: Catalog > Bundles has no slug or GID inputs (New bundle and Edit)", { newInputs, editInputs, bad });
+  drill.check(bad.length === 0 && !/gid:\/\//.test(text) && !/product-handle/.test(text), "console: Bundles has no slug or GID inputs (New bundle and Edit)", { newInputs, editInputs, bad });
   await drill.screenshot(page, "console-edit-form-1440");
 
   const newPrice = Number(b.bundle_price) - 25;
   await form.locator("#bundle-price").fill(String(newPrice));
   await waitFor(async () => /Shoppers save/.test(await form.locator("[data-bundle-saving]").innerText().catch(() => "")), 15_000);
-  await form.getByRole("button", { name: "Save changes" }).click();
+  await form.locator("[data-bundle-save]").click();
   await waitFor(async () => Number((await bundleRows()).find((x) => x.id === b.id)?.bundle_price) === newPrice, 20_000);
   const row = (await bundleRows()).find((x) => x.id === b.id);
   drill.check(Number(row.bundle_price) === newPrice && Number(row.enabled) === 1, "console: editing the live bundle's price saves it and keeps it turned on", { price: row.bundle_price, enabled: row.enabled });

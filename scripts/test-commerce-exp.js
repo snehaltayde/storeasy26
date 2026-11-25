@@ -648,7 +648,7 @@ await t("P5: bundle words: no rupee sign, 'INR' or 'component ' in the source; U
   ok(usd.every((x) => x && !/₹|INR|component \d/.test(x)), usd.join(" | "));
   const money = [BW.stateLine("no_saving", REASONS, { currency: "USD" }), BW.reasonSentence(REASONS[2], { currency: "USD" })];
   ok(money.every((x) => x.includes("$1,500")), money.join(" | "));
-  eq(BW.stateLine("no_saving", REASONS, { currency: "USD" }), "The price no longer saves anything (the products add up to $1,500), so shoppers don't see it. Lower the price in Catalog > Bundles.", "final text:");
+  eq(BW.stateLine("no_saving", REASONS, { currency: "USD" }), "The price no longer saves anything (the products add up to $1,500), so shoppers don't see it. Lower the price in Bundles.", "final text:");
   for (const cur of [null, undefined]) ok(all(cur).every((x) => !/null|undefined/.test(x)), `${cur}: ${all(cur).join(" | ")}`);
   eq(BW.stateLine("available", []), "Showing to shoppers.", "available:");
   eq(BW.reasonSentence({ kind: "duplicate" }), "This product is already in the bundle", "duplicate:");
@@ -821,7 +821,7 @@ await t("P5-FIX1: compatFrom gives no no_saving while any product is missing (va
   same([all.state, all.reasons], ["no_saving", [{ kind: "no_saving", sum: 200, price: 250 }]], "every product found: no_saving as before");
   // the founder's words: replace the product, never lower the price
   const line = BW.stateLine(gone.state, gone.reasons, { currency: "USD" });
-  eq(line, "A product in this bundle is no longer in your catalog: shoppers see Currently unavailable and can't add it. Replace it with another product in Catalog > Bundles.", "the words:");
+  eq(line, "A product in this bundle is no longer in your catalog: shoppers see Currently unavailable and can't add it. Replace it with another product in Bundles.", "the words:");
   ok(!/Lower the price|add up to/.test(line), line);
   eq(BW.stateLine("sold_out", [{ kind: "sold_out", index: 0 }]), "A product in this bundle is sold out: shoppers see Currently unavailable and can't add it.", "a sold-out product keeps its words:");
 });
