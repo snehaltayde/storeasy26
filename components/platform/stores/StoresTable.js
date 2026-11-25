@@ -204,7 +204,7 @@ export default function StoresTable() {
             </Label>
             <div className="flex gap-2">
               <Input id="stores-q" type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name, id, domain or owner email" className="h-8" />
-              <Button type="submit" variant="outline" size="sm" data-read-control>
+              <Button type="submit" variant="outline" size="sm">
                 <Search aria-hidden /> Search
               </Button>
             </div>

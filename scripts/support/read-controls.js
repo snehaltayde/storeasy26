@@ -16,6 +16,11 @@ export function routeMatches(pattern, path) {
 // fails until its row says why and the count is raised). Phase 2 lines
 // append rows; when appends conflict, keep both sides.
 export const READ_CONTROLS = [
+  // Phase 3 line 1: the operator Stores list and store page
+  { path: "components/platform/stores/StoresTable.js", reason: "Refresh, Try again and Clear filters only re-ask GET /api/platform/tenants (or change the list's address); nothing is sent", marks: 3 },
+  { path: "components/platform/stores/FleetStrip.js", reason: "Try again re-asks GET /api/platform/overview", marks: 1 },
+  { path: "components/platform/stores/HealthCard.js", reason: "Try again re-asks GET /api/platform/tenants?health=<id>", marks: 1 },
+  { path: "components/platform/stores/StoreDetail.js", reason: "Open storefront and the onboarding-sheet and billing links are GETs", marks: 3 },
   // Phase 3 line 6: the operator Operations tabs
   { path: "components/platform/operations/OperationsTabs.js", reason: "the tab triggers only switch the shown tab (and ?tab=), no write", marks: 1 },
   // Phase 3 line 4: the operator Incidents list
