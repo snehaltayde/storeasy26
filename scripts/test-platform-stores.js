@@ -10,6 +10,8 @@
 // any store at all. Outside services are blanked and fetch() is blocked; every
 // database is a throwaway file: database.
 import { readFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -114,9 +116,9 @@ await audit({ actor: operatorActor({ kind: "operator", id: operatorId }), action
 const hashes = (await db().execute("SELECT password_hash FROM users WHERE password_hash IS NOT NULL")).rows.map((r) => String(r.password_hash));
 const CANARIES = [SECRET_VALUE, a.tenant.dbUrl, b.tenant.dbUrl, "nonexistent-dir-platstores", DB_TOKEN, tokenEnc, `${a.id}-secret`, "platstores-a-legacy-pass", ...hashes];
 const KEY_CANARIES = ['"db_url"', '"dbUrl"', '"db_token', '"dbToken"', '"secrets_enc"', '"password_hash"', '"secrets"'];
-function noCanary(text, label) {
+function noCanary(text, label, { keys = true } = {}) {
   for (const c of CANARIES) ok(!text.includes(c), `${label}: holds a canary value (${c.slice(0, 24)}…)`);
-  for (const k of KEY_CANARIES) ok(!text.includes(k), `${label}: holds the key ${k}`);
+  if (keys) for (const k of KEY_CANARIES) ok(!text.includes(k), `${label}: holds the key ${k}`);
 }
 // a signed-out or merchant answer holds no store at all
 const STORE_CANARIES = [a.id, b.id, a.tenant.name, b.tenant.name, "Bulk Store", "Stores Operator Ravi"];
@@ -147,14 +149,15 @@ async function withoutOperators(fn) {
     await db().execute({ sql: "UPDATE users SET is_operator = 1 WHERE id = ?", args: [operatorId] });
   }
 }
-async function call(caller, path, { params, query } = {}) {
+async function call(caller, path, { params, query, method = "GET" } = {}) {
   const route = await import(pathToFileURL(join(API, path, "route.js")).href);
   const concrete = path.replace(/\[(\w+)\]/g, (_, k) => encodeURIComponent(params?.[k] ?? k));
   const headers = { host: HOST };
   const jar = JARS[caller];
   if (Object.keys(jar).length) headers.cookie = Object.entries(jar).map(([k, v]) => `${k}=${v}`).join("; ");
-  const request = new NextRequest(`http://${HOST}/api/platform/${concrete}${query ? `?${query}` : ""}`, { method: "GET", headers });
-  const run = () => route.GET(request, { params: Promise.resolve(params ?? {}) });
+  if (method !== "GET") headers.origin = `http://${HOST}`;
+  const request = new NextRequest(`http://${HOST}/api/platform/${concrete}${query ? `?${query}` : ""}`, { method, headers });
+  const run = () => route[method](request, { params: Promise.resolve(params ?? {}) });
   const res = caller === "bootstrap-before" ? await withoutOperators(run) : await run();
   const text = await res.text();
   let json = null;
@@ -166,6 +169,11 @@ async function call(caller, path, { params, query } = {}) {
   return { status: res.status, body: json, text };
 }
 const list = (query = "") => call("operator", "tenants", { query });
+const { makePageHarness } = await import("./support/page-harness.js");
+const P = await makePageHarness({ tenant: async () => a.tenant });
+const runAs = (caller, rel, opts = {}) => (caller === "bootstrap-before" ? withoutOperators(() => P.run(rel, { cookies: JARS[caller], ...opts })) : P.run(rel, { cookies: JARS[caller], ...opts }));
+const LIST_PAGE = "app/(console)/platform/page.js";
+const STORE_PAGE = "app/(console)/platform/stores/[id]/page.js";
 
 // --- 3. the list ---------------------------------------------------------------------
 await t("list: 50 a page, newest first by default, with total, counts and the plan list", async () => {
@@ -222,6 +230,11 @@ await t("list: sort by name, created and last updated, both ways; bad params fal
   eq((await names("sort=updated&q=bulk")).slice(0, 1), ["Bulk Store 54"], "updated desc");
   const bad = (await list("sort=evil;drop&dir=sideways&status=nope&offset=-5")).body;
   eq([bad.params.sort, bad.params.dir, bad.params.status, bad.offset], ["created", "desc", null, 0], "fallbacks");
+  for (const o of ["Infinity", "1e21", "-Infinity", "NaN", "9007199254740993"]) {
+    const r = await list(`offset=${o}`);
+    eq(r.status, 200, `offset=${o}`);
+    ok(Number.isSafeInteger(r.body.offset) && r.body.offset <= L.MAX_OFFSET, `offset=${o} -> ${r.body.offset}`);
+  }
 });
 
 // --- 4. health ---------------------------------------------------------------------
@@ -239,9 +252,31 @@ await t("health: only the named stores, reachable ones with reasons, a missing d
   noCanary(r.text, "health");
 });
 
+// a store whose database never answers: the probe hangs for that store only
+const { tenantId: currentTenant } = await import("../lib/tenant-context.js");
+async function withHangingStore(id, fn, timeoutMs = 100) {
+  const saved = { ...L.storesHooks };
+  const real = saved.probe;
+  L.storesHooks.probe = () => (currentTenant() === id ? new Promise(() => {}) : real());
+  L.storesHooks.timeoutMs = timeoutMs;
+  try {
+    return await fn();
+  } finally {
+    Object.assign(L.storesHooks, saved);
+  }
+}
+
 await t("health: a store slower than the limit is unreachable, never healthy; at most a page of ids", async () => {
-  const h = await L.storeHealth([a.id], { timeoutMs: 1 });
-  ok(["unreachable", "attention"].includes(h[a.id].state) && h[a.id].state !== "healthy", JSON.stringify(h[a.id]));
+  eq(b.tenant && (await L.storeHealth([b.id]))[b.id].state, "healthy", "b has no attention reason without the hang");
+  const t0 = Date.now();
+  const h = await withHangingStore(b.id, () => L.storeHealth([a.id, b.id]));
+  eq(h[b.id].state, "unreachable", "the hanging store");
+  eq(h[b.id].reachable, false, "never reachable");
+  ok(h[a.id].reachable, "the other store is still checked");
+  ok(Date.now() - t0 < 3000, `cut off at the limit (${Date.now() - t0} ms)`);
+  const detail = await withHangingStore(b.id, () => L.storeDetail(b.id));
+  eq([detail.live.reachable, detail.live.behind], [false, null], "the store page's live card");
+  eq(Object.keys(await L.storeHealth([...BULK, ...BULK])).length, 50, "an id list is capped at a page");
   let timedOut = false;
   await L.withTimeout(new Promise(() => {}), 20).catch((e) => (timedOut = e.message === "timeout"));
   ok(timedOut, "a check that never answers is cut off");
@@ -253,8 +288,10 @@ await t("legacy: ?legacy=1 keeps the old console's shape (every store with healt
   const r = await list("legacy=1");
   eq(r.status, 200);
   eq(r.body.tenants.length, 57, "every store");
+  eq(r.body.tenants.slice(0, 50).filter((x) => x.health.state !== "unchecked").length, 50, "the first 50 are checked");
+  eq(r.body.tenants.slice(50).map((x) => [x.health.state, x.health.reachable]), Array.from({ length: 7 }, () => ["unchecked", false]), "the rest are not, and not reachable");
   const ta = r.body.tenants.find((x) => x.id === a.id);
-  ok(ta.health && ta.health.reachable === true && Array.isArray(ta.domains), "health and domains");
+  ok(ta.health && Array.isArray(ta.domains), "health and domains");
   noCanary(r.text, "legacy");
 });
 
@@ -291,6 +328,103 @@ await t("detail: GET tenants/[id] holds the store page and the old fields, secre
   noCanary(unreachable.text, "detail bulk");
 });
 
+// --- 5b. database addresses in error text, overview reachability, the rendered page -------
+const A = await import("../lib/platform/turso-api.js");
+
+await t("scrub: libsql://, file: and Turso https addresses and the store's own url and token are stripped from error text", () => {
+  const msg = "connect failed: libsql://acme-db-org.turso.io?authToken=abc; also file:/var/data/acme.db, https://acme-db-org.aws-ap-south-1.turso.io/v2/pipeline (see profile: x)";
+  const out = A.scrubSecrets(msg);
+  ok(!/libsql:|file:\/|turso\.io|authToken=abc/.test(out), out);
+  ok(out.includes("profile: x"), `a word ending in "file:" is left alone: ${out}`);
+  eq(A.scrubSecrets(`token was ${DB_TOKEN}`, [a.tenant.dbUrl, DB_TOKEN]), "token was [redacted]", "explicit values");
+});
+
+await t("canary: a provisioning run whose error holds the database address shows it nowhere", async () => {
+  await db().execute({
+    sql: "INSERT INTO provision_runs (id, tenant_id, status, steps, refs, params, error, created_at, updated_at) VALUES ('prov_platstores', ?, 'failed', ?, '{}', '{}', ?, ?, ?)",
+    args: [a.id, JSON.stringify([{ name: "database", status: "failed" }]), `SQLITE_CANTOPEN at ${a.tenant.dbUrl} (libsql://platstores-canary.turso.io; path ${a.tenant.dbUrl.replace(/^file:/, "")})`, now, now],
+  });
+  const r = await call("operator", "tenants/[id]", { params: { id: a.id } });
+  const run = r.body.runs.find((x) => x.id === "prov_platstores");
+  ok(run && run.error.includes("SQLITE_CANTOPEN"), `the run and its error are shown: ${run?.error}`);
+  noCanary(r.text, "detail with a failed run");
+  ok(!r.text.includes("platstores-canary.turso.io"), "the libsql address");
+  const page = await P.run(STORE_PAGE, { cookies: JARS.operator, params: { id: a.id } });
+  noCanary(page.text, "store page with a failed run");
+});
+
+await t("canary: a sync that fails on the store's database answers 500 without the database address", async () => {
+  const r = await call("operator", "tenants/[id]", { method: "POST", params: { id: "bulk-05" } });
+  eq(r.status, 500, r.text.slice(0, 200));
+  noCanary(r.text, "sync error");
+  ok(r.body.error, "an error is still said");
+});
+
+await t("overview: a store that never answers is cut off at the limit and reported unreachable and uncovered, never reachable", async () => {
+  const t0 = Date.now();
+  const r = await withHangingStore(b.id, () => call("operator", "overview"));
+  eq(r.status, 200, r.text.slice(0, 200));
+  ok(Date.now() - t0 < 5000, `bounded (${Date.now() - t0} ms)`);
+  const fb = r.body.fleet.find((f) => f.tenant === b.id);
+  eq(fb.reachable, false, "b in the fleet");
+  ok(!("behind" in fb) || fb.behind !== false, "no migration verdict for b");
+  eq(r.body.fleet.find((f) => f.tenant === a.id).reachable, true, "a still reachable");
+  ok(r.body.revenue30d.uncovered.some((u) => u.tenant === b.id), "b is uncovered, not counted");
+  for (const id of ["bulk-03", "bulk-40"]) eq(r.body.fleet.find((f) => f.tenant === id)?.reachable, false, `${id}: a database that does not exist is unreachable`);
+  noCanary(r.text, "overview");
+});
+
+// StoreDetail rendered for real (the page harness only records props): Next's
+// SWC compiles components/platform/stores, components/ui, components/kit and lib
+const require = createRequire(import.meta.url);
+const swc = require("next/dist/build/swc/index.js");
+const React = require("react");
+const { renderToStaticMarkup } = require("react-dom/server");
+const compiled = new Map();
+const resolveFile = (base) => [`${base}.js`, base].find((c) => {
+  try {
+    readFileSync(join(ROOT, c));
+    return true;
+  } catch {
+    return false;
+  }
+});
+async function loadComponent(rel) {
+  if (compiled.has(rel)) return compiled.get(rel);
+  await swc.loadBindings();
+  const file = join(ROOT, rel);
+  const out = (await swc.transform(readFileSync(file, "utf8"), { filename: file, jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } }, target: "es2022" }, module: { type: "commonjs" } })).code;
+  const deps = new Map();
+  for (const [, , id] of out.matchAll(/require\((["'])([^"']+)\1\)/g)) {
+    if (deps.has(id)) continue;
+    const local = id.startsWith("@/") ? id.slice(2) : id.startsWith(".") ? join(dirname(rel), id) : null;
+    if (local) {
+      const f = resolveFile(local);
+      if (!f) throw new Error(`${rel}: cannot resolve ${id}`);
+      deps.set(id, await loadComponent(f));
+    } else deps.set(id, require(id));
+  }
+  const mod = { exports: {} };
+  new Function("require", "module", "exports", out)((id) => deps.get(id), mod, mod.exports);
+  compiled.set(rel, mod.exports);
+  return mod.exports;
+}
+
+await t("render: StoreDetail renders a store with a theme pin and one with a legacy config.theme as kit-version", async () => {
+  const SD = (await loadComponent("components/platform/stores/StoreDetail.js")).default;
+  await C.patchTenant(a.id, { config: { theme_pin: { kit: "glow", version: 1 } } });
+  await db().execute({ sql: "UPDATE tenants SET config = json_set(json_remove(config, '$.theme_pin'), '$.theme', json('{\"kit\":\"pulse\",\"version\":1}')) WHERE id = ?", args: [b.id] });
+  for (const [id, want] of [[a.id, "glow-1"], [b.id, "pulse-1"]]) {
+    const detail = await L.storeDetail(id);
+    eq(detail.live.themePin, want, `${id} pin`);
+    const html = renderToStaticMarkup(React.createElement(SD, { detail }));
+    ok(html.includes(want) && html.includes('data-card="secrets"'), `${id}: rendered with ${want}`);
+    noCanary(html, `${id} rendered`, { keys: false }); // HTML, not JSON: data-card="secrets" is the card's name
+  }
+  const none = await L.storeDetail("bulk-06");
+  ok(renderToStaticMarkup(React.createElement(SD, { detail: none })).includes("Theme pin"), "an unreachable, unpinned store renders too");
+});
+
 // --- 6. every caller ------------------------------------------------------------------
 await t("permissions: operator and bootstrap-before get 200 on the list, health, legacy and detail; every other caller 401 with no store in it", async () => {
   const calls = [
@@ -315,11 +449,6 @@ await t("permissions: operator and bootstrap-before get 200 on the list, health,
 });
 
 // --- 7. the pages -----------------------------------------------------------------------
-const { makePageHarness } = await import("./support/page-harness.js");
-const P = await makePageHarness({ tenant: async () => a.tenant });
-const runAs = (caller, rel, opts = {}) => (caller === "bootstrap-before" ? withoutOperators(() => P.run(rel, { cookies: JARS[caller], ...opts })) : P.run(rel, { cookies: JARS[caller], ...opts }));
-const LIST_PAGE = "app/(console)/platform/page.js";
-const STORE_PAGE = "app/(console)/platform/stores/[id]/page.js";
 
 await t("pages: /platform is the Stores list for operators and the sign-in for everyone else, with no store in it", async () => {
   for (const caller of ALLOWED) {
@@ -344,6 +473,10 @@ await t("pages: a store's page for operators (no database details); denied calle
     noCanary(JSON.stringify(detail), `${caller} page`);
     noCanary(r.text, `${caller} page text`);
     eq((await runAs(caller, STORE_PAGE, { params: { id: "missing-store" } })).notFound, true, `${caller}: unknown id`);
+    for (const id of ["50%", "%E0%A4%A", "%zz"]) {
+      const odd = await runAs(caller, STORE_PAGE, { params: { id } });
+      eq([odd.notFound, odd.error && String(odd.error)], [true, null], `${caller}: the id ${id} is not decoded again`);
+    }
   }
   for (const caller of DENIED) {
     const r = await runAs(caller, STORE_PAGE, { params: { id: a.id } });

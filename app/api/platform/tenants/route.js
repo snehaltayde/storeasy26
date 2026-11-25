@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireOperator } from "@/lib/platform/require-operator";
 import { listTenants } from "@/lib/platform/control.js";
-import { listStores, storeHealth, healthIds } from "@/lib/platform/stores-list.js";
+import { listStores, storeHealth, healthIds, HEALTH_MAX_IDS } from "@/lib/platform/stores-list.js";
 
 // The operator's Stores list (Phase 3 line 1, lib/platform/stores-list.js).
 //   GET ?q=&status=&plan=&attention=1&sort=&dir=&offset=
@@ -26,8 +26,10 @@ export async function GET(request) {
   if (sp.has("health")) return json({ health: await storeHealth(healthIds(sp.get("health"))) });
   if (sp.get("legacy") === "1") {
     const rows = await listTenants();
-    const health = await storeHealth(rows.map((r) => r.id));
-    return json({ tenants: rows.map(({ id, name, status, domains, created_at, updated_at }) => ({ id, name, status, domains, created_at, updated_at, health: health[id] })) });
+    // live checks for the first 50 stores only, as for a page of the new list
+    const health = await storeHealth(rows.slice(0, HEALTH_MAX_IDS).map((r) => r.id));
+    const unchecked = { state: "unchecked", reasons: [], reachable: false, error: "not checked (the old console checks the first 50 stores)" };
+    return json({ tenants: rows.map(({ id, name, status, domains, created_at, updated_at }) => ({ id, name, status, domains, created_at, updated_at, health: health[id] || unchecked })) });
   }
   return json(await listStores(sp));
 }

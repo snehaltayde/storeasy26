@@ -16,7 +16,7 @@ export default async function StorePage({ params }) {
   const operator = await platformOperator((await cookies()).get(PLATFORM_COOKIE)?.value);
   if (!operator) redirect("/platform");
   const { id } = await params;
-  const detail = await storeDetail(typeof id === "string" ? decodeURIComponent(id) : null);
+  const detail = await storeDetail(typeof id === "string" ? id : null);
   if (!detail) notFound();
   return <StoreDetail detail={detail} />;
 }

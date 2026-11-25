@@ -6,6 +6,7 @@ import { startCatalogSync, KICK_BUDGET_MS } from "@/lib/platform/sync-jobs";
 import { withTenant } from "@/lib/tenant-context.js";
 import { slog } from "@/lib/log";
 import { storeDetail } from "@/lib/platform/stores-list";
+import { scrubSecrets } from "@/lib/platform/turso-api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -164,6 +165,7 @@ export async function POST(request, { params }) {
       { status: 202 },
     );
   } catch (e) {
-    return NextResponse.json({ ok: false, error: String(e?.message || e).slice(0, 300) }, { status: 500 });
+    // the store's database address or token never reaches the browser
+    return NextResponse.json({ ok: false, error: scrubSecrets(e?.message || e, [tenant.dbUrl, tenant.dbToken]).slice(0, 300) }, { status: 500 });
   }
 }

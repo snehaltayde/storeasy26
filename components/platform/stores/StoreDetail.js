@@ -150,7 +150,7 @@ export default function StoreDetail({ detail }) {
               {live.behind === true && <Badge variant="warning">Behind</Badge>}
               {live.behind === false && <Badge variant="success">Current</Badge>}
             </Row>
-            <Row label="Theme pin">{live.themePin ? <span className="font-mono">{live.themePin}</span> : "None"}</Row>
+            <Row label="Theme pin">{typeof live.themePin === "string" && live.themePin ? <span className="font-mono">{live.themePin}</span> : "None"}</Row>
           </dl>
         </Section>
 
