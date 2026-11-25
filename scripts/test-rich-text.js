@@ -188,6 +188,12 @@ console.log("1. the editor's tags are exactly the tags the server keeps");
 const ALL_TAGS = "a abbr address area article aside audio b base bdi bdo blockquote body br button canvas caption cite code col colgroup data datalist dd del details dfn dialog div dl dt em embed fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 head header hgroup hr html i iframe img input ins kbd label legend li link main map mark menu meta meter nav noscript object ol optgroup option output p param picture pre progress q rp rt ruby s samp script section select slot small source span strong style sub summary sup svg table tbody td template textarea tfoot th thead time title tr track u ul var video wbr font center marquee o:p st1:place founder".split(" ");
 const kept = (tag) => sanitizeHtml(`<${tag}>x</${tag}>`).startsWith(`<${tag}`);
 
+await t("unit: a link starting /\\ is another site to browsers (//host), so it loses its href; /path keeps it", () => {
+  const out = sanitizeHtml('<p><a href="/\\evil.com">x</a> <a href="/collections/new">y</a></p>');
+  ok(!out.includes("evil.com"), `backslash link dropped: ${out}`);
+  ok(out.includes('href="/collections/new"'), `store path kept: ${out}`);
+});
+
 await t("unit: marks, blocks and the read-only tags together are exactly what lib/sanitize.js keeps", () => {
   const server = ALL_TAGS.filter(kept).sort();
   const editor = [...M.MARKS, ...M.BLOCKS, ...M.NOT_EDITABLE].sort();

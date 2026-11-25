@@ -26,7 +26,9 @@ async function themes(drill) {
     console.log(`— stage ${s.name}`);
     await s.fn(drill);
   }
-  drill.check(consoleErrors.length === 0, "no error in the browser console", consoleErrors);
+  // the refused evil package answers 422 on purpose (stage-upload checks the issues it lists)
+  const unexpected = consoleErrors.filter((e) => !/status of 422 \(Unprocessable (Entity|Content)\)/.test(e));
+  drill.check(unexpected.length === 0, "no error in the browser console", unexpected);
 }
 
 runDrill({ id: "THEMES", part: "main", title: "THEMES — upload, refuse unsafe packages, render, switch with a preview" }, themes).then(
