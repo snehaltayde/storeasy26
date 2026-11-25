@@ -3,6 +3,17 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-26 Phase 7 line 2: search filters (on the owner's behalf)
+
+- **Permissions:** none new. `/search` with filters is an anonymous read of this store's `products` (active only) and their published values (`display_type`, `display_vendor`, variants' `selected_options`); tags are never a facet. Support and operators see what a shopper sees.
+- **Schema:** no migration. The Typesense collection gains `options` and `options_available` (string[] facets of `name:value`, name lowercased), `created_at` (int64, for Newest) and `price` becomes a facet (min/max stats). A full sync recreates the collection with them; until then the facet query fails and that request uses SQL (`search_facets_fallback`).
+- **At most 6 selected groups** (type, brand and option names together) so one `multi_search` stays at 7 queries; extra option groups in the URL are dropped. Option groups shown stay at 6.
+- **Price and "In stock" have no counts**; the price placeholders are the cheapest and dearest price in the current results. Price filters on `price_min`.
+- **Filters without a query work** (`/search?type=Tee` lists every Tee); a bare `/search` still asks for 2 characters.
+- **SQL facets in one statement:** results (a window `row_number`) and every count in one `UNION ALL` over two materialized CTEs, so the `json_each` over variants runs once. Measured at 5,000 products × 4 variants (local file db, best of 3): 113 ms with no filter, 110 ms with a query, 113 ms with seven filters (the two-statement first version took 261 ms with seven filters). Under the plan's 150 ms line, so no table.
+- **The SQL option label** is the alphabetically first spelling of the name (`min(label)`); Typesense shows the lowercased name with a capital first letter.
+- **Sort and price are GET forms** (sort submits on change with JavaScript, a Sort button without it); a facet value or chip is a plain link, so Back/Forward restore filters. Without JavaScript the phone shows the rail inline (a `<noscript>` copy) instead of the sheet.
+
 ## 2026-11-26 Phase 7 flagship themes and storefront UX plan (on the owner's behalf)
 
 - **Schema:** tenant 0035 adds `theme_packages.source` (`upload` | `storeasy`). Only uploads count toward the 30 limit and obey the uploaded-themes kill switch.

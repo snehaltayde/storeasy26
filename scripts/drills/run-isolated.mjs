@@ -479,6 +479,8 @@ export const DRILLS = {
   themes: { id: "THEMES", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/themes/run.mjs", ...c.headed])) },
   // Phase 6: the studio (lines 1 and 2 add the stage files; in ALL since the phase end)
   studio: { id: "STUDIO", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/studio/run.mjs", ...c.headed])) },
+  // Phase 7 line 2: search filters on the storefront (desktop rail, the phone's sheet), on the roles store
+  search: { id: "SEARCH", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/search/run.mjs", ...c.headed])) },
   "support-access": { id: "SUPPORT-ACCESS", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/support-access/run.mjs", ...c.headed])) },
   // a founder connects Shopify from onboarding step 1 (Phase 1 line 4 §5 item 14):
   // the roles store plus the Roles Annex; the drill starts the Shopify stand-in

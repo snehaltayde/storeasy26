@@ -1055,5 +1055,14 @@ await t("no Shopify call, and no network call at all, was made anywhere in this 
 for (const c of raws.values()) c.close();
 await F.removeFixtureFiles("se");
 await rm(join(ROOT, ".test-se-default.db"), { force: true });
+await t("P7-FACETS document shape: every key buildSearchDoc writes; options and options_available are string arrays (Default Title is none), created_at is seconds", async () => {
+  const d = await docFor(docs, 3);
+  eq(Object.keys(d).sort(), ["available", "created_at", "currency", "description", "handle", "id", "image", "options", "options_available", "price", "product_type", "tags", "title", "vendor"], "keys:");
+  eq([d.options, d.options_available], [[], []], "the fixture's only option is Default Title:");
+  eq(d.created_at, Date.parse("2026-01-01T00:00:00Z") / 1000, "created_at:");
+  const sized = SD.buildSearchDoc({ handle: "x", options: ["size:M", "size:L"], options_available: ["size:M"], created_at: null });
+  eq([sized.options, sized.options_available, sized.created_at], [["size:M", "size:L"], ["size:M"], 0]);
+});
+
 realLog(`\n${pass} passed, ${fail} failed in ${((Date.now() - started) / 1000).toFixed(1)}s.`);
 process.exit(fail ? 1 : 0);

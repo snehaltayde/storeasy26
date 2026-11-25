@@ -336,3 +336,14 @@ Each Phase 3 line fills only its own sub-heading.
 - **Design tab:** groups sit 24px apart with a 14px semibold title over a hairline; the theme line is a bordered muted note; each failing readability pair is a card with 14px text and its fix button.
 - **Publish dialog:** each row's checkbox is labelled by its name and described by its reason (`aria-describedby`); "Other drafts" is a 14px heading under a divider.
 - **Small screens:** the four pane tabs are an equal four-column grid (fits 375px). `loading.js` shows the same tab strip below 1024px.
+
+## Storefront: search filters (Phase 7 line 2)
+
+- **Layout:** `/search?q=…` keeps its heading and "12 products" line. Desktop (≥ 1024px): a 15rem left rail (`FacetRail`) and the results; the sort form top right. Phone: a "Filters (3)" button (the number is every value, price and In stock that is on) opens `FacetSheet`, a full-height sheet with the same rail, a close button and a "Show 12 products" footer button.
+- **Rail:** "In stock only" first, then Product type, Brand and one group per option name (Size, Colour …), each value a link with a checkbox look, the value and its count (disjunctive: a group's counts ignore its own filter). A group shows with two or more values or when one is selected; past 8 values the rest sit under "Show all (N)" (a `<details>`, open when one of them is selected). Price last: min and max number fields with "Apply price" (a GET form; placeholders are the current results' cheapest and dearest).
+- **Chips:** above the results, one chip per filter ("Tee", "Size: M", "Price: 150 – 300", "In stock") with a × that removes it, then "Clear all".
+- **Sort:** Relevance, Price: low to high, Price: high to low, Newest. 24 per page; numbered page links (first, last, two either side of the current one).
+- **Empty:** "No products match these filters." with "Clear all filters"; a query alone with no match keeps "No products match “q”." with "Browse all collections →".
+- **Without JavaScript:** every value, chip, page and Clear is a link and price and sort are GET forms (a Sort button appears); the phone shows the rail inline instead of the sheet.
+- **Sheet:** `role="dialog"`, `aria-modal`; focus starts on the close button and Tab/Shift+Tab wrap inside; Escape or "Show N products" closes it and focus returns to "Filters"; picking a value keeps it open with new counts. Body scroll is locked while open.
+- Filtered pages are `noindex`. Needs the design pass (`ui-designer`): the rail, the chips, the sheet, the page links.
