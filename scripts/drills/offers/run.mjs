@@ -159,12 +159,18 @@ async function staffFlows(drill, page) {
 
 async function supportPass(drill, page, made) {
   const writes = [];
+  let devOverlay = 0;
   page.on("request", (req) => {
     const path = new URL(req.url()).pathname;
+    // /__nextjs_* is the dev server's own error overlay (next dev only), not the app
+    if (path.startsWith("/__nextjs_")) return void devOverlay++;
     if (!["GET", "HEAD"].includes(req.method()) && !READ_POSTS.some((r) => r.method === req.method() && r.path === path)) writes.push(`${req.method()} ${path}`);
   });
   const errors = [];
-  page.on("console", (m) => m.type() === "error" && errors.push(`${new URL(page.url()).pathname}: ${m.text().slice(0, 300)}`));
+  // React's development build says it needs eval() under the app's CSP (no
+  // 'unsafe-eval', next.config.mjs) on every page of a next dev server: noted, not this slice's
+  const DEV_EVAL = /eval\(\) is not supported in this environment/;
+  page.on("console", (m) => m.type() === "error" && !DEV_EVAL.test(m.text()) && errors.push(`${new URL(page.url()).pathname}: ${m.text().slice(0, 300)}`));
   page.on("pageerror", (e) => errors.push(`${new URL(page.url()).pathname}: ${String(e?.message || e).slice(0, 300)}`));
   const reads = [];
   page.on("request", (req) => READ_POSTS.some((r) => r.path === new URL(req.url()).pathname) && reads.push(req.method()));
@@ -185,6 +191,7 @@ async function supportPass(drill, page, made) {
   }
   drill.check(writes.length === 0, "support: no non-GET request but the listed reads", writes);
   drill.check(errors.length === 0, "support: no console error or page error on the four pages", errors);
+  drill.note(`next dev: React's dev build asked for eval() under the CSP on these pages; its overlay sent ${devOverlay} request(s) to /__nextjs_* (dev tooling, not counted as writes)`);
   // the route's loading.js streams the page, so the status is already sent: the not-found page says it
   const missing = [];
   for (const path of ["/admin/offers/off_missing", "/admin/bundles/bun-missing"]) {
