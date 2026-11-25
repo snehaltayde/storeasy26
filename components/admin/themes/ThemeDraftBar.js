@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { ExternalLink } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { RoleGate } from "@/components/kit/role-gate";
 import { roleAllows } from "@/lib/platform/authz";
 import { useToast } from "@/components/kit/toast";
@@ -16,10 +19,13 @@ import { NO_PUBLISH, PREVIEW_NOTE, postTheme, putDocuments } from "@/components/
 //            (POST /api/admin/preview-session { create }, then { showDesign:
 //            { sid, on: true } }), opened in a new tab; reused while this page
 //            stays open
-//   Publish  (storefront.publish; staff see "Ask an admin to publish"): the
-//            documents publishSet of the design and the layout and home
-//            drafts the theme wrote (release, publish_log and audit in one
-//            batch; an archived theme is refused there)
+//   Publish  (storefront.publish; staff see "Ask an admin to publish"): a
+//            confirm lists every other pending layout or home draft with a
+//            checkbox, ticked only when the server suggests it (a layout whose
+//            only change is its template; home when the last apply asked for
+//            it); the documents publishSet is the design plus exactly the
+//            ticked drafts, each at the revision and draft hash shown
+//            (release, publish_log and audit in one batch)
 //   state: GET /api/admin/themes state; names: { live, draft } look names
 export function ThemeDraftBar({ state, names, role }) {
   const router = useRouter();
@@ -27,7 +33,15 @@ export function ThemeDraftBar({ state, names, role }) {
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
   const [session, setSession] = useState(null);
+  const [confirming, setConfirming] = useState(false);
+  const [ticked, setTicked] = useState({});
   if (!state?.publishSet?.length) return null;
+  const extras = state.publishSet.filter((d) => d.id !== "doc_design");
+  const openConfirm = () => {
+    setError(null);
+    setTicked(Object.fromEntries(extras.map((d) => [d.id, d.suggested === true])));
+    setConfirming(true);
+  };
 
   async function preview() {
     setBusy("preview");
@@ -58,14 +72,15 @@ export function ThemeDraftBar({ state, names, role }) {
   async function publish() {
     setBusy("publish");
     setError(null);
-    const r = await putDocuments({ publishSet: state.publishSet.map(({ id, revision, draftHash }) => ({ id, revision, draftHash })) });
+    const set = state.publishSet.filter((d) => d.id === "doc_design" || ticked[d.id] === true);
+    const r = await putDocuments({ publishSet: set.map(({ id, revision, draftHash }) => ({ id, revision, draftHash })) });
     setBusy(null);
+    setConfirming(false);
     if (!r.ok) return setError(r.error);
     toast.success(`${names.draft} is live on your store.`);
     router.refresh();
   }
 
-  const others = state.publishSet.filter((d) => d.id !== "doc_design").map((d) => d.label);
   return (
     <Alert data-themes="draft-bar">
       <AlertTitle>
@@ -74,7 +89,7 @@ export function ThemeDraftBar({ state, names, role }) {
       <AlertDescription>
         <p>
           {PREVIEW_NOTE}
-          {others.length ? ` Publishing also puts these drafts live: ${others.join(", ")}.` : ""}
+          {extras.length ? " Publishing lets you choose which of your other drafts go live with it." : ""}
         </p>
         {error ? <p className="mt-2 text-destructive">{error}</p> : null}
         <div className="mt-3 flex flex-wrap gap-2">
@@ -82,13 +97,40 @@ export function ThemeDraftBar({ state, names, role }) {
             <ExternalLink aria-hidden /> Preview
           </Button>
           <RoleGate role={role} action="storefront.publish" reason={NO_PUBLISH}>
-            <Button type="button" size="sm" disabled={!!busy} aria-busy={busy === "publish"} onClick={publish} data-themes-action="publish">
+            <Button type="button" size="sm" disabled={!!busy} aria-busy={busy === "publish"} onClick={openConfirm} data-themes-action="publish">
               Publish
             </Button>
           </RoleGate>
           {!roleAllows(role, "storefront.publish") ? <span className="self-center text-sm text-muted-foreground">{NO_PUBLISH}</span> : null}
         </div>
       </AlertDescription>
+      <AlertDialog open={confirming} onOpenChange={(o) => !busy && setConfirming(o)}>
+        <AlertDialogContent data-themes="publish-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Publish {names.draft}?</AlertDialogTitle>
+            <AlertDialogDescription>Your design goes live. {extras.length ? "Tick the other drafts to publish with it; the rest stay drafts." : "Nothing else changes."}</AlertDialogDescription>
+          </AlertDialogHeader>
+          {extras.length ? (
+            <ul className="space-y-2">
+              {extras.map((d) => (
+                <li key={d.id} className="flex items-start gap-2">
+                  <Checkbox id={`pub-${d.id}`} checked={ticked[d.id] === true} onCheckedChange={(v) => setTicked((t) => ({ ...t, [d.id]: v === true }))} data-themes-publish-item={d.id} />
+                  <Label htmlFor={`pub-${d.id}`} className="font-normal">
+                    {d.label}
+                    {d.suggested ? <span className="text-muted-foreground"> (changed by the theme)</span> : <span className="text-muted-foreground"> (has other edits)</span>}
+                  </Label>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!busy}>Cancel</AlertDialogCancel>
+            <Button type="button" disabled={!!busy} aria-busy={busy === "publish"} onClick={publish} data-themes-action="publish-confirm">
+              Publish
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Alert>
   );
 }

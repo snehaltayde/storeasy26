@@ -46,3 +46,4 @@ export function lookName(look, builtins, packages) {
   if (look.package) return packages.find((p) => p.id === look.package)?.name ?? "an uploaded theme";
   return builtins.find((k) => k.id === look.kit)?.label ?? "Pulse";
 }
+export const LIVE_ARCHIVED = "Your live theme was archived. Choose another before you publish design changes.";

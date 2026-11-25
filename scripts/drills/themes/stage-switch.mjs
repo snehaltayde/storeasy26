@@ -39,8 +39,10 @@ stage("switch", async (drill) => {
     await owner.locator('[data-themes="draft-bar"]').waitFor();
   };
   const publish = async () => {
-    const done = answer("/api/admin/documents");
     await owner.locator('[data-themes-action="publish"]').click();
+    await owner.locator('[data-themes="publish-dialog"]').waitFor();
+    const done = answer("/api/admin/documents");
+    await owner.locator('[data-themes-action="publish-confirm"]').click();
     const r = await done;
     drill.check(r.status() === 200, "publish: the documents publish answers 200", await r.text().catch(() => ""));
     await owner.locator('[data-themes="draft-bar"]').waitFor({ state: "detached" });

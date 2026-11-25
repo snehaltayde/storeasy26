@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/kit/data-table";
 import { EmptyState } from "@/components/kit/empty-state";
 import { Swatch } from "@/components/admin/themes/Swatch";
-import { USE_WORDS, lookName, sameLook, shortDate } from "@/components/admin/themes/theme-words";
+import { LIVE_ARCHIVED, USE_WORDS, lookName, sameLook, shortDate } from "@/components/admin/themes/theme-words";
 import { ApplyThemeDialog } from "@/components/admin/themes/ApplyThemeDialog";
 import { ThemeDraftBar } from "@/components/admin/themes/ThemeDraftBar";
 
@@ -48,6 +48,11 @@ export function ThemeLibrary({ builtins, packages, archived, state = null, role 
   ];
   return (
     <div className="space-y-8">
+      {state?.liveArchived ? (
+        <p className="text-sm text-destructive" data-themes="live-archived">
+          {LIVE_ARCHIVED}
+        </p>
+      ) : null}
       <ThemeDraftBar state={state} names={names} role={role} />
       <section className="space-y-3" aria-labelledby="builtin-looks">
         <h2 id="builtin-looks" className="text-sm font-medium">

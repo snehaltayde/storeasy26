@@ -222,12 +222,14 @@ const inStore = async (tn, fn, cookies = {}) => {
   }
 };
 
-const apply = (caller, id, args = {}) => call(caller, "themes/[id]", "POST", { params: { id }, body: { apply: args } });
 const design = () => a.run(() => Docs.getDocument("doc_design"));
+// apply names the design revision it saw unless the test passes its own
+const apply = async (caller, id, args = {}) => call(caller, "themes/[id]", "POST", { params: { id }, body: { apply: Object.hasOwn(args, "revision") ? args : { revision: (await design()).revision, ...args } } });
 const stateOf = async () => (await call("owner", "themes", "GET")).body.state;
-const publishSet = async (caller = "owner") => {
+// what the Themes page's Publish confirm sends by default: the design and the suggested drafts
+const publishSet = async (caller = "owner", pick = (d) => d.suggested) => {
   const s = await stateOf();
-  const r = await call(caller, "documents", "PUT", { body: { publishSet: s.publishSet.map(({ id, revision, draftHash }) => ({ id, revision, draftHash })) } });
+  const r = await call(caller, "documents", "PUT", { body: { publishSet: s.publishSet.filter((d) => d.id === "doc_design" || pick(d)).map(({ id, revision, draftHash }) => ({ id, revision, draftHash })) } });
   await H.drainAfter();
   return r;
 };
@@ -253,6 +255,9 @@ await t("support and the operator get 403 on apply; signed out and store B's own
 
 await t("a malformed apply is 400 before anything is read; an unknown or other store's theme is 404", async () => {
   eq((await apply("owner", PKG, { withBrand: "yes" })).status, 400, "bad flag:");
+  const noRev = await apply("owner", PKG, { revision: undefined });
+  eq(noRev.status, 400, "no revision while a design exists:");
+  eq(noRev.body.code, "REVISION_REQUIRED", "code:");
   eq((await call("owner", "themes/[id]", "POST", { params: { id: PKG }, body: { apply: {}, archive: true } })).status, 400, "two ops:");
   eq((await apply("owner", "thm_0000000000000000")).status, 404, "unknown:");
   eq((await apply("owner", B_PKG)).status, 404, "store B's package:");
@@ -302,6 +307,8 @@ await t("state and badges: Aurora is 'In your draft', Pulse is live; the publish
   eq(JSON.stringify(r.body.state.draft), JSON.stringify({ kit: "pulse", package: PKG }), "draft:");
   eq(r.body.packages.find((p) => p.id === PKG).inUse, "draft", "badge:");
   eq(r.body.state.publishSet.map((d) => d.id).sort().join(","), "doc_collection_layout,doc_design,doc_footer,doc_header,doc_product_layout", "publish set:");
+  ok(r.body.state.publishSet.every((d) => d.suggested === true), "every layout draft only changed its template: suggested");
+  eq(r.body.state.liveArchived, false, "liveArchived:");
 });
 
 await t("revision concurrency: a stale revision is 409 'Someone else changed your design just now'", async () => {
@@ -383,6 +390,51 @@ await t("choosing a built-in look (POST /api/admin/theme) clears package and the
   eq((await stateOf()).draft.package, null, "state:");
 });
 
+await t("the stale-home case: Boreal with its home layout, then Glow, then Boreal without it: the home draft is not suggested", async () => {
+  eq((await apply("owner", PKG2, { withHome: false })).status, 200, "Boreal without home:");
+  const home = (await stateOf()).publishSet.find((d) => d.id === "doc_home");
+  ok(home, "the stale home draft is pending");
+  eq(home.suggested, false, "not suggested:");
+});
+
+await t("an unrelated home edit made in the editor is not published by default; the layouts the theme wrote are", async () => {
+  await a.run(async () => {
+    const h = await Docs.getDocument("doc_home");
+    const sec = R.newSection("text", { id: "sec_thswitch9" });
+    await Docs.saveDraft({ id: "doc_home", revision: h.revision, body: { ...h.body, sections: [{ ...sec, settings: { ...sec.settings, title: "Editor edit", body: ["Not the theme's."] } }] }, actor: { kind: "merchant", id: store.users.owner.id } });
+  });
+  eq((await apply("owner", PKG, { withHome: false })).status, 200, "Aurora without home:");
+  const homeBefore = await a.run(() => Docs.getDocument("doc_home"));
+  const s = await stateOf();
+  eq(s.publishSet.find((d) => d.id === "doc_home")?.suggested, false, "home not suggested:");
+  const r = await publishSet("owner");
+  eq(r.status, 200, `publish: ${JSON.stringify(r.body).slice(0, 200)}`);
+  const homeAfter = await a.run(() => Docs.getDocument("doc_home"));
+  eq(homeAfter.publishedVersionId, homeBefore.publishedVersionId, "home stayed as it was live:");
+  ok(homeAfter.draftHash !== homeAfter.publishedHash, "the editor's home edit is still a draft");
+  eq((await stateOf()).publishSet.length, 0, "nothing else pending with the design:");
+});
+
+await t("a half-finished apply (a layout document made by someone else meanwhile) is audited partial and answers the conflict words", async () => {
+  const { applyPackage, ThemeError } = await import("../lib/themes/packages.js");
+  const { DocumentError } = await import("../lib/documents/service.js");
+  const documents = { ...Docs, saveDraft: (args) => (args.id === "doc_header" ? Promise.reject(new DocumentError(409, "DOCUMENT_EXISTS", "exists")) : Docs.saveDraft(args)) };
+  let err = null;
+  await a.run(async () => {
+    try {
+      await applyPackage(PKG2, { actor: { kind: "merchant", id: store.users.owner.id }, revision: (await Docs.getDocument("doc_design")).revision, documents });
+    } catch (e) {
+      err = e;
+    }
+  });
+  ok(err instanceof ThemeError && err.status === 409, `refused: ${err}`);
+  ok(/Someone else changed your design just now/.test(err.message), err.message);
+  const row = (await auditRows()).find((x) => x.action === "themes.apply");
+  const diff = typeof row.diff === "string" ? JSON.parse(row.diff) : row.diff;
+  eq(JSON.stringify([diff.package, diff.partial]), JSON.stringify([PKG2, true]), "partial audit:");
+  eq((await apply("owner", PKG, { withHome: false })).status, 200, "back to Aurora in the draft:");
+});
+
 await t("an archived package blocks publish: 409 'This theme was archived. Choose another before publishing.' and nothing goes live", async () => {
   eq((await apply("owner", PKG_GONE, { withHome: false })).status, 200, "apply:");
   await sql(a, "UPDATE theme_packages SET status = 'archived', archived_at = ?, archived_by = 'test' WHERE id = ?", [new Date().toISOString(), PKG_GONE]);
@@ -406,19 +458,52 @@ await t("publishBlockers runs checkBrand with the package surfaces: a hand-edite
   eq((await a.run(() => Kits.themePackageBlockers(body))).length, 0, "Aurora's own surfaces:");
 });
 
-await t("publish Boreal, then rollback (undo) renders the older package, Aurora, and re-pins it", async () => {
+const CENTRED = "grid-cols-[1fr_auto_1fr]";
+const publishBoreal = async () => {
   eq((await apply("owner", PKG2, { withHome: false })).status, 200, "apply Boreal:");
   const r = await publishSet("owner");
   eq(r.status, 200, `publish Boreal: ${JSON.stringify(r.body).slice(0, 300)}`);
-  eq(themeAttr(await storeHtml(a)), "boreal", "Boreal live:");
+  const html = await storeHtml(a);
+  eq(themeAttr(html), "boreal", "Boreal live:");
+  ok(!html.includes(CENTRED), "Boreal's standard header is live");
   eq((await getTenant(a.id, { fresh: true })).config.theme_pin.package, PKG2, "pin Boreal:");
+  return r;
+};
+const auroraBack = async (label) => {
+  const html = await storeHtml(a);
+  eq(themeAttr(html), "aurora", `${label}: Aurora:`);
+  ok(html.includes(CENTRED), `${label}: Aurora's centred header is back`);
+  eq((await getTenant(a.id, { fresh: true })).config.theme_pin.package, PKG, `${label}: pin Aurora:`);
+};
+
+await t("rollback, the design row's Undo: it undoes the theme's layouts with it, so Aurora and its centred header come back", async () => {
+  const r = await publishBoreal();
   const undo = r.body.published.find((p) => p.id === "doc_design").undo;
   const u = await call("owner", "documents", "PUT", { body: { undo: { id: undo.id, logId: undo.logId }, revision: undo.revision } });
   await H.drainAfter();
   eq(u.status, 200, `undo: ${JSON.stringify(u.body).slice(0, 300)}`);
-  eq(themeAttr(await storeHtml(a)), "aurora", "rolled back to Aurora:");
-  eq((await getTenant(a.id, { fresh: true })).config.theme_pin.package, PKG, "pin Aurora:");
+  ok(u.body.document?.id === "doc_design", "the answer still names the design");
+  await auroraBack("design Undo");
   ok(auroraLog, "the earlier Aurora publish");
+});
+
+await t("rollback, the whole publish's Undo (undoSet): Aurora and its centred header come back", async () => {
+  const r = await publishBoreal();
+  const setId = String((await sql(a, "SELECT set_id FROM publish_log WHERE id = ?", [r.body.published.find((p) => p.id === "doc_design").undo.logId]))[0].set_id);
+  const members = r.body.published.map((p) => ({ id: p.undo.id, logId: p.undo.logId }));
+  const u = await call("owner", "documents", "PUT", { body: { undoSet: { setId, members } } });
+  await H.drainAfter();
+  eq(u.status, 200, `undoSet: ${JSON.stringify(u.body).slice(0, 300)}`);
+  await auroraBack("whole-publish Undo");
+});
+
+await t("the Themes page says so when the live theme was archived", async () => {
+  await sql(a, "UPDATE theme_packages SET status = 'archived' WHERE id = ?", [PKG]);
+  eq((await stateOf()).liveArchived, true, "liveArchived:");
+  await sql(a, "UPDATE theme_packages SET status = 'installed' WHERE id = ?", [PKG]);
+  const src = await readFile(join(ROOT, "components/admin/themes/ThemeLibrary.js"), "utf8");
+  const words = await readFile(join(ROOT, "components/admin/themes/theme-words.js"), "utf8");
+  ok(src.includes("state?.liveArchived") && words.includes("Your live theme was archived. Choose another before you publish design changes."), "the line");
 });
 
 await t("the kill switch ff_theme-packages refuses apply in plain words", async () => {
