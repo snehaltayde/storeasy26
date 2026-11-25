@@ -124,6 +124,8 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - **Sidebar at 768px:** `docs/UI.md` says the console sidebar collapses to icons at tablet width; it stays fully open. Fix in the shell.
 - **Soft-navigation writes from support:** opening `/admin/onboarding` as support sends `POST /api/admin/preview-session` and `/admin/releases` sends `PUT /api/admin/documents`; the shell drill lists them under `found.softNav`. Check those pages' own support passes (the editor line covers releases).
 - **Insights model id:** `lib/ai/insights.js` hard-codes the model id (`AI_MODEL`); read it from config with a checked default before the AI line.
+- **Radio circles in dark mode:** unselected circles in `components/ui/radio-group.js` are barely visible in dark mode.
+- **Roles harness cookies shared across ports:** every roles harness serves `roles.localhost`, and cookies are per host, not per port, so two harnesses running at once swap each other's sign-ins. Give each worktree's harness its own host name (for example `roles-<slot>.localhost`).
 - **Font licences (owner):** fonts are now self-hosted from `app/fonts/` (done 2026-11-25). Before the site is hosted, add each family's SIL OFL 1.1 text (`OFL.txt` for Geist/Geist Mono and for Fraunces) next to its files; no copy existed on this machine.
 - `requireAdmin`'s origin check passes a write with no Origin header; add a `Sec-Fetch-Site: cross-site` refusal as a second layer.
 
