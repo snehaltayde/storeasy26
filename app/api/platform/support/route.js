@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { operatorError } from "@/lib/platform/operator-error";
 import { requireOperator } from "@/lib/platform/require-operator";
 import { mailConfigured } from "@/lib/mail";
 import { storeOrigin } from "@/lib/platform/onboarding-ops";
@@ -68,7 +69,7 @@ export async function POST(request) {
     }
     return NextResponse.json({ error: "action must be grant|revoke|enter" }, { status: 400 });
   } catch (e) {
-    if (e instanceof SupportEntryRefused) return NextResponse.json({ error: e.message }, { status: e.status, headers: NO_STORE });
-    return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 400 });
+    // SupportEntryRefused and the grant's own refusals carry a status and keep their words
+    return operatorError(e, { words: "That support action didn't go through just now. Try again.", status: 400, event: "support_action_failed", headers: e instanceof SupportEntryRefused ? NO_STORE : undefined });
   }
 }

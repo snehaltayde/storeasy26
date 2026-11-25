@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
+import { operatorError } from "@/lib/platform/operator-error";
 import { requireOperator } from "@/lib/platform/require-operator";
 import { offboardTenant } from "@/lib/platform/export";
 import { getTenant } from "@/lib/platform/control";
-import { scrubSecrets } from "@/lib/platform/turso-api";
 
 // Offboard a tenant (S43 / BE29): suspend → revoke keys → cancel local
 // billing → purge platform-side derived rows. The tenant DATABASE and
@@ -27,6 +27,6 @@ export async function POST(request, { params }) {
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
     // P3-G: a driver error can name the store's database
-    return NextResponse.json({ error: scrubSecrets(e?.message || e, [tenant.dbUrl, tenant.dbToken]).slice(0, 300) }, { status: 422 });
+    return operatorError(e, { tenant, words: "Offboarding stopped part way. Check the store's state, then try again.", event: "tenant_offboard_failed" });
   }
 }

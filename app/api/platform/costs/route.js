@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { operatorError } from "@/lib/platform/operator-error";
 import { requireOperator } from "@/lib/platform/require-operator";
 import { costReport, setCostInputs } from "@/lib/platform/costs";
 import { patchTenant, getTenant } from "@/lib/platform/control";
@@ -45,6 +46,6 @@ export async function POST(request) {
     }
     return NextResponse.json({ error: "Nothing to do" }, { status: 400 });
   } catch (e) {
-    return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
+    return operatorError(e, { words: "The costs didn't save just now. Try again.", event: "costs_action_failed" });
   }
 }

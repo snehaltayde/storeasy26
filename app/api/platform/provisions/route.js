@@ -1,10 +1,12 @@
 import { NextResponse, after } from "next/server";
+import { operatorError } from "@/lib/platform/operator-error";
 import { requireOperator } from "@/lib/platform/require-operator";
 import { listProvisionRuns, runProvision, compensateProvision, getProvisionRun, provisionRunView } from "@/lib/platform/provision";
 import { resumeSignupRun, signupsForRuns } from "@/lib/platform/signup-provision";
 import { runJobById } from "@/lib/platform/worker";
 import { audit, operatorActor } from "@/lib/platform/audit";
 import { slog } from "@/lib/log";
+import { getTenant } from "@/lib/platform/control";
 
 // Provisioning runs (S41 / OP04): step-state history, safe RESUME of failed
 // runs (idempotent steps verify real state — no duplicate resources), and
@@ -26,6 +28,11 @@ export const maxDuration = 60;
 
 const JOB_SOURCES = ["signup", "operator"];
 
+async function runTenant(runId) {
+  const id = (await getProvisionRun(runId).catch(() => null))?.params?.id;
+  return id ? getTenant(String(id)).catch(() => null) : null;
+}
+
 export async function GET(request) {
   const auth = await requireOperator(request);
   if (auth instanceof Response) return auth;
@@ -38,7 +45,9 @@ export async function POST(request) {
   const auth = await requireOperator(request, { write: true });
   if (auth instanceof Response) return auth;
   const body = await request.json().catch(() => ({}));
+  let tenant = null; // the run's store, so its address and token are scrubbed from a failure
   try {
+    tenant = await runTenant(String(body.run || ""));
     if (body.action === "resume" && JOB_SOURCES.includes((await getProvisionRun(String(body.run || "")))?.params?.source)) {
       const q = await resumeSignupRun(String(body.run));
       if (q?.jobId) after(() => runJobById(q.jobId, { budgetMs: 50_000 }));
@@ -62,6 +71,6 @@ export async function POST(request) {
     }
     return NextResponse.json({ error: "action must be resume or compensate" }, { status: 400 });
   } catch (e) {
-    return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
+    return operatorError(e, { tenant, words: "That run didn't resume or compensate. Check its steps, then try again.", event: "provision_action_failed" });
   }
 }

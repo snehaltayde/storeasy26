@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
+import { operatorError } from "@/lib/platform/operator-error";
 import { requireOperator } from "@/lib/platform/require-operator";
 import { forEachActiveTenant, runAsTenant } from "@/lib/platform/ops";
 import { listPrivacyRequests, redactCustomer } from "@/lib/privacy";
 import { db } from "@/lib/db";
 import { audit, operatorActor } from "@/lib/platform/audit";
+import { refuse } from "@/lib/platform/refuse";
 import { getTenant, listTenants, platformConfigured } from "@/lib/platform/control.js";
-import { scrubSecrets } from "@/lib/platform/turso-api";
 import { slog } from "@/lib/log";
 
 // Operator privacy ops (S43 / OP11): the fleet's privacy requests in one
@@ -68,7 +69,7 @@ export async function POST(request) {
   try {
     const result = await runAsTenant(tenant, async () => {
       const req = await db.selectFrom("privacy_requests").selectAll().where("id", "=", String(body.requestId || "")).executeTakeFirst();
-      if (!req) throw new Error("request not found");
+      if (!req) throw refuse(404, "No privacy request with that id in this store.");
       if (req.status === "done") return { already: true };
       const r = await redactCustomer({ email: req.email, phone: req.phone });
       await db
@@ -83,7 +84,6 @@ export async function POST(request) {
     return NextResponse.json({ ok: true, result });
   } catch (e) {
     // P3-G: a driver error can name the store's database
-    const t = await getTenant(tenant).catch(() => null);
-    return NextResponse.json({ error: scrubSecrets(e?.message || e, [t?.dbUrl, t?.dbToken]).slice(0, 300) }, { status: 422 });
+    return operatorError(e, { tenant: await getTenant(tenant).catch(() => null), words: "The redaction didn't run: this store's database couldn't be reached. Try again.", event: "privacy_redact_failed" });
   }
 }

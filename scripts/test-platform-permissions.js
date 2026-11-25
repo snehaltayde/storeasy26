@@ -441,6 +441,21 @@ await t("P3-A export link: concurrent uses, exactly one succeeds", async () => {
   eq((await downloads(store.a.id)).length, before + 1, "one audit row");
 });
 
+await t("P3-A export link: when the download's audit row can't be written, no export is served and the link is not spent", async () => {
+  const { token } = await mintLink();
+  const jti = String(token).split(".")[2];
+  await db().execute("CREATE TRIGGER platperm_audit_down BEFORE INSERT ON audit_log WHEN NEW.action = 'tenant.export_downloaded' BEGIN SELECT RAISE(ABORT, 'audit down'); END");
+  try {
+    const res = await exportGet(store.a.id, token);
+    eq(res.status, 503, res.text.slice(0, 160));
+    ok(!/"manifest"/.test(res.text), "no export");
+    eq((await db().execute({ sql: "SELECT used_at FROM export_links WHERE jti = ?", args: [jti] })).rows[0]?.used_at ?? null, null, "the link is not spent");
+  } finally {
+    await db().execute("DROP TRIGGER IF EXISTS platperm_audit_down");
+  }
+  eq((await exportGet(store.a.id, token)).status, 200, "the same link works once the audit log is back");
+});
+
 // a store whose database can't be opened: the driver's error names its address
 const GONE_DIR = "/nonexistent-platperm-canary-dir";
 const GONE_TOKEN = "platperm-canary-db-token-9f3a";
@@ -461,6 +476,41 @@ await t("P3-G privacy redact on an unreachable store: no db_url or token in the 
   const res = await call("operator", "privacy", "POST", { body: { action: "redact", tenant: gone, requestId: "pr_x" } });
   eq(res.status, 422, res.text.slice(0, 200));
   eq(holdsGone(res.text).join(","), "", "canaries in the answer");
+});
+
+await t("P3-G provisions resume against an unopenable store: no db_url or token in the answer", async () => {
+  const now = new Date().toISOString();
+  const steps = ["create_db", "apply_schema", "content_mode", "seed_defaults", "register_tenant", "init_billing", "record_onboarding"].map((name, i) => ({ name, status: i === 0 ? "done" : i === 1 ? "failed" : "pending" }));
+  await db().execute({
+    sql: "INSERT INTO provision_runs (id, tenant_id, status, steps, refs, params, error, created_at, updated_at) VALUES ('prov_platperm_gone', ?, 'failed', ?, ?, ?, 'apply_schema: earlier failure', ?, ?)",
+    args: [gone, JSON.stringify(steps), JSON.stringify({ dbUrl: `file:${GONE_DIR}/store.db`, dbCreated: false }), JSON.stringify({ id: gone, dbDriver: "file", contentMode: "documents" }), now, now],
+  });
+  const res = await call("operator", "provisions", "POST", { body: { action: "resume", run: "prov_platperm_gone", dbToken: GONE_TOKEN } });
+  ok(res.status < 500, `resume answered ${res.status}`);
+  eq(holdsGone(res.text).join(","), "", `canaries in the ${res.status} answer`);
+});
+
+// P3-G guard: no route under app/api/platform puts an error's own text in an
+// answer except through lib/platform/operator-error.js (operatorError).
+await t("P3-G guard: no app/api/platform file uses String(e…), e.message or e?.message outside operatorError", async () => {
+  const RAW = /String\(\s*(e|err|error)\b|\b(e|err|error)\??\.message\b/;
+  const files = [];
+  async function walk(dir) {
+    for (const f of await readdir(dir)) {
+      const p = join(dir, f);
+      if ((await stat(p)).isDirectory()) await walk(p);
+      else if (f.endsWith(".js")) files.push(p);
+    }
+  }
+  await walk(API);
+  const bad = [];
+  for (const f of files) {
+    (await readFile(f, "utf8")).split("\n").forEach((line, i) => {
+      if (RAW.test(line.replace(/\/\/.*$/, ""))) bad.push(`${relative(ROOT, f)}:${i + 1}: ${line.trim().slice(0, 120)}`);
+    });
+  }
+  eq(bad.join("\n"), "", "raw error text");
+  ok(RAW.test('return NextResponse.json({ error: String(e?.message || e) })') && RAW.test("{ error: e.message }"), "the guard catches both forms");
 });
 
 await t("P3-G offboard on an unreachable store: no db_url or token in the answer", async () => {

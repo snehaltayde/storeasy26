@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { operatorError } from "@/lib/platform/operator-error";
 import { requireOperator } from "@/lib/platform/require-operator";
 import {
   billingOverview,
@@ -18,7 +19,6 @@ import {
 } from "@/lib/platform/billing";
 import { billingProviderConfigured } from "@/lib/platform/razorpay-billing";
 import { slog } from "@/lib/log";
-import { scrubSecrets } from "@/lib/platform/turso-api";
 import { audit, OPERATOR_ONLY } from "@/lib/platform/audit";
 
 // Operator billing (S40 / OP08; Phase 3 line 3): fleet subscriptions, MRR,
@@ -56,8 +56,7 @@ export async function GET(request) {
     return NextResponse.json({ ok: true, ...(await summary()) });
   } catch (e) {
     // P3-G: fixed words; the scrubbed error goes to the log
-    slog("billing_read_failed", { error: scrubSecrets(e?.message || e).slice(0, 300) });
-    return NextResponse.json({ error: "We couldn't read billing just now. Try again." }, { status: 422 });
+    return operatorError(e, { words: "We couldn't read billing just now. Try again.", event: "billing_read_failed" });
   }
 }
 
@@ -115,9 +114,10 @@ export async function POST(request) {
         const { error = null, ...detail } = e.detail || {};
         await audit({ actor, action: "billing.cancel_failed", resource: `subscription:${detail.subscription}`, tenantId: detail.tenant || null, diff: { code: e.code, ...detail, [OPERATOR_ONLY]: { error, reason: reasonOf(body) || null } } });
       }
-      return NextResponse.json({ error: String(e.message).slice(0, 300), code: e.code || null, detail: e.detail || null }, { status: e.code === "BILLING_CONFLICT" ? 409 : 502 });
+      // the words are billing's own ("Razorpay refused …", "… changed at the same moment")
+      return operatorError(e, { keep: true, status: e.code === "BILLING_CONFLICT" ? 409 : 502, fields: { code: e.code || null, detail: e.detail || null } });
     }
-    if (e?.code === "BILLING_UNCONFIGURED") return NextResponse.json({ error: String(e.message).slice(0, 300), code: e.code }, { status: 503 });
-    return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
+    if (e?.code === "BILLING_UNCONFIGURED") return operatorError(e, { keep: true, status: 503, fields: { code: e.code } });
+    return operatorError(e, { words: "That billing change didn't go through just now. Try again.", event: "billing_action_failed" });
   }
 }

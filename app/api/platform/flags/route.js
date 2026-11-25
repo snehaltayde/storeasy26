@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { operatorError } from "@/lib/platform/operator-error";
 import { requireOperator } from "@/lib/platform/require-operator";
 import { listFlags, setFlag, emergencyDisable, deleteFlag, setFlagOverride, flagHistory } from "@/lib/platform/flags";
 import { storeChoices } from "@/lib/platform/incidents";
@@ -17,7 +18,7 @@ import { storeChoices } from "@/lib/platform/incidents";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const failed = (e) => NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: e?.status || 422 });
+const failed = (e) => operatorError(e, { words: "That flag change didn't go through just now. Try again.", event: "flag_action_failed" });
 
 export async function GET(request) {
   const auth = await requireOperator(request);

@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
+import { operatorError } from "@/lib/platform/operator-error";
 import { requireOperator } from "@/lib/platform/require-operator";
 import { listJobs, listInbox, queueStats, replayJob, replayInbox, discardJob, discardInbox } from "@/lib/platform/jobs";
 import { runDueJobs, TICK_BUDGET_MS } from "@/lib/platform/worker";
 import { audit, operatorActor } from "@/lib/platform/audit";
-import { scrubSecrets } from "@/lib/platform/turso-api";
-import { slog } from "@/lib/log";
 
 // Queue & webhook inspector API (S29 / OP05). Metadata ONLY — raw webhook
 // payloads can carry PII and are never serialized here; replay is scoped,
@@ -57,7 +56,6 @@ export async function POST(request) {
     return NextResponse.json({ error: "action must be replay, discard or tick" }, { status: 400 });
   } catch (e) {
     // P3-G: no raw driver error in the answer; the scrubbed text goes to the log
-    slog("queue_action_failed", { action: String(body.action || ""), error: scrubSecrets(e?.message || e).slice(0, 300) });
-    return NextResponse.json({ error: "That queue action failed. Try again, and check the server log if it keeps failing." }, { status: 400 });
+    return operatorError(e, { words: "That queue action failed. Try again, and check the server log if it keeps failing.", status: 400, event: "queue_action_failed" });
   }
 }

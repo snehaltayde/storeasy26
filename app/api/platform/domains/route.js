@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { operatorError } from "@/lib/platform/operator-error";
 import { requireOperator } from "@/lib/platform/require-operator";
 import { claimDomain, verifyDomain, removeDomain, setPrimaryDomain, listDomains } from "@/lib/platform/domains";
 
@@ -43,7 +44,6 @@ export async function POST(request) {
         return NextResponse.json({ error: "action must be claim|verify|remove|primary" }, { status: 400 });
     }
   } catch (e) {
-    const msg = String(e?.message || e);
-    return NextResponse.json({ error: msg.slice(0, 300) }, { status: /registered to tenant/.test(msg) ? 409 : 400 });
+    return operatorError(e, { words: "That domain change didn't go through just now. Try again.", status: 400, event: "domain_action_failed" });
   }
 }

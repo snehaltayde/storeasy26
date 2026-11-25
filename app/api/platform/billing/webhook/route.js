@@ -35,7 +35,7 @@ export async function POST(request) {
   const job = await enqueueJob({ type: "billing_apply", payload: { inboxId }, idempotencyKey: `billing_${inboxId}` });
 
   after(async () => {
-    const r = await runJobById(job.id).catch((e) => ({ ok: false, error: String(e?.message || e) }));
+    const r = await runJobById(job.id).catch(() => ({ ok: false }));
     if (r) slog("billing_webhook_applied", { job: job.id, topic, ok: r.ok !== false });
   });
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { operatorError } from "@/lib/platform/operator-error";
 import { requireOperator } from "@/lib/platform/require-operator";
 import { upsertCaseStudy, setCaseStudyPublished, listCaseStudies, deleteCaseStudy } from "@/lib/platform/case-studies";
 import { audit, operatorActor } from "@/lib/platform/audit";
@@ -41,6 +42,6 @@ export async function POST(request) {
     }
     return NextResponse.json({ error: "Nothing to do" }, { status: 400 });
   } catch (e) {
-    return NextResponse.json({ error: String(e?.message || e).slice(0, 300), ...(e.blocks ? { blocks: e.blocks } : {}) }, { status: 422 });
+    return operatorError(e, { words: "The case study didn't save just now. Try again.", event: "case_study_action_failed", fields: e?.blocks ? { blocks: e.blocks } : {} });
   }
 }

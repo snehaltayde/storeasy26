@@ -1,13 +1,13 @@
 import { NextResponse, after } from "next/server";
+import { operatorError } from "@/lib/platform/operator-error";
 import { requireOperator } from "@/lib/platform/require-operator";
 import { patchTenant, getTenant, listTenants } from "@/lib/platform/control.js";
 import { audit, operatorActor } from "@/lib/platform/audit";
-import { LifecycleError, operatorRotate, setMaintenance, setStoreStatus } from "@/lib/platform/store-lifecycle";
+import { operatorRotate, setMaintenance, setStoreStatus } from "@/lib/platform/store-lifecycle";
 import { startCatalogSync, KICK_BUDGET_MS } from "@/lib/platform/sync-jobs";
 import { withTenant } from "@/lib/tenant-context.js";
 import { slog } from "@/lib/log";
 import { storeDetail } from "@/lib/platform/stores-list";
-import { scrubSecrets } from "@/lib/platform/turso-api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -138,10 +138,8 @@ export async function PATCH(request, { params }) {
     const { tenant: t, mail } = await setStoreStatus(id, body.status, { reason: body.reason, actor: auth.operator });
     return NextResponse.json({ ok: true, tenant: { id: t.id, status: t.status }, mail });
   } catch (e) {
-    if (e instanceof LifecycleError) return NextResponse.json({ ok: false, error: e.message }, { status: e.status });
-    // anything else is ours: logged (no request body), plain words back
-    slog("tenant_patch_failed", { tenant: id, error: String(e?.message || e).slice(0, 200) });
-    return NextResponse.json({ ok: false, error: "That didn't save because of a problem on our side. Try again." }, { status: 500 });
+    // a LifecycleError (4xx) keeps its words; anything else is logged scrubbed, plain words back
+    return operatorError(e, { tenant: await getTenant(id).catch(() => null), words: "That didn't save because of a problem on our side. Try again.", status: 500, event: "tenant_patch_failed", fields: { ok: false } });
   }
 }
 
@@ -171,6 +169,6 @@ export async function POST(request, { params }) {
     );
   } catch (e) {
     // the store's database address or token never reaches the browser
-    return NextResponse.json({ ok: false, error: scrubSecrets(e?.message || e, [tenant.dbUrl, tenant.dbToken]).slice(0, 300) }, { status: 500 });
+    return operatorError(e, { tenant, words: "The sync didn't start because of a problem on our side. Try again.", status: 500, event: "tenant_sync_failed", fields: { ok: false } });
   }
 }
