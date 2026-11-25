@@ -132,9 +132,15 @@ function implicitSubmits() {
 //     popups and new tabs included; no Referer is trusted) while the tab's
 //     document is the page under test: from that document's first request
 //     until the next document's first request. A same-document pushState or
-//     replaceState (a Next <Link> soft navigation included) does not end it:
-//     a control could pushState away, POST and pushState back, and anything a
-//     soft navigation sends was started by this page's own click. Each
+//     replaceState never ends it. While such a move has the tab on another
+//     path, writes are held: coming back to the page in the same document
+//     counts them (a control that pushStates away, POSTs and pushStates back
+//     is caught); a new document loading, or the pass ending, while the tab
+//     is still away hands them to the destination (a Next <Link> soft
+//     navigation: /admin/onboarding writes when it opens, its pass is its
+//     own), listed in found.softNav. The limit: a raw pushState that stays
+//     away looks the same as a soft navigation, so its writes go to that
+//     path too. Each
 //     document's first request is the drill's sentinel (an init script's GET
 //     /__shell-drill-doc?p=<path>, answered by page.route, never by Next), so a
 //     write the old document sends while it unloads still counts. A read link
@@ -230,6 +236,28 @@ async function supportNewUiControls(page, href) {
   const seen = []; // every non-GET request the browser reported during the pass: { method, path }
   const pending = new Set();
   const passFrom = serverMark();
+  let away = false; // the target document has moved (same document) to another path
+  let held = [];
+  const release = () => {
+    found.softNav.push(...held);
+    held = [];
+  };
+  // a new document: the old one's requests will never report finishing (a keepalive)
+  const newDocument = () => {
+    for (const r of pending) {
+      try {
+        if (r.frame() === page.mainFrame()) pending.delete(r);
+      } catch {}
+    }
+  };
+  const onNavigated = (frame) => {
+    if (frame !== page.mainFrame() || !counting) return;
+    away = new URL(frame.url()).pathname !== target;
+    if (!away) {
+      writes.push(...held);
+      held = [];
+    }
+  };
   const skip = (method, path) => (devServer && path.startsWith("/__nextjs")) || readPost(target, method, path);
   const onSocket = (ws) => {
     if (/\/_next\/webpack-hmr/.test(ws.url())) devServer = true;
@@ -241,25 +269,31 @@ async function supportNewUiControls(page, href) {
       try {
         main = req.frame() === page.mainFrame();
       } catch {}
-      if (main) counting = url.searchParams.get("p") === target;
+      if (main) {
+        release();
+        newDocument();
+        counting = url.searchParams.get("p") === target;
+        away = false;
+      }
       return;
     }
     pending.add(req);
     if (req.method() === "GET" || req.method() === "HEAD") return;
     seen.push({ method: req.method(), path: url.pathname });
     if (!counting || skip(req.method(), url.pathname)) return;
-    writes.push(`${req.method()} ${url.pathname}`);
+    (away ? held : writes).push(`${req.method()} ${url.pathname}`);
   };
   const onDone = (req) => pending.delete(req);
   const onPage = (p) => {
     if (p !== page) popups.push(p);
   };
-  const found = { at: [], unsafe: [], implicit: [], revealed: [], moved: [], writes, reads: 0, dialogReads: 0, gated: 0, fields: 0, logged: [], logSeen: false, pending: [] };
+  const found = { at: [], unsafe: [], implicit: [], revealed: [], moved: [], writes, reads: 0, dialogReads: 0, gated: 0, fields: 0, logged: [], logSeen: false, pending: [], softNav: [] };
   const fresh = async () => {
     await page.goto(ORIGIN + href, { waitUntil: "load" });
     await settle(page);
     if (page.url() !== ORIGIN + href) found.at.push(page.url());
   };
+  page.on("framenavigated", onNavigated);
   page.on("websocket", onSocket);
   ctx.on("request", onRequest);
   ctx.on("requestfinished", onDone);
@@ -331,6 +365,8 @@ async function supportNewUiControls(page, href) {
     // in this pass, not the next one's
     await untilQuiet(page, pending);
     await page.goto("about:blank");
+    release();
+    newDocument();
     await untilQuiet(page, pending);
     found.pending = [...pending].map((r) => `${r.method()} ${new URL(r.url()).pathname}`);
     const own = target.startsWith(SELFTEST);
@@ -345,6 +381,7 @@ async function supportNewUiControls(page, href) {
       else if (!skip(l.method, l.path)) writes.push(`${l.method} ${l.path} (server log, not seen by the browser)`);
     }
   } finally {
+    page.off("framenavigated", onNavigated);
     page.off("websocket", onSocket);
     ctx.off("request", onRequest);
     ctx.off("requestfinished", onDone);
