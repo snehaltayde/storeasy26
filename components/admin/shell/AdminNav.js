@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BadgePercent,
+  Boxes,
   Brush,
   ChartNoAxesColumn,
   CreditCard,
@@ -46,6 +47,7 @@ const ICONS = {
   media: ImageIcon,
   releases: Rocket,
   offers: BadgePercent,
+  bundles: Boxes,
   experiments: FlaskConical,
   insights: Lightbulb,
   automations: Workflow,

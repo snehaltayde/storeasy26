@@ -1,28 +1,28 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
+import { roleAllows } from "@/lib/platform/authz";
 import { listOffers } from "@/lib/offers/store";
 import { offerTargetNames, storeCurrency } from "@/lib/offers/catalog";
-import OffersAdmin from "@/components/admin/OffersAdmin";
+import { merchantTz } from "@/lib/reporting";
+import { OffersList } from "@/components/admin/offers/OffersList";
 import { tfetch } from "@/lib/console-request";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Offers · Admin", robots: { index: false } };
 
+// Phase 2 line 4: the offers list on the new UI (lib/admin/new-ui-routes.js).
+// offers.read for every role; canWrite says whether the page shows writes
+// (support reads only; the API refuses writes regardless).
 export default async function AdminOffersPage() {
   const jar = await cookies();
-  // S34 (OP10): merchants sign in normally; an OPERATOR passes only under an
-  // active support grant (support role — read-only, PII-redacted).
+  // S34 (OP10): an operator passes only under an active support grant (support role)
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
-  // COM-03: the current product names behind each offer, and the store's
-  // currency, so every offer reads as a plain sentence in the right money.
-  const { offers, names, currency } = await tfetch(async () => {
+  const { offers, names, currency, timezone } = await tfetch(async () => {
     const offers = await listOffers();
     const [names, currency] = await Promise.all([offerTargetNames(offers.flatMap((o) => [o.config, o.previous?.config].filter(Boolean))), storeCurrency()]);
-    return { offers, names, currency };
+    return { offers, names, currency, timezone: merchantTz() };
   });
-  // PageHeader renders inside OffersAdmin: the "New offer" action needs client
-  // state, and OfferForm swaps the whole view (breadcrumb header included).
-  return <OffersAdmin initialOffers={offers} initialNames={names} currency={currency} />;
+  return <OffersList initialOffers={offers} initialNames={names} currency={currency} timezone={timezone} role={actor.role} canWrite={roleAllows(actor.role, "offers.write")} />;
 }
