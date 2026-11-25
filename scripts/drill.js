@@ -141,14 +141,10 @@ export async function connectHarness({ start = false, env = process.env, root = 
     await stop();
     throw new DrillError(`The harness didn't come up at ${baseUrl} within 3 minutes.`);
   };
-  // the storefront and the console sign-in: built (not the next/font/google
-  // build failure) and compiled before the drill's browser asks for them
-  try {
-    const h = await bootBuilt({ boot, baseUrl, paths: BOOT_PATHS, say: (m) => console.error(m) });
-    return { baseUrl, port: next, creds: readCredentials(root), started: true, stop: h.stop };
-  } catch (e) {
-    throw e instanceof HarnessError ? new DrillError(e.message) : e;
-  }
+  // the storefront and the console sign-in: compiled before the drill's
+  // browser asks for them
+  const h = await bootBuilt({ boot, baseUrl, paths: BOOT_PATHS });
+  return { baseUrl, port: next, creds: readCredentials(root), started: true, stop: h.stop };
 }
 export const BOOT_PATHS = ["/", "/admin/login"];
 

@@ -561,32 +561,20 @@ const realOr = (p) => {
   }
 };
 
-// Turbopack sometimes fails one boot's build on next/font/google (seen in
-// drill server logs under load: "Module not found: Can't resolve
-// '@vercel/turbopack-next/internal/font/google/font'" … "next/font/google
-// queries have exactly one entry"). That server answers every page with a 500
-// (empty body) for its whole life; the next boot of the same code builds fine.
-// So a harness a drill starts is checked before the drill uses it: boot()
-// → { output() → string, stop() }, then each path is loaded (which also
-// compiles the routes drills use first, before a browser waits on them).
-// Only this exact build error boots again (up to `attempts`); any other answer,
-// a 500 from app code included, is left for the drill to see.
-//   → the booted handle, or throws HarnessError naming the build error.
+// A harness a drill starts is warmed before the drill uses it: boot()
+// → { output() → string, stop() }, then each path is loaded, which compiles
+// the routes drills use first, before a browser waits on them. Whatever a
+// page answers (a 500 included) is left for the drill to see.
+//   → the booted handle.
+// (It used to boot again on Turbopack's next/font/google build failure; the
+// fonts are self-hosted now, app/fonts/fonts.js, and test:fonts keeps
+// next/font/google out.) FONT_BUILD_ERROR stays for the drill runner's
+// warm-up check in scripts/drills/run-isolated.mjs.
 export const FONT_BUILD_ERROR = "turbopack-next/internal/font/google";
-export async function bootBuilt({ boot, baseUrl, paths, attempts = 3, say = () => {}, fetchPage = defaultFetchPage }) {
-  for (let i = 1; i <= attempts; i++) {
-    const h = await boot();
-    const bad = [];
-    for (const path of paths) {
-      const r = await fetchPage(baseUrl + path);
-      if (r.body.includes(FONT_BUILD_ERROR)) bad.push(`${path} ${r.status}`);
-    }
-    if (!bad.length && h.output().includes(FONT_BUILD_ERROR)) bad.push("the harness output");
-    if (!bad.length) return h;
-    await h.stop();
-    say(`! boot ${i}/${attempts}: Turbopack's build failed on next/font/google (${bad.join(", ")})${i < attempts ? "; the harness was stopped and is booting again" : ""}`);
-  }
-  throw new HarnessError(`The harness's build failed on next/font/google (${FONT_BUILD_ERROR}) in ${attempts} boots in a row; no drill ran against that build. Check the network (Google Fonts).`);
+export async function bootBuilt({ boot, baseUrl, paths, fetchPage = defaultFetchPage }) {
+  const h = await boot();
+  for (const path of paths) await fetchPage(baseUrl + path);
+  return h;
 }
 async function defaultFetchPage(url) {
   try {

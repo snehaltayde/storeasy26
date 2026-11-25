@@ -93,6 +93,7 @@
     "test:agency-removed": "node scripts/test-agency-removed.js",
     "test:drills": "node scripts/test-drills.js",
     "test:console-ui": "node scripts/test-console-ui.js",
+    "test:fonts": "node scripts/test-fonts.js",
     "test:console-shell": "node scripts/test-console-shell.js",
     "test:console-kit": "node scripts/test-console-kit.js",
     "test:api-unmatched": "node scripts/test-api-unmatched.js",

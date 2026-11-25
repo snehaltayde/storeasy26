@@ -388,8 +388,8 @@ export async function withRolesStore(c, fn, { start = startChild, up = waitUp, b
   const seeded = await c.node(["scripts/dev-roles.js", "seed", "--reset"]);
   if (seeded !== 0) return seeded;
   const base = `http://roles.localhost:${c.ports.rolesNext}`;
-  // each boot's own output (also kept in the drill's log), checked for the
-  // next/font/google build failure before the drill runs (bootBuilt)
+  // its own output (also kept in the drill's log); /admin/login is loaded
+  // (compiled) before the drill runs (bootBuilt)
   const boot = async () => {
     const own = [];
     const log = { push: (x) => (own.push(x), c.log.push(x)) };
@@ -402,7 +402,7 @@ export async function withRolesStore(c, fn, { start = startChild, up = waitUp, b
   };
   let server;
   try {
-    server = await built({ boot, baseUrl: base, paths: ["/admin/login"], say: (m) => c.log.push(`${m}\n`) });
+    server = await built({ boot, baseUrl: base, paths: ["/admin/login"] });
   } catch (e) {
     if (!(e instanceof HarnessError)) throw e;
     c.log.push(`✗ ${e.message}\n`);

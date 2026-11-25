@@ -1,4 +1,4 @@
-import { Geist, Geist_Mono, Fraunces } from "next/font/google";
+import { Geist, GeistMono, Fraunces } from "@/app/fonts/fonts";
 import "../globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -29,12 +29,6 @@ import PreviewBanner, { PreviewMain } from "@/components/PreviewBanner";
 import EditThisPage from "@/components/preview/EditThisPage";
 import { DOCUMENTS_RELEASE_VERSION } from "@/lib/releases";
 import StoreClosed from "@/components/StoreClosed";
-
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
-// S37: display serif for kits that ask for one (Glow). Loaded once; kits pick
-// it up through the --display-font token.
-const fraunces = Fraunces({ variable: "--font-fraunces", subsets: ["latin"], weight: ["400", "600", "700"] });
 
 // Render pages on the edge runtime — the libSQL client resolves to its
 // fetch-based `edge-light` build, and search uses edge-safe fetch.
@@ -251,7 +245,7 @@ export default async function RootLayout({ children }) {
   // (PLATFORM_SITE_HOSTS). Own chrome; no tenant storefront machinery.
   if (isPlatformSiteHost((await headers()).get("host"))) {
     return (
-      <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full`}>
+      <html lang="en" className={`${Geist.variable} ${GeistMono.variable} ${Fraunces.variable} h-full`}>
         <body className="flex min-h-full flex-col bg-white text-zinc-900 antialiased">
           <SiteNav />
           <main className="flex-1">{children}</main>
@@ -280,7 +274,7 @@ export default async function RootLayout({ children }) {
   // the neutral not-found / error surfaces inside this shell.
   if (isGated(await requestResolution())) {
     return (
-      <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
+      <html lang="en" className={`${Geist.variable} ${GeistMono.variable} h-full`}>
         <body className="flex min-h-full flex-col bg-white text-zinc-900 antialiased">
           <main className="flex-1">{children}</main>
         </body>
@@ -296,7 +290,7 @@ export default async function RootLayout({ children }) {
   if (await closedNow()) {
     const name = await tfetch(async () => siteName()).catch(() => "Store");
     return (
-      <html lang="en" data-kit="pulse-1" className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full`}>
+      <html lang="en" data-kit="pulse-1" className={`${Geist.variable} ${GeistMono.variable} ${Fraunces.variable} h-full`}>
         <body className="flex min-h-full flex-col antialiased">
           <StoreClosed name={name} />
         </body>
@@ -317,7 +311,7 @@ export default async function RootLayout({ children }) {
     const brandCss = brandCssVars(brand ? resolveBrand(brand) : null, { kit });
     const palette = curtainPalette(brand);
     return (
-      <html lang="en" data-kit={kit} className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full`}>
+      <html lang="en" data-kit={kit} className={`${Geist.variable} ${GeistMono.variable} ${Fraunces.variable} h-full`}>
         {brandCss ? <style id="brand-vars" precedence="default" href="brand-vars">{brandCss}</style> : null}
         {/* Colours inline from curtainPalette: every text tone reaches 4.5:1 on
             the brand's background. data-curtain marks what the edge drill measures. */}
@@ -359,7 +353,7 @@ export default async function RootLayout({ children }) {
   const editing = frame?.kind === "documents"; // preview-only data-doc / data-field
   const liveConsole = frame?.kind === "live" && (await consoleCookiePresent());
   return (
-    <html lang="en" data-kit={chrome.kitAttr} className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full`}>
+    <html lang="en" data-kit={chrome.kitAttr} className={`${Geist.variable} ${GeistMono.variable} ${Fraunces.variable} h-full`}>
       {/* Brand variables: values come from lib/brand.js (validated hex/enum
           tokens only — nothing merchant-typed reaches this string raw). */}
       {/* precedence+href let React hoist this into <head> (without them React

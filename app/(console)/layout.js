@@ -1,4 +1,4 @@
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, GeistMono } from "@/app/fonts/fonts";
 import { ToastProvider } from "@/components/console/Toast";
 import "../globals.css";
 
@@ -13,9 +13,6 @@ import "../globals.css";
 // edge, unchanged.)
 export const runtime = "nodejs";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
-
 export const metadata = {
   title: { default: "Console · Storeasy", template: "%s" },
   robots: { index: false, follow: false },
@@ -29,7 +26,7 @@ export const viewport = {
 
 export default function ConsoleRootLayout({ children }) {
   return (
-    <html lang="en" data-console className={`${geistSans.variable} ${geistMono.variable} h-full`}>
+    <html lang="en" data-console className={`${Geist.variable} ${GeistMono.variable} h-full`}>
       <body className="console min-h-full bg-surface-muted font-sans text-fg antialiased">
         <ToastProvider>{children}</ToastProvider>
       </body>
