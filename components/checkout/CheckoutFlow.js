@@ -9,19 +9,12 @@ import { friendlyCheckoutError } from "@/lib/shopper-errors";
 import { PRICE_CHANGED } from "@/lib/checkout-price";
 import { track } from "@/lib/track/client";
 import { confirmPayment } from "@/lib/checkout/confirm-payment";
+import AddressStep from "./AddressStep";
+import PaymentStep from "./PaymentStep";
+import OrderSummary from "./OrderSummary";
+import { emptyForm, applyAddress, addressValid } from "./checkoutModel";
 
 const STEPS = ["Address", "Review", "Payment"];
-
-const AUTOCOMPLETE = {
-  email: "email",
-  phone: "tel",
-  name: "name",
-  line1: "address-line1",
-  line2: "address-line2",
-  city: "address-level2",
-  state: "address-level1",
-  pincode: "postal-code",
-};
 
 function loadRazorpay() {
   return new Promise((resolve) => {
@@ -34,17 +27,6 @@ function loadRazorpay() {
   });
 }
 
-const FIELDS = [
-  { key: "email", label: "Email", type: "email", required: true, half: true },
-  { key: "phone", label: "Phone", type: "tel", required: true, half: true },
-  { key: "name", label: "Full name", required: true },
-  { key: "line1", label: "Address", required: true },
-  { key: "line2", label: "Apartment, suite (optional)", required: false },
-  { key: "city", label: "City", required: true, half: true },
-  { key: "state", label: "State", required: true, half: true },
-  { key: "pincode", label: "PIN code", required: true, half: true },
-];
-
 export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeName = "Store", logo = null, policies = [], shippingConfig: pageShippingConfig }) {
   const [step, setStep] = useState(0);
   // P1-RATES: the cart and rates this page prices with. They start as the
@@ -52,26 +34,14 @@ export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeNam
   // changed, so the summary and the button show what the server will charge.
   const [cart, setCart] = useState(pageCart);
   const [shippingConfig, setShippingConfig] = useState(pageShippingConfig);
-  const [form, setForm] = useState({
-    email: "",
-    phone: "",
-    name: "",
-    line1: "",
-    line2: "",
-    city: "",
-    state: "",
-    pincode: "",
-  });
+  const [form, setForm] = useState(emptyForm());
   const [method, setMethod] = useState("cod");
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState("");
 
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
-  const addressValid =
-    form.email.includes("@") &&
-    form.phone.trim().length >= 7 &&
-    ["name", "line1", "city", "state", "pincode"].every((k) => form[k].trim());
+  // Phase 8 step 0: the form changes only through applyAddress (./checkoutModel).
+  const changeAddress = (patch, source) => setForm((f) => applyAddress(f, patch, source));
+  const valid = addressValid(form);
 
   const contact = { email: form.email, phone: form.phone, name: form.name };
   const address = {
@@ -281,33 +251,7 @@ export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeNam
       <div className="grid gap-10 lg:grid-cols-[1fr_380px]">
         {/* main column */}
         <div>
-          {step === 0 && (
-            <section>
-              <h2 className="mb-4 text-lg font-bold">Contact &amp; shipping address</h2>
-              <div className="grid grid-cols-2 gap-3">
-                {FIELDS.map((f) => (
-                  <div key={f.key} className={f.half ? "col-span-1" : "col-span-2"}>
-                    <label className="mb-1 block text-xs font-medium text-sf-text-subtle">{f.label}</label>
-                    <input
-                      type={f.type || "text"}
-                      name={f.key}
-                      autoComplete={AUTOCOMPLETE[f.key]}
-                      value={form[f.key]}
-                      onChange={(e) => set(f.key, e.target.value)}
-                      className="w-full rounded-sf-control border border-sf-border px-3 py-2.5 text-sm outline-none focus:border-sf-border-hover"
-                    />
-                  </div>
-                ))}
-              </div>
-              <button
-                onClick={() => setStep(1)}
-                disabled={!addressValid}
-                className="mt-6 w-full rounded-sf-control bg-sf-inverse px-6 py-3 text-sm font-semibold text-sf-on-inverse transition hover:bg-sf-inverse-hover disabled:cursor-not-allowed disabled:bg-sf-surface-disabled"
-              >
-                Continue to review
-              </button>
-            </section>
-          )}
+          {step === 0 && <AddressStep form={form} valid={valid} onAddress={changeAddress} onContinue={() => setStep(1)} />}
 
           {step === 1 && (
             <section>
@@ -364,127 +308,24 @@ export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeNam
           )}
 
           {step === 2 && (
-            <section>
-              <h2 className="mb-4 text-lg font-bold">Payment</h2>
-              <div className="space-y-3">
-                <label className={`flex cursor-pointer items-start gap-3 rounded-sf-card border p-4 ${method === "cod" ? "border-sf-inverse ring-1 ring-sf-inverse" : "border-sf-border"}`}>
-                  <input type="radio" name="method" checked={method === "cod"} onChange={() => setMethod("cod")} className="mt-1" />
-                  <div>
-                    <p className="text-sm font-semibold">
-                      Cash on Delivery
-                      {codPreview.codFee > 0 && (
-                        <span className="font-normal text-sf-text-faint"> · +{formatMoney(codPreview.codFee, cart.currency)} COD fee</span>
-                      )}
-                    </p>
-                    <p className="text-xs text-sf-text-subtle">Pay in cash when your order arrives.</p>
-                  </div>
-                </label>
-                <label
-                  className={`flex cursor-pointer items-start gap-3 rounded-sf-card border p-4 ${
-                    method === "razorpay" ? "border-sf-inverse ring-1 ring-sf-inverse" : "border-sf-border"
-                  } ${razorpayEnabled ? "" : "opacity-50"}`}
-                >
-                  <input
-                    type="radio"
-                    name="method"
-                    checked={method === "razorpay"}
-                    disabled={!razorpayEnabled}
-                    onChange={() => setMethod("razorpay")}
-                    className="mt-1"
-                  />
-                  <div>
-                    <p className="text-sm font-semibold">
-                      Pay online <span className="font-normal text-sf-text-faint">· card / UPI / netbanking</span>
-                    </p>
-                    <p className="text-xs text-sf-text-subtle">
-                      {razorpayEnabled ? "You'll finish paying in a secure payment window." : "Online payment isn't available for this store right now."}
-                    </p>
-                  </div>
-                </label>
-              </div>
-
-              {error && <p role="alert" className="mt-4 rounded-sf-control bg-sf-danger-surface px-4 py-3 text-sm text-sf-danger">{error}</p>}
-
-              <div className="mt-6 flex gap-3">
-                <button onClick={() => setStep(1)} disabled={placing} className="rounded-sf-control border border-sf-border-strong px-5 py-3 text-sm font-semibold hover:bg-sf-surface-muted disabled:opacity-50">
-                  Back
-                </button>
-                <button
-                  onClick={() => placeOrder()}
-                  disabled={placing}
-                  className="flex-1 rounded-sf-control bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent transition hover:bg-sf-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {placing
-                    ? "Processing…"
-                    : method === "cod"
-                      ? `Place order · ${formatMoney(grandTotal, cart.currency)}`
-                      : `Pay ${formatMoney(grandTotal, cart.currency)}`}
-                </button>
-              </div>
-
-              {/* S38 (SF14): the store's own policies, right where the money moves */}
-              {policies.length > 0 && (
-                <p className="mt-3 text-center text-xs text-sf-text-faint">
-                  By placing this order you agree to our{" "}
-                  {policies.map((p, i) => (
-                    <span key={p.href}>
-                      {i > 0 && (i === policies.length - 1 ? " and " : ", ")}
-                      <a href={p.href} target="_blank" rel="noopener" className="underline hover:text-sf-text-muted">
-                        {p.label}
-                      </a>
-                    </span>
-                  ))}
-                  .
-                </p>
-              )}
-            </section>
+            <PaymentStep
+              cart={cart}
+              method={method}
+              onMethod={setMethod}
+              razorpayEnabled={razorpayEnabled}
+              codFee={codPreview.codFee}
+              grandTotal={grandTotal}
+              error={error}
+              placing={placing}
+              onBack={() => setStep(1)}
+              onPlace={placeOrder}
+              policies={policies}
+            />
           )}
         </div>
 
         {/* sticky order summary — mirrors the cart drawer exactly */}
-        <aside className="h-fit rounded-sf-card border border-sf-border p-5 lg:sticky lg:top-6">
-          <h3 className="mb-3 text-sm font-bold">Order summary</h3>
-          <div className="space-y-1.5 border-b border-sf-border-soft pb-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-sf-text-subtle">Subtotal</span>
-              <span>{formatMoney(cart.subtotal, cart.currency)}</span>
-            </div>
-            {cart.appliedOffers
-              .filter((o) => o.amount > 0)
-              .map((o) => (
-                <div key={o.id} className="flex justify-between gap-3 text-sf-accent-text">
-                  <span className="leading-snug">{o.label}</span>
-                  <span className="whitespace-nowrap font-medium">−{formatMoney(o.amount, cart.currency)}</span>
-                </div>
-              ))}
-            {cart.gifts.map((g) => (
-              <div key={`g-${g.variantId}`} className="flex justify-between text-sf-accent-text">
-                <span>Free gift · {g.title}</span>
-                <span className="font-medium">FREE</span>
-              </div>
-            ))}
-            <div className="flex justify-between">
-              <span className="text-sf-text-subtle">
-                Shipping
-                {shipping.codFee > 0 && <span className="text-xs"> (incl. COD fee)</span>}
-              </span>
-              {shipping.total === 0 ? (
-                <span className="font-semibold text-sf-accent-text">FREE</span>
-              ) : (
-                <span>{formatMoney(shipping.total, cart.currency)}</span>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center justify-between pt-3">
-            <span className="font-semibold">Total</span>
-            <span className="text-lg font-bold">{formatMoney(grandTotal, cart.currency)}</span>
-          </div>
-          {cart.discountTotal > 0 && (
-            <p className="mt-1 text-right text-xs font-semibold text-sf-accent-text">
-              You save {formatMoney(cart.discountTotal, cart.currency)}
-            </p>
-          )}
-        </aside>
+        <OrderSummary cart={cart} shipping={shipping} grandTotal={grandTotal} />
       </div>
     </div>
   );

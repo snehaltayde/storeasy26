@@ -346,12 +346,15 @@ console.log("— the checkout UI");
 
 await t("guard: both payment methods send the total the button shows, and a refusal redraws from the server's cart and rates", async () => {
   const src = await readFile(join(ROOT, "components/checkout/CheckoutFlow.js"), "utf8");
+  // Phase 8 step 0: the buttons moved into PaymentStep; CheckoutFlow hands it grandTotal
+  const step = await readFile(join(ROOT, "components/checkout/PaymentStep.js"), "utf8");
+  ok(/grandTotal=\{grandTotal\}/.test(src), "CheckoutFlow does not hand the payment step grandTotal");
   ok(/const shown = \{ expectedTotal: grandTotal, expectedShipping: shipping\.total \}/.test(src), "the UI does not send grandTotal as expectedTotal");
   for (const action of ["cod", "razorpay_create"]) {
     ok(new RegExp(`action: "${action}",[^}]*\\.\\.\\.shown \\}`).test(src), `the ${action} request does not carry the shown total`);
   }
   ok((src.match(/if \(data\.code === PRICE_CHANGED\) return priceChanged\(data\);/g) || []).length === 2, "a refusal is not handled for both methods");
-  ok(/Place order · \$\{formatMoney\(grandTotal, cart\.currency\)\}/.test(src) && /Pay \$\{formatMoney\(grandTotal, cart\.currency\)\}/.test(src), "the buttons no longer show grandTotal");
+  ok(/Place order · \$\{formatMoney\(grandTotal, cart\.currency\)\}/.test(step) && /Pay \$\{formatMoney\(grandTotal, cart\.currency\)\}/.test(step), "the buttons no longer show grandTotal");
   ok(/setCart\(data\.cart\)/.test(src) && /setShippingConfig\(data\.shippingConfig \?\? undefined\)/.test(src), "a refusal does not redraw from the server's cart and rates");
 });
 

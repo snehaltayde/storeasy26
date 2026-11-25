@@ -821,6 +821,10 @@ const flowStubs = {
   "@/lib/checkout/confirm-payment": await import("../lib/checkout/confirm-payment.js"),
   "@/lib/track/client": { track() {} },
 };
+// Phase 8 step 0: CheckoutFlow's own parts, loaded with the same stubs.
+for (const part of ["checkoutModel", "AddressStep", "PaymentStep", "OrderSummary"]) {
+  flowStubs[`./${part}`] = await loadComponent(sources.get(`components/checkout/${part}.js`), flowStubs);
+}
 const realFlow = () => loadComponent(sources.get("components/checkout/CheckoutFlow.js"), flowStubs);
 
 // The real checkout page, on a real store and cart, into `flow`.
@@ -974,6 +978,8 @@ async function mount(src, stubs, props) {
     const walk = (n) => {
       if (Array.isArray(n)) return n.forEach(walk);
       if (!React.isValidElement(n)) return;
+      // a stateless child component (CheckoutFlow's steps) renders in place
+      if (typeof n.type === "function") return walk(n.type(n.props));
       out.push(n);
       Object.values(n.props).forEach(walk);
     };
@@ -984,6 +990,7 @@ async function mount(src, stubs, props) {
     if (Array.isArray(n)) return n.map(textOf).join("");
     if (typeof n === "string" || typeof n === "number") return String(n);
     if (!React.isValidElement(n)) return "";
+    if (typeof n.type === "function") return textOf(n.type(n.props));
     return [n.props.title, n.props.children, n.props.actions].map(textOf).join("");
   };
   const find = (pred, what) => {

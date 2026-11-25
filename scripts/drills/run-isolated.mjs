@@ -563,6 +563,8 @@ export const DRILLS = {
   quizzes: { id: "QUIZZES", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/quizzes/run.mjs", ...c.headed])) },
   // Phase 7 line 3: the phone buy bar and the cart drawer's offer nudges, on the roles store (390×844 touch)
   "mobile-cart": { id: "MOBILE-CART", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/mobile-cart/run.mjs", ...c.headed])) },
+  // Phase 8 step 0: the checkout baseline (a cash on delivery order placed), on the roles store
+  checkout: { id: "CHECKOUT", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/checkout/run.mjs", ...c.headed])) },
 };
 // Phase 2 line 11 (phase end): every merchant console screen's drill joins the block suite
 export const ALL = ["smoke", "p5", "p6", "agency-gone", "shell", "signup", "connect", "operator-onboarding", "operator-create-store", "dashboard", "orders", "catalog", "offers", "media", "editor", "settings", "team", "growth", "quizzes", "console-styles",

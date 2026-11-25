@@ -7,22 +7,53 @@ export type MerchantRole = "owner" | "admin" | "staff" | "support";
 
 export type SessionKind = "merchant" | "operator";
 
+// What validateShippingConfig (lib/admin/settings.js) stores. Optional fields
+// are absent unless the founder set them.
+export interface DayRange {
+  min: number;
+  max: number;
+}
+
 export interface ShippingZone {
-  name: string;
+  label: string;
   prefixes: string[];
-  rate: number;
-  codFee?: number;
-  eta?: string;
+  flatRate?: number;
+  freeThreshold?: number;
+  // Phase 8: the zone's own delivery days; `cod: false` hides cash on delivery
+  deliveryDays?: DayRange;
+  cod?: boolean;
 }
 
 export interface ShippingConfig {
   currency: string;
-  basis: "net" | "subtotal";
-  freeThreshold: number;
+  basis: "net" | "gross";
+  freeThreshold: number | null;
   flatRate: number;
   codFee: number;
   codFeeWaivedAt: number | null;
   zones: ShippingZone[];
+  // Phase 8: calendar days to dispatch, and the default delivery days
+  dispatchDays?: number;
+  deliveryDays?: DayRange;
+}
+
+// Phase 8 (decisions 11 and 12): what validatePaymentConfig stores.
+export interface PrepaidDiscount {
+  kind: "percent" | "fixed";
+  value: number; // percent (at most 20) or store-currency amount
+  max?: number; // cap in store currency
+}
+
+export interface CodRules {
+  otp: "off" | "always" | "above";
+  maxTotal?: number;
+  otpAbove?: number; // only when otp is "above"
+  otpChannel?: "sms" | "email"; // only when otp is not "off"
+}
+
+export interface PaymentConfig {
+  prepaid?: PrepaidDiscount;
+  cod?: CodRules;
 }
 
 export interface BrandTokens {
@@ -75,6 +106,7 @@ export interface TenantConfig {
   merchant_timezone?: string;
   checkout_mode?: "direct" | "disabled" | "shopify";
   shipping_config?: Partial<ShippingConfig>;
+  payment_config?: PaymentConfig;
   theme_pin?: ThemePin | null;
   theme_pin_at?: string | null;
   maintenance?: {
