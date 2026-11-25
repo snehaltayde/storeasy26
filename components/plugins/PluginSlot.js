@@ -10,16 +10,29 @@
 import { slotBlocks } from "@/lib/plugins/placements";
 import { tfetch } from "@/lib/storefront-request";
 import { slog } from "@/lib/log";
-import { FounderNote, isFounderPreview } from "@/components/sections/parts";
+import { contentSource } from "@/lib/content/resolve";
+import { DOCUMENTS_RELEASE_VERSION } from "@/lib/releases";
+import { FounderNote } from "@/components/sections/parts";
 import { BLOCK_COMPONENTS } from "./blocks";
 
 export const OFF_NOTE = "Turned off: shoppers don't see this.";
 
+// A founder's documents preview, as the page's own draft reads decide it
+// (lib/content/resolve.js contentSource, once a request): asked only when the
+// slot holds a block that is switched off.
+async function inFounderPreview() {
+  const src = await contentSource();
+  return src?.preview === true && src?.v === DOCUMENTS_RELEASE_VERSION;
+}
+
 export default async function PluginSlot({ name, ctx = null, className = "" }) {
-  const preview = isFounderPreview(null);
   let blocks;
   try {
-    blocks = await tfetch(() => slotBlocks(name, ctx, { preview }));
+    blocks = await tfetch(async () => {
+      const all = await slotBlocks(name, ctx, { preview: true });
+      if (all.every((b) => b.live)) return all;
+      return (await inFounderPreview()) ? all : all.filter((b) => b.live);
+    });
   } catch (e) {
     if (e?.digest) throw e; // notFound() from the store gate
     slog("plugin_slot_failed", { slot: String(name), error: String(e?.name || "Error") });
@@ -33,7 +46,7 @@ export default async function PluginSlot({ name, ctx = null, className = "" }) {
         if (!Block) return null;
         return (
           <div key={b.key} data-plugin-slot={name} data-plugin={b.pluginId} data-block={b.blockId}>
-            {b.live ? null : <FounderNote ctx={{ preview }} text={OFF_NOTE} attrs={{ "data-plugin-off": "" }} className="mb-2" />}
+            {b.live ? null : <FounderNote ctx={{ preview: true }} text={OFF_NOTE} attrs={{ "data-plugin-off": "" }} className="mb-2" />}
             <Block {...b.props} />
           </div>
         );

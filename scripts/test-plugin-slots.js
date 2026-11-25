@@ -151,6 +151,8 @@ let renderStore = a;
 const STUBS = {
   "next/link": { __esModule: true, default: ({ href, children, prefetch, ...rest }) => React.createElement("a", { href, ...rest }, children) },
   "@/lib/storefront-request": { __esModule: true, tfetch: (fn) => renderStore.run(fn) },
+  // the founder preview as contentSource answers it (it reads the preview cookie in Next)
+  "@/lib/content/resolve": { __esModule: true, contentSource: async () => ({ preview: scope.documentsPreview, v: 4 }) },
 };
 const seen = new Map();
 async function loadJsx(file) {
