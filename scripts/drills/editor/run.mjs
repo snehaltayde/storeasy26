@@ -8,7 +8,8 @@
 //     and sees "Saved"; moves it, deletes it after the confirm; makes a new
 //     page (title and address) from the page list and archives it
 //   staff: the tree's add, move, hide, copy and delete are there
-//   support: no add, move, hide, copy, delete, New page or Archive; the
+//   support: every inspector field disabled; no add, move, hide, copy,
+//     delete, New page or Archive; the
 //     page list and the tree still read; every non-GET request is a document
 //     read (its single top-level key in the READ_POSTS row's ops) or the
 //     preview session, never saveDraft, including on pagehide
@@ -167,6 +168,8 @@ async function supportView(drill) {
   await page.locator("[data-switcher-toggle]").click();
   const row = page.locator("[data-tree-select]").first();
   if (await row.count()) await row.click();
+  const enabledFields = await page.locator("[data-inspector] input:not([disabled]), [data-inspector] textarea:not([disabled]), [data-inspector] select:not([disabled])").count();
+  drill.check(enabledFields === 0 && (await page.locator("[data-inspector] input, [data-inspector] textarea, [data-inspector] select").count()) > 0, "support's inspector: every field is disabled (6b)", { enabledFields });
   // try to type into the first enabled field, then leave (pagehide)
   const field = page.locator("[data-inspector] input:not([disabled]), [data-inspector] textarea:not([disabled])").first();
   if (await field.count()) await field.fill("support typed this").catch(() => {});

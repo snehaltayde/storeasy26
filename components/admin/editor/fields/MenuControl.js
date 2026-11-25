@@ -20,8 +20,7 @@
 // owner, context: { ownerKey: "header" | "footer", menuMode, collections,
 // products, pages }, readOnly }. Ids: inspectorModel pathsOf "menu".
 import { ArrowDown, ArrowUp, CornerDownRight, Plus, Trash2 } from "lucide-react";
-import { Input } from "../../../console/fields.js";
-import { Button, IconButton } from "../../../console/Button.js";
+import { Input, Button, IconButton } from "./parts.js";
 import { LinkControl, Notes } from "./controls.js";
 import { idOf, notesId, notesAt, blocks, menu, MENU_LIMITS, counterOf } from "./inspectorModel.js";
 
@@ -38,13 +37,13 @@ function Row({ owner, path, name, item, index, total, onEdit, onMove, onRemove, 
   return (
     <div id={rid} role="group" tabIndex={-1} aria-label={name} aria-describedby={described(rid, rnotes)} className="space-y-2">
       <div className="flex flex-wrap items-start gap-2">
-        {child && <CornerDownRight size={14} className="mt-7 shrink-0 text-fg-subtle" aria-hidden />}
+        {child && <CornerDownRight size={14} className="mt-7 shrink-0 text-muted-foreground" aria-hidden />}
         <div className="min-w-0 w-40 flex-1">
-          <label htmlFor={lid} className="mb-1 block text-xs font-medium text-fg-muted">
+          <label htmlFor={lid} className="mb-1 block text-xs font-medium text-muted-foreground">
             {`${name} label`}
           </label>
           <Input id={lid} value={label} placeholder="Label" disabled={readOnly} invalid={blocks(lnotes)} aria-describedby={described(lid, lnotes)} onChange={(e) => onEdit({ label: e.target.value })} />
-          {label.length > 40 && <p className="mt-1 text-xs text-fg-subtle">{counterOf(label, { max: 40 })}</p>}
+          {label.length > 40 && <p className="mt-1 text-xs text-muted-foreground">{counterOf(label, { max: 40 })}</p>}
           <Notes anchor={lid} notes={lnotes} />
         </div>
         <div className="min-w-0 w-56 flex-[2]">
@@ -67,14 +66,14 @@ export default function MenuControl({ field, value, onChange, issues, owner = nu
   const items = Array.isArray(value) ? value : [];
   const view = menu.view({ mode: context.menuMode, items }, context.ownerKey);
   return (
-    <div id={id} role="group" tabIndex={-1} aria-labelledby={`${id}--label`} aria-describedby={described(id, notes)} className="min-w-0 space-y-3 rounded-ctl border border-edge p-3">
-      <p id={`${id}--label`} className="text-xs font-medium text-fg-muted">
+    <div id={id} role="group" tabIndex={-1} aria-labelledby={`${id}--label`} aria-describedby={described(id, notes)} className="min-w-0 space-y-3 rounded-md border border-border p-3">
+      <p id={`${id}--label`} className="text-xs font-medium text-muted-foreground">
         {field.label}
       </p>
-      {view.auto && <div className="rounded-ctl bg-surface-sunken px-3.5 py-2.5 text-sm text-fg-muted">{view.autoText}</div>}
-      {view.keptNote && <p className="text-xs text-warning">{view.keptNote}</p>}
-      {view.emptyNote && <p className="text-xs text-warning">{view.emptyNote}</p>}
-      <p className="text-xs text-fg-muted">{`${view.count} · ${view.childNote}`}</p>
+      {view.auto && <div className="rounded-md bg-muted px-3.5 py-2.5 text-sm text-muted-foreground">{view.autoText}</div>}
+      {view.keptNote && <p className="text-xs text-warning-text">{view.keptNote}</p>}
+      {view.emptyNote && <p className="text-xs text-warning-text">{view.emptyNote}</p>}
+      <p className="text-xs text-muted-foreground">{`${view.count} · ${view.childNote}`}</p>
       <ul className={`space-y-2 ${view.auto ? "opacity-60" : ""}`}>
         {items.map((item, i) => {
           const at = `${field.path}.${i}`;
@@ -82,7 +81,7 @@ export default function MenuControl({ field, value, onChange, issues, owner = nu
           const cid = idOf(owner, `${at}.children`);
           const cnotes = notesAt(issues, cid);
           return (
-            <li key={i} className="rounded-ctl border border-edge p-3">
+            <li key={i} className="rounded-md border border-border p-3">
               <Row
                 owner={owner}
                 path={at}

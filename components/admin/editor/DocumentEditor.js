@@ -125,6 +125,7 @@ const noState = () => null;
 const ROUTE_FAMILY = { page: "page", campaign: "campaign", journal: "journal" };
 // Phase 2 line 6 (6a): the phone tabs (below 768px)
 const PANES = ["sections", "edit", "preview"];
+const READ_ONLY_WORDS = "You can look at this page but not change it.";
 const PANE_WORDS = { sections: "Sections", edit: "Edit", preview: "Preview" };
 
 function makeTabId() {
@@ -192,7 +193,9 @@ export function EditorView({
   const live = Boolean(state?.document?.publishedVersionId);
   const changed = live && state?.document?.publishedHash && state.draftHash && state.document.publishedHash !== state.draftHash;
   const route = documentType(type)?.route === true;
+  const lockedWords = can?.write === true ? null : readOnly || READ_ONLY_WORDS;
   const context = {
+    readOnlyReason: lockedWords,
     collections: catalog.collections || [],
     products: catalog.products || [],
     pages: (Array.isArray(docs) ? docs : []).filter((d) => ROUTE_FAMILY[d.type] && d.slug).map((d) => ({ slug: d.slug, family: ROUTE_FAMILY[d.type], document: d.id, title: d.label })),
@@ -231,7 +234,7 @@ export function EditorView({
           body={body}
           entity={entity}
           access={access}
-          readOnly={readOnly}
+          readOnly={lockedWords}
           issues={issues}
           context={context}
           focusRequest={focusRequest}
@@ -248,11 +251,11 @@ export function EditorView({
       );
     }
     if (type === "collection_content") {
-      return <CollectionForm key={`collection-${formKey}`} body={body} entity={entity} readOnly={readOnly} issues={issues} context={context} on={{ edit: (m) => on.edit?.({ sectionId: null, path: m.path, value: m.value }) }} />;
+      return <CollectionForm key={`collection-${formKey}`} body={body} entity={entity} readOnly={lockedWords} issues={issues} context={context} on={{ edit: (m) => on.edit?.({ sectionId: null, path: m.path, value: m.value }) }} />;
     }
     if (selected) {
       return (
-        <SettingsForm
+        <SettingsForm readOnlyReason={lockedWords}
           key={selected.id}
           kind={selected.kind}
           sectionId={selected.id}
@@ -264,10 +267,12 @@ export function EditorView({
         />
       );
     }
-    return <SettingsForm key={`doc-${state.id}`} type={type} value={body} issues={issues} focusRequest={focusRequest} context={context} onChange={(_next, m) => on.edit?.({ sectionId: null, path: m.path, value: m.value })} />;
+    return <SettingsForm readOnlyReason={lockedWords} key={`doc-${state.id}`} type={type} value={body} issues={issues} focusRequest={focusRequest} context={context} onChange={(_next, m) => on.edit?.({ sectionId: null, path: m.path, value: m.value })} />;
   };
 
   const canWrite = can?.write === true;
+  // Phase 2 line 6 (6b): support's inspector is read-only, every field and
+  // picker disabled, with these words above it
   const canPublish = can?.publish === true;
   const tab = PANES.includes(paneTab) ? paneTab : "edit";
   const ready = Boolean(state) && !staleEntity;
@@ -411,11 +416,11 @@ export function EditorView({
         <div className="space-y-4" data-writing-view="">
           <p className="text-[13px] text-muted-foreground">{WORDS.writingView}</p>
           <div className="space-y-6" data-inspector="">
-            <SettingsForm key={`doc-${state.id}`} type={type} value={body} issues={issues} focusRequest={selection ? null : focusRequest} context={context} onChange={(_n, m) => on.edit?.({ sectionId: null, path: m.path, value: m.value })} />
+            <SettingsForm readOnlyReason={lockedWords} key={`doc-${state.id}`} type={type} value={body} issues={issues} focusRequest={selection ? null : focusRequest} context={context} onChange={(_n, m) => on.edit?.({ sectionId: null, path: m.path, value: m.value })} />
             {sections
               .filter((s) => s.kind === RICH)
               .map((s) => (
-                <SettingsForm key={s.id} kind={s.kind} sectionId={s.id} value={s.settings} issues={issues} focusRequest={selection === s.id ? focusRequest : null} context={context} onChange={(_n, m) => on.edit?.({ sectionId: s.id, path: m.path, value: m.value })} />
+                <SettingsForm readOnlyReason={lockedWords} key={s.id} kind={s.kind} sectionId={s.id} value={s.settings} issues={issues} focusRequest={selection === s.id ? focusRequest : null} context={context} onChange={(_n, m) => on.edit?.({ sectionId: s.id, path: m.path, value: m.value })} />
               ))}
           </div>
           <Button size="sm" variant="outline" className="hidden md:inline-flex" onClick={on.togglePreview} aria-expanded={previewOpen} data-preview-toggle="" data-read-control="">

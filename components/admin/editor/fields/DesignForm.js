@@ -31,8 +31,7 @@
 // here changes only the look; applying a kit with its starter brand and
 // words stays with "Apply" on the theme screen (P3-DESIGN).
 import { useEffect } from "react";
-import { Input, Select } from "../../../console/fields.js";
-import { Button } from "../../../console/Button.js";
+import { Input, Select, Button } from "./parts.js";
 import { Notes } from "./controls.js";
 import {
   idOf,
@@ -87,11 +86,11 @@ export function BrandControl({ field, value, onChange, issues, owner = null, rea
   const startAccent = String(start.brand.accent);
   const atStart = sameBrand(value, start.brand);
   return (
-    <div id={id} role="group" tabIndex={-1} aria-labelledby={`${id}--label`} aria-describedby={described(id, notes)} className="min-w-0 space-y-3 rounded-ctl border border-edge p-3">
-      <p id={`${id}--label`} className="text-xs font-medium text-fg-muted">
+    <div id={id} role="group" tabIndex={-1} aria-labelledby={`${id}--label`} aria-describedby={described(id, notes)} className="min-w-0 space-y-3 rounded-md border border-border p-3">
+      <p id={`${id}--label`} className="text-xs font-medium text-muted-foreground">
         {field.label}
       </p>
-      {usingDefault && <p className="text-xs text-fg-muted">Your store uses the platform's default colours. Go back to your starting colours, or change anything below.</p>}
+      {usingDefault && <p className="text-xs text-muted-foreground">Your store uses the platform's default colours. Go back to your starting colours, or change anything below.</p>}
       <div className="grid gap-3 sm:grid-cols-3">
         {BRAND_FIELDS.filter((b) => b.kind === "colour").map((b) => {
           const bid = idOf(owner, `${field.path}.${b.key}`);
@@ -99,7 +98,7 @@ export function BrandControl({ field, value, onChange, issues, owner = null, rea
           const v = String(values[b.key] ?? "");
           return (
             <div key={b.key} className="min-w-0">
-              <label htmlFor={bid} className="mb-1 block text-xs font-medium text-fg-muted">
+              <label htmlFor={bid} className="mb-1 block text-xs font-medium text-muted-foreground">
                 {b.label}
               </label>
               <div className="flex items-center gap-2">
@@ -109,12 +108,12 @@ export function BrandControl({ field, value, onChange, issues, owner = null, rea
                   value={design.colourOk(v) ? v.toLowerCase() : "#000000"}
                   disabled={readOnly}
                   onChange={(e) => onChange(design.setToken(value, b.key, e.target.value, start.brand))}
-                  className="h-9 w-12 shrink-0 cursor-pointer rounded-ctl border border-edge bg-surface focus-ring"
+                  className="h-9 w-12 shrink-0 cursor-pointer rounded-md border border-border bg-card outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
                 <Input id={bid} mono className="w-28" value={v} disabled={readOnly} invalid={blocks(bnotes) || !design.colourOk(v)} aria-describedby={described(bid, bnotes)} placeholder={startAccent} onChange={(e) => onChange(design.setToken(value, b.key, e.target.value.trim(), start.brand))} />
               </div>
-              {b.help && <p className="mt-1 text-xs text-fg-subtle">{b.help}</p>}
-              {!design.colourOk(v) && <p className="mt-1 text-xs text-warning">A colour is # and six letters or digits, like {startAccent}.</p>}
+              {b.help && <p className="mt-1 text-xs text-muted-foreground">{b.help}</p>}
+              {!design.colourOk(v) && <p className="mt-1 text-xs text-warning-text">A colour is # and six letters or digits, like {startAccent}.</p>}
               <Notes anchor={bid} notes={bnotes} />
             </div>
           );
@@ -127,7 +126,7 @@ export function BrandControl({ field, value, onChange, issues, owner = null, rea
           const v = values[b.key];
           return (
             <div key={b.key} className="min-w-0">
-              <label htmlFor={bid} className="mb-1 block text-xs font-medium text-fg-muted">
+              <label htmlFor={bid} className="mb-1 block text-xs font-medium text-muted-foreground">
                 {b.label}
               </label>
               <Select id={bid} value={b.options.includes(v) ? v : ""} disabled={readOnly} invalid={blocks(bnotes)} aria-describedby={described(bid, bnotes)} onChange={(e) => onChange(design.setToken(value, b.key, e.target.value, start.brand))}>
@@ -161,7 +160,7 @@ export function ThemeControl({ field, value, onChange, issues, owner = null, rea
   const known = looks.some((l) => l.id === current);
   return (
     <div className="min-w-0">
-      <label htmlFor={id} className="mb-1 block text-xs font-medium text-fg-muted">
+      <label htmlFor={id} className="mb-1 block text-xs font-medium text-muted-foreground">
         {field.label}
       </label>
       <Select id={id} value={known ? current : ""} disabled={readOnly} invalid={blocks(notes)} aria-describedby={described(id, notes)} onChange={(e) => onChange(design.setLook(value, e.target.value))}>
@@ -172,7 +171,7 @@ export function ThemeControl({ field, value, onChange, issues, owner = null, rea
           </option>
         ))}
       </Select>
-      <p className="mt-1 text-xs text-fg-subtle">The look sets your header and hero colours. To also take a look's starter brand and words, apply it from the theme screen.</p>
+      <p className="mt-1 text-xs text-muted-foreground">The look sets your header and hero colours. To also take a look's starter brand and words, apply it from the theme screen.</p>
       <Notes anchor={id} notes={notes} />
     </div>
   );
@@ -200,16 +199,16 @@ export default function DesignForm({ value, onChange, issues = [], focusRequest 
   const set = (key, v) => onChange?.(setAt(body, `settings.${key}`, v), { path: key, value: v });
   return (
     <section id={rootId} data-form="design" tabIndex={-1} aria-labelledby={`${rootId}--title`} aria-describedby={described(rootId, rootNotes)} className="space-y-4">
-      <h2 id={`${rootId}--title`} className="text-sm font-semibold text-fg">
+      <h2 id={`${rootId}--title`} className="text-sm font-semibold text-foreground">
         {t.label}
       </h2>
-      <p className="text-xs text-fg-muted">Your colours, corners, text size and look, for every page. Shoppers see a change after you publish it.</p>
+      <p className="text-xs text-muted-foreground">Your colours, corners, text size and look, for every page. Shoppers see a change after you publish it.</p>
       <p className="text-xs">
-        <a href={START_HREF} data-design-start="" className="font-medium text-fg underline underline-offset-2 focus-ring">
+        <a href={START_HREF} data-design-start="" className="font-medium text-foreground underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring">
           Change your logo and colours
         </a>
       </p>
-      {readOnly && <p className="rounded-ctl bg-surface-sunken px-3 py-2 text-xs text-fg-muted">{readOnlyReason}</p>}
+      {readOnly && <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">{readOnlyReason}</p>}
       <Notes anchor={rootId} notes={rootNotes} />
       {orphans.map((a) => (
         <div key={a} id={a} tabIndex={-1} aria-describedby={notesId(a)}>

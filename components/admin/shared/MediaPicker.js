@@ -2,12 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ImagePlus, Upload } from "lucide-react";
-import { Dialog } from "@/components/console/Dialog";
-import { Button } from "@/components/console/Button";
-import { Input } from "@/components/console/fields";
-import { Banner } from "@/components/console/Banner";
-import { SkeletonText, EmptyState } from "@/components/console/bits";
-import { cx } from "@/components/console/cx";
+import { Dialog, Button, Input, Banner, SkeletonText, EmptyState } from "@/components/admin/editor/fields/parts";
+import { cn as cx } from "@/components/ui/utils";
 import { useToast } from "@/components/console/Toast";
 import { MediaUploadStatus } from "@/components/admin/MediaUploadStatus";
 import { uploadImage } from "@/lib/media-upload";
@@ -121,23 +117,23 @@ export function MediaPicker({ open, onClose, onSelect }) {
                 <button
                   type="button"
                   className={cx(
-                    "group w-full overflow-hidden rounded-ctl border border-edge bg-surface text-left focus-ring",
-                    "hover:border-edge-strong hover:shadow-card"
+                    "group w-full overflow-hidden rounded-md border border-border bg-card text-left outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "hover:border-input hover:shadow-card"
                   )}
                   onClick={() => onSelect?.({ url: m.url, alt: m.alt || "", id: m.id })}
                   title={m.alt ? `${m.filename} — ${m.alt}` : m.filename}
                 >
-                  <span className="flex h-20 items-center justify-center overflow-hidden bg-surface-sunken">
+                  <span className="flex h-20 items-center justify-center overflow-hidden bg-muted">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={thumbOf(m)} alt={m.alt || m.filename} className="h-full w-full object-cover" loading="lazy" />
                   </span>
-                  <span className="block truncate px-1.5 py-1 text-[11px] text-fg-muted group-hover:text-fg">{m.filename}</span>
+                  <span className="block truncate px-1.5 py-1 text-[11px] text-muted-foreground group-hover:text-foreground">{m.filename}</span>
                 </button>
               </li>
             ))}
           </ul>
         )}
-        <p className="text-xs text-fg-subtle">
+        <p className="text-xs text-muted-foreground">
           <ImagePlus size={12} aria-hidden className="mr-1 inline" />
           Picking fills the image URL and its library alt text — you can still adjust the alt for this spot.
         </p>

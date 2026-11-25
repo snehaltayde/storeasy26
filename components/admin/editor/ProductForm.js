@@ -41,8 +41,7 @@
 //     for an owner or admin (staff see why not)
 // Nothing here is shown to shoppers: this is console-only markup.
 import { ArrowDown, ArrowUp, ExternalLink, Plus, RotateCcw, Trash2 } from "lucide-react";
-import { Button, IconButton } from "@/components/console/Button";
-import { Input, Select } from "@/components/console/fields";
+import { Button, IconButton, Input, Select } from "@/components/admin/editor/fields/parts";
 import { Notes, TextControl, ToggleControl } from "./fields/controls.js";
 import RichTextField from "./fields/RichTextField.js";
 import GalleryControl from "./fields/GalleryControl.js";
@@ -127,7 +126,7 @@ const money = (v, cur) => {
 function Pill({ differs }) {
   return (
     <span
-      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${differs ? "bg-warning-bg text-fg" : "bg-surface-sunken text-fg-muted"}`}
+      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${differs ? "bg-warning/10 text-foreground" : "bg-muted text-muted-foreground"}`}
       data-differs={differs ? "" : undefined}
       data-same={differs ? undefined : ""}
     >
@@ -139,7 +138,7 @@ function Pill({ differs }) {
 function FieldHead({ f, label, onReset }) {
   return (
     <div className="mb-1 flex flex-wrap items-center gap-2">
-      <span className="text-xs font-medium text-fg-muted">{label}</span>
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
       <Pill differs={f.differs} />
       <Button
         size="sm"
@@ -162,7 +161,7 @@ export function LayoutSelect({ id, ownerKey, setting, value, onChange, readOnly,
   const options = setting?.options || [];
   return (
     <div className="min-w-0">
-      <label htmlFor={id} className="mb-1 block text-xs font-medium text-fg-muted">
+      <label htmlFor={id} className="mb-1 block text-xs font-medium text-muted-foreground">
         {setting?.label || "Layout"}
       </label>
       <Select id={id} value={options.includes(value) ? value : ""} disabled={readOnly} aria-describedby={notes.length ? notesId(id) : undefined} onChange={(e) => onChange(e.target.value || null)}>
@@ -181,8 +180,8 @@ export function LayoutSelect({ id, ownerKey, setting, value, onChange, readOnly,
 function Commerce({ commerce, adminUrl }) {
   const c = isObj(commerce) ? commerce : null;
   return (
-    <section aria-label="Price, variants and stock" className="space-y-2 rounded-ctl bg-surface-sunken px-3.5 py-3 text-xs text-fg-muted" data-shopify-owned="">
-      <p className="text-fg">{PRODUCT_WORDS.shopifyOwns}</p>
+    <section aria-label="Price, variants and stock" className="space-y-2 rounded-md bg-muted px-3.5 py-3 text-xs text-muted-foreground" data-shopify-owned="">
+      <p className="text-foreground">{PRODUCT_WORDS.shopifyOwns}</p>
       {c && (
         <>
           <p>
@@ -214,7 +213,7 @@ function Commerce({ commerce, adminUrl }) {
         </>
       )}
       {adminUrl ? (
-        <a href={adminUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-fg underline-offset-2 hover:underline focus-ring" data-change-in-shopify="">
+        <a href={adminUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-foreground underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-ring" data-change-in-shopify="">
           {PRODUCT_WORDS.changeInShopify} <ExternalLink size={12} aria-hidden />
         </a>
       ) : (
@@ -230,15 +229,15 @@ function Modules({ sections, issues, context, readOnly, focusRequest, selection,
   const change = (r, meta) => r?.ok && on.treeChange?.(r.sections, meta);
   return (
     <section aria-label={PRODUCT_WORDS.modulesTitle} className="space-y-3" data-product-modules="">
-      <p className="text-xs font-medium text-fg-muted">{PRODUCT_WORDS.modulesTitle}</p>
-      {list.length === 0 && <p className="text-xs text-fg-subtle">{PRODUCT_WORDS.noModules}</p>}
+      <p className="text-xs font-medium text-muted-foreground">{PRODUCT_WORDS.modulesTitle}</p>
+      {list.length === 0 && <p className="text-xs text-muted-foreground">{PRODUCT_WORDS.noModules}</p>}
       {list.map((s, j) => {
         const d = sectionType(s.kind);
         const name = `${d?.label || "module"} ${j + 1}`;
         return (
-          <div key={s.id} className="rounded-ctl border border-edge p-3" data-product-module={s.id}>
+          <div key={s.id} className="rounded-md border border-border p-3" data-product-module={s.id}>
             <div className="mb-2 flex items-center gap-2">
-              <span className="min-w-0 flex-1 truncate text-xs font-semibold text-fg">{`${j + 1}. ${d?.label || s.kind}`}</span>
+              <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">{`${j + 1}. ${d?.label || s.kind}`}</span>
               <IconButton label={`Move ${name} up`} icon={<ArrowUp size={14} aria-hidden />} disabled={readOnly || j === 0} onClick={() => change(moveUp(list, s.id, { type: TYPE }), { op: "moveUp", id: s.id })} />
               <IconButton label={`Move ${name} down`} icon={<ArrowDown size={14} aria-hidden />} disabled={readOnly || j === list.length - 1} onClick={() => change(moveDown(list, s.id, { type: TYPE }), { op: "moveDown", id: s.id })} />
               <IconButton label={`Remove ${name}`} icon={<Trash2 size={14} aria-hidden />} disabled={readOnly} onClick={() => change(removeSection(list, s.id, { type: TYPE }), { op: "remove", id: s.id })} />
@@ -257,7 +256,7 @@ function Modules({ sections, issues, context, readOnly, focusRequest, selection,
         );
       })}
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label={PRODUCT_WORDS.addModule}>
-        <span className="text-xs text-fg-muted">{PRODUCT_WORDS.addModule}:</span>
+        <span className="text-xs text-muted-foreground">{PRODUCT_WORDS.addModule}:</span>
         {options.map((kind) => (
           <Button
             key={kind}
@@ -286,7 +285,7 @@ export default function ProductForm({ body, entity = null, access = null, readOn
   if (!isObj(entity)) {
     return (
       <div className="space-y-2" data-product-form="" data-no-entity="">
-        <p className="rounded-ctl border border-warning-edge bg-warning-bg px-3 py-2 text-xs text-fg" role="status">
+        <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground" role="status">
           {DESCRIPTION_WORDS.noEntity}
         </p>
       </div>
@@ -326,9 +325,9 @@ export default function ProductForm({ body, entity = null, access = null, readOn
           {regLabel}
         </label>
         <Input id={id} value={f.value ?? ""} disabled={f.disabled || busy} aria-describedby={[f.disabledReason ? `${id}--why` : null, notes.length ? notesId(id) : null].filter(Boolean).join(" ") || undefined} onChange={(e) => setOverlay(key, e.target.value)} />
-        {f.shopifyLine && <p className="mt-1 text-xs text-fg-muted" data-shopify-value={key}>{f.shopifyLine}</p>}
+        {f.shopifyLine && <p className="mt-1 text-xs text-muted-foreground" data-shopify-value={key}>{f.shopifyLine}</p>}
         {f.disabledReason && !readOnly && (
-          <p id={`${id}--why`} className="mt-1 text-xs text-fg-muted" data-gated={key}>
+          <p id={`${id}--why`} className="mt-1 text-xs text-muted-foreground" data-gated={key}>
             {f.disabledReason}
           </p>
         )}
@@ -346,22 +345,22 @@ export default function ProductForm({ body, entity = null, access = null, readOn
   return (
     <div className="space-y-5" data-product-form="" data-orphan={m.orphan ? "" : undefined}>
       <header className="space-y-1">
-        <h3 className="text-base font-semibold text-fg" data-product-heading="">
+        <h3 className="text-base font-semibold text-foreground" data-product-heading="">
           {m.heading || "Untitled product"}
         </h3>
-        <p className="text-xs text-fg-muted" data-shopify-title="">
+        <p className="text-xs text-muted-foreground" data-shopify-title="">
           {m.shopifyTitleLine}
         </p>
-        {m.readOnly && <p className="rounded-ctl bg-surface-sunken px-3 py-2 text-xs text-fg-muted" data-read-only="">{m.readOnly}</p>}
+        {m.readOnly && <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground" data-read-only="">{m.readOnly}</p>}
         {m.gateClosed && !m.readOnly && (
-          <p className="rounded-ctl border border-warning-edge bg-warning-bg px-3 py-2 text-xs text-fg" data-title-gate="">
+          <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground" data-title-gate="">
             {m.gateReason}
           </p>
         )}
       </header>
 
       {m.orphan && (
-        <section aria-label={PRODUCT_WORDS.orphan} className="space-y-2 rounded-ctl border border-warning-edge bg-warning-bg px-3 py-3 text-xs text-fg" data-orphan-notice="">
+        <section aria-label={PRODUCT_WORDS.orphan} className="space-y-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-3 text-xs text-foreground" data-orphan-notice="">
           <p className="font-semibold">{PRODUCT_WORDS.orphan}</p>
           <p>{PRODUCT_WORDS.orphanWords}</p>
           {m.discard?.offered ? (
@@ -375,7 +374,7 @@ export default function ProductForm({ body, entity = null, access = null, readOn
       )}
 
       {m.notices.map((n) => (
-        <section key={n.field} aria-label={n.title} className="space-y-2 rounded-ctl border border-warning-edge bg-warning-bg px-3 py-3 text-xs text-fg" data-shopify-changed={n.field}>
+        <section key={n.field} aria-label={n.title} className="space-y-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-3 text-xs text-foreground" data-shopify-changed={n.field}>
           <p className="font-semibold">{n.title}</p>
           <p data-notice-words={n.field}>{n.field === "description_html" ? DESCRIPTION_WORDS.changed(plainSummary(field(n.field).shopifyValue)) : n.words}</p>
           <div className="flex flex-wrap gap-2">
@@ -407,21 +406,21 @@ export default function ProductForm({ body, entity = null, access = null, readOn
             readOnlyReason={readOnly || null}
             onChange={(html) => setOverlay("description_html", html)}
           />
-          {!desc.following && descMax != null && <p className="mt-1 text-xs text-fg-subtle">{PRODUCT_WORDS.descriptionCount(descLen, descMax)}</p>}
-          {desc.following && m.inShopify && <p className="mt-1 text-xs text-fg-muted">{"This is Shopify's description. Change it here to use your own."}</p>}
+          {!desc.following && descMax != null && <p className="mt-1 text-xs text-muted-foreground">{PRODUCT_WORDS.descriptionCount(descLen, descMax)}</p>}
+          {desc.following && m.inShopify && <p className="mt-1 text-xs text-muted-foreground">{"This is Shopify's description. Change it here to use your own."}</p>}
           {!desc.following && (
-            <div className="mt-1 text-xs text-fg-muted" data-shopify-value="description_html">
+            <div className="mt-1 text-xs text-muted-foreground" data-shopify-value="description_html">
               <p>{m.inShopify ? DESCRIPTION_WORDS.beside(plainSummary(desc.shopifyValue)) : DESCRIPTION_WORDS.whenItLeft(plainSummary(desc.baseValue))}</p>
               {plainSummary(m.inShopify ? desc.shopifyValue : desc.baseValue) !== plainSummary(m.inShopify ? desc.shopifyValue : desc.baseValue, 20000) && (
                 <details className="mt-1">
-                  <summary className="cursor-pointer font-medium text-fg">{"Show all of Shopify's description"}</summary>
+                  <summary className="cursor-pointer font-medium text-foreground">{"Show all of Shopify's description"}</summary>
                   <p className="mt-1 whitespace-pre-line">{plainSummary(m.inShopify ? desc.shopifyValue : desc.baseValue, 20000)}</p>
                 </details>
               )}
             </div>
           )}
           {m.caps.description_html && (
-            <p className="mt-1 text-xs text-danger" data-cap="description_html">
+            <p className="mt-1 text-xs text-destructive" data-cap="description_html">
               {m.caps.description_html}
             </p>
           )}
@@ -429,7 +428,7 @@ export default function ProductForm({ body, entity = null, access = null, readOn
         <div className="min-w-0" data-overlay="gallery">
           <FieldHead f={gal} label={decl("gallery")?.label || "Images"} onReset={() => set("gallery", null)} />
           {m.galleryNote && (
-            <p className="mb-2 rounded-ctl bg-surface-sunken px-3 py-2 text-xs text-fg" data-gallery-note="">
+            <p className="mb-2 rounded-md bg-muted px-3 py-2 text-xs text-foreground" data-gallery-note="">
               {m.galleryNote}
             </p>
           )}
@@ -443,7 +442,7 @@ export default function ProductForm({ body, entity = null, access = null, readOn
             readOnly={Boolean(readOnly)}
           />
           {m.caps.gallery && (
-            <p className="mt-1 text-xs text-danger" data-cap="gallery">
+            <p className="mt-1 text-xs text-destructive" data-cap="gallery">
               {m.caps.gallery}
             </p>
           )}

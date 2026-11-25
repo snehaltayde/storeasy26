@@ -187,8 +187,10 @@ function driver() {
       }
       return getSnapshot();
     },
-    useContext() {
-      return null;
+    // a context's default value (no provider in a driven render; the
+    // toggle-group of the Phase 2 editor frame reads one)
+    useContext(c) {
+      return c?._currentValue ?? null;
     },
   };
   const react = { ...React, ...hooks, default: { ...React, ...hooks } };
@@ -242,7 +244,13 @@ async function mount(file, exportName, makeProps, { stubs = {} } = {}) {
   const C = exportName === "default" ? mod.default : mod[exportName];
   ok(typeof C === "function", `${file} has no ${exportName}`);
   let nodes = [];
-  const draw = () => (nodes = d.render(React.createElement(C, makeProps())));
+  // Phase 2 line 6: the page always hands the editor `can`; a test that
+  // names none is a writer's (can.write false makes the store read-only)
+  const propsNow = () => {
+    const p = makeProps();
+    return file.endsWith("DocumentEditor.js") && !p.can ? { ...p, can: { write: true, publish: true, offersWrite: true } } : p;
+  };
+  const draw = () => (nodes = d.render(React.createElement(C, propsNow())));
   const flush = async () => {
     for (let round = 0; round < 40; round++) {
       d.takeDirty();

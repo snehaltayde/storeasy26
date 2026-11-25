@@ -8,7 +8,7 @@
 //             (ProductPicks: effective titles, Shopify's title under them)
 // Props are the inspector's (controls.js). Keyboard: the title is a labelled
 // text box and every row action is a button.
-import { Input } from "../../../console/fields.js";
+import { Input } from "./parts.js";
 import { Notes } from "./controls.js";
 import { ProductPicks, picksPaths } from "./ProductListControl.js";
 import { idOf, notesId, notesAt, blocks } from "./inspectorModel.js";
@@ -32,9 +32,9 @@ export default function PairsControl({ field, value, onChange, issues, owner = n
   const tid = idOf(owner, `${field.path}.title`);
   const tnotes = notesAt(issues, tid);
   return (
-    <div id={id} role="group" tabIndex={-1} aria-label={field.label} aria-describedby={notesAt(issues, id).length ? notesId(id) : undefined} className="min-w-0 space-y-2 focus-ring" data-pairs-control="">
+    <div id={id} role="group" tabIndex={-1} aria-label={field.label} aria-describedby={notesAt(issues, id).length ? notesId(id) : undefined} className="min-w-0 space-y-2 outline-none focus-visible:ring-2 focus-visible:ring-ring" data-pairs-control="">
       <div className="min-w-0">
-        <label htmlFor={tid} className="mb-1 block text-xs font-medium text-fg-muted">
+        <label htmlFor={tid} className="mb-1 block text-xs font-medium text-muted-foreground">
           {`${field.label}: title above these products`}
         </label>
         <Input
@@ -46,7 +46,7 @@ export default function PairsControl({ field, value, onChange, issues, owner = n
           aria-describedby={[`${tid}--hint`, tnotes.length ? notesId(tid) : null].filter(Boolean).join(" ")}
           onChange={(e) => onChange(pairsValue(e.target.value, products))}
         />
-        <p id={`${tid}--hint`} className="mt-1 text-xs text-fg-subtle">{`Leave it empty to use “${DEFAULT_PAIRS_TITLE}”.`}</p>
+        <p id={`${tid}--hint`} className="mt-1 text-xs text-muted-foreground">{`Leave it empty to use “${DEFAULT_PAIRS_TITLE}”.`}</p>
         <Notes anchor={tid} notes={tnotes} />
       </div>
       <ProductPicks

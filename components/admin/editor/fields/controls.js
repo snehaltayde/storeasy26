@@ -23,8 +23,7 @@
 // and which that element names in aria-describedby.
 import { useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
-import { Input, Textarea, Select } from "../../../console/fields.js";
-import { Button, IconButton } from "../../../console/Button.js";
+import { Input, Textarea, Select, Button, IconButton } from "./parts.js";
 import RichTextField from "./RichTextField.js";
 import { BundleControl, BundleListControl } from "./BundleControl.js";
 import {
@@ -52,7 +51,7 @@ import {
 } from "./inspectorModel.js";
 
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
-const TONE = { danger: "text-danger", warning: "text-warning", muted: "text-fg-muted" };
+const TONE = { danger: "text-destructive", warning: "text-warning-text", muted: "text-muted-foreground" };
 
 // ---- shared pieces -----------------------------------------------------------------
 
@@ -72,13 +71,13 @@ const described = (anchor, notes) => (notes.length ? notesId(anchor) : undefined
 
 function Label({ htmlFor, id, children, required }) {
   return (
-    <label htmlFor={htmlFor} id={id} className="mb-1 block text-xs font-medium text-fg-muted">
+    <label htmlFor={htmlFor} id={id} className="mb-1 block text-xs font-medium text-muted-foreground">
       {children}
-      {required && <span className="text-danger"> *</span>}
+      {required && <span className="text-destructive"> *</span>}
     </label>
   );
 }
-const Hint = ({ children }) => (children ? <p className="mt-1 text-xs text-fg-subtle">{children}</p> : null);
+const Hint = ({ children }) => (children ? <p className="mt-1 text-xs text-muted-foreground">{children}</p> : null);
 
 // A labelled text box at one path.
 function TextBox({ id, label, value, onChange, notes, readOnly, mono, placeholder, hint, multiline, required, type }) {
@@ -109,10 +108,10 @@ function TextBox({ id, label, value, onChange, notes, readOnly, mono, placeholde
 // field's id, focusable, labelled, with its own notes under it.
 function Group({ id, label, notes, required, hint, children }) {
   return (
-    <div id={id} role="group" tabIndex={-1} aria-labelledby={`${id}--label`} aria-describedby={described(id, notes)} className="min-w-0 rounded-ctl border border-edge p-3 focus-ring">
-      <p id={`${id}--label`} className="mb-2 text-xs font-medium text-fg-muted">
+    <div id={id} role="group" tabIndex={-1} aria-labelledby={`${id}--label`} aria-describedby={described(id, notes)} className="min-w-0 rounded-md border border-border p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <p id={`${id}--label`} className="mb-2 text-xs font-medium text-muted-foreground">
         {label}
-        {required && <span className="text-danger"> *</span>}
+        {required && <span className="text-destructive"> *</span>}
       </p>
       <div className="space-y-3">{children}</div>
       <Hint>{hint}</Hint>
@@ -178,7 +177,7 @@ export function ToggleControl({ field, value, onChange, issues, owner, readOnly 
   const on = value === true;
   return (
     <div className="min-w-0">
-      <span className="flex items-center gap-2 text-sm text-fg">
+      <span className="flex items-center gap-2 text-sm text-foreground">
         <button
           id={id}
           type="button"
@@ -188,9 +187,9 @@ export function ToggleControl({ field, value, onChange, issues, owner, readOnly 
           aria-describedby={described(id, notes)}
           disabled={readOnly}
           onClick={() => onChange(!on)}
-          className={`relative inline-flex h-5.5 w-10 shrink-0 items-center rounded-full focus-ring disabled:cursor-not-allowed ${on ? "bg-primary" : "bg-edge-strong"}`}
+          className={`relative inline-flex h-5.5 w-10 shrink-0 items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed ${on ? "bg-primary" : "bg-input"}`}
         >
-          <span className={`size-4 rounded-full bg-surface shadow-card ${on ? "translate-x-[1.375rem]" : "translate-x-0.5"}`} />
+          <span className={`size-4 rounded-full bg-card shadow-card ${on ? "translate-x-[1.375rem]" : "translate-x-0.5"}`} />
         </button>
         <span id={`${id}--label`}>{field.label}</span>
       </span>
@@ -292,7 +291,7 @@ export function QaListControl({ field, value, onChange, issues, owner, context, 
         const iid = idOf(owner, at);
         const it = isObj(item) ? item : {};
         return (
-          <div key={j} id={iid} role="group" tabIndex={-1} aria-label={`Question ${j + 1}`} aria-describedby={described(iid, notesAt(issues, iid))} className="space-y-2 rounded-ctl border border-edge p-3">
+          <div key={j} id={iid} role="group" tabIndex={-1} aria-label={`Question ${j + 1}`} aria-describedby={described(iid, notesAt(issues, iid))} className="space-y-2 rounded-md border border-border p-3">
             <div className="flex items-start gap-2">
               <div className="min-w-0 flex-1">
                 <TextBox id={idOf(owner, `${at}.q`)} label={`Question ${j + 1}`} value={textOf(it.q)} onChange={(t) => patch(j, { q: t })} notes={notesAt(issues, idOf(owner, `${at}.q`))} readOnly={readOnly} />
@@ -488,7 +487,7 @@ export function ButtonControl({ field, value, onChange, issues, owner, context, 
   if (!isObj(value)) {
     return (
       <Group id={id} label={field.label} notes={notes} required={field.setting.required}>
-        <p className="text-xs text-fg-muted">{value == null ? "No button." : "This button couldn't be read."}</p>
+        <p className="text-xs text-muted-foreground">{value == null ? "No button." : "This button couldn't be read."}</p>
         <Button size="sm" icon={<Plus size={13} aria-hidden />} disabled={readOnly} onClick={() => onChange({ label: "", link: null })}>
           Add a button
         </Button>
@@ -574,9 +573,9 @@ function RefListControl({ field, value, onChange, issues, owner, context, readOn
   const addId = `${id}--add`;
   return (
     <Group id={id} label={field.label} notes={notesAt(issues, id)} required={field.setting.required} hint={max != null ? `${list.length} of ${max} ${noun}s` : null}>
-      {list.length === 0 && <p className="text-xs text-fg-subtle">{`No ${noun}s yet.`}</p>}
+      {list.length === 0 && <p className="text-xs text-muted-foreground">{`No ${noun}s yet.`}</p>}
       {list.length > 0 && (
-        <ul className="divide-y divide-edge rounded-ctl border border-edge">
+        <ul className="divide-y divide-border rounded-md border border-border">
           {list.map((c, j) => {
             const rid = idOf(owner, `${field.path}.${j}`);
             const rnotes = notesAt(issues, rid);
@@ -584,7 +583,7 @@ function RefListControl({ field, value, onChange, issues, owner, context, readOn
             return (
               <li key={j} className="px-2.5 py-1.5">
                 <div className="flex items-center gap-1.5">
-                  <span id={rid} tabIndex={-1} aria-describedby={described(rid, rnotes)} className="min-w-0 flex-1 truncate text-sm text-fg">
+                  <span id={rid} tabIndex={-1} aria-describedby={described(rid, rnotes)} className="min-w-0 flex-1 truncate text-sm text-foreground">
                     {`${j + 1}. ${h ? titleOf(h) : `This ${noun} couldn't be read`}`}
                   </span>
                   <RowButtons name={h ? titleOf(h) : `${noun} ${j + 1}`} index={j} total={list.length} readOnly={readOnly} onMove={(d) => onChange(moveIn(list, j, d))} onRemove={() => onChange(removeAt(list, j))} />
@@ -640,7 +639,7 @@ export function SystemControl({ field, issues, owner }) {
   const notes = notesAt(issues, id);
   return (
     <div className="min-w-0">
-      <p id={id} tabIndex={-1} aria-describedby={described(id, notes)} className="rounded-ctl bg-surface-sunken px-3 py-2 text-sm text-fg-muted">
+      <p id={id} tabIndex={-1} aria-describedby={described(id, notes)} className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
         {`${field.label}: made by your store from what you publish. Nothing to change here.`}
       </p>
       <Notes anchor={id} notes={notes} />

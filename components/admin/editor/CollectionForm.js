@@ -44,10 +44,10 @@ export default function CollectionForm({ body, entity = null, readOnly = null, i
   return (
     <div className="space-y-5" data-collection-form="">
       <header className="space-y-1">
-        <h3 className="text-base font-semibold text-fg">{name || "Collection"}</h3>
-        {name && <p className="text-xs text-fg-muted">{PRODUCT_WORDS.shopifyTitle(name)}</p>}
-        {!inShopify && <p className="rounded-ctl border border-warning-edge bg-warning-bg px-3 py-2 text-xs text-fg">{COLLECTION_WORDS.gone}</p>}
-        {readOnly && <p className="rounded-ctl bg-surface-sunken px-3 py-2 text-xs text-fg-muted" data-read-only="">{readOnly}</p>}
+        <h3 className="text-base font-semibold text-foreground">{name || "Collection"}</h3>
+        {name && <p className="text-xs text-muted-foreground">{PRODUCT_WORDS.shopifyTitle(name)}</p>}
+        {!inShopify && <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground">{COLLECTION_WORDS.gone}</p>}
+        {readOnly && <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground" data-read-only="">{readOnly}</p>}
       </header>
       {leftover.map((a) => (
         <div key={a} id={a} tabIndex={-1} aria-describedby={notesId(a)}>
@@ -56,10 +56,10 @@ export default function CollectionForm({ body, entity = null, readOnly = null, i
       ))}
       <ProductListControl field={f("pinned")} value={settings.pinned ?? null} onChange={(v) => on.edit?.({ path: "pinned", value: v })} issues={placed} owner={null} context={context} readOnly={Boolean(readOnly)} />
       <LayoutSelect id={idOf(null, "template")} ownerKey="collection_layout" setting={f("template")?.setting} value={settings.template ?? null} onChange={(v) => on.edit?.({ path: "template", value: v })} readOnly={Boolean(readOnly)} notes={notesAt(placed, idOf(null, "template"))} />
-      <section aria-label="From Shopify" className="space-y-1 rounded-ctl bg-surface-sunken px-3.5 py-3 text-xs text-fg-muted" data-shopify-owned="">
-        <p className="text-fg">{COLLECTION_WORDS.shopifyOwns}</p>
+      <section aria-label="From Shopify" className="space-y-1 rounded-md bg-muted px-3.5 py-3 text-xs text-muted-foreground" data-shopify-owned="">
+        <p className="text-foreground">{COLLECTION_WORDS.shopifyOwns}</p>
         {e.shopifyAdminUrl ? (
-          <a href={e.shopifyAdminUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-fg underline-offset-2 hover:underline focus-ring" data-change-in-shopify="">
+          <a href={e.shopifyAdminUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-foreground underline-offset-2 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-ring" data-change-in-shopify="">
             {PRODUCT_WORDS.changeInShopify} <ExternalLink size={12} aria-hidden />
           </a>
         ) : (

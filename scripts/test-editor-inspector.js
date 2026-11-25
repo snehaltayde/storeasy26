@@ -1657,7 +1657,8 @@ await t("P5-FIX2 wiring (MA): editor/page.js gives can.offersWrite from roleAllo
     seen.currency = 0;
     const el = await Page({ searchParams: Promise.resolve({}) });
     ok(el.type === Stub, `${role}: the editor`);
-    eq(el.props.can, { offersWrite: may }, `${role}: can`);
+    // Phase 2 line 6: can also carries write and publish (canEdit is stubbed to true here)
+    eq(el.props.can.offersWrite, may, `${role}: can.offersWrite`);
     eq([el.props.currency, seen.currency], may ? ["USD", 1] : [undefined, 0], `${role}: the currency`);
   }
 });

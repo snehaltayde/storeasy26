@@ -373,6 +373,49 @@ await t("no old console part in the 6a files (components/console), and no React 
   eq(errs, []);
 });
 
+// ---- 4b. the inspector (6b) ----------------------------------------------------------
+console.log("— 4b. the inspector");
+const heroBody = { schema: 1, type: "home", meta: {}, sections: [{ id: "sec_h1", kind: "hero", v: 1, enabled: true, settings: {}, blocks: [] }, textSec("sec_t1", "One")] };
+const inspectorOf = (m) => {
+  const at = m.indexOf("data-inspector");
+  ok(at >= 0, "the inspector is there");
+  return m.slice(m.lastIndexOf("<", at), m.indexOf('data-pane="preview"'));
+};
+const fieldTags = (m) => tags(m, /<(input|textarea|select)\b[^>]*>/g);
+const inspectorView = (role, sel) => view(role, { state: snap(role, { body: heroBody }), selection: sel, pickImage: async () => null });
+await t("support's inspector: every field (text, select, textarea) is disabled, and so are the picker's Choose and every Remove; the read-only words show", () => {
+  for (const sel of ["sec_h1", "sec_t1"]) {
+    const m = inspectorOf(inspectorView("support", sel));
+    const fields = fieldTags(m);
+    ok(fields.length > 0, `${sel}: fields shown`);
+    eq(fields.filter((f) => !/\sdisabled=""/.test(f)), [], `${sel}: enabled fields:`);
+    eq(enabledWith(m, ["Choose", "Remove", "Add", "Move ", "Use ", "Reset"]), [], `${sel}: enabled picker or list buttons:`);
+    ok(m.includes("You can look at this page but not change it."), `${sel}: the words`);
+  }
+  const staff = inspectorOf(inspectorView("staff", "sec_h1"));
+  ok(fieldTags(staff).some((f) => !/\sdisabled=""/.test(f)) && enabledWith(staff, ["Choose from your library"]).length === 1, "staff can edit and choose");
+});
+await t("'Create a bundle' shows only with offersWrite; without it the picker says to ask an owner", async () => {
+  const B = await loadJsx(join(ROOT, "components/admin/editor/fields/BundleControl.js"));
+  const field = { key: "bundle", path: "bundle", label: "Bundle", setting: {} };
+  const ctx = (canCreateBundles) => ({ bundles: { status: "ready", items: [] }, canCreateBundles });
+  const yes = html(h(B.BundleControl, { field, value: null, onChange() {}, issues: [], context: ctx(true) }));
+  const no = html(h(B.BundleControl, { field, value: null, onChange() {}, issues: [], context: ctx(false) }));
+  ok(yes.includes("Create a bundle") && !no.includes("Create a bundle") && /Ask an owner/.test(no), `${no.slice(0, 300)}`);
+  const lockedPage = view("support", { state: snap("support", { body: heroBody }), selection: "sec_h1" });
+  ok(!lockedPage.includes("Create a bundle"), "support's editor never offers it");
+});
+await t("the 6b files import no old console part (only useToast) and the pickers open in the components/ui dialog", () => {
+  const files = ["BundleControl", "DesignForm", "GalleryControl", "MenuControl", "PairsControl", "ProductListControl", "RichTextField", "SettingsForm", "controls", "index"].map((f) => `components/admin/editor/fields/${f}.js`);
+  for (const f of [...files, "components/admin/editor/ProductForm.js", "components/admin/editor/CollectionForm.js", "components/admin/shared/MediaPicker.js", "components/admin/shared/RefPicker.js"]) {
+    const src = read(f);
+    ok(!/from "(@\/components\/console\/(?!Toast")|(\.\.\/)+console\/)/.test(src), `${f}: no old console part`);
+    ok(!/\b(text-fg|bg-surface|border-edge|rounded-ctl|focus-ring)\b/.test(src), `${f}: no old tokens`);
+  }
+  ok(/from "@\/components\/ui\/dialog"/.test(read("components/admin/editor/fields/parts.js")), "parts' Dialog is the ui dialog");
+  for (const f of ["components/admin/shared/MediaPicker.js", "components/admin/shared/RefPicker.js"]) ok(/import \{[^}]*\bDialog\b[^}]*\} from "@\/components\/admin\/editor\/fields\/parts"/.test(read(f)), `${f} uses it`);
+});
+
 // ---- 5. the page list -------------------------------------------------------------------
 console.log("— 5. the page list");
 await t("pageGroups: Home, Pages, Header and footer, Design, Policies in order; Live or Draft, the unpublished dot; archived only with the switch", () => {

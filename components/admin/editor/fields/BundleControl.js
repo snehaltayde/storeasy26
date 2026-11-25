@@ -44,15 +44,12 @@
 // (controls.js imports it for its CONTROLS map).
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
-import { Input } from "../../../console/fields.js";
-import { Button, IconButton } from "../../../console/Button.js";
-import { Badge } from "../../../console/Badge.js";
-import { Dialog } from "../../../console/Dialog.js";
+import { Input, Button, IconButton, Badge, Dialog } from "./parts.js";
 import { BundleForm } from "../../bundles/BundleForm.js";
 import { idOf, notesId, notesAt, noteTone, bundleView, bundleOptions, pickBundle, bundleList, linkParts, bundleSlugGuess, isOldBundleChoice, bundleGridMax, BUNDLE_WORDS } from "./inspectorModel.js";
 
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
-const TONE = { danger: "text-danger", warning: "text-warning", muted: "text-fg-muted" };
+const TONE = { danger: "text-destructive", warning: "text-warning-text", muted: "text-muted-foreground" };
 const OPTIONS_SHOWN = 8;
 
 function Notes({ anchor, notes }) {
@@ -92,17 +89,17 @@ function BundleSummary({ view, index = null }) {
   return (
     <div className="min-w-0 space-y-1" data-bundle-picked={view.id || ""}>
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className={`min-w-0 truncate text-sm text-fg ${view.title ? "" : "font-mono"}`}>{index != null ? `${index + 1}. ${name}` : name}</span>
-        {view.price && <span className="text-xs text-fg-muted">{view.price}</span>}
+        <span className={`min-w-0 truncate text-sm text-foreground ${view.title ? "" : "font-mono"}`}>{index != null ? `${index + 1}. ${name}` : name}</span>
+        {view.price && <span className="text-xs text-muted-foreground">{view.price}</span>}
         {view.chip && (
           <Badge tone={view.chip.tone}>
             <span data-bundle-chip="">{view.chip.words}</span>
           </Badge>
         )}
       </div>
-      {view.line && <LinkedLine line={view.line} data-bundle-status="" className="text-xs text-fg-muted" />}
+      {view.line && <LinkedLine line={view.line} data-bundle-status="" className="text-xs text-muted-foreground" />}
       {view.overlap && (
-        <p data-bundle-overlap="" className="text-xs text-warning">
+        <p data-bundle-overlap="" className="text-xs text-warning-text">
           {view.overlap}
         </p>
       )}
@@ -136,28 +133,28 @@ export function BundleSearch({ id, label, context, picked = [], onPick, disabled
   const listId = `${id}--options`;
   return (
     <div className="min-w-0 space-y-1.5">
-      <label htmlFor={id} className="mb-1 block text-xs font-medium text-fg-muted">
+      <label htmlFor={id} className="mb-1 block text-xs font-medium text-muted-foreground">
         {label}
       </label>
       <Input id={id} type="search" value={q} disabled={disabled} placeholder="Search your bundles" aria-controls={listId} onChange={(e) => setQ(e.target.value)} />
-      <ul id={listId} className="divide-y divide-edge rounded-ctl border border-edge" data-bundle-options="">
-        {options.length === 0 && <li className="px-2.5 py-1.5 text-xs text-fg-subtle">{words ? BUNDLE_WORDS.noMatch : context?.bundles?.status === "ready" ? BUNDLE_WORDS.noBundles : BUNDLE_WORDS.checking}</li>}
+      <ul id={listId} className="divide-y divide-border rounded-md border border-border" data-bundle-options="">
+        {options.length === 0 && <li className="px-2.5 py-1.5 text-xs text-muted-foreground">{words ? BUNDLE_WORDS.noMatch : context?.bundles?.status === "ready" ? BUNDLE_WORDS.noBundles : BUNDLE_WORDS.checking}</li>}
         {options.map((o) => (
           <li key={o.id}>
             <button
               type="button"
               disabled={disabled}
               data-bundle-option={o.id}
-              className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-sm text-fg hover:bg-surface-sunken focus-ring disabled:cursor-not-allowed"
+              className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-sm text-foreground hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed"
               onClick={() => {
                 onPick(o.id);
                 setQ("");
               }}
             >
               <span className="min-w-0 flex-1 truncate">{o.title}</span>
-              {o.price && <span className="text-xs text-fg-muted">{o.price}</span>}
+              {o.price && <span className="text-xs text-muted-foreground">{o.price}</span>}
               {o.chip && <Badge tone={o.chip.tone}>{o.chip.words}</Badge>}
-              {o.picked && <span className="text-xs text-fg-subtle">Picked</span>}
+              {o.picked && <span className="text-xs text-muted-foreground">Picked</span>}
             </button>
           </li>
         ))}
@@ -184,7 +181,7 @@ export function CreateBundleDialog({ open, currency, onClose, onCreated }) {
   return (
     <Dialog open={open} onClose={onClose} title="Create a bundle" size="lg">
       <div className="space-y-3" data-bundle-create="">
-        <p className="text-[13px] text-fg" data-bundle-live-now="">
+        <p className="text-[13px] text-foreground" data-bundle-live-now="">
           {BUNDLE_WORDS.liveNow(bundleSlugGuess(name))}
         </p>
         {open && <BundleForm compact currency={currency} onTitleChange={setTitle} onSaved={onCreated} onCancel={onClose} />}
@@ -199,7 +196,7 @@ function CreateBundle({ context, onCreated, readOnly, full = null }) {
   const [open, setOpen] = useState(false);
   if (!context?.canCreateBundles) {
     return (
-      <p className="text-xs text-fg-subtle" data-bundle-ask-owner="">
+      <p className="text-xs text-muted-foreground" data-bundle-ask-owner="">
         {BUNDLE_WORDS.askOwner}
       </p>
     );
@@ -210,7 +207,7 @@ function CreateBundle({ context, onCreated, readOnly, full = null }) {
         Create a bundle
       </Button>
       {full && (
-        <p className="text-xs text-fg-subtle" data-bundle-full="">
+        <p className="text-xs text-muted-foreground" data-bundle-full="">
           {full}
         </p>
       )}
@@ -230,13 +227,13 @@ function CreateBundle({ context, onCreated, readOnly, full = null }) {
 
 function Group({ id, label, notes, required, hint, children }) {
   return (
-    <div id={id} role="group" tabIndex={-1} aria-labelledby={`${id}--label`} aria-describedby={described(id, notes)} className="min-w-0 rounded-ctl border border-edge p-3 focus-ring">
-      <p id={`${id}--label`} className="mb-2 text-xs font-medium text-fg-muted">
+    <div id={id} role="group" tabIndex={-1} aria-labelledby={`${id}--label`} aria-describedby={described(id, notes)} className="min-w-0 rounded-md border border-border p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <p id={`${id}--label`} className="mb-2 text-xs font-medium text-muted-foreground">
         {label}
-        {required && <span className="text-danger"> *</span>}
+        {required && <span className="text-destructive"> *</span>}
       </p>
       <div className="space-y-3">{children}</div>
-      {hint && <p className="mt-1 text-xs text-fg-subtle">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
       <Notes anchor={id} notes={notes} />
     </div>
   );
@@ -266,7 +263,7 @@ export function BundleControl({ field, value, onChange, issues = [], owner = nul
           </span>
         </div>
       ) : (
-        <p className="text-xs text-fg-subtle">{value == null ? BUNDLE_WORDS.none : canSee ? "This bundle couldn't be read. Pick it again." : BUNDLE_WORDS.cantSee}</p>
+        <p className="text-xs text-muted-foreground">{value == null ? BUNDLE_WORDS.none : canSee ? "This bundle couldn't be read. Pick it again." : BUNDLE_WORDS.cantSee}</p>
       )}
       {canSee ? (
         <>
@@ -275,7 +272,7 @@ export function BundleControl({ field, value, onChange, issues = [], owner = nul
         </>
       ) : (
         // the line above already says it for a picked or unreadable value
-        value == null && <p className="text-xs text-fg-subtle">{BUNDLE_WORDS.cantSee}</p>
+        value == null && <p className="text-xs text-muted-foreground">{BUNDLE_WORDS.cantSee}</p>
       )}
     </Group>
   );
@@ -296,9 +293,9 @@ export function BundleListControl({ field, value, onChange, issues = [], owner =
   const ids = bundleList.ids(list);
   return (
     <Group id={id} label={field.label} notes={notes} required={field.setting?.required} hint={max != null ? `${list.length} of ${max} bundles` : null}>
-      {list.length === 0 && <p className="text-xs text-fg-subtle">No bundles yet.</p>}
+      {list.length === 0 && <p className="text-xs text-muted-foreground">No bundles yet.</p>}
       {list.length > 0 && (
-        <ul className="divide-y divide-edge rounded-ctl border border-edge" data-bundle-rows="">
+        <ul className="divide-y divide-border rounded-md border border-border" data-bundle-rows="">
           {list.map((x, j) => {
             const rid = idOf(owner, `${field.path}.${j}`);
             const rnotes = notesAt(issues, rid);
@@ -310,7 +307,7 @@ export function BundleListControl({ field, value, onChange, issues = [], owner =
               <li key={`${j}:${bid ?? ""}`} className="px-2.5 py-1.5" data-bundle-row={j}>
                 <div className="flex items-start gap-1.5">
                   <div id={rid} tabIndex={-1} aria-describedby={described(rid, rnotes)} className="min-w-0 flex-1">
-                    {view ? <BundleSummary view={view} index={j} /> : <p className="text-sm text-fg">{`${j + 1}. This bundle couldn't be read`}</p>}
+                    {view ? <BundleSummary view={view} index={j} /> : <p className="text-sm text-foreground">{`${j + 1}. This bundle couldn't be read`}</p>}
                   </div>
                   <span className="flex shrink-0 items-center">
                     {old && (
@@ -330,7 +327,7 @@ export function BundleListControl({ field, value, onChange, issues = [], owner =
         </ul>
       )}
       {refused && (
-        <p role="alert" className="text-xs text-warning" data-bundle-refused="">
+        <p role="alert" className="text-xs text-warning-text" data-bundle-refused="">
           {refused}
         </p>
       )}
@@ -340,7 +337,7 @@ export function BundleListControl({ field, value, onChange, issues = [], owner =
           <CreateBundle context={context} readOnly={readOnly} full={list.length >= bundleGridMax(field.setting) ? BUNDLE_WORDS.full(bundleGridMax(field.setting)) : null} onCreated={(bid) => apply(bundleList.add(list, bid, max))} />
         </>
       ) : (
-        <p className="text-xs text-fg-subtle">{BUNDLE_WORDS.cantSee}</p>
+        <p className="text-xs text-muted-foreground">{BUNDLE_WORDS.cantSee}</p>
       )}
     </Group>
   );

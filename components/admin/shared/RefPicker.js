@@ -2,13 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Check, ChevronLeft, X } from "lucide-react";
-import { Dialog } from "@/components/console/Dialog";
-import { Button, IconButton } from "@/components/console/Button";
-import { Input } from "@/components/console/fields";
-import { Badge } from "@/components/console/Badge";
-import { Banner } from "@/components/console/Banner";
-import { SkeletonText, EmptyState } from "@/components/console/bits";
-import { cx } from "@/components/console/cx";
+import { Dialog, Button, IconButton, Input, Badge, Banner, SkeletonText, EmptyState } from "@/components/admin/editor/fields/parts";
+import { cn as cx } from "@/components/ui/utils";
 
 // THE catalog reference picker (S53 B2, on the B1 refs read model): every
 // place a form takes a product/collection/variant opens this dialog instead
@@ -47,22 +42,22 @@ export function refLabel(item) {
 const Thumb = ({ src, size = "size-9" }) =>
   src ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt="" loading="lazy" className={cx(size, "shrink-0 rounded-ctl border border-edge bg-surface-sunken object-cover")} />
+    <img src={src} alt="" loading="lazy" className={cx(size, "shrink-0 rounded-md border border-border bg-muted object-cover")} />
   ) : (
-    <span className={cx(size, "shrink-0 rounded-ctl border border-edge bg-surface-sunken")} aria-hidden />
+    <span className={cx(size, "shrink-0 rounded-md border border-border bg-muted")} aria-hidden />
   );
 
 function RowMeta({ type, item }) {
   if (type === "collection")
     return (
-      <span className="mt-0.5 flex items-center gap-1.5 text-xs text-fg-subtle">
+      <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
         <span className="truncate font-mono">{item.handle}</span>
         {item.product_count != null && <span>· {item.product_count} product{item.product_count === 1 ? "" : "s"}</span>}
       </span>
     );
   if (type === "variant")
     return (
-      <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-fg-subtle">
+      <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
         {(item.options || [])
           .filter((o) => o?.value && o.value !== "Default Title")
           .map((o, i) => (
@@ -73,7 +68,7 @@ function RowMeta({ type, item }) {
         {item.sku && <span className="font-mono">SKU {item.sku}</span>}
       </span>
     );
-  return <span className="mt-0.5 block truncate font-mono text-xs text-fg-subtle">{item.handle}</span>;
+  return <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground">{item.handle}</span>;
 }
 
 // One searchable, paginated list over /api/admin/refs. Owns its load/error/
@@ -182,7 +177,7 @@ function RefList({ active, type, collectionId, productId, selectedIds = [], addD
       )}
       {phase === "ready" && visible.length > 0 && (
         <>
-          <ul className="max-h-80 divide-y divide-edge overflow-y-auto rounded-ctl border border-edge" aria-label={`Synced ${NOUN[type]}s`}>
+          <ul className="max-h-80 divide-y divide-border overflow-y-auto rounded-md border border-border" aria-label={`Synced ${NOUN[type]}s`}>
             {visible.map((item) => {
               const picked = selectedIds.includes(item.id);
               return (
@@ -193,21 +188,21 @@ function RefList({ active, type, collectionId, productId, selectedIds = [], addD
                     disabled={addDisabled && !picked}
                     aria-pressed={picked}
                     className={cx(
-                      "flex w-full items-center gap-3 px-3 py-2 text-left text-sm focus-ring",
-                      picked ? "bg-surface-sunken" : "hover:bg-surface-sunken",
+                      "flex w-full items-center gap-3 px-3 py-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      picked ? "bg-muted" : "hover:bg-muted",
                       addDisabled && !picked && "cursor-not-allowed opacity-50"
                     )}
                   >
                     <Thumb src={item.thumb} />
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-1.5">
-                        <span className="truncate font-medium text-fg">{item.title}</span>
+                        <span className="truncate font-medium text-foreground">{item.title}</span>
                         {item.status === "unavailable" && <Badge tone="warning">Unavailable</Badge>}
                       </span>
                       <RowMeta type={type} item={item} />
                     </span>
                     {money(type === "variant" ? item.price : item.price_min, item.currency) && (
-                      <span className="shrink-0 text-xs tabular-nums text-fg-muted">{money(type === "variant" ? item.price : item.price_min, item.currency)}</span>
+                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{money(type === "variant" ? item.price : item.price_min, item.currency)}</span>
                     )}
                     {picked && <Check size={14} className="shrink-0 text-success" aria-hidden />}
                   </button>
@@ -222,7 +217,7 @@ function RefList({ active, type, collectionId, productId, selectedIds = [], addD
           )}
         </>
       )}
-      {syncedAt && <p className="text-xs text-fg-subtle">Catalog synced {new Date(syncedAt).toLocaleString()}</p>}
+      {syncedAt && <p className="text-xs text-muted-foreground">Catalog synced {new Date(syncedAt).toLocaleString()}</p>}
     </div>
   );
 }
@@ -313,8 +308,8 @@ export function RefPicker({ open, onClose, type = "product", multi = false, sele
       <div className="space-y-3">
         {multi && (
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-fg-muted">
-              Selected <span className="text-fg-subtle">({selected.length}{max != null ? `/${max}` : ""})</span>
+            <p className="text-xs font-medium text-muted-foreground">
+              Selected <span className="text-muted-foreground">({selected.length}{max != null ? `/${max}` : ""})</span>
               {max != null && atMax ? " — at the limit; remove one to add another" : ""}
             </p>
             {hydration === "loading" && <SkeletonText lines={1} />}
@@ -323,15 +318,15 @@ export function RefPicker({ open, onClose, type = "product", multi = false, sele
                 Couldn&rsquo;t load your current selections — confirming is disabled so nothing gets dropped. {hydrationErr}
               </Banner>
             )}
-            {hydration === "ready" && selected.length === 0 && <p className="text-xs text-fg-subtle">Nothing selected yet — pick from the list below.</p>}
+            {hydration === "ready" && selected.length === 0 && <p className="text-xs text-muted-foreground">Nothing selected yet — pick from the list below.</p>}
             {hydration === "ready" && selected.length > 0 && (
               <ul className="flex flex-wrap gap-1.5">
                 {selected.map((s, i) => (
                   <li
                     key={s.id}
                     className={cx(
-                      "inline-flex items-center gap-1 rounded-ctl border px-2 py-1 text-[11px]",
-                      s.missing ? "border-danger-edge bg-danger-bg text-danger" : "border-edge bg-surface-sunken text-fg"
+                      "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px]",
+                      s.missing ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-border bg-muted text-foreground"
                     )}
                   >
                     {s.missing ? (
@@ -418,7 +413,7 @@ export function VariantPicker({ open, onClose, onConfirm, title = "Choose a vari
     <Dialog open={open} onClose={onClose} title={title} size="lg">
       <div className="space-y-3">
         {!product && selectedVariantId && (
-          <p className="text-xs text-fg-muted">
+          <p className="text-xs text-muted-foreground">
             Currently selected:{" "}
             {current ? (
               current.missing ? (
@@ -426,21 +421,21 @@ export function VariantPicker({ open, onClose, onConfirm, title = "Choose a vari
                   missing from catalog
                 </Badge>
               ) : (
-                <span className="font-medium text-fg">
+                <span className="font-medium text-foreground">
                   {refLabel(current)}
                   {current.sku ? ` · SKU ${current.sku}` : ""}
                 </span>
               )
             ) : currentErr ? (
-              <span className="text-warning">couldn&rsquo;t check it ({currentErr})</span>
+              <span className="text-warning-text">couldn&rsquo;t check it ({currentErr})</span>
             ) : (
-              <span className="text-fg-subtle">checking…</span>
+              <span className="text-muted-foreground">checking…</span>
             )}
           </p>
         )}
         {!product ? (
           <>
-            <p className="text-xs text-fg-muted">Step 1 of 2 — pick the product, then one of its variants.</p>
+            <p className="text-xs text-muted-foreground">Step 1 of 2 — pick the product, then one of its variants.</p>
             <RefList active={open && !product} type="product" onPick={setProduct} />
           </>
         ) : (
@@ -448,8 +443,8 @@ export function VariantPicker({ open, onClose, onConfirm, title = "Choose a vari
             <div className="flex items-center gap-2">
               <IconButton label="Back to products" icon={<ChevronLeft size={14} aria-hidden />} onClick={() => setProduct(null)} />
               <Thumb src={product.thumb} size="size-7" />
-              <span className="min-w-0 flex-1 truncate text-sm font-medium text-fg">{product.title}</span>
-              <span className="shrink-0 font-mono text-xs text-fg-subtle">{product.handle}</span>
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{product.title}</span>
+              <span className="shrink-0 font-mono text-xs text-muted-foreground">{product.handle}</span>
             </div>
             <RefList active={open && !!product} type="variant" productId={product.id} selectedIds={selectedVariantId ? [selectedVariantId] : []} onPick={confirmVariant} />
           </>

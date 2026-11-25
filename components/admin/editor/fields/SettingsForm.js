@@ -90,7 +90,7 @@ function Form({ value, onChange, issues = [], focusRequest = null, kind = null, 
 
   if (!form) {
     return (
-      <section id={rootId} className="text-sm text-fg-muted">
+      <section id={rootId} className="text-sm text-muted-foreground">
         This can't be edited here.
       </section>
     );
@@ -114,13 +114,13 @@ function Form({ value, onChange, issues = [], focusRequest = null, kind = null, 
   return (
     <section id={rootId} data-form={form.form} tabIndex={-1} aria-labelledby={`${rootId}--title`} aria-describedby={rootNotes.length ? notesId(rootId) : undefined} className="space-y-4">
       <div>
-        <h2 id={`${rootId}--title`} className="text-sm font-semibold text-fg">
+        <h2 id={`${rootId}--title`} className="text-sm font-semibold text-foreground">
           {form.label}
         </h2>
-        {form.placeholder && <p className="mt-0.5 text-xs text-fg-muted">{form.placeholder}</p>}
+        {form.placeholder && <p className="mt-0.5 text-xs text-muted-foreground">{form.placeholder}</p>}
       </div>
-      {readOnly && <p className="rounded-ctl bg-surface-sunken px-3 py-2 text-xs text-fg-muted">{readOnlyReason}</p>}
-      {form.waits && <p className="rounded-ctl border border-warning-edge bg-warning-bg px-3 py-2 text-xs text-fg">{form.waits}</p>}
+      {readOnly && <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">{readOnlyReason}</p>}
+      {form.waits && <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground">{form.waits}</p>}
       <Notes anchor={rootId} notes={rootNotes} />
       {orphans.map((a) => (
         <div key={a} id={a} tabIndex={-1} aria-describedby={notesId(a)}>
@@ -132,7 +132,7 @@ function Form({ value, onChange, issues = [], focusRequest = null, kind = null, 
         if (!C) return null;
         return <C key={f.path} field={f} value={valueOf(f) ?? null} onChange={(v) => set(f, v)} issues={placed} owner={owner} context={ctx} readOnly={readOnly} />;
       })}
-      {note && <p className="text-xs text-fg-subtle">{note}</p>}
+      {note && <p className="text-xs text-muted-foreground">{note}</p>}
     </section>
   );
 }

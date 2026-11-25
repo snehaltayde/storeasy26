@@ -20,7 +20,7 @@
 // The stored value is ids only; names are looked up, never stored.
 import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, ListPlus, Trash2 } from "lucide-react";
-import { Button, IconButton } from "../../../console/Button.js";
+import { Button, IconButton } from "./parts.js";
 import { ProductPicker, fetchRefs } from "../../shared/RefPicker.js";
 import { Notes } from "./controls.js";
 import { idOf, notesId, notesAt, moveIn, removeAt } from "./inspectorModel.js";
@@ -83,15 +83,15 @@ export function ProductPicks({ id, owner, path, label, ids, onChange, issues, co
     return l.loading || l.missing ? `product ${j + 1}` : l.primary;
   };
   return (
-    <div id={id} role="group" tabIndex={-1} aria-labelledby={`${id}--label`} aria-describedby={described(id, notes)} className="min-w-0 rounded-ctl border border-edge p-3 focus-ring" data-product-picks="">
-      <p id={`${id}--label`} className="mb-2 text-xs font-medium text-fg-muted">
+    <div id={id} role="group" tabIndex={-1} aria-labelledby={`${id}--label`} aria-describedby={described(id, notes)} className="min-w-0 rounded-md border border-border p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring" data-product-picks="">
+      <p id={`${id}--label`} className="mb-2 text-xs font-medium text-muted-foreground">
         {label}
       </p>
       <div className="space-y-3">
         {children}
-        {list.length === 0 && <p className="text-xs text-fg-subtle">No products yet.</p>}
+        {list.length === 0 && <p className="text-xs text-muted-foreground">No products yet.</p>}
         {list.length > 0 && (
-          <ol className="divide-y divide-edge rounded-ctl border border-edge" aria-label={label}>
+          <ol className="divide-y divide-border rounded-md border border-border" aria-label={label}>
             {list.map((pid, j) => {
               const rid = idOf(owner, `${path}.${j}`);
               const rnotes = notesAt(issues, rid);
@@ -101,11 +101,11 @@ export function ProductPicks({ id, owner, path, label, ids, onChange, issues, co
                 <li key={`${pid}-${j}`} className="px-2.5 py-1.5" data-pick={pid}>
                   <div className="flex items-start gap-1.5">
                     <span id={rid} tabIndex={-1} aria-describedby={described(rid, rnotes)} className="min-w-0 flex-1">
-                      <span className={`block truncate text-sm ${line.missing ? "text-warning" : "text-fg"}`} data-pick-title="">
+                      <span className={`block truncate text-sm ${line.missing ? "text-warning-text" : "text-foreground"}`} data-pick-title="">
                         {`${j + 1}. ${line.primary}`}
                       </span>
                       {line.secondary && (
-                        <span className="block truncate text-xs text-fg-muted" data-pick-shopify="">
+                        <span className="block truncate text-xs text-muted-foreground" data-pick-shopify="">
                           {line.secondary}
                         </span>
                       )}
@@ -122,12 +122,12 @@ export function ProductPicks({ id, owner, path, label, ids, onChange, issues, co
             })}
           </ol>
         )}
-        {lookupError && <p className="text-xs text-warning">{lookupError}</p>}
+        {lookupError && <p className="text-xs text-warning-text">{lookupError}</p>}
         <Button size="sm" icon={<ListPlus size={13} aria-hidden />} disabled={readOnly} onClick={() => setPicking(true)}>
           {list.length ? "Change the products" : "Choose products"}
         </Button>
       </div>
-      {(hint || max != null) && <p className="mt-1 text-xs text-fg-subtle">{[hint, max != null ? `${list.length} of ${max} products${full ? ". The list is full." : ""}` : null].filter(Boolean).join(" ")}</p>}
+      {(hint || max != null) && <p className="mt-1 text-xs text-muted-foreground">{[hint, max != null ? `${list.length} of ${max} products${full ? ". The list is full." : ""}` : null].filter(Boolean).join(" ")}</p>}
       <Notes anchor={id} notes={notes} />
       {picking && (
         <ProductPicker

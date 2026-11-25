@@ -62,7 +62,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { applyFocus, blockStart, notesId, noteTone, blocks } from "./inspectorModel.js";
 import { TOOLBAR, uneditableTags, readOnlyWords, refusedByCleaner, REFUSED_WORDS, pastedPart, plainToHtml, hasBlocks, splicePaste, linkHtml, newMarker, blockChildAt, textOffset, pointAt, syncAction, frameDocument, looksEmpty } from "./richTextModel.js";
 
-const TONE = { danger: "text-danger", warning: "text-warning", muted: "text-fg-muted" };
+const TONE = { danger: "text-destructive", warning: "text-warning-text", muted: "text-muted-foreground" };
 const MIN_HEIGHT = 112;
 const MAX_HEIGHT = 560;
 
@@ -91,11 +91,11 @@ export function HtmlSource({ id, value, onChange, describedBy, invalid, onDone, 
         aria-describedby={describedBy}
         spellCheck={false}
         onChange={(e) => onChange?.(e.target.value)}
-        className={`w-full min-h-40 rounded-ctl border bg-surface px-3 py-2 font-mono text-xs text-fg focus-ring ${invalid ? "border-danger" : "border-edge"}`}
+        className={`w-full min-h-40 rounded-md border bg-card px-3 py-2 font-mono text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring ${invalid ? "border-destructive" : "border-border"}`}
       />
       <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-fg-subtle">You're changing the HTML itself. When it saves, anything a page can't show safely, such as scripts, is taken out.</p>
-        <button type="button" onClick={onDone} className="rounded-ctl border border-edge bg-surface px-2.5 py-1 text-xs font-medium text-fg hover:bg-surface-muted focus-ring">
+        <p className="text-xs text-muted-foreground">You're changing the HTML itself. When it saves, anything a page can't show safely, such as scripts, is taken out.</p>
+        <button type="button" onClick={onDone} className="rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring">
           Show formatted
         </button>
       </div>
@@ -423,9 +423,9 @@ export default function RichTextField({ value, onChange, issues = [], focusReque
 
   return (
     <div className="min-w-0" data-rich-text={mode}>
-      <span id={labelId} className="mb-1 block text-xs font-medium text-fg-muted">
+      <span id={labelId} className="mb-1 block text-xs font-medium text-muted-foreground">
         {label}
-        {required && <span className="text-danger"> *</span>}
+        {required && <span className="text-destructive"> *</span>}
       </span>
       {mode === "html" ? (
         <HtmlSource id={id} value={html} label={label} onChange={(v) => onChange?.(v)} describedBy={describedBy} invalid={invalid} onDone={() => setSource(false)} />
@@ -442,10 +442,10 @@ export default function RichTextField({ value, onChange, issues = [], focusReque
           onFocus={(e) => {
             if (e.target === e.currentTarget && editable) frameRef.current?.contentWindow?.focus();
           }}
-          className={`overflow-hidden rounded-ctl border bg-surface focus-within:ring-2 focus-within:ring-edge-strong ${invalid ? "border-danger" : "border-edge"}`}
+          className={`overflow-hidden rounded-md border bg-card focus-within:ring-2 focus-within:ring-edge-strong ${invalid ? "border-destructive" : "border-border"}`}
         >
           {editable && (
-            <div role="toolbar" aria-label={`Formatting for ${label}`} className="flex flex-wrap items-center gap-0.5 border-b border-edge bg-surface-muted px-1.5 py-1">
+            <div role="toolbar" aria-label={`Formatting for ${label}`} className="flex flex-wrap items-center gap-0.5 border-b border-border bg-muted px-1.5 py-1">
               {TOOLBAR.map((b) => (
                 <button
                   key={b.id}
@@ -455,7 +455,7 @@ export default function RichTextField({ value, onChange, issues = [], focusReque
                   title={b.key ? `${b.label} (⌘${b.key.toUpperCase()})` : b.label}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => run(b)}
-                  className={`rounded px-2 py-1 text-xs text-fg hover:bg-surface-sunken focus-ring ${pressed[b.id] ? "bg-surface-sunken font-semibold" : ""}`}
+                  className={`rounded px-2 py-1 text-xs text-foreground hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring ${pressed[b.id] ? "bg-muted font-semibold" : ""}`}
                 >
                   {b.label}
                 </button>
@@ -463,8 +463,8 @@ export default function RichTextField({ value, onChange, issues = [], focusReque
             </div>
           )}
           {editable && linking && (
-            <div className="flex flex-wrap items-center gap-2 border-b border-edge px-2 py-1.5" data-rte-link-form>
-              <label htmlFor={`${id}--link`} className="text-xs text-fg-muted">
+            <div className="flex flex-wrap items-center gap-2 border-b border-border px-2 py-1.5" data-rte-link-form>
+              <label htmlFor={`${id}--link`} className="text-xs text-muted-foreground">
                 Web address
               </label>
               <input
@@ -481,12 +481,12 @@ export default function RichTextField({ value, onChange, issues = [], focusReque
                     applyLink();
                   } else if (e.key === "Escape") setLinking(false);
                 }}
-                className="min-w-0 flex-1 rounded-ctl border border-edge bg-surface px-2 py-1 text-xs text-fg focus-ring"
+                className="min-w-0 flex-1 rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
-              <button type="button" onClick={applyLink} className="rounded-ctl bg-primary px-2.5 py-1 text-xs font-medium text-primary-fg hover:bg-primary-hover focus-ring">
+              <button type="button" onClick={applyLink} className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary-hover outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 Add link
               </button>
-              <button type="button" onClick={() => setLinking(false)} className="rounded-ctl px-2 py-1 text-xs text-fg-muted focus-ring">
+              <button type="button" onClick={() => setLinking(false)} className="rounded-md px-2 py-1 text-xs text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 Cancel
               </button>
             </div>
@@ -496,9 +496,9 @@ export default function RichTextField({ value, onChange, issues = [], focusReque
       )}
       {why && (
         <div id={readonlyId} className="mt-1 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-fg-muted">{why}</p>
+          <p className="text-xs text-muted-foreground">{why}</p>
           {(mode === "view" || rescue) && (
-            <button type="button" data-rte-edit-html onClick={() => setSource(true)} className="rounded-ctl border border-edge bg-surface px-2.5 py-1 text-xs font-medium text-fg hover:bg-surface-muted focus-ring">
+            <button type="button" data-rte-edit-html onClick={() => setSource(true)} className="rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring">
               Edit as HTML
             </button>
           )}

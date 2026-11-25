@@ -19,8 +19,7 @@
 // shopify: { gallery: [{ media, alt }] } (what Shopify sends now; null when
 // the product is no longer in Shopify or isn't loaded yet).
 import { ArrowDown, ArrowUp, ImagePlus, Plus, RotateCcw, Trash2 } from "lucide-react";
-import { Button, IconButton } from "../../../console/Button.js";
-import { Input } from "../../../console/fields.js";
+import { Button, IconButton, Input } from "./parts.js";
 import { Notes } from "./controls.js";
 import { idOf, notesId, notesAt, blocks, moveIn, removeAt } from "./inspectorModel.js";
 
@@ -83,17 +82,17 @@ export default function GalleryControl({ field, value, onChange, issues, owner =
   const shopifyLabel = context.shopifyMissing ? GALLERY_WORDS.shopifyGone : GALLERY_WORDS.shopifyLoading;
 
   return (
-    <div id={id} role="group" tabIndex={-1} aria-labelledby={`${id}--label`} aria-describedby={described(id, notes)} className="min-w-0 rounded-ctl border border-edge p-3 focus-ring" data-gallery-control="" data-following={list ? undefined : ""}>
-      <p id={`${id}--label`} className="mb-1 text-xs font-medium text-fg-muted">
+    <div id={id} role="group" tabIndex={-1} aria-labelledby={`${id}--label`} aria-describedby={described(id, notes)} className="min-w-0 rounded-md border border-border p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring" data-gallery-control="" data-following={list ? undefined : ""}>
+      <p id={`${id}--label`} className="mb-1 text-xs font-medium text-muted-foreground">
         {field.label}
       </p>
-      <p className="mb-3 text-xs text-fg-subtle" data-gallery-state="">
+      <p className="mb-3 text-xs text-muted-foreground" data-gallery-state="">
         {list ? GALLERY_WORDS.own : GALLERY_WORDS.following}
       </p>
       <div className="space-y-4">
         <section aria-label="Your images" className="min-w-0 space-y-2" data-gallery-own="">
-          <p className="text-xs font-medium text-fg">Your images</p>
-          {items.length === 0 && <p className="text-xs text-fg-subtle">{list ? "No images in your list." : "None yet."}</p>}
+          <p className="text-xs font-medium text-foreground">Your images</p>
+          {items.length === 0 && <p className="text-xs text-muted-foreground">{list ? "No images in your list." : "None yet."}</p>}
           {items.length > 0 && (
             <ol className="space-y-2">
               {items.map((it, j) => {
@@ -107,13 +106,13 @@ export default function GalleryControl({ field, value, onChange, issues, owner =
                 const v = isObj(it) ? it : {};
                 const name = `image ${j + 1}`;
                 return (
-                  <li key={j} id={iid} tabIndex={-1} aria-describedby={described(iid, inotes)} className="rounded-ctl border border-edge p-2" data-gallery-item={textOf(v.media)}>
+                  <li key={j} id={iid} tabIndex={-1} aria-describedby={described(iid, inotes)} className="rounded-md border border-border p-2" data-gallery-item={textOf(v.media)}>
                     <div className="flex items-center gap-2">
-                      <span id={mid} tabIndex={-1} aria-describedby={described(mid, mnotes)} className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-ctl border border-edge bg-surface-sunken">
+                      <span id={mid} tabIndex={-1} aria-describedby={described(mid, mnotes)} className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        {v.media ? <img src={v.media} alt={textOf(v.alt)} className="h-full w-full object-cover" loading="lazy" /> : <span className="text-[10px] text-fg-subtle">No image</span>}
+                        {v.media ? <img src={v.media} alt={textOf(v.alt)} className="h-full w-full object-cover" loading="lazy" /> : <span className="text-[10px] text-muted-foreground">No image</span>}
                       </span>
-                      <span className="min-w-0 flex-1 text-xs text-fg-muted">{`Image ${j + 1}`}</span>
+                      <span className="min-w-0 flex-1 text-xs text-muted-foreground">{`Image ${j + 1}`}</span>
                       <span className="flex shrink-0 items-center">
                         <IconButton label={`Move ${name} up`} icon={<ArrowUp size={14} aria-hidden />} disabled={readOnly || j === 0} onClick={() => set(moveIn(items, j, -1))} />
                         <IconButton label={`Move ${name} down`} icon={<ArrowDown size={14} aria-hidden />} disabled={readOnly || j === items.length - 1} onClick={() => set(moveIn(items, j, 1))} />
@@ -121,7 +120,7 @@ export default function GalleryControl({ field, value, onChange, issues, owner =
                       </span>
                     </div>
                     <div className="mt-2 min-w-0">
-                      <label htmlFor={aid} className="mb-1 block text-xs font-medium text-fg-muted">
+                      <label htmlFor={aid} className="mb-1 block text-xs font-medium text-muted-foreground">
                         {`Alt text for image ${j + 1}`}
                       </label>
                       <Input
@@ -159,23 +158,23 @@ export default function GalleryControl({ field, value, onChange, issues, owner =
               </Button>
             )}
           </div>
-          {max != null && <p className="text-xs text-fg-subtle">{`${items.length} of ${max} images${full ? ". The list is full: remove one to add another." : ""}`}</p>}
+          {max != null && <p className="text-xs text-muted-foreground">{`${items.length} of ${max} images${full ? ". The list is full: remove one to add another." : ""}`}</p>}
         </section>
         <section aria-label="Shopify's images" className="min-w-0 space-y-2" data-gallery-shopify="">
-          <p className="text-xs font-medium text-fg">Shopify&rsquo;s images</p>
-          {!shopify && <p className="text-xs text-fg-subtle">{shopifyLabel}</p>}
-          {shopify && shopify.length === 0 && <p className="text-xs text-fg-subtle">Shopify has no images for this product.</p>}
+          <p className="text-xs font-medium text-foreground">Shopify&rsquo;s images</p>
+          {!shopify && <p className="text-xs text-muted-foreground">{shopifyLabel}</p>}
+          {shopify && shopify.length === 0 && <p className="text-xs text-muted-foreground">Shopify has no images for this product.</p>}
           {shopify && shopify.length > 0 && (
             <ol className="space-y-2">
               {shopify.map((s, j) => {
                 const inList = items.some((x) => isObj(x) && sameImage(x.media, s.media));
                 return (
                   <li key={j} className="flex items-center gap-2" data-shopify-image={textOf(s.media)}>
-                    <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-ctl border border-edge bg-surface-sunken">
+                    <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={s.media} alt={textOf(s.alt)} className="h-full w-full object-cover" loading="lazy" />
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-xs text-fg-muted">{textOf(s.alt) || `Shopify image ${j + 1}`}</span>
+                    <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{textOf(s.alt) || `Shopify image ${j + 1}`}</span>
                     <IconButton
                       label={inList ? `Shopify image ${j + 1} is in your list` : `Add Shopify image ${j + 1} to your list`}
                       icon={<Plus size={14} aria-hidden />}
