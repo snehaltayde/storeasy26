@@ -350,7 +350,7 @@ export default function LifecycleCard({ store, lifecycle }) {
         {exportLink && (
           <div className="space-y-1.5 rounded-md border border-border bg-muted p-3" data-export-link>
             <p>
-              Export link ready. It expires in {exportLink.expires} and only works for this store. Anyone with the link can download the store&apos;s data, so share it with care.
+              Export link ready. It works once, expires in {exportLink.expires} and only works for this store. Until it is used, anyone with the link can download the store&apos;s data, so share it with care.
             </p>
             <CopyButton value={exportLink.url} label="the export link" />
           </div>

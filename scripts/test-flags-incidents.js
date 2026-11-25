@@ -330,6 +330,23 @@ await t("least trusted: the merchant Audit log read (support 403, owner allowed)
   ok(!owner.text.includes(NOTE) && !owner.text.includes(NOTE2), "the owner's answer has no note");
 });
 
+await t("P3-D least trusted: a store incident with no public message keeps its title from the owner's Audit log until a public message is posted", async () => {
+  const TITLE = "Title canary P3D 7c1e";
+  const open = await call("operator", "incidents", "POST", { body: { action: "open", title: TITLE, tenant: store.a.id, internalNote: "note" } });
+  eq(open.status, 200, open.text.slice(0, 160));
+  const owner = await store.call("owner", "audit", "GET", { query: "limit=200&facets=1" });
+  eq(owner.status, 200);
+  ok(!owner.text.includes(TITLE), "the owner's answer holds the title before any public message");
+  const timeline = (await call("operator", "incidents", "GET", { query: `timeline=${open.body.incident.id}` })).body.timeline;
+  eq(timeline[0]?.kind, "open", "the operator's timeline still has the open");
+  const raw = (await db().execute({ sql: "SELECT diff FROM audit_log WHERE action = 'incident.open' AND resource = ?", args: [`incident:${open.body.incident.id}`] })).rows[0];
+  ok(String(raw?.diff).includes(TITLE), "operators keep the title (under operator_only)");
+  eq((await call("operator", "incidents", "POST", { body: { action: "update", id: open.body.incident.id, publicMessage: "Checkout is slow" } })).status, 200, "update");
+  const after = await store.call("owner", "audit", "GET", { query: "limit=200" });
+  ok(after.text.includes(TITLE), "once public, a fresh row names the title");
+  eq((await call("operator", "incidents", "POST", { body: { action: "resolve", id: open.body.incident.id } })).status, 200, "resolve");
+});
+
 await t("least trusted: a merchant token in _platform gets 401 on every flag and incident write, and nothing changes", async () => {
   await flags({ flag: { key: "ff_guarded", default_on: false } });
   const count = async () => {
