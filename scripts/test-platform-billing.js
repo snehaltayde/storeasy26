@@ -693,6 +693,29 @@ await t("race loser: when its new Razorpay subscription can't be cancelled it is
   eq((await db().execute({ sql: "SELECT cancel_state s FROM subscriptions WHERE id = ?", args: [lost.kept_as] })).rows[0].s, "now", "confirmed");
 });
 
+await t("race loser kept as a newer row: the merchant view and extendGrace still use the real current subscription", async () => {
+  providerOn();
+  gate = { n: 0, of: 2 };
+  gate.opened = new Promise((r) => (gate.open = r));
+  failNext.push(/\/cancel$/);
+  const [x, y] = await Promise.all([op({ action: "start", tenant: Bid, plan: "starter" }), op({ action: "start", tenant: Bid, plan: "growth" })]);
+  gate = null;
+  eq([x.status, y.status].sort().join(","), "200,409", `${x.status} / ${y.status}`);
+  const won = (x.status === 200 ? x : y).body.result;
+  const lost = (x.status === 409 ? x : y).body.detail;
+  ok(lost.kept_as, "the loser is kept");
+  // the kept row is the newest by time; the winner's payment then fails
+  await db().execute({ sql: "UPDATE subscriptions SET created_at = ? WHERE id = ?", args: [new Date(Date.now() + 60_000).toISOString(), lost.kept_as] });
+  await db().execute({ sql: "UPDATE subscriptions SET status = 'halted', grace_until = ? WHERE id = ?", args: [new Date(Date.now() + 86400000).toISOString(), won.id] });
+  eq((await B.subscriptionFor(Bid)).id, won.id, "subscriptionFor is the current row");
+  const view = await store.call("owner-b", "billing", "GET", { host: store.b.tenant.domains[0] });
+  eq(view.status, 200, view.text.slice(0, 160));
+  eq(`${view.body.subscription?.plan}/${view.body.subscription?.status}`, `${won.plan}/halted`, "the merchant view shows the real plan");
+  const g = await op({ action: "grace", subscription: won.id, days: 3, reason: "after the race" });
+  eq(g.status, 200, g.text.slice(0, 160));
+  eq((await op({ action: "grace", subscription: lost.kept_as, days: 3, reason: "x" })).status, 422, "never on the kept loser");
+});
+
 await t("in force: an authenticated row is not paid, even with a period ahead; a failing row counts only inside a charged period", async () => {
   const E5 = "platbill-e";
   await C.upsertTenant({ id: E5, name: "Platbill E", domains: ["platbill-e.test"], dbUrl: "file:.test-platbill-e-tenant.db", config: {}, secrets: {} });
