@@ -4,7 +4,10 @@
 // a single-use, 60-second entry token, then submits a form POST with it to the
 // store's own /api/admin/support-entry (another host), which sets the store's
 // host-only __Host-support cookie and sends the browser to /admin. The token lives
-// only in this click: never in a URL, the page or storage. Same tab, so no
+// only in this click: never in a URL, the page or storage. No rel=noreferrer on
+// the form: a no-referrer submission sends Origin: null, which the entry route
+// refuses (it needs the console's origin); the entry answer itself sends
+// Referrer-Policy: no-referrer. Same tab, so no
 // popup blocker can eat the post; the browser's Back returns here.
 import { useState } from "react";
 import { LogIn } from "lucide-react";
@@ -15,7 +18,6 @@ function post(url, token) {
   const form = document.createElement("form");
   form.method = "POST";
   form.action = url;
-  form.rel = "noreferrer";
   form.style.display = "none";
   const input = document.createElement("input");
   input.type = "hidden";

@@ -321,6 +321,10 @@ await t("the team's audit view names the operator on support rows, never the raw
   const rows = res.body.entries.filter((e) => e.action.startsWith("support.") && e.actor_kind === "operator");
   ok(rows.length >= 3, `support rows: ${rows.length}`);
   ok(rows.every((e) => e.who === "Opname supacc"), JSON.stringify(rows.map((e) => e.who)));
+  const withFacets = await call("owner-b", "audit", "GET", { host: hostB, query: "facets=1" });
+  eq(withFacets.status, 200);
+  ok(!withFacets.text.includes(operatorId), "the operator's id is in no entry and no filter choice");
+  ok(withFacets.body.entries.filter((e) => e.actor_kind === "operator").every((e) => e.actor === null), "operator rows carry no actor id");
 });
 
 await t("expiry ends the session at once: the grant's end passes, the next request is 401", async () => {

@@ -134,7 +134,7 @@ async function strayPassAll(drill, page) {
 }
 
 async function ownerEnds(drill, owner) {
-  await owner.goto(`${STORE}/admin/settings/team`, { waitUntil: "load" });
+  await owner.goto(new URL("/admin/settings/team", STORE).href, { waitUntil: "load" });
   await settle(owner);
   const body = await bodyText(owner);
   drill.check(/Platform support access is active/.test(body) && body.includes(OP_NAME) && body.includes(REASON), "the owner's banner names the operator and the reason", body.slice(0, 400));

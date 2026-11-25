@@ -62,13 +62,15 @@ export const GET = tenantHandler(async (request) => {
   // (the store's team sees who had access), never their id or email
   const supportRow = (r) => r.actor_kind === "operator" && String(r.action).startsWith("support.");
   const opNames = await operatorNames(rows.filter(supportRow).map((r) => r.actor)).catch(() => new Map());
-  // the raw diff never leaves the server: only its redacted lines
-  const entries = rows.map(({ diff, ...r }) => ({ ...r, who: (supportRow(r) && opNames.get(String(r.actor))) || labels.get(r.actor), changes: auditChanges(diff) }));
+  // the raw diff never leaves the server: only its redacted lines. An
+  // operator's id never does either: operator rows carry the words only
+  // (actor null), and operators are not among the filter choices.
+  const entries = rows.map(({ diff, ...r }) => ({ ...r, ...(r.actor_kind === "operator" ? { actor: null } : {}), who: (supportRow(r) && opNames.get(String(r.actor))) || labels.get(r.actor), changes: auditChanges(diff) }));
   const last = entries.at(-1);
   return NextResponse.json({
     ok: true,
     entries,
     next: entries.length === limit && last ? `${last.at}|${last.id}` : null,
-    ...(facets ? { facets: { actions: facets.actions, actors: facets.actors.map((a) => ({ ...a, label: labels.get(a.actor) })) } } : {}),
+    ...(facets ? { facets: { actions: facets.actions, actors: facets.actors.filter((a) => a.kind !== "operator").map((a) => ({ ...a, label: labels.get(a.actor) })) } } : {}),
   });
 });
