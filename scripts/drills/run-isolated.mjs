@@ -477,7 +477,7 @@ export const DRILLS = {
   apps: { id: "APPS", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/apps/run.mjs", ...c.headed])) },
   // Phase 5: uploadable themes (lines 1-3 each add a stage file: upload, render, switch)
   themes: { id: "THEMES", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/themes/run.mjs", ...c.headed])) },
-  // Phase 6: the studio (lines 1 and 2 add stage files; not in ALL until they exist)
+  // Phase 6: the studio (lines 1 and 2 add the stage files; in ALL since the phase end)
   studio: { id: "STUDIO", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/studio/run.mjs", ...c.headed])) },
   "support-access": { id: "SUPPORT-ACCESS", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/support-access/run.mjs", ...c.headed])) },
   // a founder connects Shopify from onboarding step 1 (Phase 1 line 4 §5 item 14):
@@ -567,7 +567,9 @@ export const ALL = ["smoke", "p5", "p6", "agency-gone", "shell", "signup", "conn
   // Phase 4
   "apps",
   // Phase 5
-  "themes"];
+  "themes",
+  // Phase 6
+  "studio"];
 
 const git = (root, args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
 
