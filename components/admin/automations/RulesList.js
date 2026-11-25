@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Lock, Plus } from "lucide-react";
+import { FlaskConical, Lock, Plus, Power, PowerOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,6 +43,7 @@ const quietWords = (r) => (r.quiet_start ? `${r.quiet_start}–${r.quiet_end}` :
 
 export function RulesList({ initial, role }) {
   const [data, setData] = useState(initial);
+  const [retrying, setRetrying] = useState(false);
   const [sheet, setSheet] = useState(null); // { rule } | null
   const [confirm, setConfirm] = useState(null); // { kind: "remove", rule } | { kind: "kill" }
   const [pending, setPending] = useState(null);
@@ -69,6 +70,39 @@ export function RulesList({ initial, role }) {
     }
   }
 
+  // The first read failed: plain words and Try again (a fresh GET). Only
+  // admins and owners reach this component, so it needs no read mark.
+  if (!data) {
+    return (
+      <>
+        <PageHeader title="Automations" />
+        <EmptyState
+          title="Couldn't read your automations just now."
+          description="Nothing is lost. Try again in a moment."
+          action={
+            <Button
+              type="button"
+              variant="outline"
+              disabled={retrying}
+              onClick={async () => {
+                setRetrying(true);
+                try {
+                  setData(await sendJson(API, "GET"));
+                } catch {
+                  /* still failing: the same note stays */
+                } finally {
+                  setRetrying(false);
+                }
+              }}
+            >
+              Try again
+            </Button>
+          }
+        />
+      </>
+    );
+  }
+
   const { disabled, automations = [], runs = [], triggers, actions } = data;
   return (
     <>
@@ -78,12 +112,13 @@ export function RulesList({ initial, role }) {
         actions={
           <>
             <RoleGate role={role} action="settings.write" mode="hide">
-              <Button type="button" variant={disabled ? "default" : "outline"} onClick={() => setConfirm({ kind: "kill" })} data-automations="kill-switch">
+              <Button type="button" variant={disabled ? "default" : "outline"} className={disabled ? undefined : "text-destructive hover:text-destructive"} onClick={() => setConfirm({ kind: "kill" })} data-automations="kill-switch">
+                {disabled ? <Power aria-hidden /> : <PowerOff aria-hidden />}
                 {disabled ? "Turn automations back on" : "Turn all off"}
               </Button>
             </RoleGate>
             <RoleGate role={role} action="settings.write" mode="hide">
-              <Button type="button" onClick={() => setSheet({ rule: null })}>
+              <Button type="button" variant={disabled ? "outline" : "default"} onClick={() => setSheet({ rule: null })}>
                 <Plus aria-hidden />
                 New rule
               </Button>
@@ -92,19 +127,31 @@ export function RulesList({ initial, role }) {
         }
       />
       {disabled && (
-        <p role="note" data-automations="disabled" className="mb-4 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-text">
-          All automations are off. No rule runs, whatever its own switch says, until you turn them back on.
+        <p role="note" data-automations="disabled" className="mb-4 flex items-start gap-2 rounded-md border border-warning/50 bg-warning/10 px-3 py-2.5 text-sm text-warning-text">
+          <PowerOff aria-hidden className="mt-0.5 size-4 shrink-0" />
+          <span>All automations are off. No rule runs, whatever its own switch says, until you turn them back on.</span>
         </p>
       )}
       {notice && (
-        <p role={notice.tone === "error" ? "alert" : "status"} className={`mb-4 text-sm ${notice.tone === "error" ? "text-destructive" : "text-foreground"}`} data-automations="notice">
-          {notice.text}
+        <p
+          role={notice.tone === "error" ? "alert" : "status"}
+          className={`mb-4 flex items-start gap-2 rounded-md border px-3 py-2.5 text-sm ${notice.tone === "error" ? "border-destructive/40 bg-destructive/5 text-destructive" : "border-info/30 bg-info/5 text-foreground"}`}
+          data-automations="notice"
+        >
+          {notice.tone !== "error" && <FlaskConical aria-hidden className="mt-0.5 size-4 shrink-0 text-info" />}
+          <span>{notice.text}</span>
         </p>
       )}
 
       <div className="space-y-4">
-        <DataTable
-          label="Rules"
+        <Card data-automations="rules">
+          <CardHeader>
+            <CardTitle>Rules</CardTitle>
+            <CardDescription>Each switch turns one rule on or off. A dry run works a rule out against your latest order and sends nothing.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DataTable
+              label="Rules"
           rows={automations}
           rowKey={(r) => r.id}
           columns={[
@@ -112,7 +159,7 @@ export function RulesList({ initial, role }) {
             { key: "trigger", header: "When", cell: (r) => `${TRIGGER_WORDS[r.trigger] || r.trigger}, ${conditionWords(r)}` },
             { key: "action", header: "Then", cell: (r) => ACTION_WORDS[r.action?.kind] || r.action?.kind },
             { key: "cap_per_day", header: "A day", align: "right", cell: (r) => <span className="font-mono tabular-nums">{r.cap_per_day}</span> },
-            { key: "quiet", header: "Quiet hours", cell: quietWords },
+            { key: "quiet", header: "Quiet hours", cell: (r) => <span className={r.quiet_start ? "font-mono tabular-nums" : "text-muted-foreground"}>{quietWords(r)}</span> },
             {
               key: "enabled",
               header: "On",
@@ -140,8 +187,10 @@ export function RulesList({ initial, role }) {
               </RoleGate>
             </div>
           )}
-          empty={<EmptyState title="No rules yet." description="A rule sends one email when an order is placed or a return is asked for." />}
-        />
+              empty={<EmptyState title="No rules yet." description="A rule sends one email when an order is placed or a return is asked for." className="py-6" />}
+            />
+          </CardContent>
+        </Card>
 
         <Card data-automations="runs">
           <CardHeader>

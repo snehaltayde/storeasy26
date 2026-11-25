@@ -88,10 +88,10 @@ export function CoverageNote({ coverage }) {
   const pct = coverage.event_coverage_pct;
   if (pct == null || pct >= 60) return null;
   return (
-    <p role="note" data-analytics="coverage" className="flex items-start gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-[0.8125rem] text-muted-foreground">
-      <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
+    <p role="note" data-analytics="coverage" className="flex items-start gap-2 rounded-md border border-info/30 bg-info/5 px-3 py-2 text-[0.8125rem] text-foreground">
+      <Info aria-hidden className="mt-0.5 size-4 shrink-0 text-info" />
       <span>
-        Tracking is thin: about {pct}% of your sales came from shoppers who agreed to analytics, so the funnel, searches, campaigns and devices show only part of the picture. Sales and top products come from your orders and are complete.
+        Tracking is thin: {pct === 0 ? "none" : `about ${pct}%`} of your sales came from shoppers who agreed to analytics, so the funnel, searches, campaigns and devices show only part of the picture. Sales and top products come from your orders and are complete.
       </span>
     </p>
   );

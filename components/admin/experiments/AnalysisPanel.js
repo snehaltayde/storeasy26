@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AlertTriangle, EyeOff, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/kit/page-header";
@@ -26,6 +27,22 @@ import { ExperimentStatus, splitWords } from "./ExperimentsList";
 const API = "/api/admin/experiments";
 const START_REASON = "Starting shows shoppers a variant, so it needs an owner or admin.";
 const pct = (r) => `${(r * 100).toFixed(1)}%`;
+// How each reason looks: an icon and a tone; a broken split is a warning.
+const BLOCK_LOOK = {
+  peeking: { Icon: EyeOff, box: "border-border bg-muted/50", icon: "text-muted-foreground" },
+  sample: { Icon: Users, box: "border-border bg-muted/50", icon: "text-muted-foreground" },
+  srm: { Icon: AlertTriangle, box: "border-warning/50 bg-warning/10", icon: "text-warning-text" },
+};
+// "Lead words: the rest" → the lead words in weight; the text stays the same.
+function BlockText({ text }) {
+  const at = text.indexOf(": ");
+  if (at < 0) return text;
+  return (
+    <>
+      <span className="font-medium text-foreground">{text.slice(0, at + 1)}</span> {text.slice(at + 2)}
+    </>
+  );
+}
 
 // Why a winner can't be named yet, in words, from the analysis itself.
 export function blockWords(analysis) {
@@ -87,20 +104,26 @@ export function AnalysisPanel({ experiment, analysis, role, onChanged }) {
                 { key: "weight", header: "Share", align: "right", cell: (c) => <span className="font-mono tabular-nums">{c.weight}%</span> },
                 { key: "exposed", header: "Visitors", align: "right", cell: (c) => <span className="font-mono tabular-nums">{c.exposed}</span> },
                 { key: "conversions", header: "Orders", align: "right", cell: (c) => <span className="font-mono tabular-nums">{c.conversions}</span> },
-                { key: "rate", header: "Rate", align: "right", cell: (c) => <span className="font-mono tabular-nums">{completed ? pct(c.rate) : "Hidden"}</span> },
+                { key: "rate", header: "Rate", align: "right", cell: (c) => <span className="font-mono tabular-nums">{completed ? pct(c.rate) : <span className="font-sans text-muted-foreground">Hidden</span>}</span> },
               ]}
             />
             {blocks.length > 0 && (
-              <ul className="space-y-1.5 text-sm" data-experiment="blocks">
-                {blocks.map((b) => (
-                  <li key={b.kind} data-block={b.kind} className="rounded-md border border-border bg-muted/50 px-3 py-2 text-muted-foreground">
-                    {b.text}
-                  </li>
-                ))}
+              <ul className="space-y-2 text-sm" data-experiment="blocks" aria-label="Why there is no winner yet">
+                {blocks.map((b) => {
+                  const look = BLOCK_LOOK[b.kind] || BLOCK_LOOK.peeking;
+                  return (
+                    <li key={b.kind} data-block={b.kind} className={`flex items-start gap-2.5 rounded-md border px-3 py-2.5 text-muted-foreground ${look.box}`}>
+                      <look.Icon aria-hidden className={`mt-0.5 size-4 shrink-0 ${look.icon}`} />
+                      <span>
+                        <BlockText text={b.text} />
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             )}
             {verdict && (
-              <p className="text-sm font-medium text-foreground" data-experiment="verdict">
+              <p className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm font-medium text-foreground" data-experiment="verdict">
                 {verdict}
               </p>
             )}
@@ -115,7 +138,7 @@ export function AnalysisPanel({ experiment, analysis, role, onChanged }) {
                   <label htmlFor="exp-adopt" className="text-sm font-medium">
                     Variant to keep
                   </label>
-                  <select id="exp-adopt" value={pick} onChange={(e) => setPick(e.target.value)} className="h-8 rounded-md border border-input bg-background px-2 text-sm">
+                  <select id="exp-adopt" value={pick} onChange={(e) => setPick(e.target.value)} className="h-8 min-w-40 rounded-md border border-input bg-muted px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:bg-input/30">
                     {analysis.cells.map((c) => (
                       <option key={c.key} value={c.key}>
                         {c.key}

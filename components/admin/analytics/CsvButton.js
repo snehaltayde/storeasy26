@@ -28,7 +28,7 @@ export function CsvButton({ rows, columns, filename, label }) {
   return (
     <Button type="button" variant="outline" size="sm" data-read-control onClick={download} aria-label={`Download ${label} as CSV`}>
       <Download aria-hidden />
-      CSV
+      Download CSV
     </Button>
   );
 }

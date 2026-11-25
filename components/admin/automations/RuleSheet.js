@@ -58,7 +58,8 @@ function Field({ id, label, hint, children }) {
     </div>
   );
 }
-const SELECT = "h-8 w-full rounded-md border border-input bg-background px-2 text-sm";
+// Native selects (the phone's own picker, no portal) drawn like Input.
+const SELECT = "h-8 w-full rounded-md border border-input bg-muted px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30";
 
 export function RuleSheet({ open, onOpenChange, rule = null, triggers = Object.keys(TRIGGER_WORDS), actions = Object.keys(ACTION_WORDS), onSaved }) {
   const [f, setF] = useState(NEW);
@@ -115,7 +116,7 @@ export function RuleSheet({ open, onOpenChange, rule = null, triggers = Object.k
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field id="aut-min" label="Only if the total is at least" hint="Leave empty for any total.">
-              <Input id="aut-min" type="number" min="0" value={f.min_total} onChange={(e) => set({ min_total: e.target.value })} />
+              <Input id="aut-min" type="number" min="0" className="font-mono tabular-nums" value={f.min_total} onChange={(e) => set({ min_total: e.target.value })} />
             </Field>
             <Field id="aut-pay" label="Only if paid by">
               <select id="aut-pay" className={SELECT} value={f.payment_method} onChange={(e) => set({ payment_method: e.target.value })}>
@@ -141,23 +142,24 @@ export function RuleSheet({ open, onOpenChange, rule = null, triggers = Object.k
             <Textarea id="aut-text" value={f.text} onChange={(e) => set({ text: e.target.value })} />
           </Field>
           <Field id="aut-cap" label="At most this many a day">
-            <Input id="aut-cap" type="number" min="1" max="500" value={f.cap_per_day} onChange={(e) => set({ cap_per_day: e.target.value })} />
+            <Input id="aut-cap" type="number" min="1" max="500" className="max-w-32 font-mono tabular-nums" value={f.cap_per_day} onChange={(e) => set({ cap_per_day: e.target.value })} />
           </Field>
           <fieldset className="space-y-1.5">
             <legend className="text-sm font-medium">Quiet hours (store time)</legend>
             <div className="flex items-center gap-2">
-              <Input aria-label="Quiet from" type="time" value={f.quiet_start} onChange={(e) => set({ quiet_start: e.target.value })} className="w-32" />
+              <Input aria-label="Quiet from" type="time" value={f.quiet_start} onChange={(e) => set({ quiet_start: e.target.value })} className="w-32 font-mono tabular-nums" />
               <span className="text-sm text-muted-foreground">to</span>
-              <Input aria-label="Quiet until" type="time" value={f.quiet_end} onChange={(e) => set({ quiet_end: e.target.value })} className="w-32" />
+              <Input aria-label="Quiet until" type="time" value={f.quiet_end} onChange={(e) => set({ quiet_end: e.target.value })} className="w-32 font-mono tabular-nums" />
             </div>
             <p className="text-[0.8125rem] text-muted-foreground">Nothing is sent in this window; it is skipped, not saved for later. Leave both empty for none.</p>
           </fieldset>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 rounded-md border border-border p-3">
             <Checkbox id="aut-enabled" checked={f.enabled} onCheckedChange={(v) => set({ enabled: v === true })} />
             <Label htmlFor="aut-enabled">Turn it on after saving</Label>
           </div>
         </div>
-        <SheetFooter className="mt-auto gap-2 p-0">
+        <SheetFooter className="sticky bottom-0 -mx-4 mt-auto -mb-4 gap-2 border-t border-border bg-popover px-4 py-3 sm:-mx-6 sm:-mb-6 sm:px-6 sm:py-4">
+          {missing && <p className="text-[0.8125rem] text-muted-foreground">Give the rule a name and a message to save it.</p>}
           {error && (
             <p role="alert" className="text-sm text-destructive">
               {error}

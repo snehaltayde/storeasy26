@@ -27,6 +27,8 @@ export const slugFrom = (name) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60);
+// Native selects (the phone's own picker, no portal) drawn like Input.
+const SELECT = "h-8 w-full rounded-md border border-input bg-muted px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30";
 export const weightTotal = (variants) => variants.reduce((s, v) => s + (Number(v.weight) || 0), 0);
 
 // What still stops a save, in words (the server says the rest).
@@ -125,7 +127,7 @@ export function ExperimentForm({ open, onOpenChange, experiment = null, onSaved 
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field id="exp-target" label="What it changes">
-              <select id="exp-target" value={f.target_kind} onChange={(e) => set({ target_kind: e.target.value })} className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm">
+              <select id="exp-target" value={f.target_kind} onChange={(e) => set({ target_kind: e.target.value })} className={SELECT}>
                 {Object.entries(TARGETS).map(([k, v]) => (
                   <option key={k} value={k}>
                     {v}
@@ -134,7 +136,7 @@ export function ExperimentForm({ open, onOpenChange, experiment = null, onSaved 
               </select>
             </Field>
             <Field id="exp-metric" label="Measured by">
-              <select id="exp-metric" value="conversion" onChange={() => {}} className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm">
+              <select id="exp-metric" value="conversion" onChange={() => {}} className={SELECT}>
                 {Object.entries(METRICS).map(([k, v]) => (
                   <option key={k} value={k}>
                     {v}
@@ -144,16 +146,24 @@ export function ExperimentForm({ open, onOpenChange, experiment = null, onSaved 
             </Field>
           </div>
           <Field id="exp-min" label="Minimum visitors per variant" hint="No winner is named until every variant reaches this.">
-            <Input id="exp-min" type="number" min="50" step="1" value={f.min_sample} onChange={(e) => set({ min_sample: e.target.value })} />
+            <Input id="exp-min" type="number" min="50" step="1" className="max-w-40 font-mono tabular-nums" value={f.min_sample} onChange={(e) => set({ min_sample: e.target.value })} />
           </Field>
 
           <fieldset className="space-y-3">
             <legend className="text-sm font-medium">Variants</legend>
-            <p className={`text-[0.8125rem] ${total === 100 ? "text-muted-foreground" : "text-destructive"}`} data-experiment="weight-total">
-              Weights add up to {total}%{total === 100 ? "." : " (they must add up to 100%)."}
-            </p>
+            <div className="space-y-1.5">
+              <div aria-hidden className="flex h-2 overflow-hidden rounded-full bg-muted">
+                {f.variants.map((v, i) => (
+                  <span key={i} className={i % 2 ? "bg-primary/60" : "bg-primary"} style={{ width: `${Math.min(100, Math.max(0, Number(v.weight) || 0))}%` }} />
+                ))}
+              </div>
+              <p role="status" className={`text-[0.8125rem] ${total === 100 ? "text-muted-foreground" : "font-medium text-destructive"}`} data-experiment="weight-total">
+                Weights add up to <span className="font-mono tabular-nums">{total}%</span>
+                {total === 100 ? "." : " (they must add up to 100%)."}
+              </p>
+            </div>
             {f.variants.map((v, i) => (
-              <div key={i} className="space-y-3 rounded-md border border-border p-3" data-experiment-variant={i}>
+              <div key={i} className={`space-y-3 rounded-md border p-3 ${i === 0 ? "border-border bg-muted/40" : "border-border"}`} data-experiment-variant={i}>
                 <div className="flex items-end gap-2">
                   <div className="min-w-0 flex-1">
                     <Field id={`exp-v${i}-key`} label={i === 0 ? "Control (your live hero, unchanged)" : "Variant name"}>
@@ -162,7 +172,7 @@ export function ExperimentForm({ open, onOpenChange, experiment = null, onSaved 
                   </div>
                   <div className="w-24">
                     <Field id={`exp-v${i}-weight`} label="Weight %">
-                      <Input id={`exp-v${i}-weight`} type="number" min="1" max="100" value={v.weight} onChange={(e) => setVariant(i, { weight: e.target.value })} />
+                      <Input id={`exp-v${i}-weight`} type="number" min="1" max="100" className="text-right font-mono tabular-nums" value={v.weight} onChange={(e) => setVariant(i, { weight: e.target.value })} />
                     </Field>
                   </div>
                   {i > 1 && (
@@ -195,13 +205,16 @@ export function ExperimentForm({ open, onOpenChange, experiment = null, onSaved 
           </fieldset>
         </div>
 
-        <SheetFooter className="mt-auto gap-2 p-0">
+        <SheetFooter className="sticky bottom-0 -mx-4 mt-auto -mb-4 gap-2 border-t border-border bg-popover px-4 py-3 sm:-mx-6 sm:-mb-6 sm:px-6 sm:py-4">
           {problems.length > 0 && (
-            <ul className="space-y-0.5 text-[0.8125rem] text-muted-foreground" data-experiment="problems">
-              {problems.map((p) => (
-                <li key={p}>{p}</li>
-              ))}
-            </ul>
+            <div className="text-[0.8125rem]" data-experiment="problems">
+              <p className="font-medium text-foreground">Before you can save</p>
+              <ul className="mt-1 max-h-20 list-disc space-y-0.5 overflow-y-auto pl-4 text-muted-foreground sm:max-h-32">
+                {problems.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+            </div>
           )}
           {error && (
             <p role="alert" className="text-sm text-destructive">
