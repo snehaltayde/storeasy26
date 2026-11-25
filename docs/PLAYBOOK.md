@@ -7,8 +7,6 @@ orchestrating a phase. Keep it under about 80 lines: merge, reword or delete bef
 
 - A plan that assumes something runs (a seed, a drill, a script) lists running it once as a first check;
   Phase 0's drill line read the code and missed a seed that crashed on retired modules, costing three rounds.
-- While a builder works on a branch and runs drills, the session edits no tracked file in that checkout
-  (the drill runner refuses a dirty tree); queue doc edits and commit them on the branch afterwards.
 - A slice that adds a guard gets a reviewer brief with this escape list, and the guard's self-test a case
   per escape: marks on an ancestor, faked marks, content revealed after a click, submits from outside a
   form (`form=`, `formaction`, Enter), test-only reach, stale allowlist rows, folder rows hiding one file.
@@ -32,6 +30,11 @@ orchestrating a phase. Keep it under about 80 lines: merge, reword or delete bef
   sweeps every nav page per role and width, and Phase 6's studio contract broke it on main unseen.
 - Parallel lines that share client state (one store, one document) get one named owner in the plan and the
   other line reuses it: both Phase 6 reviews found two live `doc_design` stores, once per line.
+- A feature that shows money to shoppers (nudges, totals, prices) gets, in its plan, a brute-force test that
+  completes every suggestion the way a shopper would (whole units, real products) and checks the engine:
+  Phase 7's cart nudges needed three review rounds because each fix was tested the way it was built.
+- First-party content (theme copy, seed pages) runs the banned-copy scan in its suite, and reads of a new
+  column go through `hasColumns`: both slipped past Phase 7 line 1's builder and were caught in review.
 - Merge only on the verdict: chain `git merge` on `steelthread-verify`'s own exit, never after a `tail` or
   `grep` of its output (Phase 5's contract merged before its one failed suite was read).
 - "Drafts only" covers every document a button publishes: a publish that takes more than one document lists
@@ -59,13 +62,11 @@ orchestrating a phase. Keep it under about 80 lines: merge, reword or delete bef
   `Origin: null`, and the CSP's `form-action 'self'` blocked the store host).
 - While a full verify runs in a worktree, reviewers there run nothing: suites share file databases in the
   worktree root, and a reviewer's `test-copy` run moved them mid-verify (`SQLITE_READONLY_DBMOVED`).
-- History reads order by time, then insertion order (`rowid`), never a random id: flag history came back
-  in either order for same-millisecond rows, and only under the full suite's load.
 - Guards and allowlists read the real thing, never a hand list or a regex over source: route methods come
   from importing the module, animation utilities from the package's CSS, imports from a walk of the files.
   Reviewers found a blind spot in every hand-written guard in Phase 0.
-- Tests wait on a real signal (a port listening, a pid file gone), never a fixed delay: a 300 ms sleep
-  passed alone and failed under the full suite's load.
+- Load-only failures come from ordering and timing: order history by time then `rowid` (never a random id),
+  and wait on a real signal (a port, a settled save), never fixed ticks or sleeps (flags, editor-store 409).
 - Browser drills reseed and wipe the checkout they run in, so they run only through `pnpm drill:<name>`
   (a throwaway worktree at HEAD, its own ports and data; the drills refuse anywhere else). Commit before
   a drill run: uncommitted code is not what it tests.
