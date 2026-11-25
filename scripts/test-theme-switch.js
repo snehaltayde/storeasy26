@@ -223,6 +223,13 @@ const inStore = async (tn, fn, cookies = {}) => {
 };
 
 const design = () => a.run(() => Docs.getDocument("doc_design"));
+const OWNER = { kind: "merchant", id: store.users.owner.id };
+const header = () => a.run(() => Docs.getDocument("doc_header"));
+const toggleHeaderMenu = () =>
+  a.run(async () => {
+    const h = await Docs.getDocument("doc_header");
+    await Docs.saveDraft({ id: "doc_header", revision: h.revision, body: { ...h.body, settings: { ...h.body.settings, mode: h.body.settings.mode === "custom" ? "auto" : "custom" } }, actor: OWNER });
+  });
 // apply names the design revision it saw unless the test passes its own
 const apply = async (caller, id, args = {}) => call(caller, "themes/[id]", "POST", { params: { id }, body: { apply: Object.hasOwn(args, "revision") ? args : { revision: (await design()).revision, ...args } } });
 const stateOf = async () => (await call("owner", "themes", "GET")).body.state;
@@ -377,6 +384,14 @@ await t("home layout: off by default; on needs a confirm (409), then replaces th
   const home = await a.run(() => Docs.getDocument("doc_home"));
   eq(home.body.sections.map((s) => s.kind).join(","), BOREAL.templates.home.sections.map((s) => s.kind).join(","), "home sections:");
   eq((await design()).body.settings.brand.accent, AURORA.tokens.accent, "withBrand false keeps the brand:");
+  eq((await stateOf()).publishSet.find((d) => d.id === "doc_home")?.suggested, true, "home pre-ticked while its draft is the one the apply wrote:");
+  const audit = (await auditRows()).find((x) => x.action === "themes.apply");
+  eq((typeof audit.diff === "string" ? JSON.parse(audit.diff) : audit.diff).homeDraftHash, home.draftHash, "the audit keeps the home draft hash:");
+  await a.run(async () => {
+    const sec = R.newSection("text", { id: "sec_thswitch7" });
+    await Docs.saveDraft({ id: "doc_home", revision: home.revision, body: { ...home.body, sections: [...home.body.sections, { ...sec, settings: { ...sec.settings, title: "Later", body: ["An editor edit."] } }] }, actor: OWNER });
+  });
+  eq((await stateOf()).publishSet.find((d) => d.id === "doc_home")?.suggested, false, "an editor edit after the apply: not pre-ticked:");
 });
 
 await t("choosing a built-in look (POST /api/admin/theme) clears package and the theme's layouts", async () => {
@@ -497,6 +512,45 @@ await t("rollback, the whole publish's Undo (undoSet): Aurora and its centred he
   await auroraBack("whole-publish Undo");
 });
 
+await t("narrow undo: the theme stays (accent and a header menu edit published together); design-row Undo leaves the header live and its draft untouched", async () => {
+  await a.run(async () => {
+    const d = await Docs.getDocument("doc_design");
+    await Docs.saveDraft({ id: "doc_design", revision: d.revision, body: { ...d.body, settings: { ...d.body.settings, brand: { ...(d.body.settings.brand || {}), accent: "#3730a3" } } }, actor: OWNER });
+  });
+  await toggleHeaderMenu();
+  const r = await publishSet("owner", (d) => d.id === "doc_header");
+  eq(r.status, 200, `publish: ${JSON.stringify(r.body).slice(0, 200)}`);
+  ok(r.body.published.some((p) => p.id === "doc_header"), "the header menu went live with it");
+  const before = await header();
+  const undo = r.body.published.find((p) => p.id === "doc_design").undo;
+  const u = await call("owner", "documents", "PUT", { body: { undo: { id: undo.id, logId: undo.logId }, revision: undo.revision } });
+  await H.drainAfter();
+  eq(u.status, 200, `undo: ${JSON.stringify(u.body).slice(0, 300)}`);
+  const after = await header();
+  eq(after.publishedVersionId, before.publishedVersionId, "the header menu stays live:");
+  eq(JSON.stringify([after.revision, after.draftHash]), JSON.stringify([before.revision, before.draftHash]), "the header draft is untouched:");
+  eq(themeAttr(await storeHtml(a)), "aurora", "Aurora stays:");
+});
+
+await t("the theme changed, then the header was published again alone: design-row Undo answers 200, undoes the design and the other layouts, leaves the header and says so", async () => {
+  const r = await publishBoreal();
+  await toggleHeaderMenu();
+  const h = await header();
+  const hp = await call("owner", "documents", "PUT", { body: { publishSet: [{ id: "doc_header", revision: h.revision, draftHash: h.draftHash }] } });
+  await H.drainAfter();
+  eq(hp.status, 200, "the header alone:");
+  const headerLive = (await header()).publishedVersionId;
+  const undo = r.body.published.find((p) => p.id === "doc_design").undo;
+  const u = await call("owner", "documents", "PUT", { body: { undo: { id: undo.id, logId: undo.logId }, revision: (await design()).revision } });
+  await H.drainAfter();
+  eq(u.status, 200, `undo: ${JSON.stringify(u.body).slice(0, 300)}`);
+  ok(/published again after that/.test(String(u.body.message)), `says so: ${u.body.message}`);
+  eq(themeAttr(await storeHtml(a)), "aurora", "the design is Aurora again:");
+  eq((await header()).publishedVersionId, headerLive, "the header stays as published later:");
+  const footer = await a.run(() => Docs.getDocument("doc_footer"));
+  eq(JSON.parse(String((await sql(a, "SELECT body FROM document_versions WHERE id = ?", [footer.publishedVersionId]))[0].body)).settings.template, "minimal", "Aurora's footer is back:");
+});
+
 await t("the Themes page says so when the live theme was archived", async () => {
   await sql(a, "UPDATE theme_packages SET status = 'archived' WHERE id = ?", [PKG]);
   eq((await stateOf()).liveArchived, true, "liveArchived:");
@@ -513,6 +567,19 @@ await t("the kill switch ff_theme-packages refuses apply in plain words", async 
   eq(r.status, 409, "killed:");
   ok(r.body.error.startsWith(LP.THEMES_OFF_WORDS), r.body.error);
   await FLAGS.setFlagOverride({ key: LP.THEMES_KILL_FLAG, tenant: a.id, on: true, actor: "operator" });
+});
+
+await t("an archived layout document is skipped, not a failure: apply answers 200 and says so", async () => {
+  await sql(a, "UPDATE documents SET archived_at = ? WHERE id = 'doc_header'", [new Date().toISOString()]);
+  try {
+    const r = await apply("owner", PKG2, { withHome: false });
+    eq(r.status, 200, `apply: ${JSON.stringify(r.body).slice(0, 200)}`);
+    ok(r.body.applied.skipped?.some((x) => x.id === "doc_header"), "skipped");
+    ok(String(r.body.applied.note).includes("Header layout is archived, so the theme's header wasn't applied."), r.body.applied.note);
+    eq((await a.run(() => Docs.getDocument("doc_footer"))).body.settings.template, "columns", "the footer layout was written:");
+  } finally {
+    await sql(a, "UPDATE documents SET archived_at = NULL WHERE id = 'doc_header'");
+  }
 });
 
 await t("store B is untouched: no design names a package, no pin", async () => {
