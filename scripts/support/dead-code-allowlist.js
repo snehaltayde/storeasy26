@@ -10,7 +10,12 @@ export const ALLOWLIST = [
   { path: "components/ui/README.md", reason: "the folder's notes for people (the shadcn copy-in rules); Markdown is read, never imported" },
   { path: "lib/types/", reason: "TypeScript contracts that pnpm typecheck checks through tsconfig.json's include; JS modules adopt them one at a time, so nothing imports them yet" },
   // Phase 2 line 0: the shared parts lines 1-5 build on; the first new-UI page imports them
-  { path: "components/kit/", reason: "Phase 2 line 0's shared console parts; lines 1-5 import them, remove this row when the first does" },
+  { path: "components/kit/data-table.js", reason: "a Phase 2 line 0 shared console part for lines 1-5; remove this row when the first page imports it" },
+  { path: "components/kit/empty-state.js", reason: "a Phase 2 line 0 shared console part for lines 1-5; remove this row when the first page imports it" },
+  { path: "components/kit/money-cell.js", reason: "a Phase 2 line 0 shared console part for lines 1-5; remove this row when the first page imports it" },
+  { path: "components/kit/page-header.js", reason: "a Phase 2 line 0 shared console part for lines 1-5; remove this row when the first page imports it" },
+  { path: "components/kit/role-gate.js", reason: "a Phase 2 line 0 shared console part for lines 1-5; remove this row when the first page imports it" },
+  { path: "components/kit/status-badge.js", reason: "a Phase 2 line 0 shared console part for lines 1-5; remove this row when the first page imports it" },
   { path: "components/ui/card.js", reason: "added in Phase 2 line 0 for lines 1-5; remove this row when the first page imports it" },
   { path: "components/ui/tabs.js", reason: "added in Phase 2 line 0 for lines 1-5; remove this row when the first page imports it" },
   { path: "components/ui/select.js", reason: "added in Phase 2 line 0 for lines 1-5; remove this row when the first page imports it" },

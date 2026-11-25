@@ -8,7 +8,7 @@ import { navFor, navItems } from "@/lib/admin/nav";
 import { listMyStores } from "@/lib/admin/stores";
 import { consoleNotices } from "@/lib/admin/notices";
 import { AdminShell } from "@/components/admin/shell/AdminShell";
-import { ConsoleNotices } from "@/components/admin/shell/ConsoleNotices";
+import { ConsoleNotices, hasConsoleNotices } from "@/components/admin/shell/ConsoleNotices";
 
 // The signed-in console (S50; the new shell in Phase 0 line 8): one auth gate
 // and one shell for every screen (pages keep their own adminActor guards).
@@ -78,7 +78,7 @@ export default async function AdminAuthedLayout({ children }) {
       storeName={storeName}
       storeId={storeId}
       defaultOpen={jar.get("sidebar_state")?.value !== "false"}
-      notices={<ConsoleNotices {...notices} />}
+      notices={hasConsoleNotices(notices) ? <ConsoleNotices {...notices} /> : null}
     >
       {children}
     </AdminShell>

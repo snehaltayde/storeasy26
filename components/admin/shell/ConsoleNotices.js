@@ -5,8 +5,13 @@ import { Banner } from "@/components/console/Banner";
 // console's content area and above the sign-in pages. Data from
 // consoleNotices() (lib/admin/notices.js). Old Banner look, so it renders
 // inside a [data-legacy] region.
+// Whether consoleNotices() has anything to show: the (authed) layout passes no
+// notices element at all otherwise, so a new-UI page gets no empty
+// [data-legacy] box (AdminShell).
+export const hasConsoleNotices = (n) => Boolean(n?.grant || n?.incidents?.length);
+
 export function ConsoleNotices({ grant = null, incidents = [], className = "space-y-2" }) {
-  if (!grant && !incidents.length) return null;
+  if (!hasConsoleNotices({ grant, incidents })) return null;
   return (
     <div className={className} data-console-notices>
       {incidents.map((i) => (

@@ -187,7 +187,9 @@ function world(stubs) {
 
 // ---------- 2. the (authed) layout ----------
 console.log("— the (authed) layout");
-const L = { actor: null, getUserCalls: 0, storesCalls: [], shellProps: null };
+const L = { actor: null, getUserCalls: 0, storesCalls: [], shellProps: null, notices: null };
+// the real notices component (old Banner look) and its has-anything check
+const RealNotices = await world({})(join(ROOT, "components/admin/shell/ConsoleNotices.js"));
 const OTHER_EMAIL = "someone-else@x.test";
 const layoutStubs = {
   "next/headers": { cookies: async () => ({ get: (n) => (n === "sidebar_state" ? { value: "false" } : { value: "cookie" }) }) },
@@ -222,14 +224,14 @@ const layoutStubs = {
       return actor.kind === "merchant" ? [{ id: "roles", name: "Roles Demo Co", role: actor.role, url: "http://roles.localhost/admin", current: true }] : [];
     },
   },
-  "@/lib/admin/notices": { consoleNotices: async () => ({ grant: null, incidents: [{ id: "inc_1", tenant_id: null, title: "Slow sync", public_message: "Catching up", internal_notes: `ask ${OTHER_EMAIL}` }] }) },
+  "@/lib/admin/notices": { consoleNotices: async () => L.notices ?? { grant: null, incidents: [{ id: "inc_1", tenant_id: null, title: "Slow sync", public_message: "Catching up", internal_notes: `ask ${OTHER_EMAIL}` }] } },
   "@/components/admin/shell/AdminShell": {
     AdminShell: (p) => {
       L.shellProps = p;
       return React.createElement("div", { "data-shell": "stub" }, p.children);
     },
   },
-  "@/components/admin/shell/ConsoleNotices": { ConsoleNotices: (p) => React.createElement("div", { "data-notices": p.incidents?.length ?? 0 }) },
+  "@/components/admin/shell/ConsoleNotices": { ConsoleNotices: (p) => React.createElement("div", { "data-notices": p.incidents?.length ?? 0 }), hasConsoleNotices: RealNotices.hasConsoleNotices },
 };
 const Layout = (await world(layoutStubs)(join(ROOT, "app/(console)/admin/(authed)/layout.js"))).default;
 const CASES = [
@@ -290,7 +292,7 @@ await t("no caller: the layout redirects to the sign-in page", async () => {
   L.actor = null;
   let to = null;
   try {
-    await Layout({ children: null });
+    renderToStaticMarkup(await Layout({ children: null }));
   } catch (e) {
     to = e.message;
   }
@@ -402,9 +404,16 @@ const outsideLegacy = (html) => {
 };
 const interactive = (html) => [...html.matchAll(/<(a|button|input|select|textarea)\b[^>]*>|<[a-z]+\b[^>]*(?:role="(?:menuitem|button|link)"|tabindex="(?!-1")[^"]*")[^>]*>/g)].map((m) => m[0]);
 const ALLOWED_CONTROLS = ["skip", "toggle", "switcher", "account"];
-// on a new-UI route a control in main also passes when the page marked it a
-// read (data-read-control) or RoleGate disabled it (the drill's rule too)
-const newUiPasses = (e) => /\sdata-read-control(?:=""|="true")?(?:\s|>)|\sdisabled(?:=""|\s|>)|aria-disabled="true"/.test(e);
+// on a new-UI route a control in main also passes when it carries
+// data-read-control itself, is natively disabled, or is RoleGate's
+// (aria-disabled="true" with data-role-gate="disabled"): the drill's rule.
+// Attributes are read from the opening tag, so a class like
+// "disabled:opacity-50" or a marked ancestor never counts.
+const attrsOf = (openTag) => new Map([...openTag.replace(/^<[a-z]+/, "").matchAll(/\s([\w:-]+)(?:="([^"]*)")?/g)].map((m) => [m[1], m[2] ?? ""]));
+const newUiPasses = (openTag) => {
+  const a = attrsOf(openTag);
+  return (a.has("data-read-control") && a.get("data-read-control") !== "false") || a.has("disabled") || (a.get("aria-disabled") === "true" && a.get("data-role-gate") === "disabled");
+};
 
 await t("support's shell: outside [data-legacy] only nav links and the allowlisted shell controls; the read-only label; the page inside [data-legacy]", async () => {
   for (const [label, actor, words] of [
@@ -461,13 +470,41 @@ await t("support's shell on a new-UI route: main holds the page directly, the no
   }
   // the rule bites: a stray write in main fails it; a marked read and a gated control pass
   const h = React.createElement;
-  const page = h("div", null, h("a", { href: "/admin/orders/ord_2", "data-read-control": true }, "Open"), h("button", { "aria-disabled": true }, "Push"), h("button", { disabled: true }, "Cancel"), h("button", null, "Delete"));
+  const page = h("div", null,
+    h("a", { href: "/admin/orders/ord_2", "data-read-control": true }, "Open"),
+    h("button", { "aria-disabled": true, "data-role-gate": "disabled" }, "Push"),
+    h("button", { disabled: true }, "Cancel"),
+    h("button", null, "Delete"),
+    h("button", { "aria-disabled": true }, "Refund"),
+    h("button", { className: "disabled:opacity-50", "data-x": "disabled" }, "Archive"),
+    h("div", { "data-read-control": true }, h("button", { id: "inner" }, "Remove")),
+  );
   const html = render("support", { kind: "merchant", role: "support" }, "/admin/orders", { Shell: AdminShellNew, page });
   const main = html.slice(html.indexOf("<main "), html.indexOf("</main>"));
-  eq(interactive(main).filter((e) => !newUiPasses(e)), ["<button>"], "only the unmarked Delete is stray:");
-  // the old route with notices: both inside the one region
+  eq(interactive(main).filter((e) => !newUiPasses(e)), ["<button>", '<button aria-disabled="true">', '<button class="disabled:opacity-50" data-x="disabled">', '<button id="inner">'], "stray: Delete, aria-disabled without RoleGate's mark, the word disabled in a class, a button under a marked ancestor:");
+  // the old route with notices: both inside the one region (below)
   const old = render("support", { kind: "merchant", role: "support" }, OLD_PATH, { notices: React.createElement("p", { id: "notices-marker" }, "notice") });
   ok(new RegExp(`<div data-legacy="true" class="contents"><div class="mb-6">${NOTICES}</div>${PAGE}</div>`).test(old), "old route: notices and page share main > [data-legacy]:");
+});
+
+await t("no notices on a new-UI route: the layout passes none, so main has no empty [data-legacy] box", async () => {
+  eq([RealNotices.hasConsoleNotices({ grant: null, incidents: [] }), RealNotices.hasConsoleNotices({ grant: { operator: "x" }, incidents: [] }), RealNotices.hasConsoleNotices({ grant: null, incidents: [{ id: "i" }] }), RealNotices.hasConsoleNotices(null)], [false, true, true, false], "hasConsoleNotices:");
+  // the real element renders nothing for empty data: that is why the layout must not pass it
+  eq(renderToStaticMarkup(React.createElement(RealNotices.ConsoleNotices, { grant: null, incidents: [] })), "", "ConsoleNotices with nothing to show renders nothing:");
+  const actor = { kind: "merchant", id: "usr_support", role: "support" };
+  Object.assign(L, { actor, getUserCalls: 0, storesCalls: [], shellProps: null, notices: { grant: null, incidents: [] } });
+  try {
+    renderToStaticMarkup(await Layout({ children: null }));
+    eq(L.shellProps.notices, null, "the layout passes no notices element:");
+    const html = render("support", actor, "/admin/orders", { Shell: AdminShellNew, notices: L.shellProps.notices });
+    ok(!html.includes("data-legacy") && /<main [^>]*id="console-content"[^>]*>\s*<p id="page-marker">/.test(html), "main > the page, no [data-legacy]:");
+    // and with a notice the layout passes the element
+    L.notices = null;
+    renderToStaticMarkup(await Layout({ children: null }));
+    ok(React.isValidElement(L.shellProps.notices), "with an incident the layout passes the notices:");
+  } finally {
+    L.notices = null;
+  }
 });
 
 // ---------- 6. the old-region wrapper and the editor preview ----------

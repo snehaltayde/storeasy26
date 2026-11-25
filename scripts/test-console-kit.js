@@ -20,6 +20,11 @@
 //      "Load more")
 //   7. components/kit imports only components/ui, lib/ and its own folder
 //      (no old components/console or components/admin part)
+//   8. data-read-control: never on a submit button or inside a form that is
+//      not method="get"; outside components/kit/ only in a file with a reasoned
+//      row in scripts/support/read-controls.js
+//   9. every <RoleGate> in app/ and components/ wraps a child that forwards
+//      onClick and aria-disabled (<button>, <a>, Button, Link)
 import { createRequire } from "node:module";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -159,7 +164,20 @@ await t("MoneyCell: formatMoney, mono, tabular, right-aligned; a dash for no amo
     ok(s.includes(`>${formatMoney(amount, currency)}</span>`), `${amount} ${currency} → ${formatMoney(amount, currency)}:`);
     ok(/class="[^"]*\btext-right\b[^"]*\bfont-mono\b[^"]*\btabular-nums\b/.test(s), `${amount}: mono, tabular, right-aligned:`);
   }
-  for (const none of [null, "", undefined]) ok(html(h(MC.MoneyCell, { amount: none })).includes('aria-label="No amount">—'), `${JSON.stringify(none)} shows a dash:`);
+  for (const none of [null, "", undefined]) ok(html(h(MC.MoneyCell, { amount: none, currency: "INR" })).includes('aria-label="No amount">—'), `${JSON.stringify(none)} shows a dash:`);
+  // no currency: a dash and a warning, never a guessed ₹
+  const warned = [];
+  const warn = console.warn;
+  console.warn = (...a) => warned.push(a.join(" "));
+  let s;
+  try {
+    s = html(h(MC.MoneyCell, { amount: 1499 }));
+  } finally {
+    console.warn = warn;
+  }
+  ok(s.includes('aria-label="No amount">—') && !s.includes("₹") && !s.includes("1,499"), "no currency: a dash, no amount:");
+  eq(warned.length, 1, "no currency: one dev warning:");
+  ok(!/currency\s*=\s*"/.test(read(`${KIT}/money-cell.js`)), "no default currency in the source:");
 });
 
 // ---------- 5. RoleGate ----------
@@ -178,8 +196,12 @@ await t("RoleGate, support (least-trusted): a write control is aria-disabled wit
   ok(read(`${KIT}/role-gate.js`).includes("<TooltipContent>{reason}</TooltipContent>"), "the reason is the tooltip's content (portal content mounts only in a browser):");
   eq(html(h(RG.RoleGate, { role: "support", action: WRITE, reason: "Support access is read-only.", mode: "hide" }, button)), "", "mode hide: nothing renders:");
   eq(html(h(RG.RoleGate, { role: "support", action: READ, reason: "x" }, button)), '<button type="button" class="px-3">Push to Shopify</button>', "a read support may do: untouched:");
-  const link = html(h(RG.RoleGate, { role: "support", action: "offers.write", reason: "Support access is read-only." }, h("a", { href: "/admin/offers/new" }, "New offer")));
-  ok(/<a href="\/admin\/offers\/new"[^>]*aria-disabled="true"/.test(link), "a link is gated the same way:");
+  const link = html(h(RG.RoleGate, { role: "support", action: "offers.write", reason: "Support access is read-only." }, h("a", { href: "/admin/offers/new", className: "x" }, "New offer")));
+  const a = tag(link, 'data-role-gate="disabled"');
+  ok(a.startsWith("<a") && !a.includes("href=") && a.includes('role="link"') && a.includes('tabindex="0"') && a.includes('aria-disabled="true"') && link.includes(">New offer</a>"), "a gated link loses its href, keeps role=link and a tab stop:");
+  const { default: Link } = require("next/link");
+  const nl = html(h(RG.RoleGate, { role: "support", action: "offers.write", reason: "Support access is read-only." }, h(Link, { href: "/admin/offers/new" }, "New offer")));
+  ok(!nl.includes("href=") && nl.includes('role="link"'), "a gated next/link too:");
 });
 
 await t("RoleGate swallows a gated control's click and Enter/Space before its own handler", () => {
@@ -221,7 +243,7 @@ const COLUMNS = [
   { key: "number", header: "Order", sortable: true },
   { key: "customer", header: "Customer", truncate: true },
   { key: "status", header: "Status", cell: (r) => h(SB.StatusBadge, { kind: "order", status: r.status }) },
-  { key: "total", header: "Total", align: "right", sortable: true, cell: (r) => h(MC.MoneyCell, { amount: r.total }) },
+  { key: "total", header: "Total", align: "right", sortable: true, cell: (r) => h(MC.MoneyCell, { amount: r.total, currency: "INR" }) },
 ];
 const ROWS = [
   { id: "ord_b", number: "PAV-1002", customer: "A very long customer name that needs truncating", status: "synced", total: 2499 },
@@ -236,14 +258,16 @@ await t("DataTable: columns, rows in the server's order, the row link, the row a
   ok(/<a [^>]*href="\/admin\/orders\/ord_b"[^>]*data-read-control="true"[^>]*>PAV-1002<\/a>|<a [^>]*data-read-control="true"[^>]*href="\/admin\/orders\/ord_b"[^>]*>PAV-1002<\/a>/.test(s), "the first column links to the row's page, marked as a read:");
   eq((s.match(/<a /g) || []).length, 2, "one link per row:");
   ok(s.includes('data-act="ord_b"') && s.includes('data-act="ord_a"'), "the row actions slot per row:");
-  ok(s.includes(">In Shopify</span>") && s.includes(">Shopify push failed</span>") && s.includes(`>${formatMoney(2499)}</span>`), "custom cells render:");
+  ok(s.includes(">In Shopify</span>") && s.includes(">Shopify push failed</span>") && s.includes(`>${formatMoney(2499, "INR")}</span>`), "custom cells render:");
   ok(/<thead [^>]*class="[^"]*\bsticky\b[^"]*\btop-0\b/.test(s), "the header is sticky:");
   ok(/data-slot="table-container" class="[^"]*\bmax-h-\[calc\(100dvh-14rem\)\][^"]*\boverflow-auto\b/.test(s), "inside a height-capped scroll box:");
   const rows = [...s.matchAll(/<tr [^>]*data-slot="table-row"[^>]*>/g)].slice(1);
   ok(rows.length === 2 && rows.every((r) => /\bh-10\b/.test(r) && /\bpointer-coarse:h-12\b/.test(r)), "body rows are 40px, 48px on touch:");
   ok(/<th [^>]*class="[^"]*\btext-right\b/.test(s) && /<td [^>]*class="[^"]*\btext-right\b/.test(s), "a right-aligned column:");
-  ok(/<span[^>]*data-slot="tooltip-trigger"[^>]*class="block max-w-full truncate"[^>]*>A very long customer name/.test(s) || /<span class="block max-w-full truncate"[^>]*data-slot="tooltip-trigger"[^>]*>A very long/.test(s), "a truncating cell is a tooltip trigger with the full text:");
-  ok(!/<span[^>]*tooltip-trigger[^>]*tabindex/.test(s), "the truncation tooltip adds no tab stop:");
+  const cell = tag(s, 'data-slot="tooltip-trigger"');
+  ok(cell.startsWith("<span") && /\btruncate\b/.test(cell) && cell.includes('tabindex="0"') && cell.includes('data-read-control="true"') && s.includes(">A very long customer name that needs truncating</span>"), "a truncated cell is a focusable tooltip trigger (keyboard reaches the full text), marked as a read:");
+  const linked = html(h(DT.DataTable, { columns: [{ key: "customer", header: "Customer", truncate: true }], rows: ROWS, rowHref: (r) => `/admin/orders/${r.id}` }));
+  ok(/<a [^>]*data-slot="tooltip-trigger"[^>]*>A very long customer name|<a [^>]*href="\/admin\/orders\/ord_b"[^>]*data-slot="tooltip-trigger"/.test(linked) && !/<span[^>]*tabindex/.test(linked), "in the link column the row link is the trigger (no second tab stop):");
   ok(read(`${KIT}/data-table.js`).includes("<TooltipContent>{value}</TooltipContent>"), "the tooltip holds the whole value:");
 });
 
@@ -292,6 +316,77 @@ await t("components/kit holds the six parts and imports only components/ui, lib/
     const ids = [...read(`${KIT}/${f}`).matchAll(/\bfrom\s+["']([^"']+)["']/g)].map((m) => m[1]);
     eq(ids.filter((id) => (id.startsWith("@/") && !/^@\/(components\/(ui|kit)|lib)\//.test(id)) || id.startsWith(".")), [], `${f} imports:`);
   }
+});
+
+// ---------- 8. data-read-control ----------
+const { READ_CONTROLS } = await import("./support/read-controls.js");
+const walk = (rel) => readdirSync(join(ROOT, rel), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(`${rel}/${e.name}`) : /\.(js|jsx|tsx?)$/.test(e.name) ? [`${rel}/${e.name}`] : []));
+const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
+// each mark: its opening tag, whether it submits, whether it sits in a form that isn't method="get"
+function readMarks(src) {
+  const out = [];
+  for (const m of src.matchAll(/data-read-control/g)) {
+    const start = src.lastIndexOf("<", m.index);
+    const rest = src.slice(m.index);
+    const end = m.index + (rest.search(/(?<![=\-])>/) + 1 || rest.length);
+    const open = src.slice(start, end);
+    const name = (open.match(/^<([\w.]+)/) || [])[1] || "";
+    const formOpen = src.lastIndexOf("<form", start);
+    const inForm = formOpen >= 0 && src.lastIndexOf("</form>", start) < formOpen;
+    const formTag = inForm ? src.slice(formOpen, src.indexOf(">", formOpen) + 1) : "";
+    out.push({
+      open,
+      submits: /\btype=(?:"submit"|\{"submit"\}|'submit')/.test(open) || (inForm && /^(button|Button)$/.test(name) && !/\btype=/.test(open)),
+      postForm: inForm && !/\bmethod=(?:"get"|\{"get"\}|'get')/i.test(formTag),
+    });
+  }
+  return out;
+}
+await t("data-read-control: never on a submit button or in a non-GET form; outside components/kit/ only with a reasoned row", () => {
+  const bad = (src) => readMarks(src).filter((r) => r.submits || r.postForm).length;
+  eq([
+    bad('<button type="button" data-read-control onClick={() => go()}>Next</button>'),
+    bad('<button type="submit" data-read-control>Save</button>'),
+    bad('<form method="get"><input name="q" data-read-control /><Button type="button" data-read-control>Search</Button></form>'),
+    bad('<form action={save}><Button data-read-control>Go</Button></form>'),
+    bad('<form onSubmit={save}><input data-read-control /></form>'),
+    bad('<form method="get"><Button data-read-control>Search</Button></form>'),
+  ], [0, 1, 0, 1, 1, 1], "the rule bites (submit, a default-submit button, a non-GET form):");
+  for (const r of READ_CONTROLS) ok(r && typeof r.path === "string" && typeof r.reason === "string" && r.reason.trim().length >= 10, `read-controls row ${JSON.stringify(r)} needs a path and a reason:`);
+  const problems = [];
+  const files = [...walk("app"), ...walk("components")];
+  let marks = 0;
+  for (const f of files) {
+    const src = stripComments(read(f));
+    if (!src.includes("data-read-control")) continue;
+    const found = readMarks(src);
+    marks += found.length;
+    for (const r of found) {
+      if (r.submits) problems.push(`${f}: a submit control is marked a read: ${r.open}`);
+      if (r.postForm) problems.push(`${f}: a marked control sits in a form that is not method="get": ${r.open}`);
+    }
+    if (!f.startsWith(`${KIT}/`) && !READ_CONTROLS.some((r) => r.path === f)) problems.push(`${f}: data-read-control outside components/kit/ needs a row in scripts/support/read-controls.js`);
+  }
+  ok(marks >= 5, `found ${marks} marks (the kit's own):`);
+  for (const r of READ_CONTROLS) ok(files.includes(r.path) && stripComments(read(r.path)).includes("data-read-control"), `${r.path} is listed but marks nothing: remove the row:`);
+  eq(problems, [], "found:");
+});
+
+// ---------- 9. RoleGate's child forwards the props ----------
+const FORWARDS = new Set(["button", "a", "Button", "Link"]);
+const gateChildren = (src) => [...src.matchAll(/<RoleGate\b[^>]*?(?<!=)>\s*<([\w.]+)/g)].map((m) => m[1]);
+await t("every <RoleGate> wraps a child that forwards onClick and aria-disabled (<button>, <a>, Button, Link)", () => {
+  eq(gateChildren('<RoleGate role={r} action="orders.push" reason="x">\n  <Button onClick={push}>Push</Button>\n</RoleGate>'), ["Button"], "reads the child:");
+  eq(gateChildren('<RoleGate role={r} action="a" reason="x"><Badge>Hi</Badge></RoleGate>').filter((n) => !FORWARDS.has(n)), ["Badge"], "a child that doesn't forward is flagged:");
+  const problems = [];
+  for (const f of [...walk("app"), ...walk("components")]) {
+    const src = stripComments(read(f));
+    if (!src.includes("<RoleGate")) continue;
+    const kids = gateChildren(src);
+    if (kids.length !== (src.match(/<RoleGate\b/g) || []).length) problems.push(`${f}: a <RoleGate> whose child is not a plain element tag (write the child inline)`);
+    for (const name of kids) if (!FORWARDS.has(name)) problems.push(`${f}: <RoleGate> wraps <${name}>, which may not forward onClick/aria-disabled: use a <button>, <a>, Button or Link`);
+  }
+  eq(problems, [], "found:");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

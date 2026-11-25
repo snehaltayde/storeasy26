@@ -15,7 +15,8 @@ import { cn } from "@/components/ui/utils";
 //   columns: [{ key, header, cell?(row), align?: "right", truncate?: true,
 //              sortable?: true, className? }]
 //            cell defaults to row[key]; truncate cuts the text to the column
-//            and shows the whole of it in a tooltip (cell must be a string)
+//            and shows the whole of it in a tooltip on hover or focus (cell
+//            must return a string)
 //   rows, rowKey(row) (default row.id)
 //   rowHref(row): the row's page; the first column's text becomes the link
 //   rowActions(row): the row's own controls (role-gated by the page), last column
@@ -48,14 +49,38 @@ function SortButton({ column, sort, onSort }) {
   );
 }
 
+const cellValue = (column, row) => (column.cell ? column.cell(row) : row[column.key]);
+const truncates = (column, value) => column.truncate && typeof value === "string";
+
+// A truncated cell's full text is in a tooltip that opens on hover and on
+// keyboard focus: the cell itself takes focus (a read, so data-read-control);
+// in the link column the row link is the trigger instead (RowLink).
 function CellText({ column, row }) {
-  const value = column.cell ? column.cell(row) : row[column.key];
-  if (!column.truncate || typeof value !== "string") return value ?? null;
+  const value = cellValue(column, row);
+  if (!truncates(column, value)) return value ?? null;
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="block max-w-full truncate">{value}</span>
+        <span tabIndex={0} data-read-control className="block max-w-full truncate rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
+          {value}
+        </span>
       </TooltipTrigger>
+      <TooltipContent>{value}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function RowLink({ column, row, href }) {
+  const value = cellValue(column, row);
+  const link = (
+    <Link href={href} data-read-control className="block truncate font-medium text-foreground hover:underline focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
+      {value ?? null}
+    </Link>
+  );
+  if (!truncates(column, value)) return link;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{link}</TooltipTrigger>
       <TooltipContent>{value}</TooltipContent>
     </Tooltip>
   );
@@ -123,13 +148,7 @@ export function DataTable({ columns, rows = [], rowKey = (r) => r.id, rowHref = 
                   <TableRow key={rowKey(row)} className={ROW}>
                     {columns.map((c, i) => (
                       <TableCell key={c.key} className={cn(c.align === "right" && "text-right", c.truncate && "max-w-0 w-full", c.className)}>
-                        {href && i === 0 ? (
-                          <Link href={href} data-read-control className="block truncate font-medium text-foreground hover:underline focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
-                            <CellText column={c} row={row} />
-                          </Link>
-                        ) : (
-                          <CellText column={c} row={row} />
-                        )}
+                        {href && i === 0 ? <RowLink column={c} row={row} href={href} /> : <CellText column={c} row={row} />}
                       </TableCell>
                     ))}
                     {rowActions && (

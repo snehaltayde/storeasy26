@@ -74,15 +74,66 @@ const seed = () => JSON.parse(readFileSync(join(ROOT, ".design-data-roles", "rol
 // In the page: interactive elements that are not nav links or allowlisted
 // shell controls, outside [data-legacy] (an old route) or anywhere (a new-UI
 // route, lib/admin/new-ui-routes.js: the rule covers the whole of main). On a
-// new-UI route a control also passes when it is a read the page marked
-// (inside [data-read-control]: a search box, a row link, Next) or a
-// RoleGate-disabled one (disabled or aria-disabled="true").
+// new-UI route a control also passes when it carries data-read-control itself
+// (never through an ancestor), is natively disabled, or is RoleGate's
+// (aria-disabled="true" with data-role-gate="disabled").
 function strayControls([allowed, newUi]) {
-  const q = 'a[href], button, input, select, textarea, [role="menuitem"], [tabindex]:not([tabindex="-1"])';
-  const passes = (el) => newUi && (el.closest("[data-read-control]") || el.disabled || el.getAttribute("aria-disabled") === "true");
+  const q = 'a[href], button, input, select, textarea, [role="menuitem"], [role="link"], [tabindex]:not([tabindex="-1"])';
+  const passes = (el) => newUi && (el.hasAttribute("data-read-control") || el.disabled === true || (el.getAttribute("aria-disabled") === "true" && el.getAttribute("data-role-gate") === "disabled"));
   return [...document.querySelectorAll(q)]
     .filter((el) => (newUi || !el.closest("[data-legacy]")) && !el.closest("[data-nav-item]") && !allowed.some((c) => el.closest(`[data-shell-control="${c}"]`)) && !passes(el))
     .map((el) => `${el.tagName.toLowerCase()}${el.getAttribute("aria-label") ? `[${el.getAttribute("aria-label")}]` : ""} "${(el.innerText || "").trim().slice(0, 40)}"`);
+}
+// In the page (a new-UI route): marked reads that could still write: a submit
+// button, or one inside a form that is not method="get".
+function unsafeReads() {
+  return [...document.querySelectorAll("main [data-read-control]")]
+    .filter((el) => el.getAttribute("type") === "submit" || (el.tagName === "BUTTON" && el.closest("form") && !el.hasAttribute("type")) || (el.closest("form") && (el.closest("form").getAttribute("method") || "get").toLowerCase() !== "get"))
+    .map((el) => `${el.tagName.toLowerCase()} "${(el.innerText || "").trim().slice(0, 40)}"`);
+}
+
+// Support on a new-UI route: click each marked read control, then press Enter
+// and Space on each RoleGate-disabled control; none may send a non-GET request,
+// and a gated control may not navigate.
+async function supportNewUiControls(drill, page, href) {
+  const writes = [];
+  const onRequest = (req) => {
+    if (req.method() !== "GET" && req.method() !== "HEAD") writes.push(`${req.method()} ${new URL(req.url()).pathname}`);
+  };
+  page.on("request", onRequest);
+  try {
+    const reads = await page.locator("main [data-read-control]").count();
+    for (let i = 0; i < reads; i++) {
+      await page.goto(ORIGIN + href, { waitUntil: "load" });
+      await settle(page);
+      const el = page.locator("main [data-read-control]").nth(i);
+      if (!(await el.isVisible().catch(() => false)) || (await el.isDisabled().catch(() => true))) continue;
+      await el.click({ timeout: 5000 }).catch(() => {});
+      await page.waitForTimeout(500);
+    }
+    await page.goto(ORIGIN + href, { waitUntil: "load" });
+    await settle(page);
+    const gated = await page.locator('main [data-role-gate="disabled"]').count();
+    const moved = [];
+    for (let i = 0; i < gated; i++) {
+      const el = page.locator('main [data-role-gate="disabled"]').nth(i);
+      for (const key of ["Enter", " "]) {
+        const before = page.url();
+        await el.focus().catch(() => {});
+        await page.keyboard.press(key === " " ? "Space" : key);
+        await page.waitForTimeout(300);
+        if (page.url() !== before) {
+          moved.push(`${key === " " ? "Space" : key} on #${i} → ${page.url()}`);
+          await page.goto(ORIGIN + href, { waitUntil: "load" });
+          await settle(page);
+        }
+      }
+    }
+    drill.check(writes.length === 0, `${href}: support's ${reads} marked read control(s) and ${gated} gated control(s) send no non-GET request`, writes);
+    drill.check(moved.length === 0, `${href}: Enter and Space on support's ${gated} gated control(s) do nothing`, moved);
+  } finally {
+    page.off("request", onRequest);
+  }
 }
 // In the page: an old route's content sits in main > [data-legacy]; a new-UI
 // route's sits in main directly, and the only [data-legacy] regions left are
@@ -223,6 +274,13 @@ async function roleAtWidth(drill, page, role, width, out) {
     if (role === "support" && width === 1280) {
       const stray = await page.evaluate(strayControls, [CONTROLS, newUi]);
       check(stray.length === 0, `${href}: ${newUi ? "anywhere" : "outside [data-legacy]"} only nav links and shell controls`, stray);
+      if (newUi) {
+        const unsafe = await page.evaluate(unsafeReads);
+        check(unsafe.length === 0, `${href}: no marked read control submits a form`, unsafe);
+        await supportNewUiControls(drill, page, href);
+        await page.goto(ORIGIN + href, { waitUntil: "load" });
+        await settle(page);
+      }
       out.supportWrites.push({ page: href, controls: await page.evaluate(legacyControls) });
     }
   }
