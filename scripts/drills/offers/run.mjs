@@ -42,6 +42,8 @@ const open = async (page, path) => {
   await settle(page);
   return r;
 };
+// a READ_POSTS page ("/admin/offers/[id]") against a path
+const pageMatches = (pattern, path) => new RegExp(`^${String(pattern || "").replace(/\[[^\]]+\]/g, "[^/]+")}$`).test(path);
 const waitFor = (page, fn, arg, ms = 15_000) => page.waitForFunction(fn, arg, { timeout: ms }).then(() => true, () => false);
 
 // In the page: controls support could press that are not a marked read, natively
@@ -70,6 +72,20 @@ async function staffFlows(drill, page) {
   const closed = !(await pop.isVisible().catch(() => false));
   const focusBack = await page.evaluate(() => document.activeElement?.getAttribute("data-ref-combobox") === "trigger");
   check(closed && focusBack, "Esc closes the picker and focus returns to its trigger", { closed, focusBack });
+  // type, then Enter at once: the list is stale until the search answers, so
+  // Enter picks nothing; once it answers, Enter picks the one match
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Fixture product 3");
+  await page.keyboard.press("Enter");
+  const early = await page.locator('[data-picked="target"]').innerText().catch(() => "");
+  const stillOpen = await pop.isVisible().catch(() => false);
+  await waitFor(page, () => !document.querySelector('[data-ref-combobox="list"][data-stale]') && [...document.querySelectorAll('[data-ref-combobox="list"] [role=option]')].length === 1);
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(400);
+  const typed = await page.locator('[data-picked="target"]').innerText().catch(() => "");
+  check(stillOpen && /Nothing chosen/.test(early) && typed === "Fixture product 3", "type then Enter: nothing is picked from the stale list; Enter on the fresh one picks the match", { early, stillOpen, typed });
+  // then the arrows, on a wider search
+  await trigger.focus();
   await page.keyboard.press("Enter");
   await page.keyboard.type("Fixture product");
   await waitFor(page, () => document.querySelectorAll('[data-ref-combobox="list"] [role=option]').length >= 2);
@@ -158,19 +174,28 @@ async function staffFlows(drill, page) {
 }
 
 async function supportPass(drill, page, made) {
+  // the shell drill's rule (phase2/dashboard, scripts/drills/shell/run.mjs):
+  // every non-GET request counts, except an exact READ_POSTS row and Next's dev
+  // error overlay (POST /__nextjs_*) only when the server is a dev server (the
+  // page opened the HMR socket), never against a production build
   const writes = [];
+  let devServer = false;
   let devOverlay = 0;
+  page.on("websocket", (ws) => {
+    if (/\/_next\/webpack-hmr/.test(ws.url())) devServer = true;
+  });
+  const listed = (method, path) => READ_POSTS.some((r) => r.method === method && r.path === path && pageMatches(r.page, new URL(page.url()).pathname));
   page.on("request", (req) => {
+    if (["GET", "HEAD"].includes(req.method())) return;
     const path = new URL(req.url()).pathname;
-    // /__nextjs_* is the dev server's own error overlay (next dev only), not the app
-    if (path.startsWith("/__nextjs_")) return void devOverlay++;
-    if (!["GET", "HEAD"].includes(req.method()) && !READ_POSTS.some((r) => r.method === req.method() && r.path === path)) writes.push(`${req.method()} ${path}`);
+    if (devServer && path.startsWith("/__nextjs")) return void devOverlay++;
+    if (!listed(req.method(), path)) writes.push(`${req.method()} ${path}`);
   });
   const errors = [];
   // React's development build says it needs eval() under the app's CSP (no
-  // 'unsafe-eval', next.config.mjs) on every page of a next dev server: noted, not this slice's
+  // 'unsafe-eval', next.config.mjs) on a dev server: noted, only on a dev server
   const DEV_EVAL = /eval\(\) is not supported in this environment/;
-  page.on("console", (m) => m.type() === "error" && !DEV_EVAL.test(m.text()) && errors.push(`${new URL(page.url()).pathname}: ${m.text().slice(0, 300)}`));
+  page.on("console", (m) => m.type() === "error" && !(devServer && DEV_EVAL.test(m.text())) && errors.push(`${new URL(page.url()).pathname}: ${m.text().slice(0, 300)}`));
   page.on("pageerror", (e) => errors.push(`${new URL(page.url()).pathname}: ${String(e?.message || e).slice(0, 300)}`));
   const reads = [];
   page.on("request", (req) => READ_POSTS.some((r) => r.path === new URL(req.url()).pathname) && reads.push(req.method()));
@@ -191,7 +216,7 @@ async function supportPass(drill, page, made) {
   }
   drill.check(writes.length === 0, "support: no non-GET request but the listed reads", writes);
   drill.check(errors.length === 0, "support: no console error or page error on the four pages", errors);
-  drill.note(`next dev: React's dev build asked for eval() under the CSP on these pages; its overlay sent ${devOverlay} request(s) to /__nextjs_* (dev tooling, not counted as writes)`);
+  drill.note(`dev server: ${devServer}; Next's dev overlay sent ${devOverlay} request(s) to /__nextjs_* (skipped only on a dev server)`);
   // the route's loading.js streams the page, so the status is already sent: the not-found page says it
   const missing = [];
   for (const path of ["/admin/offers/off_missing", "/admin/bundles/bun-missing"]) {

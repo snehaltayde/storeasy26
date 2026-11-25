@@ -25,13 +25,23 @@ export function RefCombobox({ buttonText, label, load, onPick, selectedId = null
   const [items, setItems] = useState(null);
   const [error, setError] = useState(null);
   const [active, setActive] = useState(0);
+  // the list on screen is for an earlier search (the debounce is running or
+  // the answer hasn't come): Enter waits for the fresh list
+  const [stale, setStale] = useState(true);
+  const [attempt, setAttempt] = useState(0);
   const seq = useRef(0);
+  const preloaded = useRef(false); // choose() already loaded this stage
   const listRef = useRef(null);
   const listId = useId();
 
   useEffect(() => {
     if (!open) return undefined;
+    if (preloaded.current) {
+      preloaded.current = false;
+      return undefined;
+    }
     const n = ++seq.current;
+    setStale(true);
     const h = setTimeout(
       () =>
         load(q.trim(), parent).then(
@@ -40,19 +50,21 @@ export function RefCombobox({ buttonText, label, load, onPick, selectedId = null
             setItems(r);
             setError(null);
             setActive(0);
+            setStale(false);
           },
           (e) => {
             if (n !== seq.current) return;
             setItems([]);
             setError(String(e?.message || e));
+            setStale(false);
           },
         ),
       q ? 200 : 0,
     );
     return () => clearTimeout(h);
-    // load is the caller's; the list follows the search, the stage and opening
+    // load is the caller's; the list follows the search, the stage, opening and Try again
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, q, parent]);
+  }, [open, q, parent, attempt]);
 
   useEffect(() => {
     listRef.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView?.({ block: "nearest" });
@@ -60,54 +72,60 @@ export function RefCombobox({ buttonText, label, load, onPick, selectedId = null
 
   const reset = () => {
     seq.current++;
+    preloaded.current = false;
     setQ("");
     setParent(null);
     setItems(null);
     setError(null);
+    setStale(true);
   };
   const setOpenState = (v) => {
     setOpen(v);
     if (!v) reset();
   };
+  const toStage = (p, list, err = null) => {
+    seq.current++;
+    preloaded.current = true;
+    setParent(p);
+    setQ("");
+    setItems(list);
+    setError(err);
+    setActive(0);
+    setStale(false);
+  };
+  const retry = () => {
+    setError(null);
+    setItems(null);
+    setAttempt((x) => x + 1);
+  };
 
   async function choose(item) {
-    if (!item) return;
+    if (!item) return undefined;
     if (item.drill) {
-      const kids = await load("", item).catch(() => null);
-      if (kids?.length === 1) {
+      setStale(true);
+      let kids;
+      try {
+        kids = await load("", item);
+      } catch (e) {
+        // the sizes didn't load: say so on this product's stage, with Try again
+        return toStage(item, [], String(e?.message || e));
+      }
+      if (kids.length === 1) {
         onPick(kids[0], item);
         return setOpenState(false);
       }
-      seq.current++;
-      setParent(item);
-      setQ("");
-      setItems(kids);
-      setActive(0);
-      return undefined;
+      return toStage(item, kids);
     }
     onPick(item, parent);
     return setOpenState(false);
   }
 
   function onKeyDown(e) {
-    const n = items?.length || 0;
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setActive((a) => (n ? (a + 1) % n : 0));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActive((a) => (n ? (a - 1 + n) % n : 0));
-    } else if (e.key === "Home") {
-      e.preventDefault();
-      setActive(0);
-    } else if (e.key === "End") {
-      e.preventDefault();
-      setActive(Math.max(0, n - 1));
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      choose(items?.[active]);
-    } else if (e.key === "Backspace" && !q && parent) {
-      e.preventDefault();
+    const r = comboKey(e.key, { n: items?.length || 0, active, stale, q, hasParent: Boolean(parent) });
+    if (r.prevent) e.preventDefault();
+    if (r.active !== undefined) setActive(r.active);
+    if (r.pick) choose(items?.[active]);
+    if (r.back) {
       seq.current++;
       setParent(null);
       setItems(null);
@@ -148,12 +166,22 @@ export function RefCombobox({ buttonText, label, load, onPick, selectedId = null
           aria-label={parent ? `Search the sizes of ${parent.label}` : label || "Search"}
           placeholder={parent ? `Sizes of ${parent.label}` : placeholder}
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => {
+            setStale(true);
+            setQ(e.target.value);
+          }}
           onKeyDown={onKeyDown}
         />
-        <ul ref={listRef} id={listId} role="listbox" aria-label={label || "Options"} className="mt-2 max-h-72 overflow-y-auto" data-ref-combobox="list">
+        <ul ref={listRef} id={listId} role="listbox" aria-busy={stale || undefined} data-stale={stale ? "true" : undefined} aria-label={label || "Options"} className="mt-2 max-h-72 overflow-y-auto" data-ref-combobox="list">
           {items === null && <li className="px-2 py-1.5 text-sm text-muted-foreground">Loading…</li>}
-          {error && <li className="px-2 py-1.5 text-sm text-destructive">{error}</li>}
+          {error && (
+            <li className="flex items-center justify-between gap-2 px-2 py-1.5 text-sm text-destructive" data-ref-combobox="error">
+              <span>{error}</span>
+              <Button type="button" size="sm" variant="outline" onClick={retry}>
+                Try again
+              </Button>
+            </li>
+          )}
           {items && !error && items.length === 0 && <li className="px-2 py-1.5 text-sm text-muted-foreground">{emptyText}</li>}
           {(items || []).map((o, i) => (
             <li
@@ -179,6 +207,20 @@ export function RefCombobox({ buttonText, label, load, onPick, selectedId = null
       </PopoverContent>
     </Popover>
   );
+}
+
+// The picker's keys, as data (scripts/test-offers-console.js runs it):
+//   n options, the active index, stale (the list is for an earlier search),
+//   q (the search text), hasParent (on a product's sizes)
+// -> { prevent, active?, pick?, back? }. Enter on a stale list does nothing.
+export function comboKey(key, { n = 0, active = 0, stale = false, q = "", hasParent = false } = {}) {
+  if (key === "ArrowDown") return { prevent: true, active: n ? (active + 1) % n : 0 };
+  if (key === "ArrowUp") return { prevent: true, active: n ? (active - 1 + n) % n : 0 };
+  if (key === "Home") return { prevent: true, active: 0 };
+  if (key === "End") return { prevent: true, active: Math.max(0, n - 1) };
+  if (key === "Enter") return { prevent: true, pick: !stale && n > 0 && active < n };
+  if (key === "Backspace" && !q && hasParent) return { prevent: true, back: true };
+  return { prevent: false };
 }
 
 // ---- loaders on GET /api/admin/refs (lib/admin/refs.js) ----

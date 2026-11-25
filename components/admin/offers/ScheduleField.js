@@ -32,13 +32,21 @@ export function isoToZoned(iso, tz) {
   return `${p.year}-${z(p.month)}-${z(p.day)}T${z(p.hour)}:${z(p.minute)}`;
 }
 
+// A wall time that happens twice (the hour clocks go back) is the earlier
+// instant; one that never happens (the hour clocks skip) moves forward by the
+// skipped length (02:30 in a 02:00 -> 03:00 jump is 03:30). Both as
+// Temporal's "compatible" disambiguation.
+const DAY = 86_400_000;
 export function zonedToIso(value, tz) {
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(String(value || ""));
   if (!m) return null;
   const wall = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
-  // the offset at the guess, then again at the corrected instant (a DST edge)
-  let ms = wall - offsetAt(wall, tz);
-  ms = wall - offsetAt(ms, tz);
+  // the offsets a day either side cover any one transition near this time
+  const before = offsetAt(wall - DAY, tz);
+  const after = offsetAt(wall + DAY, tz);
+  const fits = [...new Set([before, after])].map((o) => wall - o).filter((ms) => offsetAt(ms, tz) === wall - ms);
+  // in a gap nothing fits: the offset from before the jump lands past it
+  const ms = fits.length ? Math.min(...fits) : wall - before;
   return new Date(ms).toISOString();
 }
 

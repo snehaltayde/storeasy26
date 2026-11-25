@@ -60,11 +60,14 @@ const bundleMade = await call("owner", "bundles", "POST", { body: { create: { ti
 const OFFER_ID = made.body?.offer?.id;
 const BUNDLE_ID = bundleMade.body?.bundle?.id;
 const BUNDLE_OFFER = `bundle-${BUNDLE_ID}`;
+// an edit, so the offer has "previous" settings (the page then offers "Go back")
+const edited = await call("owner", "offers/[id]", "PUT", { params: { id: OFFER_ID }, body: { offer: { ...made.body?.offer?.config, id: OFFER_ID, buy: 3 }, enabled: true } });
 
 await t("setup: an offer and a live bundle exist (made through the real routes as the owner)", () => {
   eq(made.status, 200, `offer create: ${made.text}`);
   eq(bundleMade.status, 200, `bundle create: ${bundleMade.text}`);
   ok(BUNDLE_ID?.startsWith("bun-"), "a bundle id:");
+  eq(edited.status, 200, `offer edit: ${edited.text}`);
 });
 
 // ---------- 1. the reads, every role ----------
@@ -79,6 +82,18 @@ const READS = [
 await t("reads: lists, detail, simulate and targets answer every role 200 (support first); signed out 401", async () => {
   for (const role of ROLES) for (const [path, method, opts] of READS) eq((await call(role, path, method, opts)).status, 200, `${role} ${method} ${path}:`);
   for (const [path, method, opts] of READS) eq((await call("signed-out", path, method, opts)).status, 401, `signed out ${method} ${path}:`);
+});
+
+const { withTenant } = await import("../lib/tenant-context.js");
+const { listOffers } = await import("../lib/offers/store.js");
+const { listAudit } = await import("../lib/platform/audit.js");
+const inStore = async (fn) => withTenant(await C.getTenant(a.id, { fresh: true }), fn);
+await t("support's simulate writes nothing: the offers rows and audit_log are the same after it", async () => {
+  const offersBefore = JSON.stringify(await inStore(() => listOffers()));
+  const auditBefore = (await listAudit({ tenantId: a.id, limit: 500 })).length;
+  for (const body of [offerBody, { offer: { ...edited.body?.offer?.config, id: OFFER_ID, buy: 4 } }]) eq((await call("support", "offers/simulate", "POST", { body })).status, 200, "support simulates:");
+  eq(JSON.stringify(await inStore(() => listOffers())), offersBefore, "offers rows:");
+  eq((await listAudit({ tenantId: a.id, limit: 500 })).length, auditBefore, "audit_log rows:");
 });
 
 await t("POST /api/admin/bundles {check}: support 403 (offers.write), every writer 200, signed out 401", async () => {
@@ -150,6 +165,28 @@ await t("pages: unknown ids are a not-found; support's \"new\" goes to the list;
   }
   for (const p of ["offers", "bundles"]) eq((await pages.run(rel(p), { cookies: {} })).redirect, "/admin/login", `signed out ${p}:`);
   for (const [p, id] of [["offers/[id]", OFFER_ID], ["bundles/[id]", BUNDLE_ID]]) eq((await pages.run(rel(p), { cookies: {}, params: { id } })).redirect, "/admin/login", `signed out ${p}:`);
+});
+
+await t("a saved timezone Intl doesn't know falls back to Asia/Kolkata: merchantTz, and the offers pages still run for every role", async () => {
+  const { merchantTz } = await import("../lib/reporting.js");
+  const { patchTenant } = C;
+  const saved = (await C.getTenant(a.id, { fresh: true })).config.timezone ?? null;
+  try {
+    for (const bad of ["Asia/Kolkatta", "", "GMT+5:30"]) {
+      await patchTenant(a.id, { config: { timezone: bad } });
+      eq(await inStore(() => merchantTz()), "Asia/Kolkata", `merchantTz for ${JSON.stringify(bad)}:`);
+      for (const role of ROLES) {
+        const list = await pages.run(rel("offers"), { cookies: cookies[role] });
+        const one = await pages.run(rel("offers/[id]"), { cookies: cookies[role], params: { id: OFFER_ID } });
+        ok(!list.error && !one.error, `${role} with ${JSON.stringify(bad)}: ${list.error?.message || one.error?.message}`);
+        eq(propsOf(list, "OffersList").timezone, "Asia/Kolkata", `${role} list timezone:`);
+      }
+    }
+    await patchTenant(a.id, { config: { timezone: "America/New_York" } });
+    eq(await inStore(() => merchantTz()), "America/New_York", "a real zone is kept:");
+  } finally {
+    await patchTenant(a.id, { config: { timezone: saved } });
+  }
 });
 
 // ---------- 3. the markup ----------
@@ -229,6 +266,12 @@ await t("markup (writers): the switch, Save and Delete are there", () => {
   }
 });
 
+await t("markup: an edited offer offers \"Go back to previous settings\" to writers, never to support", () => {
+  ok(propsOf(runs.support.offer, "OfferEditor").existing.previous, "the fixture offer has previous settings:");
+  ok(!/Go back/.test(html.support.offer), "support sees no Go back:");
+  for (const role of WRITERS) ok(/Go back to previous settings/.test(html[role].offer), `${role} sees Go back:`);
+});
+
 await t("markup: the bundle-owned offer row has no switch for any role, says \"Part of bundle\" and links to the bundle", () => {
   for (const role of ROLES) {
     const s = html[role].offers;
@@ -241,13 +284,37 @@ await t("markup: the bundle-owned offer row has no switch for any role, says \"P
 // ---------- 4. the pure parts ----------
 const SF = await load(join(ROOT, "components/admin/offers/ScheduleField.js"));
 const BC = await load(join(ROOT, "components/admin/bundles/BundleCheck.js"));
-await t("schedule: store time to and from UTC (Kolkata, New York across DST), a bad value is null", () => {
-  eq(SF.zonedToIso("2026-11-25T09:00", "Asia/Kolkata"), "2026-11-25T03:30:00.000Z", "Kolkata:");
+await t("schedule: store time to and from UTC; a skipped time moves forward, a repeated one is the earlier instant (Temporal \"compatible\")", () => {
+  const z = SF.zonedToIso;
+  // India: no DST
+  eq(z("2026-11-25T09:00", "Asia/Kolkata"), "2026-11-25T03:30:00.000Z", "Kolkata:");
   eq(SF.isoToZoned("2026-11-25T03:30:00.000Z", "Asia/Kolkata"), "2026-11-25T09:00", "Kolkata back:");
-  eq(SF.zonedToIso("2026-07-01T09:00", "America/New_York"), "2026-07-01T13:00:00.000Z", "New York summer:");
-  eq(SF.zonedToIso("2026-12-01T09:00", "America/New_York"), "2026-12-01T14:00:00.000Z", "New York winter:");
-  eq(SF.isoToZoned(SF.zonedToIso("2026-03-08T12:15", "America/New_York"), "America/New_York"), "2026-03-08T12:15", "round trip on the DST day:");
-  eq([SF.zonedToIso("", "Asia/Kolkata"), SF.zonedToIso("nope", "Asia/Kolkata"), SF.isoToZoned(null, "Asia/Kolkata")], [null, null, ""], "empty and bad:");
+  eq(z("2026-07-01T09:00", "America/New_York"), "2026-07-01T13:00:00.000Z", "New York summer:");
+  eq(z("2026-12-01T09:00", "America/New_York"), "2026-12-01T14:00:00.000Z", "New York winter:");
+  // New York: 2026-03-08 02:00 -> 03:00 (02:30 never happens); 2026-11-01 02:00 -> 01:00 (01:30 twice)
+  eq(z("2026-03-08T02:30", "America/New_York"), "2026-03-08T07:30:00.000Z", "New York gap -> 03:30 EDT:");
+  eq(SF.isoToZoned(z("2026-03-08T02:30", "America/New_York"), "America/New_York"), "2026-03-08T03:30", "the gap time reads as 03:30:");
+  eq(z("2026-11-01T01:30", "America/New_York"), "2026-11-01T05:30:00.000Z", "New York overlap -> the earlier (EDT):");
+  // Lord Howe: half-hour DST; 2026-10-04 02:00 -> 02:30 (02:15 never happens); 2026-04-05 02:00 -> 01:30 (01:45 twice)
+  eq(z("2026-10-04T02:15", "Australia/Lord_Howe"), "2026-10-03T15:45:00.000Z", "Lord Howe gap -> 02:45 (+11):");
+  eq(SF.isoToZoned(z("2026-10-04T02:15", "Australia/Lord_Howe"), "Australia/Lord_Howe"), "2026-10-04T02:45", "the gap time reads as 02:45:");
+  eq(z("2026-04-05T01:45", "Australia/Lord_Howe"), "2026-04-04T14:45:00.000Z", "Lord Howe overlap -> the earlier (+11):");
+  eq(z("2026-04-05T02:15", "Australia/Lord_Howe"), "2026-04-04T15:45:00.000Z", "Lord Howe after the overlap (+10:30):");
+  eq([z("", "Asia/Kolkata"), z("nope", "Asia/Kolkata"), SF.isoToZoned(null, "Asia/Kolkata")], [null, null, ""], "empty and bad:");
+});
+
+const RC = await load(join(ROOT, "components/admin/offers/RefCombobox.js"));
+await t("picker keys: type then Enter waits while the list is stale and picks once it is fresh; arrows wrap; Backspace goes back", () => {
+  const k = RC.comboKey;
+  // typed "Fixture product 3": the debounce runs, the list still shows the old search
+  eq(k("Enter", { n: 4, active: 0, stale: true, q: "Fixture product 3" }), { prevent: true, pick: false }, "Enter on a stale list picks nothing:");
+  // the fresh list (one match) arrived
+  eq(k("Enter", { n: 1, active: 0, stale: false, q: "Fixture product 3" }), { prevent: true, pick: true }, "Enter on the fresh list picks:");
+  eq(k("Enter", { n: 0, active: 0, stale: false, q: "zzz" }), { prevent: true, pick: false }, "Enter with no match picks nothing:");
+  eq([k("ArrowDown", { n: 3, active: 2 }).active, k("ArrowUp", { n: 3, active: 0 }).active, k("Home", { n: 3, active: 2 }).active, k("End", { n: 3 }).active], [0, 2, 0, 2], "arrows wrap, Home, End:");
+  eq(k("Backspace", { q: "", hasParent: true }), { prevent: true, back: true }, "Backspace in an empty box on sizes goes back:");
+  eq(k("Backspace", { q: "a", hasParent: true }).prevent, false, "Backspace with text edits it:");
+  eq(k("a", {}).prevent, false, "a letter types:");
 });
 
 await t("bundle rules: a picked product already listed adds to its quantity; empty quantities; the saving to the cent", () => {

@@ -256,6 +256,15 @@ await t("buildSettingsPatch commerce: valid accepted, invalid named", () => {
   ok(bad.errors.some((e) => /Timezone/.test(e)), "tz rejected");
 });
 
+await t("buildSettingsPatch timezone: a name Intl doesn't know is refused, a real one saved", () => {
+  for (const tz of ["Asia/Kolkatta", "Mars/Olympus_Mons", "GMT+5:30", "Etc/Nowhere"]) {
+    const r = SET.buildSettingsPatch({ commerce: { timezone: tz } }, {});
+    ok(!r.ok && r.errors.some((e) => /Timezone/.test(e)), `${tz} refused`);
+    eq(r.patch?.config?.timezone, undefined, `${tz} not in the patch`);
+  }
+  for (const tz of ["America/New_York", "Australia/Lord_Howe", "Asia/Kolkata"]) eq(SET.buildSettingsPatch({ commerce: { timezone: tz } }, {}).patch.config.timezone, tz, `${tz} saved`);
+});
+
 // --- P3-CLOSED (PUB-06): a closed store's checkout and forms -----------------------------
 console.log("— a closed store (documents mode, never published)");
 const { NextRequest } = require("next/server.js");

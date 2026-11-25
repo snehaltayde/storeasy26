@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { roleAllows } from "@/lib/platform/authz";
-import { bundleCompat, listBundles } from "@/lib/bundles";
+import { listBundles, withComponentNames } from "@/lib/bundles";
 import { storeCurrency } from "@/lib/offers/catalog";
 import { BundlesList } from "@/components/admin/bundles/BundlesList";
 import { tfetch } from "@/lib/console-request";
@@ -19,9 +19,8 @@ export default async function AdminBundlesPage() {
   if (!actor) redirect("/admin/login");
   // each row's products by name (the list API answers ids and quantities only)
   const { bundles, currency } = await tfetch(async () => {
-    const rows = await listBundles();
-    const named = await Promise.all(rows.map(async (b) => ({ ...b, components: (await bundleCompat({ items: b.items, bundle_price: b.bundle_price })).components })));
-    return { bundles: named, currency: await storeCurrency() };
+    const bundles = await withComponentNames(await listBundles());
+    return { bundles, currency: await storeCurrency() };
   });
   return <BundlesList initialBundles={bundles} currency={currency} role={actor.role} canWrite={roleAllows(actor.role, "offers.write")} />;
 }
