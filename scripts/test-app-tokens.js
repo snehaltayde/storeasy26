@@ -100,7 +100,7 @@ const PII = { email: "apptokbuyer@example.test", phone: "9876512399", name: "App
 const ORDER_ID = "BL-APPTOK0001";
 await inA(async () => {
   const now = new Date().toISOString();
-  await db.insertInto("orders").values({ id: ORDER_ID, ...PII, state: "KA", country: "IN", cart_id: "cart_apptoksecret", idempotency_key: "idem_apptoksecret", subtotal: 500, discount_total: 0, shipping_total: 0, total: 500, currency: "INR", payment_method: "cod", payment_status: "cod", status: "cod_pending", snapshot: JSON.stringify({ contact: { email: PII.email } }), created_at: now, updated_at: now }).execute();
+  await db.insertInto("orders").values({ id: ORDER_ID, ...PII, state: "KA", country: "IN", cart_id: "cart_apptoksecret", idempotency_key: "idem_apptoksecret", subtotal: 500, discount_total: 50, shipping_total: 0, total: 500, currency: "INR", coupon_code: "APPTOKCOUPON55", applied_offers: JSON.stringify([{ id: "apptok-coupon", type: "COUPON", label: "Coupon APPTOKCOUPON55", amount: 50 }]), payment_method: "cod", payment_status: "cod", status: "cod_pending", snapshot: JSON.stringify({ contact: { email: PII.email } }), created_at: now, updated_at: now }).execute();
   await db.insertInto("order_items").values({ order_id: ORDER_ID, variant_id: "v1", product_id: "p1", title: "Item", variant_title: "M", unit_price: 500, quantity: 1, line_total: 500, line_discount: 0, position: 0 }).execute();
 });
 const noCustomer = (text, label) => {
@@ -221,6 +221,27 @@ await t("v1 orders and orders/[id]: in scope 200, never a customer field, cart_i
   eq((await v1("orders/[id]", { token: tok(), params: { id: "BL-NOPE" } })).status, 404);
 });
 
+await t("v1 orders never carry coupon_code (discount_total stays)", async () => {
+  const list = await v1("orders", { token: tok() });
+  const one = await v1("orders/[id]", { token: tok(), params: { id: ORDER_ID } });
+  for (const r of [list, one]) {
+    eq(r.status, 200);
+    ok(!r.text.includes("APPTOKCOUPON55") && !r.text.includes("coupon_code"), "no coupon code");
+  }
+  eq(one.body.order.discount_total, 50, "discount_total stays:");
+  eq(JSON.stringify(one.body.order.applied_offers), JSON.stringify([{ id: "apptok-coupon", type: "COUPON", label: "Coupon", amount: 50 }]), "the applied coupon keeps its amount, not its code:");
+});
+
+await t("v1 orders ?status=<unknown>: 400 in plain words; a known status filters", async () => {
+  const bad = await v1("orders", { token: tok(), query: "status=bogus" });
+  eq(bad.status, 400, bad.text.slice(0, 160));
+  eq(bad.body.code, "BAD_STATUS");
+  ok(/status/i.test(bad.body.error) && !/undefined|null/.test(bad.body.error), bad.body.error);
+  const good = await v1("orders", { token: tok(), query: "status=cod_pending" });
+  eq(good.status, 200);
+  ok(good.body.items.some((o) => o.id === ORDER_ID), "listed");
+});
+
 await t("v1 out of scope: products, collections and offers answer 403 in plain words", async () => {
   const r = await v1("products", { token: tok() });
   eq(r.status, 403);
@@ -331,6 +352,28 @@ await t("rate limits: 429 with Retry-After per token (audited); unknown tokens a
   }
 });
 
+await t("two tokens of one app share one budget: the app's limit spends across its tokens (429, audited)", async () => {
+  // a fresh app, so no earlier call has spent from its budget
+  const app = (await call("owner", "apps", "POST", { body: { create_custom: { name: "Budget app", url: "http://127.0.0.1:9/hooks", topics: ["order.created"], scopes: ["orders.read"] } } })).body.install.id;
+  const mint = async (name) => (await post("owner", { create: { name, scopes: ["orders.read"] } }, app)).body;
+  const one = await mint("Budget one");
+  const two = await mint("Budget two");
+  process.env.RATE_LIMIT_DISABLED = "0";
+  const envKey = `RATE_LIMIT_APPS_API_APP_${app.toUpperCase().replace(/[^A-Z0-9]/g, "_")}`;
+  process.env[envKey] = "2";
+  try {
+    const got = [(await v1("me", { token: one.secret })).status, (await v1("me", { token: two.secret })).status];
+    const third = await v1("me", { token: two.secret, headers: { "x-forwarded-for": "203.0.113.77" } });
+    eq([...got, third.status].join(","), "200,200,429", "one app, one budget:");
+    ok(Number(third.headers.get("retry-after")) > 0, "Retry-After");
+    ok((await callsOf(app)).some((r) => JSON.parse(r.diff).via === two.token.id && JSON.parse(r.diff).status === 429), "the 429 is audited");
+  } finally {
+    process.env.RATE_LIMIT_DISABLED = "1";
+    delete process.env[envKey];
+    eq((await call("owner", "apps/[id]", "POST", { params: { id: app }, body: { uninstall: true } })).status, 200, "uninstall:");
+  }
+});
+
 await t("at 4 active tokens, two creates at once make exactly one (the cap is counted inside the insert)", async () => {
   const active = (await tokensOf()).body.tokens.filter((k) => k.status === "active" || k.status === "expiring").length;
   const extra = [];
@@ -434,6 +477,29 @@ await t("a token of an app Storeasy turned off (its kill switch) is refused 401"
     eq((await v1("me", { token: HA.secret })).status, 401, "killed");
   } finally {
     await pdb.execute({ sql: "DELETE FROM feature_flags WHERE key = ?", args: [killFlag(pluginId)] });
+    __resetFlagCache();
+  }
+  eq((await v1("me", { token: HA.secret })).status, 200, "back once the switch is gone");
+});
+
+await t("an operator kills one custom app through the flags route: 200, then v1 me gives 401; removing the switch brings it back", async () => {
+  const { killFlag } = await import("../lib/plugins/catalog.js");
+  const { __resetFlagCache } = await import("../lib/platform/flags.js");
+  const { NextRequest } = await import("./support/next-server-stub.js");
+  const S = await import("../lib/platform/sessions.js");
+  const flags = await import("../app/api/platform/flags/route.js");
+  const opCookie = (await S.createSession({ userId: users.operator.id, kind: "operator", ttlMs: 10 * 60_000 })).token;
+  const opPost = (body) => flags.POST(new NextRequest("http://operator.console.test/api/platform/flags", { method: "POST", headers: { host: "operator.console.test", origin: "http://operator.console.test", cookie: `_platform=${opCookie}`, "content-type": "application/json" }, body: JSON.stringify(body) }));
+  const pluginId = await inA(async () => (await db.selectFrom("plugin_installs").select("plugin_id").where("id", "=", HA.installId).executeTakeFirst()).plugin_id);
+  ok(pluginId.startsWith("custom:"), `a custom app's stored id stays ${pluginId}`);
+  const key = killFlag(pluginId);
+  const set = await opPost({ flag: { key, description: "Kill one custom app", default_on: false, create: true } });
+  eq(set.status, 200, `operator flags route for ${key}: ${(await set.clone().text()).slice(0, 160)}`);
+  __resetFlagCache();
+  try {
+    eq((await v1("me", { token: HA.secret })).status, 401, "killed through the route");
+  } finally {
+    eq((await opPost({ remove: { key } })).status, 200, "removed");
     __resetFlagCache();
   }
   eq((await v1("me", { token: HA.secret })).status, 200, "back once the switch is gone");

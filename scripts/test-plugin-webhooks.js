@@ -285,11 +285,11 @@ const custom = (over = {}) => ({ create_custom: { name: "Order hooks", url: HOOK
 // an order with customer details that must never leave
 const PII = { email: "plwhbuyer@example.test", phone: "9876512345", name: "Plwhname Buyer", address_line1: "12 Plwhaddr Road", city: "Plwhcity", pincode: "560999" };
 let orderN = 0;
-async function makeOrder({ status = "cod_pending", items = 2 } = {}) {
+async function makeOrder({ status = "cod_pending", items = 2, coupon = null } = {}) {
   const id = `BL-PLWH${String(++orderN).padStart(4, "0")}`;
   const now = new Date().toISOString();
   await inA(async () => {
-    await db.insertInto("orders").values({ id, ...PII, state: "KA", country: "IN", subtotal: 500, discount_total: 0, shipping_total: 0, total: 500, currency: "INR", payment_method: "cod", payment_status: "cod", status, snapshot: JSON.stringify({ contact: { email: PII.email } }), created_at: now, updated_at: now }).execute();
+    await db.insertInto("orders").values({ id, ...PII, state: "KA", country: "IN", subtotal: 500, discount_total: 0, shipping_total: 0, total: 500, currency: "INR", payment_method: "cod", payment_status: "cod", status, coupon_code: coupon, snapshot: JSON.stringify({ contact: { email: PII.email } }), created_at: now, updated_at: now }).execute();
     for (let i = 0; i < items; i++) await db.insertInto("order_items").values({ order_id: id, variant_id: `v${i}`, product_id: `p${i}`, title: `Item ${i}`, variant_title: "M", unit_price: 250, quantity: 1, line_total: 250, line_discount: 0, position: i }).execute();
   });
   return id;
@@ -735,6 +735,73 @@ await t("first-party fixture: its handler runs with a narrow context; its fetch 
     undoH();
     undo();
   }
+});
+
+await t("an operator's kill switch for one custom app: its pending delivery ends Skipped and fan-out gives it nothing", async () => {
+  const FLAGS = await import("../lib/platform/flags.js");
+  const pluginId = await inA(async () => (await db.selectFrom("plugin_installs").select("plugin_id").where("id", "=", appId).executeTakeFirst()).plugin_id);
+  ok(pluginId.startsWith("custom:"), "a custom app");
+  const ev = await inA(() => E.emitPluginEvent("order.created", { key: "kill-test", data: { order: { id: "k" } } }));
+  await inA(() => E.fanOut(ev.id));
+  const d = (await deliveriesOf(appId)).find((x) => x.event_id === ev.id);
+  ok(d && d.status === "pending", "a pending delivery");
+  const key = CAT.killFlag(pluginId);
+  await FLAGS.setFlag({ key, description: "kill", default_on: false, create: true, actor: { kind: "operator", id: users.operator.id } });
+  FLAGS.__resetFlagCache();
+  try {
+    eq((await inA(() => D.deliver(d.id))).status, "skipped", "skipped:");
+    const ev2 = await inA(() => E.emitPluginEvent("order.created", { key: "kill-test-2", data: { order: { id: "k2" } } }));
+    await inA(() => E.fanOut(ev2.id));
+    ok(!(await deliveriesOf(appId)).some((x) => x.event_id === ev2.id), "no delivery while killed");
+  } finally {
+    await FLAGS.deleteFlag(key, { kind: "operator", id: users.operator.id });
+    FLAGS.__resetFlagCache();
+  }
+});
+
+await t("first-party handler error text never reaches support: fixed words stored, support and operator support never see it", async () => {
+  const undo = CAT.registerPlugin({ id: "fixture-errs", name: "Fixture errs", version: "1.0.0", summary: "s", description: "d", icon: "Truck", author: { name: "Tests" }, scopes: ["orders.read"], settings: [], events: ["order.created"], egress: [] });
+  const undoH = HANDLERS.registerPluginHandler("fixture-errs", "order.created", async () => ({ ok: false, error: `Carrier said: bad phone ${PII.phone}` }));
+  try {
+    const ins = await call("owner", "apps", "POST", { body: { install: { pluginId: "fixture-errs", scopes: ["orders.read"] } } });
+    eq(ins.status, 200, `install: ${ins.text.slice(0, 160)}`);
+    const id = ins.body.install.id;
+    const orderId = await makeOrder();
+    const ev = await inA(() => E.emitOrderEvent("order.created", orderId));
+    await inA(() => E.fanOut(ev.id));
+    const [d] = await deliveriesOf(id);
+    eq(d.target, "internal", "internal:");
+    await inA(() => D.deliver(d.id));
+    const row = (await deliveriesOf(id))[0];
+    ok(row.last_error && !row.last_error.includes(PII.phone), `stored words: ${row.last_error}`);
+    for (const caller of ["support", ...OPS]) {
+      const g = await call(caller, "apps/[id]/webhooks", "GET", { params: { id } });
+      eq(g.status, 200, `${caller}:`);
+      ok(g.body.deliveries.length > 0, `${caller} rows`);
+      ok(!g.text.includes(PII.phone), `${caller}: no handler text`);
+    }
+    eq((await call("owner", "apps/[id]", "POST", { params: { id }, body: { uninstall: true } })).status, 200, "uninstall:");
+  } finally {
+    undoH();
+    undo();
+  }
+});
+
+await t("the sent body and the stored payload carry no coupon_code (discount_total stays)", async () => {
+  const CODE = "PLWHCOUPON77";
+  const id = await makeOrder({ coupon: CODE });
+  const ev = await inA(() => E.emitOrderEvent("order.created", id));
+  const stored = await inA(() => db.selectFrom("plugin_events").select("payload").where("id", "=", ev.id).executeTakeFirst());
+  ok(!stored.payload.includes(CODE) && !stored.payload.includes("coupon_code"), "stored payload");
+  await inA(() => E.fanOut(ev.id));
+  const d = (await deliveriesOf(appId)).find((x) => x.event_id === ev.id);
+  const n = got.length;
+  eq((await inA(() => D.deliver(d.id))).status, "delivered", "delivered:");
+  eq(got.length, n + 1, "one request:");
+  const body = got[got.length - 1].body;
+  ok(!body.includes(CODE) && !body.includes("coupon_code"), "sent body");
+  ok("discount_total" in JSON.parse(body).data.order, "discount_total stays");
+  ok(!("coupon_code" in TOP.orderSnapshot({ id: "x", coupon_code: CODE })), "orderSnapshot drops it");
 });
 
 await t("limits: up to 10 custom apps per store; line items capped at 100 with line_items_truncated", async () => {

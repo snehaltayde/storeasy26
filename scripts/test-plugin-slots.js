@@ -436,6 +436,97 @@ await t("the order slot renders only the slot's context (an order's id and state
   ok(/<PluginSlot name="storefront\.footer\.above"/.test(await readFile(join(ROOT, "app/(storefront)/layout.js"), "utf8")), "layout outlet");
 });
 
+await t("order slot: a fixture block's resolver gets only id/status/fulfillment_status/created_at on the guest and account order pages; no contact canary in the HTML; a bad token or another order gives 404 and the resolver never runs", async () => {
+  // contact canaries an order holds, which no plugin may ever see
+  const C = { email: "pslotsbuyer@example.test", phone: "9876500011", name: "Pslotsname Buyer", address_line1: "12 Pslotsaddr Road", city: "Pslotscity", pincode: "560811" };
+  const ORDER = "BL-PSLOTS0001";
+  await a.run(async () => {
+    const now = new Date().toISOString();
+    await db.insertInto("orders").values({ id: ORDER, ...C, state: "KA", country: "IN", subtotal: 500, discount_total: 0, shipping_total: 0, total: 500, currency: "INR", payment_method: "cod", payment_status: "cod", status: "cod_pending", snapshot: JSON.stringify({ contact: { email: C.email, phone: C.phone }, items: [{ title: "Item", quantity: 1, price: 500, lineTotal: 500 }] }), created_at: now, updated_at: now }).execute();
+    await db.insertInto("order_items").values({ order_id: ORDER, variant_id: "v1", product_id: "p1", title: "Item", variant_title: "M", unit_price: 500, quantity: 1, line_total: 500, line_discount: 0, position: 0 }).execute();
+  });
+  const recorded = [];
+  const undo = CAT.registerPlugin({
+    id: "order-spy",
+    name: "Order spy",
+    version: "1.0.0",
+    summary: "s",
+    description: "d",
+    icon: "Puzzle",
+    author: { name: "T" },
+    scopes: [],
+    settings: [],
+    blocks: [{ id: "spy", label: "Spy", primitive: "notice", slots: ["storefront.order.status"], data: (ctx) => (recorded.push(ctx), { text: "Order spy note" }) }],
+  });
+  // the pages' Next-only imports, as Next answers them in a request
+  const nav = require("next/navigation");
+  let jar = {};
+  Object.assign(STUBS, {
+    "next/navigation": { __esModule: true, notFound: nav.notFound, redirect: nav.redirect, useRouter: () => ({ refresh() {}, push() {} }) },
+    "next/server": { __esModule: true, after: () => {} },
+    "next/headers": { __esModule: true, cookies: async () => ({ get: (k) => (k in jar ? { value: jar[k] } : undefined) }) },
+  });
+  let installId;
+  try {
+    const r = await call("owner", "apps", "POST", { body: { install: { pluginId: "order-spy", scopes: [] } } });
+    eq(r.status, 200, r.text.slice(0, 200));
+    installId = r.body.install.id;
+    await a.run(() => db.updateTable("plugin_placements").set({ state: "live" }).where("install_id", "=", installId).execute());
+    const Guest = (await loadJsx(join(ROOT, "app/(storefront)/orders/[orderId]/page.js"))).default;
+    const Account = (await loadJsx(join(ROOT, "app/(storefront)/account/orders/[orderId]/page.js"))).default;
+    const { orderStatusToken } = await import("../lib/orders.js");
+    const K = await import("../lib/customers.js");
+    const { runDueJobs } = await import("../lib/platform/worker.js");
+    const token = await a.run(() => orderStatusToken(ORDER));
+    // a signed-in customer through the real OTP flow (it claims the order by email)
+    await a.run(() => K.requestOtp(C.email));
+    await runDueJobs({ limit: 10 }).catch(() => {});
+    const subject = (await a.run(() => db.selectFrom("notifications").select("subject").where("type", "=", "customer_otp").orderBy("created_at", "desc").executeTakeFirst())).subject;
+    const session = await a.run(() => K.verifyOtp(C.email, /(\d{6})/.exec(subject)[1]));
+    const props = (orderId, t) => ({ params: Promise.resolve({ orderId }), searchParams: Promise.resolve({ t }) });
+    const pages = {
+      guest: () => html(React.createElement(Guest, props(ORDER, token))),
+      account: () => {
+        jar = { [K.CUSTOMER_COOKIE]: session.token };
+        return html(React.createElement(Account, props(ORDER)));
+      },
+    };
+    for (const [name, render] of Object.entries(pages)) {
+      recorded.length = 0;
+      const h = await render();
+      ok(h.includes("Order spy note") && blocksIn(h).includes("storefront.order.status/spy"), `${name}: the block renders`);
+      ok(recorded.length > 0, `${name}: the resolver ran`);
+      for (const ctx of recorded) eq(Object.keys(ctx).sort().join(","), "created_at,fulfillment_status,id,status", `${name} ctx keys:`);
+      eq(recorded[0].id, ORDER, `${name} ctx id:`);
+      for (const v of Object.values(C)) ok(!h.toLowerCase().includes(v.toLowerCase()), `${name}: no ${v} in the HTML`);
+      ok(!JSON.stringify(recorded).includes(C.email), `${name}: no email in ctx`);
+    }
+    // refused: a bad signed link, and a signed-in customer asking for an order that isn't theirs
+    recorded.length = 0;
+    const is404 = (e) => /NEXT_HTTP_ERROR_FALLBACK;404|NEXT_NOT_FOUND/.test(String(e?.digest || ""));
+    let guest404 = null;
+    try {
+      await Guest(props(ORDER, `${token.slice(0, -4)}AAAA`));
+    } catch (e) {
+      guest404 = e;
+    }
+    ok(is404(guest404), `guest bad token: 404 (${guest404?.digest})`);
+    let acct404 = null;
+    try {
+      jar = { [K.CUSTOMER_COOKIE]: session.token };
+      await Account(props("BL-NOTMINE01"));
+    } catch (e) {
+      acct404 = e;
+    }
+    ok(is404(acct404), `account, not their order: 404 (${acct404?.digest})`);
+    eq(recorded.length, 0, "the resolver never ran:");
+  } finally {
+    for (const k of ["next/navigation", "next/server", "next/headers"]) delete STUBS[k];
+    if (installId) eq((await call("owner", "apps/[id]", "POST", { params: { id: installId }, body: { uninstall: true } })).status, 200, "uninstall:");
+    undo();
+  }
+});
+
 await t("install off, then on; the kill switch; then uninstall: each hides every block at once", async () => {
   const live = async () => blocksIn(await pdp(productA)).length + blocksIn(await footer()).length;
   eq(await live(), 2, "two live:");
