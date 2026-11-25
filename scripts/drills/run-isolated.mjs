@@ -454,6 +454,16 @@ export const DRILLS = {
       return seeded !== 0 ? seeded : c.node(["scripts/drills/signup/run.mjs", ...c.headed]);
     },
   },
+  // Phase 3 line 3: the operator's Billing screen (tabs, plans, subscriptions,
+  // costs), on the --p3 design store like platform-shell
+  "platform-billing": {
+    id: "PLATFORM-BILLING",
+    warm: true,
+    async run(c) {
+      const seeded = await c.node(["scripts/seed-design-documents.js", "--p3"]);
+      return seeded !== 0 ? seeded : c.node(["scripts/drills/platform-billing/run.mjs", ...c.headed]);
+    },
+  },
   // settings, integrations and billing (Phase 2 line 7): the roles store; the
   // drill opens an operator's support grant in its control plane for the banner check
   settings: { id: "SETTINGS", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/settings/run.mjs", ...c.headed])) },

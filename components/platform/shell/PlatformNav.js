@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Store, ListChecks, Plus } from "lucide-react";
+import { Store, ListChecks, Plus, CreditCard } from "lucide-react";
 import { Wrench } from "lucide-react"; // line 6: Operations
 import {
   Sidebar,
@@ -27,6 +27,7 @@ const ICONS = {
   operations: Wrench,
   flags: Flag,
   incidents: Siren,
+  billing: CreditCard,
 };
 
 // 240px from 1024px, icons with tooltips at 768-1023px, a sheet below 768px

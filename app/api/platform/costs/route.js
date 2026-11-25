@@ -4,7 +4,7 @@ import { costReport, setCostInputs } from "@/lib/platform/costs";
 import { patchTenant, getTenant } from "@/lib/platform/control";
 import { audit } from "@/lib/platform/audit";
 
-// Operator unit costs (S47 / OP09). The operator enters the real monthly
+// Operator unit costs (S47 / OP09; shown in Billing → Costs since Phase 3 line 3). The operator enters the real monthly
 // provider totals; allocation uses MEASURED drivers with the method stated,
 // and the unallocated remainder stays visible. Budgets alert — they never
 // silently charge a merchant anything.
@@ -18,6 +18,7 @@ export async function GET(request) {
   const auth = await requireOperator(request);
   if (auth instanceof Response) return auth;
   const month = new URL(request.url).searchParams.get("month") || undefined;
+  if (month && !/^\d{4}-\d{2}$/.test(month)) return NextResponse.json({ error: "month must be YYYY-MM" }, { status: 422 });
   return NextResponse.json({ ok: true, report: await costReport(month) });
 }
 

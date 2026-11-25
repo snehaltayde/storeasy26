@@ -341,7 +341,7 @@ await t("writes: the bootstrap caller is audited as bootstrap (incident, flag, s
   eq((await as("billing", { action: "plan_version", plan: "platperm-boot", spec: { name: "Boot", price: 1 } })).status, 200, "plan version");
   eq((await as("queues", { action: "tick" })).status, 200, "tick");
   const rows = await auditRows(since);
-  for (const action of ["incident.open", "flags.set", "flags.emergency_disable", "flags.delete", "support.grant_created", "support.grant_revoked", "settings.write", "billing.plan_version", "queue.tick"]) {
+  for (const action of ["incident.open", "flags.set", "flags.emergency_disable", "flags.delete", "support.grant_created", "support.grant_revoked", "billing.override", "billing.override_cleared", "billing.plan_version", "queue.tick"]) {
     const mine = rows.filter((x) => x.action === action);
     ok(mine.length, `an audit row for ${action}`);
     for (const x of mine) eq(`${x.actor}/${x.actor_kind}`, "bootstrap/bootstrap", action);

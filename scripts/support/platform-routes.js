@@ -24,6 +24,13 @@ export const PLATFORM_ROUTES = Object.freeze([
   { path: "billing", method: "POST", write: true, variant: "override", probe: { body: { action: "override", tenant: "" } } },
   { path: "billing", method: "POST", write: true, variant: "clear_override", probe: { body: { action: "clear_override", tenant: "missing-store" } } },
   { path: "billing", method: "POST", write: true, variant: "plan_version", probe: { body: { action: "plan_version", plan: "" } } },
+  // Phase 3 line 3: the billing screen's lists and its plan and subscription writes
+  { path: "billing", method: "GET", write: false, variant: "subscriptions", probe: { query: "view=subscriptions" } },
+  { path: "billing", method: "GET", write: false, variant: "events", probe: { query: "view=events&store=missing-store" } },
+  { path: "billing", method: "POST", write: true, variant: "retire", probe: { body: { action: "retire", plan: "missing-plan", version: 1 } } },
+  { path: "billing", method: "POST", write: true, variant: "start", probe: { body: { action: "start", tenant: "missing-store", plan: "free" } } },
+  { path: "billing", method: "POST", write: true, variant: "grace", probe: { body: { action: "grace", subscription: "sub_missing", days: 1, reason: "probe" } } },
+  { path: "billing", method: "POST", write: true, variant: "cancel", probe: { body: { action: "cancel", subscription: "sub_missing" } } },
   { path: "case-studies", method: "GET", write: false },
   { path: "case-studies", method: "POST", write: true, variant: "case_study", probe: { body: { case_study: {} } } },
   { path: "case-studies", method: "POST", write: true, variant: "publish_case", probe: { body: { publish_case: { slug: "missing-case", published: false } } } },
