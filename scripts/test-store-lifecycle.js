@@ -258,6 +258,33 @@ await t("suspended for 7 days: a waiting job dead-letters with a plain reason", 
   eq(ran.length, 0, "not run");
 });
 
+await t("suspended for 7 days with a webhook_apply job: the dead-letter marks its webhook receipt dead too", async () => {
+  const inboxId = await J.recordWebhook({ source: "shopify", topic: "products/update", tenantId: a.id, rawBody: "{}", hmacOk: true });
+  const { id } = await J.enqueueJob({ type: "webhook_apply", tenantId: a.id, payload: { inboxId } });
+  const since = new Date(Date.now() - J.SUSPENDED_MAX_MS - 60_000).toISOString();
+  await db().execute({ sql: "UPDATE jobs SET last_error = ? WHERE id = ?", args: [`${J.SUSPENDED_WAIT_PREFIX}${since})`, id] });
+  await WK.runJobById(id, { handlers: { webhook_apply: async () => ({}) } });
+  eq(String((await jobRow(id)).status), "dead", "job");
+  eq(String((await J.getInbox(inboxId)).status), "dead", "receipt");
+});
+
+await t("another server resumed the store: a cached 'suspended' with a fresh 'active' runs the job, even past 7 days of waiting", async () => {
+  eq((await C.getTenant(a.id)).status, "suspended", "this server's cache says suspended");
+  await db().execute({ sql: "UPDATE tenants SET status = 'active' WHERE id = ?", args: [a.id] }); // the other server's resume
+  try {
+    eq((await C.getTenant(a.id)).status, "suspended", "the cache is still behind");
+    const { id } = await J.enqueueJob({ type: "lifecycle_probe", tenantId: a.id });
+    const since = new Date(Date.now() - J.SUSPENDED_MAX_MS - 60_000).toISOString();
+    await db().execute({ sql: "UPDATE jobs SET last_error = ? WHERE id = ?", args: [`${J.SUSPENDED_WAIT_PREFIX}${since})`, id] });
+    const ran = [];
+    await WK.runJobById(id, { handlers: { lifecycle_probe: async () => ran.push(1) } });
+    eq([ran.length, String((await jobRow(id)).status)], [1, "done"], "ran, not dead");
+  } finally {
+    await db().execute({ sql: "UPDATE tenants SET status = 'suspended' WHERE id = ?", args: [a.id] });
+    await C.getTenant(a.id, { fresh: true });
+  }
+});
+
 await t("resume: the same reason rule; the host resolves again at once; waiting jobs are due at once and run; audit row", async () => {
   eq((await call("operator", "tenants/[id]", { params: { id: a.id }, body: { status: "active", reason: "ok" } })).status, 400, "short reason");
   const r = await call("operator", "tenants/[id]", { params: { id: a.id }, body: { status: "active", reason: "Review cleared" } });
