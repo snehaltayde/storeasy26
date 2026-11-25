@@ -31,7 +31,7 @@ export default function Events({ params, setParams }) {
             No store
           </Badge>
         ) : (
-          <a href={`/platform/billing?tab=subscriptions&store=${encodeURIComponent(e.tenant_id)}`} data-read-control title={e.store_name || e.tenant_id} className="block max-w-[10rem] truncate rounded-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring lg:max-w-[16rem]">
+          <a href={`/platform/billing?tab=subscriptions&store=${encodeURIComponent(e.tenant_id)}`} title={e.store_name || e.tenant_id} className="block max-w-[10rem] truncate rounded-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring lg:max-w-[16rem]">
             {e.store_name || e.tenant_id}
           </a>
         ),
@@ -53,7 +53,7 @@ export default function Events({ params, setParams }) {
           <Label htmlFor="ev-store" className="mb-1 text-xs text-muted-foreground">
             Store
           </Label>
-          <select id="ev-store" className={`${selectClass} max-w-64`} value={params.store || ""} onChange={(e) => setParams({ store: e.target.value, offset: null })} data-read-control>
+          <select id="ev-store" className={`${selectClass} max-w-64`} value={params.store || ""} onChange={(e) => setParams({ store: e.target.value, offset: null })}>
             <option value="">Every store</option>
             <option value="orphan">No store (unmatched)</option>
             {stores.map((s) => (
@@ -67,7 +67,7 @@ export default function Events({ params, setParams }) {
           <Label htmlFor="ev-type" className="mb-1 text-xs text-muted-foreground">
             Event
           </Label>
-          <select id="ev-type" className={selectClass} value={params.type || ""} onChange={(e) => setParams({ type: e.target.value, offset: null })} data-read-control>
+          <select id="ev-type" className={selectClass} value={params.type || ""} onChange={(e) => setParams({ type: e.target.value, offset: null })}>
             <option value="">Any event</option>
             {(data?.types || []).map((t) => (
               <option key={t} value={t}>
@@ -80,7 +80,7 @@ export default function Events({ params, setParams }) {
           <Label htmlFor="ev-month" className="mb-1 text-xs text-muted-foreground">
             Month
           </Label>
-          <Input id="ev-month" type="month" value={params.month || ""} onChange={(e) => setParams({ month: e.target.value, offset: null })} className="h-8 w-40" data-read-control />
+          <Input id="ev-month" type="month" value={params.month || ""} onChange={(e) => setParams({ month: e.target.value, offset: null })} className="h-8 w-40" />
         </div>
       </div>
       {error && (

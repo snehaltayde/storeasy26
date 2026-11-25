@@ -49,7 +49,7 @@ export default function BillingConsole() {
           <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
             <TabsList aria-label="Billing sections">
               {TABS.map(([id, label]) => (
-                <TabsTrigger key={id} value={id} data-read-control className="px-3 pointer-coarse:h-10">
+                <TabsTrigger key={id} value={id} className="px-3 pointer-coarse:h-10">
                   {label}
                 </TabsTrigger>
               ))}

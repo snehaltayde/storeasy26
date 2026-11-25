@@ -162,7 +162,7 @@ export default function Subscriptions({ params, setParams }) {
             </Label>
             <Input id="sub-q" type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by store name or id" className="h-8" />
           </div>
-          <Button type="submit" size="sm" variant="outline" data-read-control>
+          <Button type="submit" size="sm" variant="outline">
             <Search className="size-3.5" aria-hidden /> Search
           </Button>
         </form>
@@ -170,7 +170,7 @@ export default function Subscriptions({ params, setParams }) {
           <Label htmlFor="sub-status" className="mb-1 text-xs text-muted-foreground">
             Status
           </Label>
-          <select id="sub-status" className={selectClass} value={params.status || ""} onChange={(e) => setParams({ status: e.target.value, offset: null })} data-read-control>
+          <select id="sub-status" className={selectClass} value={params.status || ""} onChange={(e) => setParams({ status: e.target.value, offset: null })}>
             <option value="">Any status</option>
             {Object.entries(SUB_STATUS).map(([s, [label]]) => (
               <option key={s} value={s}>
@@ -183,7 +183,7 @@ export default function Subscriptions({ params, setParams }) {
           <Label htmlFor="sub-plan" className="mb-1 text-xs text-muted-foreground">
             Plan
           </Label>
-          <select id="sub-plan" className={selectClass} value={params.plan || ""} onChange={(e) => setParams({ plan: e.target.value, offset: null })} data-read-control>
+          <select id="sub-plan" className={selectClass} value={params.plan || ""} onChange={(e) => setParams({ plan: e.target.value, offset: null })}>
             <option value="">Any plan</option>
             {planIds.map((p) => (
               <option key={p} value={p}>
@@ -199,7 +199,7 @@ export default function Subscriptions({ params, setParams }) {
       {store && (
         <p className="flex items-center gap-2 text-sm">
           Showing <span className="font-medium">{storeName(store)}</span>
-          <Button size="sm" variant="ghost" onClick={() => setParams({ store: null, offset: null })} data-read-control>
+          <Button size="sm" variant="ghost" onClick={() => setParams({ store: null, offset: null })}>
             <X className="size-3.5" aria-hidden /> All stores
           </Button>
         </p>

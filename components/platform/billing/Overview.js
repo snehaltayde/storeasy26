@@ -66,7 +66,7 @@ export default function Overview() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2">
           <CardTitle>Exception queue</CardTitle>
-          <Button variant="outline" size="sm" onClick={reload} disabled={loading} data-read-control>
+          <Button variant="outline" size="sm" onClick={reload} disabled={loading}>
             <RefreshCw className="size-3.5" aria-hidden /> Refresh
           </Button>
         </CardHeader>
@@ -83,11 +83,11 @@ export default function Overview() {
                     <Badge variant={x.kind === "past_grace" ? "danger" : "warning"}>{EXCEPTION_WORDS[x.kind] || x.kind}</Badge>
                   </span>
                   {x.tenant ? (
-                    <a href={`/platform/billing?tab=subscriptions&store=${encodeURIComponent(x.tenant)}`} data-read-control className="w-fit truncate rounded-sm font-mono text-[0.8125rem] font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
+                    <a href={`/platform/billing?tab=subscriptions&store=${encodeURIComponent(x.tenant)}`} className="w-fit truncate rounded-sm font-mono text-[0.8125rem] font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
                       {x.tenant}
                     </a>
                   ) : (
-                    <a href="/platform/billing?tab=events&store=orphan" data-read-control className="w-fit rounded-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
+                    <a href="/platform/billing?tab=events&store=orphan" className="w-fit rounded-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
                       Open in the ledger
                     </a>
                   )}

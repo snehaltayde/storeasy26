@@ -69,7 +69,7 @@ export default function Costs({ params, setParams }) {
           <Label htmlFor="cost-month" className="mb-1 text-xs text-muted-foreground">
             Month
           </Label>
-          <Input id="cost-month" type="month" value={month} max={thisMonth()} onChange={(e) => setParams({ month: e.target.value || null })} className="h-8 w-40" data-read-control />
+          <Input id="cost-month" type="month" value={month} max={thisMonth()} onChange={(e) => setParams({ month: e.target.value || null })} className="h-8 w-40" />
         </div>
         {report?.configured && report.inputs && (
           <Button size="sm" variant="outline" onClick={() => setDialog({ kind: "inputs" })}>
