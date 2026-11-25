@@ -174,10 +174,15 @@ await t("a document setting change gives one plain row named by the type's setti
   const ci2 = clone(ci);
   ci2.settings.featured = [{ handle: "summer" }, { handle: "winter" }];
   eq(diffBodies("collections_index", ci, ci2), [{ kind: "settings", words: "Collections page: 2 collections added to featured collections" }]);
+  // Phase 5 line 2: a new layout document has no template (null: the theme's, then the platform's)
   const pl = R.emptyBody("product_layout");
+  eq(pl.settings.template, null, "no template by default:");
   const pl2 = clone(pl);
   pl2.settings.template = "editorial";
-  eq(diffBodies("product_layout", pl, pl2), [{ kind: "settings", words: "Product page layout: layout changed" }]);
+  eq(diffBodies("product_layout", pl, pl2), [{ kind: "settings", words: "Product page layout: layout added" }]);
+  const pl3 = clone(pl2);
+  pl3.settings.template = "classic";
+  eq(diffBodies("product_layout", pl2, pl3), [{ kind: "settings", words: "Product page layout: layout changed" }]);
 });
 
 await t("two sections of one kind are told apart by their place", async () => {

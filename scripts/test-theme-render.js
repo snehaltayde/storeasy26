@@ -309,6 +309,44 @@ await t("store A: the theme's templates are the defaults under the founder's own
   eq(effectiveSurfaceTemplate(null, "pdp", null).template, "classic", "no theme: today's default:");
 });
 
+await t("review fix: a published doc_header and doc_product_layout made with default settings (template null) still render the theme's templates; a founder's explicit choice wins", async () => {
+  eq(R.emptyBody("header").settings.template, null, "header default:");
+  eq(R.emptyBody("footer").settings.template, null, "footer default:");
+  eq(R.emptyBody("product_layout").settings.template, null, "product layout default:");
+  eq(R.emptyBody("collection_layout").settings.template, null, "collection layout default:");
+  const publishDocs = (ids) =>
+    a.run(async () => {
+      const items = [];
+      for (const id of ids) {
+        const d = await Docs.getDocument(id);
+        items.push({ id: d.id, revision: d.revision, draftHash: d.draftHash });
+      }
+      await Pub.publish({ ids: items, actor: ACTOR });
+    });
+  await a.run(async () => {
+    await Docs.createDocument({ type: "header", body: null, actor: ACTOR });
+    await Docs.createDocument({ type: "product_layout", body: null, actor: ACTOR });
+  });
+  await publishDocs(["doc_header", "doc_product_layout"]);
+  const live = await a.run(async () => [await Docs.getDocument("doc_header"), await Res.resolvedSurfaceTemplateFor("pdp", null)]);
+  ok(live[0].publishedVersionId != null && live[0].body.settings.template === null, `doc_header is live with no template: ${JSON.stringify(live[0].body?.settings)}`);
+  eq(`${live[1].template}/${live[1].source}`, "editorial/theme", "pdp with a live default layout document:");
+  ok((await shopperHtml(a)).includes("grid-cols-[1fr_auto_1fr]"), "the theme's centered header with a live default doc_header");
+  // the founder picks standard: their choice beats the theme
+  await a.run(async () => {
+    const d = await Docs.getDocument("doc_header");
+    await Docs.saveDraft({ id: "doc_header", revision: d.revision, body: { ...d.body, settings: { ...d.body.settings, template: "standard" } }, actor: ACTOR });
+  });
+  await publishDocs(["doc_header"]);
+  ok(!(await shopperHtml(a)).includes("grid-cols-[1fr_auto_1fr]"), "the founder's standard header");
+  await a.run(async () => {
+    const d = await Docs.getDocument("doc_header");
+    await Docs.saveDraft({ id: "doc_header", revision: d.revision, body: { ...d.body, settings: { ...d.body.settings, template: null } }, actor: ACTOR });
+  });
+  await publishDocs(["doc_header"]);
+  ok((await shopperHtml(a)).includes("grid-cols-[1fr_auto_1fr]"), "back to unchosen: the theme's again");
+});
+
 await t("store B (anonymous shopper): no data-theme, no theme CSS and no package surface; B naming A's package id (a row only A holds) renders its base kit", async () => {
   const h = await shopperHtml(b);
   eq(attr(htmlTag(h), "data-theme"), null, "B data-theme:");
@@ -435,7 +473,7 @@ await t("ff_theme-packages off: store A renders its base kit (no data-theme, no 
   eq(attr(htmlTag(h), "data-theme"), null, "killed:");
   eq(attr(htmlTag(h), "data-kit"), "pulse-1", "base kit:");
   ok(!styleOf(h).includes("data-theme") && !h.includes(AURORA.surfaces.hero.bg), "no package CSS");
-  ok(logs.some((l) => l.includes('"evt":"theme_packages_killed"')), "logged");
+  eq(logs.filter((l) => l.includes('"evt":"theme_packages_killed"')).length, 1, "logged once a request:");
   eq(await a.run(() => LP.themePackagesOff()), true, "themePackagesOff:");
   eq(LP.THEMES_OFF_WORDS, "Uploaded themes are turned off by Storeasy right now.", "the words line 1's upload refuses with:");
   await setKill(false);
@@ -447,7 +485,7 @@ await t("a design naming a package with no row renders the base kit, logged them
   const logs = [];
   const h = await shopperHtml(a, { logs });
   eq(attr(htmlTag(h), "data-theme"), null, "missing:");
-  ok(logs.some((l) => l.includes('"evt":"theme_package_missing"') && l.includes('"reason":"not_found"')), `logged: ${logs.join(" | ").slice(0, 300)}`);
+  eq(logs.filter((l) => l.includes('"evt":"theme_package_missing"') && l.includes('"reason":"not_found"')).length, 1, `logged once a request: ${logs.join(" | ").slice(0, 300)}`);
   const lines = [];
   const orig = console.log;
   console.log = (l) => lines.push(String(l));

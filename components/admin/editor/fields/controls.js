@@ -204,13 +204,15 @@ export function SelectControl({ field, value, onChange, issues, owner, context, 
   const notes = notesAt(issues, id);
   const options = field.setting.options || [];
   const known = options.includes(value);
+  // Phase 5 line 2: a layout with no default can stay unchosen (null): the live theme's, then the platform's
+  const unset = field.key === "template" && field.setting.default === null;
   return (
     <div className="min-w-0">
       <Label htmlFor={id} required={field.setting.required}>
         {field.label}
       </Label>
-      <Select id={id} value={known ? value : ""} disabled={readOnly} invalid={blocks(notes)} aria-describedby={described(id, notes)} onChange={(e) => onChange(e.target.value)}>
-        {!known && <option value="">{value == null ? "Choose one" : "Not one of the choices: choose one"}</option>}
+      <Select id={id} value={known ? value : ""} disabled={readOnly} invalid={blocks(notes)} aria-describedby={described(id, notes)} onChange={(e) => onChange(unset && e.target.value === "" ? null : e.target.value)}>
+        {unset ? <option value="">Your theme&rsquo;s layout</option> : !known && <option value="">{value == null ? "Choose one" : "Not one of the choices: choose one"}</option>}
         {options.map((o) => (
           <option key={o} value={o}>
             {choiceWords(context.ownerKey, field.key, o)}
