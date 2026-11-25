@@ -58,7 +58,7 @@ export const READ_CONTROLS = [
   // Phase 2 line 10 (quizzes)
   { path: "components/admin/quizzes/QuizList.js", reason: "the search box and Clear search filter the quizzes already on the page; nothing is sent", marks: 2 },
   { path: "components/admin/quizzes/QuizEditor.js", reason: "Open on the store (the quiz's public page in a new tab) and Back to quizzes / Cancel (a link to the list): navigation only", marks: 2 },
-  { path: "components/admin/quizzes/QuizTry.js", reason: "\"Try it\": the answer radios, Show the picks and Start again score in the page (scoreQuiz) and ask GET /api/admin/quiz?view=try (storefront.read) for the picks; nothing is saved", marks: 3 },
+  { path: "components/admin/quizzes/QuizTry.js", reason: "\"Try it\": each question's radio group (Radix makes the group itself focusable), the answer radios, Show the picks and Start again score in the page (scoreQuiz) and ask GET /api/admin/quiz?view=try (storefront.read) for the picks; nothing is saved", marks: 4 },
 ];
 
 // Reads sent as a non-GET request: { page, method, path, reason }. page is a
