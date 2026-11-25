@@ -3,6 +3,12 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Shell drill: what counts as support writing (on the owner's behalf)
+
+- **Decision:** a support pass counts writes until a new document loads (an init script marks each document's first request), so a `pushState` round trip or a write still in flight is caught; a Next `<Link>` soft navigation hands later writes to the destination page. The pass waits until nothing is pending and the server log stops growing, and must find its own `GET` line in the Next log (the drill refuses to start without `DRILL_LOG_DIR`); `sendBeacon` and keepalive-on-`pagehide`, which Playwright never sees, are caught from that log. `READ_POSTS` rows need a reason, a non-GET method and a path other than the page, and `page` may be a route pattern. Known limit: a raw `pushState` that stays on another path is treated like a soft navigation; a mark moved within one file keeps its count.
+- **Decided by:** Claude
+- **Slice:** fix outside the feature list (Phase 2)
+
 ## 2026-11-25 Editor: archive stays terminal; saved templates stay read-only (on the owner's behalf)
 
 - **Decision:** the editor rebuild (Phase 2 line 6) does not add "bring back an archived page" or "rename/delete a saved template", though the line 6 plan listed them. Archive is terminal by design (no code sets `documents.archived_at` back to NULL, a grep test guards it, and the publish and slug rules rely on it); archived pages are listed read-only, and "make a new page from this one" is the way back. Saved templates live in the retired `cms_templates` table, which only read-only helpers may name; the new templates screen lists them and inserts their sections into a page through `saveDraft`. Both are recorded under Later for a line with its own design.
