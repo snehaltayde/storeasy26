@@ -3,6 +3,15 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Phase 2 lines 6–11: shape of the rest (on the owner's behalf)
+
+- **Schema:** no migrations in lines 6–11 (next free numbers stay tenant 0030, platform 0016).
+- **Permissions:** team hardening in line 8 — the last-owner guard becomes one conditional statement, `role` on a non-member is a 404 (today it adds any platform user to the store), ownership `transfer` is owner-only and one batch, revoking an owner invite needs `team.owner`. Going live needs `storefront.publish`: starting an experiment, and turning a quiz on (or editing or deleting one that is on); staff can still draft, pause and complete. The support-access banner is shown only to signed-in members (line 7). `READ_POSTS` rows may list allowed body `ops`, so the editor's document reads are exempt but `saveDraft` never is.
+- **Scope:** routes no line named are assigned — integrations and billing to line 7, insights to line 9, editor templates and the Publishing page to line 6, sign-in and invite pages to line 11. Settings become sub-pages saving only their own section; old `#hash` links redirect. Quizzes get their own pages under Catalog with a locked slug, and delete is refused while a page uses one. New shadcn parts `toggle-group`, `scroll-area`, `collapsible`, `alert` on the existing `radix-ui`.
+- **Why:** Phase 2 plan, lines 6–11 (`docs/plans/phase-2.md`).
+- **Decided by:** Claude
+- **Slice:** Phase 2
+
 ## 2026-11-25 Media library on the new UI (on the owner's behalf)
 
 - **Permissions and integrity:** no schema change; the library is a GET view mode. Support's write controls are hidden (non-button sections by `roleAllows`, buttons by `RoleGate`); "Where it's used" (`PUT /api/admin/media`, `storefront.read`, writes nothing, tested) is the media `READ_POSTS` row. A delete or alt edit on an id the store doesn't have (another store's included) answers 404 `MEDIA_NOT_FOUND` with no log line or audit row; before, a delete of nothing reported success and wrote a false audit row. There is no force delete in the new UI.
