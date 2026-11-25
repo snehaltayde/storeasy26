@@ -3,6 +3,14 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Offers and bundles on the new UI (on the owner's behalf)
+
+- **Permissions:** no new actions; support gets the four pages read-only (`canWrite:false`), and opening `offers/new` or `bundles/new` as support goes back to the list. "Try it" (`POST /api/admin/offers/simulate`, `offers.read`, writes nothing, tested) is the one non-GET read, listed in `READ_POSTS`; its page key `/admin/offers/[id]` doesn't match real URLs yet, so the shell-drill follow-up adds pattern matching. A bundle's own offer has no switch for any role.
+- **Data rules:** schedules use the store timezone; an invalid saved zone falls back to Asia/Kolkata and Settings refuses unknown zones; a time skipped by DST moves forward, a repeated one takes the earlier instant. Gift and code offers say "counts the whole cart". The picker ignores Enter while results are stale.
+- **UI:** bundles live at `/admin/bundles` under Growth; new shared parts `ConfirmAction` (confirm dialog and unsaved-changes guard) and `BundleCheck`.
+- **Decided by:** Claude
+- **Slice:** Phase 2 line 4
+
 ## 2026-11-25 Dashboard details and the shell drill's role (on the owner's behalf)
 
 - **Permissions:** the dashboard shows the shop domain only with `settings.read`; "Run again" is `RoleGate`d on `sync.run` (staff and support see it disabled with the reason); "Reconnect Shopify" needs `settings.write`. Queue counts are real `COUNT`s, never a capped list; a part the server can't read says "Couldn't check".
