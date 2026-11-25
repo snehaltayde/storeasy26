@@ -353,7 +353,7 @@ await t("rendered: support and operator support (role support) get no write cont
   // an inconsistent can never shows Publish without write
   const odd = renderToStaticMarkup(React.createElement(StudioMod.default, { document: { id: "doc_home", type: "home", label: "Home page" }, can: { write: false, publish: true }, role: "support" }));
   ok(!odd.includes("data-studio-publish"), "publish without write");
-  ok(renderToStaticMarkup(React.createElement(DesignRail, { studio: studioFor("support") })).includes("data-read-control"), "Open the design is a read control");
+  ok(renderToStaticMarkup(React.createElement(DesignRail, { studio: studioFor("support") })).includes("data-studio-design"), "the Design tab renders (its controls: test-studio-tokens)");
 });
 
 await t("source: the studio's writes go through the read-only api and store without storefront.write; the slots get one `studio` prop", async () => {

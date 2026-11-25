@@ -94,7 +94,6 @@ export const READ_CONTROLS = [
   { path: "components/admin/integrations/IntegrationsList.js", reason: "Test asks POST /api/admin/integrations { action: \"test\" } (settings.read): the cheapest provider check, it stores nothing", marks: 1 },
   // Phase 6 step 0: the studio shell
   { path: "components/admin/studio/Studio.js", reason: "the Sections and Design tab buttons only switch the shown rail", marks: 1 },
-  { path: "components/admin/studio/DesignRail.js", reason: "Open the design opens doc_design in the studio (getDocument, a read)", marks: 1 },
   { path: "app/(console)/admin/(authed)/studio/error.js", reason: "Try again re-renders the page (a re-read, no write)", marks: 1 },
   // Phase 2 line 6 (6a): the editor frame, the page list, the tree, templates
   { path: "components/admin/editor/DocumentEditor.js", reason: "the page-list toggle, the phone tabs (Sections, Edit, Preview, and their group, which Radix makes focusable), the tablet preview toggle, the writing view's preview toggle, Earlier versions (listHistory, a document read), \"Edit the page's details\" (a selection) and Try again (getDocument) only show, select or read", marks: 8 },

@@ -30,7 +30,7 @@
 // issues on the brand field and show under the brand group. Choosing a look
 // here changes only the look; applying a kit with its starter brand and
 // words stays with "Apply" on the theme screen (P3-DESIGN).
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Input, Select, Button } from "./parts.js";
 import { Notes } from "./controls.js";
 import {
@@ -78,6 +78,59 @@ export function sameBrand(a, b) {
   return true;
 }
 
+// Phase 6 line 2: one colour token (picker + hex) and one step token
+// (select), shared by BrandControl and the studio's Design tab
+// (components/admin/studio/DesignRail.js). `token` is a BRAND_FIELDS entry;
+// `anchor` is the input's id; onValue gets the new raw value (the hex
+// trimmed). (Not id / onChange: suites that walk the form's elements find
+// the inputs by those props.) Hook-free, so BrandControl calls them as
+// functions: its own element tree still holds every input.
+export function BrandColourInput({ token: b, anchor: bid, value, issues, readOnly, placeholder, onValue: onChange }) {
+  const bnotes = notesAt(issues, bid);
+  const v = String(value ?? "");
+  return (
+    <div className="min-w-0" data-token={b.key}>
+      <label htmlFor={bid} className="mb-1 block text-xs font-medium text-muted-foreground">
+        {b.label}
+      </label>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          aria-label={`${b.label} picker`}
+          value={design.colourOk(v) ? v.toLowerCase() : "#000000"}
+          disabled={readOnly}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-9 w-12 shrink-0 cursor-pointer rounded-md border border-border bg-card outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+        <Input id={bid} mono className="w-28" value={v} disabled={readOnly} invalid={blocks(bnotes) || !design.colourOk(v)} aria-describedby={described(bid, bnotes)} placeholder={placeholder} onChange={(e) => onChange(e.target.value.trim())} />
+      </div>
+      {b.help && <p className="mt-1 text-xs text-muted-foreground">{b.help}</p>}
+      {!design.colourOk(v) && <p className="mt-1 text-xs text-warning-text">A colour is # and six letters or digits, like {placeholder}.</p>}
+      <Notes anchor={bid} notes={bnotes} />
+    </div>
+  );
+}
+
+export function BrandStepSelect({ token: b, anchor: bid, value: v, issues, readOnly, onValue: onChange }) {
+  const bnotes = notesAt(issues, bid);
+  return (
+    <div className="min-w-0" data-token={b.key}>
+      <label htmlFor={bid} className="mb-1 block text-xs font-medium text-muted-foreground">
+        {b.label}
+      </label>
+      <Select id={bid} value={b.options.includes(v) ? v : ""} disabled={readOnly} invalid={blocks(bnotes)} aria-describedby={described(bid, bnotes)} onChange={(e) => onChange(e.target.value)}>
+        {!b.options.includes(v) && <option value="">Not one of the choices: choose one</option>}
+        {b.options.map((o) => (
+          <option key={o} value={o}>
+            {stepWords(o)}
+          </option>
+        ))}
+      </Select>
+      <Notes anchor={bid} notes={bnotes} />
+    </div>
+  );
+}
+
 export function BrandControl({ field, value, onChange, issues, owner = null, readOnly, context = null }) {
   const id = idOf(owner, field.path);
   const notes = notesAt(issues, id);
@@ -92,55 +145,14 @@ export function BrandControl({ field, value, onChange, issues, owner = null, rea
       </p>
       {usingDefault && <p className="text-xs text-muted-foreground">Your store uses the platform's default colours. Go back to your starting colours, or change anything below.</p>}
       <div className="grid gap-3 sm:grid-cols-3">
-        {BRAND_FIELDS.filter((b) => b.kind === "colour").map((b) => {
-          const bid = idOf(owner, `${field.path}.${b.key}`);
-          const bnotes = notesAt(issues, bid);
-          const v = String(values[b.key] ?? "");
-          return (
-            <div key={b.key} className="min-w-0">
-              <label htmlFor={bid} className="mb-1 block text-xs font-medium text-muted-foreground">
-                {b.label}
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  aria-label={`${b.label} picker`}
-                  value={design.colourOk(v) ? v.toLowerCase() : "#000000"}
-                  disabled={readOnly}
-                  onChange={(e) => onChange(design.setToken(value, b.key, e.target.value, start.brand))}
-                  className="h-9 w-12 shrink-0 cursor-pointer rounded-md border border-border bg-card outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                />
-                <Input id={bid} mono className="w-28" value={v} disabled={readOnly} invalid={blocks(bnotes) || !design.colourOk(v)} aria-describedby={described(bid, bnotes)} placeholder={startAccent} onChange={(e) => onChange(design.setToken(value, b.key, e.target.value.trim(), start.brand))} />
-              </div>
-              {b.help && <p className="mt-1 text-xs text-muted-foreground">{b.help}</p>}
-              {!design.colourOk(v) && <p className="mt-1 text-xs text-warning-text">A colour is # and six letters or digits, like {startAccent}.</p>}
-              <Notes anchor={bid} notes={bnotes} />
-            </div>
-          );
-        })}
+        {BRAND_FIELDS.filter((b) => b.kind === "colour").map((b) => (
+          <Fragment key={b.key}>{BrandColourInput({ token: b, anchor: idOf(owner, `${field.path}.${b.key}`), value: values[b.key], issues, readOnly, placeholder: startAccent, onValue: (v) => onChange(design.setToken(value, b.key, v, start.brand)) })}</Fragment>
+        ))}
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        {BRAND_FIELDS.filter((b) => b.kind === "step").map((b) => {
-          const bid = idOf(owner, `${field.path}.${b.key}`);
-          const bnotes = notesAt(issues, bid);
-          const v = values[b.key];
-          return (
-            <div key={b.key} className="min-w-0">
-              <label htmlFor={bid} className="mb-1 block text-xs font-medium text-muted-foreground">
-                {b.label}
-              </label>
-              <Select id={bid} value={b.options.includes(v) ? v : ""} disabled={readOnly} invalid={blocks(bnotes)} aria-describedby={described(bid, bnotes)} onChange={(e) => onChange(design.setToken(value, b.key, e.target.value, start.brand))}>
-                {!b.options.includes(v) && <option value="">Not one of the choices: choose one</option>}
-                {b.options.map((o) => (
-                  <option key={o} value={o}>
-                    {stepWords(o)}
-                  </option>
-                ))}
-              </Select>
-              <Notes anchor={bid} notes={bnotes} />
-            </div>
-          );
-        })}
+        {BRAND_FIELDS.filter((b) => b.kind === "step").map((b) => (
+          <Fragment key={b.key}>{BrandStepSelect({ token: b, anchor: idOf(owner, `${field.path}.${b.key}`), value: values[b.key], issues, readOnly, onValue: (v) => onChange(design.setToken(value, b.key, v, start.brand)) })}</Fragment>
+        ))}
       </div>
       {!atStart && (
         <Button size="sm" variant="ghost" disabled={readOnly} data-design-reset="" onClick={() => onChange(design.reset(start.brand))}>

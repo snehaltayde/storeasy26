@@ -23,6 +23,7 @@ import { applyDesignToggle, createPreviewController, showDesignFor, WORDS } from
 //   onPick(pick), onView(view)
 //   fill         (Phase 6 studio) the pane takes its parent's full height
 //                instead of 70vh
+//   showDesign   (Phase 6 studio) true turns "Show design changes" on, once
 //   onFrame(post) (Phase 6 studio) called once on mount with a poster bound
 //                to this frame and this origin: post(msg) → true when it was
 //                handed to the frame, false when there is no frame (or it is
@@ -47,7 +48,7 @@ export const DEVICES = Object.freeze([
   { id: "desktop", width: 1280, words: "Desktop", icon: Monitor },
 ]);
 
-export default function PreviewPane({ api, documentId, path, ack = null, problem = null, select = null, adding = false, hidden = false, label = "", retry = 0, fill = false, onPick, onView, onFrame }) {
+export default function PreviewPane({ api, documentId, path, ack = null, problem = null, select = null, adding = false, hidden = false, label = "", retry = 0, fill = false, showDesign = false, onPick, onView, onFrame }) {
   const frameRef = useRef(null);
   const ctlRef = useRef(null);
   const pathRef = useRef(path);
@@ -190,6 +191,16 @@ export default function PreviewPane({ api, documentId, path, ack = null, problem
     if (sid) await api.setShowDesign(sid, on);
     ctlRef.current?.pathChanged();
   };
+  // Phase 6 line 2: the studio turns "Show design changes" on once a token is
+  // touched. No reload: the frame already draws the tokens (storeasy:tokens),
+  // and the next reload brings the saved design draft.
+  useEffect(() => {
+    if (!showDesign || designRef.current) return;
+    designRef.current = true;
+    setDesign(true);
+    const sid = ctlRef.current?.view().sid;
+    if (sid) api.setShowDesign(sid, true);
+  }, [showDesign]); // eslint-disable-line react-hooks/exhaustive-deps
   const reload = () => (failed ? ctlRef.current?.retry() : ctlRef.current?.pathChanged());
   const openHref = () => {
     try {

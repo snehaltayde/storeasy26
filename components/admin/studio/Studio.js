@@ -238,6 +238,7 @@ export default function Studio({ document: entry, note = null, can = {}, role = 
       preview={
         <PreviewPane
           fill
+          showDesign={history.touched.includes("doc_design")}
           api={api}
           documentId={state?.id || entry?.id}
           path={framePathFor(state ? { type: state.type, body: state.body, slug: state.document?.slug } : entry)}

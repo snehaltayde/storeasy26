@@ -15,6 +15,12 @@
 //                                     (redo) as a normal draft save, never a
 //                                     publish; neither records a new step
 //     canUndo(), canRedo() → boolean
+//     onStep(docId, fn) → unsubscribe  (Phase 6 line 2) a document kept in
+//                                     its own store outside the studio's
+//                                     (doc_design, DesignRail.js) applies its
+//                                     own steps: undo()/redo() call
+//                                     fn(step, "undo"|"redo") for that docId
+//                                     before returning the step
 //     subscribe(fn) → unsubscribe     fn() after every change
 //     getSnapshot() → {touched, undo, redo}  (counts; stable between changes)
 //
@@ -40,7 +46,14 @@ export function createStudioModel({ limit = HISTORY_LIMIT } = {}) {
   let past = [];
   let future = [];
   const listeners = new Set();
+  const appliers = new Map();
   let snap = null;
+  const applied = (step, dir) => {
+    const out = { docId: step.docId, before: copy(step.before), after: copy(step.after) };
+    const fn = appliers.get(step.docId);
+    if (fn) fn({ docId: out.docId, before: copy(out.before), after: copy(out.after) }, dir);
+    return out;
+  };
   const changed = () => {
     snap = null;
     for (const fn of [...listeners]) fn();
@@ -65,7 +78,7 @@ export function createStudioModel({ limit = HISTORY_LIMIT } = {}) {
     past = past.slice(0, -1);
     future = [...future, step];
     changed();
-    return { docId: step.docId, before: copy(step.before), after: copy(step.after) };
+    return applied(step, "undo");
   };
   const redo = () => {
     const step = future.at(-1);
@@ -73,7 +86,7 @@ export function createStudioModel({ limit = HISTORY_LIMIT } = {}) {
     future = future.slice(0, -1);
     past = [...past, step];
     changed();
-    return { docId: step.docId, before: copy(step.before), after: copy(step.after) };
+    return applied(step, "redo");
   };
 
   return {
@@ -85,6 +98,11 @@ export function createStudioModel({ limit = HISTORY_LIMIT } = {}) {
     redo,
     canUndo: () => past.length > 0,
     canRedo: () => future.length > 0,
+    onStep(docId, fn) {
+      if (typeof docId !== "string" || !docId || typeof fn !== "function") return () => {};
+      appliers.set(docId, fn);
+      return () => appliers.get(docId) === fn && appliers.delete(docId);
+    },
     subscribe(fn) {
       listeners.add(fn);
       return () => listeners.delete(fn);

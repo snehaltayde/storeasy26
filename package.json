@@ -149,6 +149,7 @@
     "test:doc-changes": "node scripts/test-doc-changes.js",
     "test:preview-frame": "node scripts/test-preview-frame.js",
     "test:studio": "node scripts/test-studio.js",
+    "test:studio-tokens": "node scripts/test-studio-tokens.js",
     "test:editor-store": "node scripts/test-editor-store.js",
     "test:editor-inspector": "node scripts/test-editor-inspector.js",
     "test:editor-tree": "node scripts/test-editor-tree.js",

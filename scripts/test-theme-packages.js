@@ -465,7 +465,7 @@ await t("support (least trusted) and operator support: reads carry only listed k
     for (const p of list.body.packages) eq(Object.keys(p).sort().join(","), want, `${caller} package keys:`);
     ok(!list.text.includes(B_CANARY), `${caller}: no B canary in the list`);
     const detail = await call(caller, "themes/[id]", "GET", { params: { id: (await call("owner", "themes", "GET")).body.packages[0].id } });
-    eq(Object.keys(detail.body).sort().join(","), "content,ok,package", `${caller} detail keys:`);
+    eq(Object.keys(detail.body).sort().join(","), "content,ok,package,tokens", `${caller} detail keys:`);
     ok(!detail.text.includes(B_CANARY), `${caller}: no B canary in a detail`);
     const other = await call(caller, "themes/[id]", "GET", { params: { id: bId } });
     eq(other.status, 404, `${caller} B's id on A:`);

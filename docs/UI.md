@@ -309,3 +309,14 @@ Each Phase 3 line fills only its own sub-heading.
 - **Upload refusal:** with issues, the title says what to do ("The file wasn't uploaded. Fix these N problems and upload it again."); each issue is its sentence, then its place as a muted mono line, in a list that scrolls past 256px. Without issues, the route's sentence is the title. "Your live theme was archived" is a destructive `Alert`.
 - **Theme page:** the facts as one sentence (no middle dots), the version and colour codes in mono, the actions wrap and sit right from 640px; "Use this theme" matches the other actions' size there.
 - **Loading:** both pages have a `loading.js` shaped like the page. Section titles are 1.125rem semibold.
+
+## Merchant screens: Studio (Phase 6)
+
+### Studio: design (line 2)
+- **Design tab** (left rail): doc_design's colours, type and spacing in three groups: "Colours" (accent, background, text: a colour picker plus a hex field each, DesignForm's `BrandColourInput`), "Type" (text size) and "Spacing and shape" (space between sections, corners, button shape: DesignForm's `BrandStepSelect`). Only `validateBrand`'s options; a half-typed hex shows the field's hint and isn't posted or saved.
+- **Instant:** each change draws in the preview at once (`storeasy:tokens`), then saves as a draft (doc_design's own store, 700 ms); "Show design changes" turns on for the session. Undo and redo in the top bar take token changes back too.
+- **Theme line:** an uploaded theme reads "Theme: Aurora 1.2.0. Your colours, type and spacing go on top of it."; a built-in look "Your colours, type and spacing go on top of your look." Package surfaces and styles aren't editable here.
+- **Readability:** under the groups, "Every colour pair is easy to read." or each failing pair as a bordered item in plain words with a "Use #xxxxxx" outline button (`suggestFix`); a blocker adds "Fix this before you publish: shoppers couldn't read it." in the destructive colour. The server refuses the same publish.
+- **Reset:** a ghost button, shown when the tokens differ: "Reset to the theme's" (an uploaded theme's tokens) or "Go back to your starting colours" (the store's starting brand).
+- **Roles:** support and operator support see every value with disabled inputs and "You can see your design here but not change it."; no Reset, no fix buttons. Staff draft; Publish is line 1's dialog (doc_design pre-ticked when touched).
+- Needs the design pass (`ui-designer`): the group spacing, the readability list and the theme line.
