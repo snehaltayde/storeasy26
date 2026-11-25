@@ -149,6 +149,7 @@ async function platformStores(drill) {
   await until(async () => searchParam(page, "status") === "suspended");
   drill.check(searchParam(page, "status") === "suspended", "the Status filter lands in the URL", page.url());
   await page.locator("#stores-status").selectOption("");
+  await until(async () => !searchParam(page, "status"));
   // the checkbox mirrors the URL, so it flips once the list's address changes: click, then wait for it
   await page.locator("#stores-attention").click();
   await until(async () => searchParam(page, "attention") === "1" && (await page.locator("#stores-attention").isChecked()));

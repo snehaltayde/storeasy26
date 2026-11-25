@@ -90,7 +90,7 @@ t("no source holds data-legacy", () =>
   files.filter((f) => f !== SELF && LEGACY.test(src.get(f))).map((f) => `${f} holds data-legacy`));
 
 t("the old parts, the old operator console and the old/new route switch are gone", () =>
-  ["components/console", "app/(console)/platform/legacy", "lib/admin/new-ui-routes.js"].filter((p) => existsSync(join(ROOT, p)) || files.some((f) => f.startsWith(`${p}/`))).map((p) => `${p} still exists`));
+  ["components/console", "app/(console)/platform/legacy", "lib/admin/new-ui-routes.js", ...["BillingPanel", "CaseStudiesPanel", "GrowthOpsPanels", "IncidentsPanel", "OverviewPanel", "PlatformAdmin", "PrivacyOpsPanel", "ProvisionRunsPanel", "QueuesPanel", "TenantDetail", "ThemesPanel"].map((n) => `components/platform/${n}.js`)].filter((p) => files.some((f) => f === p || f.startsWith(`${p}/`))).map((p) => `${p} still exists`));
 
 console.log(failed ? `\n${failed} failure(s)` : "\nno old console UI in either console");
 process.exit(failed ? 1 : 0);
