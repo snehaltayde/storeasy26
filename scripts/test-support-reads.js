@@ -751,6 +751,27 @@ await t("P5-A archived themes: support and operator support see only A's archive
   }
 });
 
+// P7-B: a flagship's detail page is read-only for support. The page harness
+// returns props, not markup, so the controls (ApplyThemeDialog and the Archive
+// dialog, both gated on the role prop by RoleGate) are checked through what the
+// page hands them: the support role, no Archive for a flagship, and no
+// use/update/archive action strings anywhere in what it sends the browser.
+await t("P7-B flagship detail (/admin/themes/bloom): support and operator support render it read-only", async () => {
+  const own = await pages.run(pageRel("themes/[id]"), { cookies: cookies.owner, params: { id: "bloom" } });
+  ok(/\brole owner\b/.test(own.text), "positive control: the owner's page is handed role owner");
+  for (const caller of ["support", "operator-support-entry"]) {
+    const run = await pages.run(pageRel("themes/[id]"), { cookies: cookies[caller], params: { id: "bloom" } });
+    ok(!run.error && !run.redirect && !run.notFound && run.props.length, `${caller} flagship detail renders (200)`);
+    ok(run.text.includes("Bloom"), `${caller} detail names Bloom`);
+    ok(/\brole support\b/.test(run.text) && !/\brole (owner|admin|staff)\b/.test(run.text), `${caller} page is handed the support role`);
+    const all = `${run.text}\n${JSON.stringify(run.props)}`;
+    ok(!/data-themes-action["':= \\]*(use|update|archive)\b/.test(all), `${caller} has no use, update or archive control`);
+    ok(!/Archive theme|Use this theme|Update to /.test(all), `${caller} has no Archive, Use or Update words`);
+    const actions = [...all.matchAll(/data-themes-action["':= \\]*([a-z-]+)/g)].map((m) => m[1]);
+    ok(actions.every((x) => ["download", "details", "flagship-preview"].includes(x)), `${caller} only read-controls: ${actions.join(",")}`);
+  }
+});
+
 // P6-A: store B's real document id, asked of store A's studio, opens home with the missing note
 await t("studio page: store B's document id opens A's home with the missing note and no B text", async () => {
   ok(CTX.bDocId && CTX.bDocId !== CTX.docId, "fixture bDocId");

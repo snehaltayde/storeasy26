@@ -45,10 +45,12 @@ export const GET = tenantHandler(async (request) => {
 });
 
 export const POST = tenantHandler(async (request) => {
+  let actor = null;
   try {
     // requireAdmin covers the CSRF origin check for write actions
     const auth = await requireAdmin(request, "storefront.write");
     if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+    actor = auth.actor;
     const body = await request.json().catch(() => undefined);
     const r = await saveBrandStep(body, auth.actor);
     slog("brand_step_saved", { skipped: r.skipped, theme: r.brandStep?.themeId ?? null, palette: r.brandStep?.paletteId ?? null, design: r.design?.revision ?? null, live_now: r.liveNow, after_publish: r.afterPublish });
@@ -60,6 +62,15 @@ export const POST = tenantHandler(async (request) => {
     }); // best-effort, never throws
     return NextResponse.json(r);
   } catch (e) {
+    // a half-finished save (the design draft changed, a later step failed) is
+    // audited too; a failing audit never hides the original error
+    if (e?.partial?.partial) {
+      try {
+        await audit({ actor, action: "storefront.write", resource: "brand-step", diff: { partial: true, design: e.partial.design, layouts: e.partial.layouts ?? [] } });
+      } catch (ae) {
+        slog("brand_step_audit_failed", { error: String(ae?.message || ae).slice(0, 200) });
+      }
+    }
     if (e?.expose) return NextResponse.json(refusal(e), { status: e.status });
     if (e?.issues) return NextResponse.json(validationBody(e.issues), { status: 422 });
     const infra = infraResponse(e, { route: ROUTE, doing: "save" });

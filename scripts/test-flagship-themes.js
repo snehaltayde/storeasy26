@@ -48,8 +48,22 @@ export async function cookies() {
   return { get: (n) => (Object.hasOwn(r.cookies, n) ? { name: n, value: r.cookies[n] } : undefined) };
 }
 `);
+// P7-A: the Brand step's own import of the documents service answers through a
+// wrapper whose saveDraft can be made to refuse (globalThis.__failSaveDraft = doc id)
+const DOCS_REAL = pathToFileURL(join(ROOT, "lib/documents/service.js")).href;
+const DOCS_WRAP =
+  "data:text/javascript," +
+  encodeURIComponent(`
+import * as R from ${JSON.stringify(DOCS_REAL)};
+export * from ${JSON.stringify(DOCS_REAL)};
+export async function saveDraft(a) {
+  if (globalThis.__failSaveDraft && a?.id === globalThis.__failSaveDraft) throw new R.DocumentError(409, "DOCUMENT_CHANGED", "Someone else changed this just now. Reload and try again.");
+  return R.saveDraft(a);
+}
+`);
 registerHooks({
   resolve(spec, ctx, next) {
+    if (spec === "../documents/service.js" && ctx.parentURL?.endsWith("/lib/first-run/brand-step.js")) return { url: DOCS_WRAP, shortCircuit: true, format: "module" };
     if (spec === "next/headers") return { url: HEADERS_STUB, shortCircuit: true, format: "module" };
     if (spec === "next/navigation") return next("next/navigation.js", ctx);
     return next(spec, ctx);
@@ -642,6 +656,25 @@ await t("the brand-step route answers refusals as 409 in plain words: a store wi
   } finally {
     await old.cleanup?.().catch(() => {});
   }
+});
+
+await t("P7-A: a layout write refused after the design draft saved is audited once as partial, and the answer is the 409", async () => {
+  const before = (await auditRows()).filter((x) => x.resource === "brand-step").length;
+  // the layout draft's save refuses with a 409 after the design draft is saved
+  globalThis.__failSaveDraft = "doc_footer";
+  let r;
+  try {
+    const cur = await design();
+    r = await call("owner", "brand-step", "POST", { body: { themeId: "loom", paletteId: null, revision: cur.revision } });
+  } finally {
+    globalThis.__failSaveDraft = null;
+  }
+  eq(r.status, 409, r.text.slice(0, 300));
+  const rows = (await auditRows()).filter((x) => x.resource === "brand-step");
+  eq(rows.length - before, 1, "one brand-step audit row:");
+  const diff = typeof rows[0].diff === "string" ? JSON.parse(rows[0].diff) : rows[0].diff;
+  eq(diff.partial, true, "partial:");
+  ok(diff.design?.id, "design in the audit");
 });
 
 await t("no network", () => eq(network.calls?.length ?? 0, 0, "no network:"));
