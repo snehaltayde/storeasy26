@@ -34,10 +34,14 @@ export function MediaDetails({ item, role, onUpdated, onRemoved }) {
   const [usage, setUsage] = useState(null); // { status: "loading" | "ready" | "failed", lines }
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Copy URL says how it went next to the button, not in a toast: a toast
+  // brings its own Dismiss button, which support's stray-control rule counts
+  const [copied, setCopied] = useState(null); // null | "ok" | "failed"
 
   useEffect(() => {
     setAlt(item.alt || "");
     setUsage(null);
+    setCopied(null);
   }, [item.id, item.alt]);
 
   async function loadUsage() {
@@ -81,9 +85,9 @@ export function MediaDetails({ item, role, onUpdated, onRemoved }) {
   async function copyUrl() {
     try {
       await navigator.clipboard.writeText(new URL(item.url, window.location.origin).href);
-      toast.success(MEDIA_WORDS.copied);
+      setCopied("ok");
     } catch {
-      toast.error(MEDIA_WORDS.copyFailed);
+      setCopied("failed");
     }
   }
 
@@ -126,6 +130,9 @@ export function MediaDetails({ item, role, onUpdated, onRemoved }) {
             <ExternalLink aria-hidden /> Open full size
           </a>
         </Button>
+        <p aria-live="polite" data-media="copy-status" className={copied === "failed" ? "w-full text-xs text-danger" : "w-full text-xs text-muted-foreground"}>
+          {copied === "ok" ? MEDIA_WORDS.copied : copied === "failed" ? MEDIA_WORDS.copyFailed : null}
+        </p>
       </div>
 
       <section aria-labelledby="media-alt" className="space-y-2">
