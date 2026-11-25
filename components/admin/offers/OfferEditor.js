@@ -154,7 +154,7 @@ export function OfferEditor({ existing = null, offers = [], names = {}, currency
     }
   }
 
-  const targetLabel = form.target ? (form.target.kind === "tag" || form.target.kind === "productType" ? form.target.value : allNames[form.target.value] || form.target.label || (form.target.kind === "collection" ? "The chosen collection" : "The chosen product")) : null;
+  const targetLabel = form.target ? (form.target.kind === "tag" || form.target.kind === "productType" ? form.target.value : (form.target.kind === "collection" ? allNames[`collection:${form.target.value}`] || form.target.label || "The chosen collection" : allNames[form.target.value] || form.target.label || "The chosen product")) : null;
   const primaryLabel = !existing ? "Start offer" : live ? "Update live offer" : "Save changes";
   const title = existing ? existing.label : "New offer";
   const setTier = (i, patch) => set({ tiers: form.tiers.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
@@ -225,7 +225,7 @@ export function OfferEditor({ existing = null, offers = [], names = {}, currency
                   set={set}
                   disabled={ro}
                   targetLabel={targetLabel}
-                  onPicked={(value, label) => setPicked((p) => ({ ...p, [value]: label }))}
+                  onPicked={(value, label) => setPicked((p) => ({ ...p, [form.choice === "collection" ? `collection:${value}` : value]: label }))}
                   options={targetOptions}
                   optionsError={optionsError}
                   onRetry={loadTargetOptions}

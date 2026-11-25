@@ -3,10 +3,12 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { offerTargetOptions, storeCurrency } from "@/lib/offers/catalog";
 import { tenantHandler } from "@/lib/tenant-request";
 
-// The store's tags and product types, for the offer form's "All products
-// with a tag" and "All products of one type" pickers (COM-03), so a founder
-// picks one instead of typing it. GET → { ok, tags, types, currency }, each
-// option { value, count, maxPrice }. Read-only.
+// The store's tags, product types and collections, for the offer form's
+// "Products with a tag", "Products of one type" (COM-03) and "Products in a
+// collection" (Phase 8 line 5) pickers, so a founder picks one instead of
+// typing it. GET → { ok, tags, types, collections, currency }; each option is
+// { value, count, maxPrice }, and a collection's also has label (its title;
+// value is its handle). Only this store's synced collections. Read-only.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 

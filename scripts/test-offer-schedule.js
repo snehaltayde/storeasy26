@@ -52,13 +52,13 @@ const eq = (a, b, m = "") => {
 };
 
 // ---- the stores --------------------------------------------------------------------
-// A: 8 products (₹100 × n). "summer-edit" holds 1–4, "gym-kit" 5–6, 7–8 are in
-// no collection. B: its own collection "only-b" (a handle A does not have).
+// A: 8 products (₹100 × n). "summer-edit" holds 1–4, "gym-kit" 4–6 (product
+// 4 is in both), 7–8 are in no collection. B: its own collection "only-b" (a handle A does not have).
 const PID = (n) => `gid://shopify/Product/${9100 + n}`;
 const VID = (n) => `gid://shopify/ProductVariant/${9100 + n}1`;
 const A_COLLECTIONS = [
   { handle: "summer-edit", title: "Summer Edit", productIds: [1, 2, 3, 4].map(PID) },
-  { handle: "gym-kit", title: "Gym Kit", productIds: [5, 6].map(PID) },
+  { handle: "gym-kit", title: "Gym Kit", productIds: [4, 5, 6].map(PID) },
 ];
 const S = await H.makeRoleStore({
   name: "osched",
@@ -176,6 +176,50 @@ await t("anonymous: the bundle page and card before, during and after its window
   for (const x of [before, during, after]) await a.run(() => B.deleteBundle(x.id));
 });
 
+await t("review fix: a scheduled bundle whose offer row drifted stays hidden (its own window decides first)", async () => {
+  const x = await a.run(() => B.createBundle(bundleInput({ title: "Drift pair", starts_at: later(3_600_000) })));
+  await raw(a, "UPDATE offers SET starts_at = NULL WHERE id = ?", [`bundle-${x.id}`]);
+  const m = (await a.run(() => BR.bundlesByIds([x.id]))).get(x.id);
+  eq([m.state, m.reasons[0]?.kind], ["scheduled", "scheduled"], "hidden, not a shown not_ready");
+  eq(await a.run(() => B.getBundle(x.slug)), null, "its page is not found");
+  await a.run(() => B.deleteBundle(x.id));
+});
+
+await t("review fix: the bundle row and its offer row are written in one batch; a failed offer write changes neither", async () => {
+  const x = await a.run(() => B.createBundle(bundleInput({ title: "Atomic pair", starts_at: S0, ends_at: E0 })));
+  const rows = async () => [
+    (await raw(a, "SELECT bundle_price, starts_at, ends_at, updated_at FROM bundles WHERE id = ?", [x.id])).rows[0],
+    (await raw(a, "SELECT config, starts_at, ends_at, enabled FROM offers WHERE id = ?", [`bundle-${x.id}`])).rows[0],
+  ];
+  const before = JSON.stringify(await rows());
+  await raw(a, `CREATE TRIGGER osched_fail BEFORE UPDATE ON offers WHEN NEW.id = 'bundle-${x.id}' BEGIN SELECT RAISE(ABORT, 'osched forced failure'); END`);
+  let err = null;
+  await a.run(() => B.upsertBundle({ id: x.id, title: "Atomic pair", items: bundleInput().items, bundle_price: 230, starts_at: null, ends_at: null })).catch((e) => (err = e));
+  ok(/forced failure/.test(String(err?.message || err?.cause?.message || err)), `the offer write failed (${err?.message})`);
+  eq(JSON.stringify(await rows()), before, "neither the bundle row nor the offer row changed");
+  err = null;
+  await a.run(() => B.setBundleEnabled(x.id, false)).catch((e) => (err = e));
+  ok(err, "turning it off fails too");
+  eq(JSON.stringify(await rows()), before, "still neither row changed");
+  await raw(a, "DROP TRIGGER osched_fail");
+  await raw(a, `CREATE TRIGGER osched_fail_ins BEFORE INSERT ON offers WHEN NEW.label = 'Atomic new' BEGIN SELECT RAISE(ABORT, 'osched forced failure'); END`);
+  err = null;
+  await a.run(() => B.createBundle(bundleInput({ title: "Atomic new", starts_at: S0 }))).catch((e) => (err = e));
+  ok(err, "a new bundle whose offer write fails is refused");
+  eq((await raw(a, "SELECT count(*) AS n FROM bundles WHERE title = 'Atomic new'")).rows[0].n, 0, "and no bundle row was left");
+  await raw(a, "DROP TRIGGER osched_fail_ins");
+  await a.run(() => B.deleteBundle(x.id));
+  eq((await raw(a, "SELECT count(*) AS n FROM offers WHERE id = ?", [`bundle-${x.id}`])).rows[0].n, 0, "delete takes both rows");
+});
+
+await t("a scheduled bundle's publish-check line reads its start in the store's time zone", async () => {
+  const { stateLine } = await import("../lib/commerce/bundle-words.js");
+  const line = stateLine("scheduled", [{ kind: "scheduled", phase: "upcoming", starts_at: S0 }], { timeZone: "Asia/Kolkata" });
+  ok(/1 Dec.*10:00/.test(line) && !/UTC/.test(line), line);
+  const checks = readFileSync(join(ROOT, "lib/documents/checks.js"), "utf8");
+  ok(/scheduled: BUNDLE_SCHEDULED/.test(checks) && /timeZone:/.test(checks), "checks.js maps scheduled to its own code and passes the store's time zone");
+});
+
 // ---- 2. collection offers ----------------------------------------------------------------
 await t("cart rows carry this store's collection handles; matchesTarget uses them", async () => {
   const cartId = `osched-rows-${Date.now()}`;
@@ -211,6 +255,26 @@ await t("store B's collection handle never matches on A: refused on save, and a 
   await raw(a, "DELETE FROM offers WHERE id = 'tiered-only-b'");
 });
 
+await t("a collection offer next to a bundle offer: the bundle claims its lines first, the collection offer the rest", async () => {
+  const x = await a.run(() => B.createBundle(bundleInput({ title: "Beside pair" })));
+  await a.run(() => O.upsertOffer({ offer: tier("tiered-beside", "summer-edit") }));
+  const cartId = `osched-beside-${Date.now()}`;
+  await a.run(async () => {
+    await createCart(cartId);
+    await addItem(cartId, VID(1), 1);
+    await addItem(cartId, VID(2), 1);
+    await addItem(cartId, VID(3), 2);
+  });
+  const cart = await a.run(() => getCart(cartId));
+  eq(cart.appliedOffers.map((o) => o.id).sort(), [`bundle-${x.id}`, "tiered-beside"].sort(), "both apply");
+  const ld = (v) => cart.lineDiscounts?.[v] ?? null;
+  // the bundle (₹300 for ₹250) on 1 + 2; 10% of 2 × ₹300 on product 3 only
+  eq(cart.discountTotal, 50 + 60, "₹50 bundle saving + ₹60 tier on product 3");
+  if (ld(VID(3)) != null) eq(ld(VID(3)), 60, "product 3's discount");
+  await a.run(() => O.deleteOffer("tiered-beside"));
+  await a.run(() => B.deleteBundle(x.id));
+});
+
 await t("the collection note: titles only, while live; never targets or rules", async () => {
   await a.run(() => O.upsertOffer({ offer: { ...tier("tiered-note", "summer-edit"), title: "Buy 2+, get 10% off" } }));
   await a.run(() => O.upsertOffer({ offer: tier("tiered-gym", "gym-kit") }));
@@ -224,12 +288,12 @@ await t("the collection note: titles only, while live; never targets or rules", 
 
 await t("console words, names, picker options and examples for a collection offer", async () => {
   const names = await a.run(() => offerTargetNames([tier("x", "summer-edit")]));
-  eq(names, { "summer-edit": "Summer Edit" }, "names");
+  eq(names, { "collection:summer-edit": "Summer Edit" }, "names, kept apart from product handles");
   eq(offerSentence({ ...tier("x", "summer-edit"), tiers: [{ minQty: 2, percent: 10 }] }, { names }), "Buy 2+ from Summer Edit, get 10% off", "TIERED sentence");
   eq(offerSentence({ id: "x", type: "BXGY", scope: "line", target: { kind: "collection", value: "summer-edit" }, buy: 2, free: 1 }, { names }), "Buy 2 from Summer Edit, get 1 free", "BXGY sentence");
   eq(defaultOfferTitle(tier("x", "summer-edit"), { names }), "Buy 2+, save more", "default title names no target");
   const opts = await a.run(() => offerTargetOptions());
-  eq(opts.collections.map((c) => [c.value, c.label, c.count, c.maxPrice]), [["gym-kit", "Gym Kit", 2, 600], ["summer-edit", "Summer Edit", 4, 400]], "picker options");
+  eq(opts.collections.map((c) => [c.value, c.label, c.count, c.maxPrice]), [["gym-kit", "Gym Kit", 3, 600], ["summer-edit", "Summer Edit", 4, 400]], "picker options");
   const cat = await a.run(() => exampleCatalog(tier("x", "summer-edit")));
   eq(cat.map((r) => r.variantId).sort(), [1, 2, 3, 4].map(VID).sort(), "the simulator's example carts come from the collection");
   const ex = offerExamples(tier("x", "summer-edit"), cat);
@@ -254,7 +318,7 @@ await t("brute force: 500 random carts; only in-collection lines discounted; com
     x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
     return ((x ^ (x >>> 14)) >>> 0) % n;
   };
-  const mixed = { both: 0 };
+  const mixed = { both: 0, overlap: 0 };
   const line = (c, quantity) => ({ variantId: c.variantId, productId: c.productId, handle: c.handle, title: c.title, price: c.price, currency: "INR", quantity, tags: c.tags, productType: c.productType, collections: c.collections });
   let nudged = 0;
   for (let k = 0; k < 500; k++) {
@@ -273,12 +337,18 @@ await t("brute force: 500 random carts; only in-collection lines discounted; com
     const summerQty = items.filter((i) => i.collections.includes("summer-edit")).reduce((s, i) => s + i.quantity, 0);
     // each collection's lines get exactly their own offer's discount: the
     // tier's percent on Summer Edit lines, what the Gym Kit offer alone gives
+    // product 4 is in both: the tier (listed first) claims it once it applies,
+    // otherwise the Gym Kit offer may
     const pctNow = summerQty >= 4 ? 20 : summerQty >= 2 ? 10 : 0;
-    const gymOnly = evaluateOffers(items, { offers: [offers[1]] });
+    const gymOnly = evaluateOffers(pctNow ? items.filter((i) => !i.collections.includes("summer-edit")) : items, { offers: [offers[1]] });
     for (const i of items) {
       const d = result.lineDiscounts[i.variantId] || 0;
-      if (i.collections.includes("summer-edit")) eq(d, Math.round((i.price * i.quantity * pctNow) / 100), `cart ${k}: ${i.handle} (summer) discount`);
-      else if (i.collections.includes("gym-kit")) eq(d, gymOnly.lineDiscounts[i.variantId] || 0, `cart ${k}: ${i.handle} (gym) discount`);
+      const summer = i.collections.includes("summer-edit");
+      const gym = i.collections.includes("gym-kit");
+      if (summer && pctNow) eq(d, Math.round((i.price * i.quantity * pctNow) / 100), `cart ${k}: ${i.handle} (summer) discount`);
+      else if (gym) eq(d, gymOnly.lineDiscounts[i.variantId] || 0, `cart ${k}: ${i.handle} (gym) discount`);
+      else if (summer) eq(d, 0, `cart ${k}: ${i.handle} (summer, below the tier) discount`);
+      if (summer && gym) mixed.overlap++;
     }
     const progress = offerProgress(items, { offers, result });
     const nudge = progress.nudges.find((n) => n.kind === "tier" && n.id === "tiered-bf");
@@ -302,7 +372,7 @@ await t("brute force: 500 random carts; only in-collection lines discounted; com
     ok(proof.appliedOffers.some((o) => o.id === "tiered-bf" && o.label === `Buy 2+, save more · ${pct}% off`), `cart ${k}: the ${pct}% tier applies after adding ${nudge.add}`);
     for (const i of done) if (i.collections.includes("summer-edit")) eq(proof.lineDiscounts[i.variantId] || 0, Math.round((i.price * i.quantity * pct) / 100), `cart ${k}: ${i.handle} discount`);
   }
-  ok(nudged > 100 && mixed.both > 150, `enough nudged (${nudged}) and mixed in/out-of-collection (${mixed.both}) carts to mean something`);
+  ok(nudged > 100 && mixed.both > 150 && mixed.overlap > 50, `enough nudged (${nudged}), mixed in/out-of-collection (${mixed.both}) and two-collection-product (${mixed.overlap}) carts to mean something`);
 });
 
 // ---- 4. routes -------------------------------------------------------------------------
