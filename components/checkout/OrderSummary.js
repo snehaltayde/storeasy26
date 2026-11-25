@@ -4,7 +4,9 @@
 // Stateless: it shows the cart and the shipping CheckoutFlow priced.
 import { formatMoney } from "@/lib/format";
 
-export default function OrderSummary({ cart, shipping, grandTotal }) {
+// Phase 8 line 2: `paymentDiscount` is the quote's prepaid discount, shown when
+// paying online is the chosen method.
+export default function OrderSummary({ cart, shipping, grandTotal, paymentDiscount = 0 }) {
   return (
     <aside className="h-fit rounded-sf-card border border-sf-border p-5 lg:sticky lg:top-6">
       <h3 className="mb-3 text-sm font-bold">Order summary</h3>
@@ -27,6 +29,12 @@ export default function OrderSummary({ cart, shipping, grandTotal }) {
             <span className="font-medium">FREE</span>
           </div>
         ))}
+        {paymentDiscount > 0 && (
+          <div className="flex justify-between text-sf-accent-text">
+            <span>Paying online</span>
+            <span className="font-medium">−{formatMoney(paymentDiscount, cart.currency)}</span>
+          </div>
+        )}
         <div className="flex justify-between">
           <span className="text-sf-text-subtle">
             Shipping
@@ -43,9 +51,9 @@ export default function OrderSummary({ cart, shipping, grandTotal }) {
         <span className="font-semibold">Total</span>
         <span className="text-lg font-bold">{formatMoney(grandTotal, cart.currency)}</span>
       </div>
-      {cart.discountTotal > 0 && (
+      {cart.discountTotal + paymentDiscount > 0 && (
         <p className="mt-1 text-right text-xs font-semibold text-sf-accent-text">
-          You save {formatMoney(cart.discountTotal, cart.currency)}
+          You save {formatMoney(cart.discountTotal + paymentDiscount, cart.currency)}
         </p>
       )}
     </aside>

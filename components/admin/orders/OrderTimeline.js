@@ -17,7 +17,9 @@ const metaOf = (e) => {
   }
 };
 
-export function OrderTimeline({ fulfillments = [], refunds = [], events = [], currency, timeZone }) {
+// Phase 8 line 2: `codVerifiedAt` is when a COD order's phone was confirmed by
+// code. A time, not the number, so every role (support included) sees it.
+export function OrderTimeline({ fulfillments = [], refunds = [], events = [], codVerifiedAt = null, currency, timeZone }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
       <Card>
@@ -77,6 +79,11 @@ export function OrderTimeline({ fulfillments = [], refunds = [], events = [], cu
           <CardTitle className="text-[1.125rem]">Timeline</CardTitle>
         </CardHeader>
         <CardContent>
+          {codVerifiedAt && (
+            <p data-order="cod-verified" className="mb-3 text-sm text-foreground">
+              Phone confirmed by code <span className="text-xs text-muted-foreground">{orderTime(codVerifiedAt, timeZone)}</span>
+            </p>
+          )}
           {events.length === 0 ? (
             <p className="text-sm text-muted-foreground">No events recorded.</p>
           ) : (

@@ -18,6 +18,7 @@
     "test:orders": "node scripts/test-orders.js",
     "test:shipping": "node scripts/test-shipping.js",
     "test:checkout-model": "node scripts/test-checkout-model.js",
+    "test:cod-checkout": "node scripts/test-cod-checkout.js",
     "test:shopify-push": "node scripts/test-shopify-push.js",
     "test:shopify-boundary": "node scripts/test-shopify-boundary.js",
     "push:shopify": "node --env-file=.env.local scripts/sync-shopify.js",

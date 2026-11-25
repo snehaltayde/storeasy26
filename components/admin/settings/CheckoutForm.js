@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Field, SecretField, SELECT_CLASS } from "@/components/admin/settings/SecretField";
 import { SaveBar, ReadOnlyNote, useSettingsSection } from "@/components/admin/settings/SaveBar";
-import { shoppersPayWith } from "@/lib/admin/settings";
+import { shoppersPayWith, validatePaymentConfig, PREPAID_PERCENT_MAX, SMS_UNAVAILABLE } from "@/lib/admin/settings";
+import { paymentExample } from "@/lib/checkout/payment-terms";
 
 // Settings → Checkout and payments (Phase 2 line 7): checkout on or off, the
 // store's timezone, the Razorpay key id, and the two Razorpay secrets
@@ -18,12 +19,35 @@ import { shoppersPayWith } from "@/lib/admin/settings";
 // pay with …" line is the open checks' payment item (the page reads it); after a
 // save it follows the saved checkout mode and keys, except a block that isn't
 // this tab's (billing paused, a checkout Storeasy's team has to turn on).
-//   initial: { readOnly, commerce, payments, payment: { level, title, message } }
-const toState = (v) => ({
-  commerce: { checkout_mode: v.commerce?.checkout_mode || "direct", timezone: v.commerce?.timezone || "Asia/Kolkata" },
-  payments: { razorpay_key_id: v.payments?.razorpay_key_id || "", razorpay_key_secret: "", razorpay_webhook_secret: "" },
+// Phase 8 line 2: how shoppers pay. A prepaid discount (off, percent or fixed
+// with an optional cap), the most a cash-on-delivery order may be, and whether
+// COD asks for a code (off, always, above an amount) by SMS or email. SMS is
+// off, with its reason, where no SMS provider is set. The worked example comes
+// from lib/checkout/payment-terms.js, the function checkout prices with.
+//   initial: { readOnly, commerce, payments, payment: { level, title, message },
+//              payment_config, shipping, smsAvailable }
+const blank = (v) => (v == null ? "" : String(v));
+const toState = (v) => {
+  const pc = v.payment_config || {};
+  return {
+    commerce: { checkout_mode: v.commerce?.checkout_mode || "direct", timezone: v.commerce?.timezone || "Asia/Kolkata" },
+    payments: { razorpay_key_id: v.payments?.razorpay_key_id || "", razorpay_key_secret: "", razorpay_webhook_secret: "" },
+    pay: {
+      prepaidKind: pc.prepaid?.kind || "off",
+      prepaidValue: blank(pc.prepaid?.value),
+      prepaidMax: blank(pc.prepaid?.max),
+      codMax: blank(pc.cod?.maxTotal),
+      otp: pc.cod?.otp || "off",
+      otpAbove: blank(pc.cod?.otpAbove),
+      otpChannel: pc.cod?.otpChannel || "email",
+    },
+  };
+};
+const paymentConfigOf = (p) => ({
+  prepaid: p.prepaidKind === "off" ? null : { kind: p.prepaidKind, value: p.prepaidValue, max: p.prepaidKind === "percent" ? p.prepaidMax : "" },
+  cod: { maxTotal: p.codMax, otp: p.otp, otpAbove: p.otp === "above" ? p.otpAbove : "", otpChannel: p.otp === "off" ? "" : p.otpChannel },
 });
-const toBody = (s) => ({ commerce: s.commerce, payments: s.payments });
+const toBody = (s) => ({ commerce: s.commerce, payments: s.payments, payment_config: paymentConfigOf(s.pay) });
 
 export function CheckoutForm({ initial, role }) {
   const form = useSettingsSection({ initial, toState, toBody });
@@ -39,6 +63,11 @@ export function CheckoutForm({ initial, role }) {
     : null;
   const setC = (k) => (e) => setState((s) => ({ ...s, commerce: { ...s.commerce, [k]: e.target.value } }));
   const setP = (k) => (v) => setState((s) => ({ ...s, payments: { ...s.payments, [k]: v } }));
+  const setPay = (k) => (e) => setState((s) => ({ ...s, pay: { ...s.pay, [k]: e.target.value } }));
+  const pay = state.pay;
+  const checked = validatePaymentConfig(paymentConfigOf(pay));
+  const example = checked.ok ? paymentExample(checked.value, view.shipping) : [];
+  const smsOff = !view.smsAvailable;
 
   async function testKeys() {
     setTest({ busy: true });
@@ -135,6 +164,60 @@ export function CheckoutForm({ initial, role }) {
               onChange={setP("razorpay_webhook_secret")}
               disabled={readOnly}
             />
+          </CardContent>
+        </Card>
+
+        <Card data-settings="cod-prepaid">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Cash on delivery and paying online</CardTitle>
+            <CardDescription>A discount for paying online, a limit for cash on delivery, and a code to confirm the phone number.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            <Field id="st-prepaid-kind" label="Discount for paying online" hint={`A percent is at most ${PREPAID_PERCENT_MAX}% and rounds down to whole rupees.`}>
+              <select id="st-prepaid-kind" className={SELECT_CLASS} disabled={readOnly} value={pay.prepaidKind} onChange={setPay("prepaidKind")} aria-describedby="st-prepaid-kind-hint">
+                <option value="off">None</option>
+                <option value="percent">A percent of the order</option>
+                <option value="fixed">A fixed amount</option>
+              </select>
+            </Field>
+            {pay.prepaidKind !== "off" && (
+              <Field id="st-prepaid-value" label={pay.prepaidKind === "percent" ? "Percent off" : "Amount off (₹)"}>
+                <Input id="st-prepaid-value" inputMode="decimal" disabled={readOnly} value={pay.prepaidValue} onChange={setPay("prepaidValue")} placeholder={pay.prepaidKind === "percent" ? "5" : "50"} />
+              </Field>
+            )}
+            {pay.prepaidKind === "percent" && (
+              <Field id="st-prepaid-max" label="At most (₹, optional)" hint="Leave blank for no cap.">
+                <Input id="st-prepaid-max" inputMode="decimal" disabled={readOnly} value={pay.prepaidMax} onChange={setPay("prepaidMax")} placeholder="200" aria-describedby="st-prepaid-max-hint" />
+              </Field>
+            )}
+            <Field id="st-cod-max" label="Largest cash-on-delivery order (₹, optional)" hint="Above this, shoppers pay online. Leave blank for no limit." className="md:col-start-1">
+              <Input id="st-cod-max" inputMode="decimal" disabled={readOnly} value={pay.codMax} onChange={setPay("codMax")} placeholder="5000" aria-describedby="st-cod-max-hint" />
+            </Field>
+            <Field id="st-cod-otp" label="Code for cash on delivery" hint="The shopper types a 6-digit code before the order is placed.">
+              <select id="st-cod-otp" className={SELECT_CLASS} disabled={readOnly} value={pay.otp} onChange={setPay("otp")} aria-describedby="st-cod-otp-hint">
+                <option value="off">Off</option>
+                <option value="always">Every cash-on-delivery order</option>
+                <option value="above">Orders above an amount</option>
+              </select>
+            </Field>
+            {pay.otp === "above" && (
+              <Field id="st-cod-otp-above" label="Ask for a code above (₹)">
+                <Input id="st-cod-otp-above" inputMode="decimal" disabled={readOnly} value={pay.otpAbove} onChange={setPay("otpAbove")} placeholder="2000" />
+              </Field>
+            )}
+            {pay.otp !== "off" && (
+              <Field id="st-cod-otp-channel" label="Send the code by" hint={smsOff ? SMS_UNAVAILABLE : null}>
+                <select id="st-cod-otp-channel" className={SELECT_CLASS} disabled={readOnly} value={pay.otpChannel} onChange={setPay("otpChannel")} aria-describedby={smsOff ? "st-cod-otp-channel-hint" : undefined}>
+                  <option value="email">Email</option>
+                  <option value="sms" disabled={smsOff}>
+                    SMS
+                  </option>
+                </select>
+              </Field>
+            )}
+            <div data-settings="payment-example" className="space-y-1 text-sm text-muted-foreground md:col-span-2">
+              {checked.ok ? example.map((line) => <p key={line}>{line}</p>) : checked.errors.map((line) => <p key={line} className="text-destructive">{line}</p>)}
+            </div>
           </CardContent>
         </Card>
 

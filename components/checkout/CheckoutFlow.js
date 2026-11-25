@@ -4,30 +4,20 @@ import { useEffect, useRef, useState } from "react";
 import Image from "@/components/StoreImage";
 import Link from "next/link";
 import { formatMoney } from "@/lib/format";
-import { computeShipping } from "@/lib/shipping";
 import { friendlyCheckoutError } from "@/lib/shopper-errors";
-import { PRICE_CHANGED } from "@/lib/checkout-price";
 import { track } from "@/lib/track/client";
-import { confirmPayment } from "@/lib/checkout/confirm-payment";
+import { paymentTerms } from "@/lib/checkout/payment-terms";
 import AddressStep from "./AddressStep";
 import PaymentStep from "./PaymentStep";
 import OrderSummary from "./OrderSummary";
+import CodOtpDialog from "./CodOtpDialog";
+import useQuote from "./useQuote";
+import { placeOrder as place, postCheckout } from "./placeOrder";
 import { emptyForm, applyAddress, addressValid } from "./checkoutModel";
 
 const STEPS = ["Address", "Review", "Payment"];
 
-function loadRazorpay() {
-  return new Promise((resolve) => {
-    if (window.Razorpay) return resolve(true);
-    const s = document.createElement("script");
-    s.src = "https://checkout.razorpay.com/v1/checkout.js";
-    s.onload = () => resolve(true);
-    s.onerror = () => resolve(false);
-    document.body.appendChild(s);
-  });
-}
-
-export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeName = "Store", logo = null, policies = [], shippingConfig: pageShippingConfig }) {
+export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeName = "Store", logo = null, policies = [], shippingConfig: pageShippingConfig, paymentConfig = null }) {
   const [step, setStep] = useState(0);
   // P1-RATES: the cart and rates this page prices with. They start as the
   // page's and are replaced by the server's when it refuses a total that has
@@ -38,6 +28,9 @@ export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeNam
   const [method, setMethod] = useState("cod");
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState("");
+  // Phase 8 line 2: the open code dialog, and the challenge it verified
+  const [otp, setOtp] = useState(null); // { challengeId, sentTo, resendIn, sentAt, error, busy }
+  const [challenge, setChallenge] = useState(null); // a verified challenge id
 
   // Phase 8 step 0: the form changes only through applyAddress (./checkoutModel).
   const changeAddress = (patch, source) => setForm((f) => applyAddress(f, patch, source));
@@ -53,14 +46,17 @@ export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeNam
     country: "India",
   };
 
-  // Live shipping — same pure engine the drawer and the checkout API use, so
-  // what's shown here is what the server charges. Recomputes as the payment
-  // method / pincode change. GEN-03: `config` is the store's own rates from the
-  // server; without it this preview showed the code default on every store.
-  const shipInputs = { subtotal: cart.subtotal, discountTotal: cart.discountTotal, pincode: form.pincode || null, config: shippingConfig };
-  const shipping = computeShipping({ ...shipInputs, paymentMethod: method === "cod" ? "cod" : "prepaid" });
-  const codPreview = computeShipping({ ...shipInputs, paymentMethod: "cod" });
-  const grandTotal = cart.total + shipping.total;
+  // Phase 8 line 2 (decision 10): every amount on this page is the server's
+  // quote for this cart and PIN code. Until it lands, the same pure function
+  // draws with the store's own rates and payment rules from the server (GEN-03:
+  // `config: shippingConfig` is this store's, never the code default).
+  const quote = useQuote({ cart, address });
+  const terms = quote.terms || paymentTerms({ cart, shippingConfig, paymentConfig, pincode: form.pincode || null, prepaidAvailable: razorpayEnabled });
+  // COD hidden here (zone or limit) → paying online is the method
+  const chosen = method === "cod" && !terms.cod.available ? "razorpay" : method;
+  const selected = chosen === "cod" ? terms.cod : terms.prepaid;
+  const shipping = { total: selected.shipping, codFee: chosen === "cod" ? terms.cod.fee : 0 };
+  const grandTotal = selected.total;
 
   const eventItems = () =>
     cart.items.map((it) => ({
@@ -84,14 +80,6 @@ export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeNam
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function goConfirmation(data) {
-    // Full nav so the layout re-reads the (now-cleared) cart. The server hands
-    // back a tokenized confirmationPath (S25/SF08 — the confirmation page
-    // requires it). The tokenless fallback only fires on deploy skew (old
-    // server + new client) and lands on a neutral 404, never a PII leak.
-    window.location.href = data.confirmationPath || `/checkout/confirmation/${data.orderId}`;
-  }
-
   // One idempotency key per payment ATTEMPT — minted on first submit, reused by
   // retries (double click, network retry, Razorpay modal reopen) so the server
   // returns the SAME order instead of creating a second one. Rotated only when
@@ -112,116 +100,70 @@ export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeNam
   function priceChanged(data) {
     if (data.cart?.items) setCart(data.cart);
     setShippingConfig(data.shippingConfig ?? undefined);
+    quote.replace(data.quote, data.cart?.items ? data.cart : cart);
     paymentKey(true);
+    setChallenge(null);
+    setOtp(null);
     setError(friendlyCheckoutError(data));
     setPlacing(false);
   }
 
-  async function placeOrder(isRetry = false) {
-    setPlacing(true);
-    setError("");
-    // What the button says: the server charges this or nothing.
-    const shown = { expectedTotal: grandTotal, expectedShipping: shipping.total };
-    // add_payment_info — the user committed a payment method (fired once per
-    // attempt; the stable id makes an auto-retry after 409 a dedup no-op).
-    if (!isRetry) {
-      track("add_payment_info", {
-        event_id: `api-${paymentKey()}`,
-        value: grandTotal,
-        currency: cart.currency,
-        items: eventItems(),
-        params: { payment_type: method },
-      });
-    }
+  // What the button says: the server charges this or nothing.
+  const shown = { expectedTotal: grandTotal, expectedShipping: shipping.total };
+  const orderCtx = (extra = {}) => ({
+    method: chosen,
+    cart,
+    contact,
+    address,
+    form,
+    storeName,
+    grandTotal,
+    shown,
+    otpRequired: chosen === "cod" && terms.cod.otpRequired,
+    challenge,
+    paymentKey,
+    eventItems,
+    priceChanged,
+    newQuote: (t) => quote.replace(t, cart),
+    openOtp: (sent) => {
+      setChallenge(null);
+      setOtp(sent ? { challengeId: sent.challengeId, sentTo: sent.sentTo, resendIn: sent.resendIn, sentAt: Date.now(), error: "", busy: false } : null);
+    },
+    setError,
+    setPlacing,
+    ...extra,
+  });
+  const placeOrder = (isRetry = false) => place(orderCtx(), isRetry);
+
+  // Phase 8 line 2: the code dialog's three actions.
+  async function verifyCode(code) {
+    setOtp((o) => ({ ...o, busy: true, error: "" }));
     try {
-      if (method === "cod") {
-        const res = await fetch("/api/checkout", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "cod", contact, address, idempotencyKey: paymentKey(), ...shown }),
-        });
-        const data = await res.json();
-        if (data.code === PRICE_CHANGED) return priceChanged(data);
-        if (res.status === 409 && !isRetry) {
-          paymentKey(true); // stale intent (cart changed) — new key, one retry
-          return placeOrder(true);
-        }
-        if (!data.ok) throw new Error(friendlyCheckoutError(data));
-        goConfirmation(data);
-        return;
-      }
-
-      // Razorpay
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "razorpay_create", contact, address, idempotencyKey: paymentKey(), ...shown }),
-      });
-      const data = await res.json();
-      if (data.code === PRICE_CHANGED) return priceChanged(data);
-      if (res.status === 409 && !isRetry) {
-        paymentKey(true);
-        return placeOrder(true);
-      }
-      if (!data.ok) throw new Error(friendlyCheckoutError(data));
-      if (data.alreadyPaid) {
-        // This intent's payment already landed (duplicate submit after verify).
-        goConfirmation(data);
-        return;
-      }
-
-      const ready = await loadRazorpay();
-      if (!ready) throw new Error("Could not open the payment window — check your connection and try again.");
-
-      const rzp = new window.Razorpay({
-        key: data.keyId,
-        order_id: data.razorpayOrderId,
-        amount: data.amount,
-        currency: data.currency,
-        name: storeName,
-        description: `Order ${data.orderId}`,
-        prefill: { name: form.name, email: form.email, contact: form.phone },
-        theme: { color: "#0a0a0b" },
-        handler: async (response) => {
-          const result = await confirmPayment(async () => {
-            const r = await fetch("/api/checkout", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                action: "razorpay_verify",
-                orderId: data.orderId,
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-              }),
-            });
-            return { status: r.status, data: await r.json().catch(() => ({})) };
-          });
-          if (result.state === "confirmed") goConfirmation(result.data);
-          else if (result.state === "pending" && result.confirmationPath) goConfirmation(result);
-          else {
-            setError(
-              result.state === "rejected"
-                ? `We couldn't confirm your payment for order ${data.orderId}. If money left your account, please don't pay again — contact the store with this order number.`
-                : `Your payment went through and we're confirming order ${data.orderId}. Please don't pay again. We'll email you once it's confirmed.`,
-            );
-            setPlacing(false);
-          }
-        },
-        modal: { ondismiss: () => setPlacing(false) },
-      });
-      rzp.on("payment.failed", (resp) => {
-        setError(resp?.error?.description || "Payment failed");
-        setPlacing(false);
-      });
-      rzp.open();
-    } catch (e) {
-      // GEN-03: fetch/JSON failures carry browser wording, not ours.
-      const raw = e instanceof TypeError || e instanceof SyntaxError;
-      setError(raw ? "Could not reach the store — your cart is untouched. Check your connection and try again." : String(e.message || e));
-      setPlacing(false);
+      const { data } = await postCheckout({ action: "cod_otp_verify", challengeId: otp.challengeId, code, contact, address, idempotencyKey: paymentKey() });
+      if (!data.ok) return setOtp((o) => ({ ...o, busy: false, error: friendlyCheckoutError(data) }));
+      setChallenge(otp.challengeId);
+      setOtp(null);
+      await place(orderCtx({ challenge: otp.challengeId }));
+    } catch {
+      setOtp((o) => o && { ...o, busy: false, error: "Could not reach the store — your cart is untouched. Check your connection and try again." });
     }
   }
+  async function resendCode() {
+    setOtp((o) => ({ ...o, busy: true, error: "" }));
+    try {
+      const { data } = await postCheckout({ action: "cod_otp_send", contact, address, idempotencyKey: paymentKey(), ...shown });
+      if (data.code === "PRICE_CHANGED") return priceChanged(data);
+      if (!data.ok) return setOtp((o) => ({ ...o, busy: false, error: friendlyCheckoutError(data) }));
+      setOtp({ challengeId: data.challengeId, sentTo: data.sentTo, resendIn: data.resendIn, sentAt: Date.now(), error: "", busy: false });
+    } catch {
+      setOtp((o) => o && { ...o, busy: false, error: "Could not reach the store — your cart is untouched. Check your connection and try again." });
+    }
+  }
+  const changeNumber = () => {
+    setOtp(null);
+    setChallenge(null);
+    setStep(0);
+  };
 
   return (
     <div data-protected="checkout" className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
@@ -310,10 +252,11 @@ export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeNam
           {step === 2 && (
             <PaymentStep
               cart={cart}
-              method={method}
+              method={chosen}
               onMethod={setMethod}
-              razorpayEnabled={razorpayEnabled}
-              codFee={codPreview.codFee}
+              razorpayEnabled={terms.prepaid.available}
+              codFee={terms.cod.fee}
+              terms={terms}
               grandTotal={grandTotal}
               error={error}
               placing={placing}
@@ -325,8 +268,21 @@ export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeNam
         </div>
 
         {/* sticky order summary — mirrors the cart drawer exactly */}
-        <OrderSummary cart={cart} shipping={shipping} grandTotal={grandTotal} />
+        <OrderSummary cart={cart} shipping={shipping} grandTotal={grandTotal} paymentDiscount={chosen === "cod" ? 0 : terms.prepaid.discount} />
       </div>
+      {otp && (
+        <CodOtpDialog
+          sentTo={otp.sentTo}
+          resendIn={otp.resendIn}
+          sentAt={otp.sentAt}
+          error={otp.error}
+          busy={otp.busy}
+          onVerify={verifyCode}
+          onResend={resendCode}
+          onChangeNumber={changeNumber}
+          onClose={() => setOtp(null)}
+        />
+      )}
     </div>
   );
 }

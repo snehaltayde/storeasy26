@@ -658,6 +658,7 @@ const fullOrder = (overrides = {}) => ({
   email: CONTACT.email,
   total: 1900,
   shipping_total: 49,
+  payment_discount: 0, // Phase 8 line 2: the prepaid discount column
   razorpay_order_id: "order_X",
   razorpay_payment_id: "pay_X",
   snapshot: {
@@ -809,7 +810,7 @@ await t("SHOP-02 (OVL-03): a cart built through the effective read, with publish
 // Merchant-typed or merchant-set text that reaches Shopify. All of it is order
 // data, not content write-back, so it is consistent with Decision 2.
 const MERCHANT_TEXT_ROUTES = {
-  "discount description": { path: "appliedDiscount.description", from: "offer and bundle titles, through the offer engine's label" },
+  "discount description": { path: "appliedDiscount.description", from: "offer and bundle titles, through the offer engine's label, and the fixed words \"Prepaid discount\" (Phase 8 line 2)" },
   "discount title": { path: "appliedDiscount.title", from: "the store name" },
   "shipping title": { path: "shippingLine.title", from: "the shipping label, which can carry a merchant's zone label" },
   note: { path: "note", from: "a fixed sentence with our order id, which carries the store's order-id prefix" },

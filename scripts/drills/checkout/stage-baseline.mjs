@@ -47,7 +47,8 @@ stage("baseline", async (drill) => {
   drill.check(shown === summaryTotal, "the button shows the summary's total", { shown, summaryTotal });
   await drill.shoot(page, "payment");
 
-  const answered = page.waitForResponse((x) => x.url().endsWith("/api/checkout") && x.request().method() === "POST");
+  // Phase 8 line 2: the page also asks /api/checkout for quotes; this waits for the order
+  const answered = page.waitForResponse((x) => x.url().endsWith("/api/checkout") && x.request().method() === "POST" && x.request().postDataJSON()?.action === "cod");
   await place.click();
   const res = await answered;
   drill.check(res.status() === 200 && res.request().postDataJSON()?.action === "cod", "POST /api/checkout (cod) answers 200", res.status());

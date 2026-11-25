@@ -3,6 +3,21 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-26 Phase 8 line 2: prepaid nudge and COD code (on the owner's behalf)
+
+- **Schema:** migration 0036 exactly as planned (`cod_otps`; `orders.payment_discount`, `orders.cod_verified_at`). `createOrder` writes the two columns only after `hasColumns`; the prepaid discount is also in the snapshot's `totals.paymentDiscount`. Order total = subtotal − discount_total − payment_discount + shipping_total, rounded to the currency's minor unit.
+- **Permissions:** no new action. Payment rules are saved as `payment_config` by the existing `settings.write` route (admin, owner) and audited under its changed keys; support and staff get NoAccess on the screen. "Phone confirmed by code" is a time, not PII, so support sees it.
+- **One pure pricing function** (`lib/checkout/payment-terms.js`): the `quote` action, every placing action, the checkout page's first render and the console's worked example all use it. The page draws with it on the store's own configs (passed by the page, no secrets) until the quote lands; the quote then replaces it. Request-body discounts are never read.
+- **Zone lookup is duplicated** in `payment-terms.js` (the 3-line first-prefix rule) because `lib/shipping.js` belongs to line 1 and exports no zone; `test-cod-checkout` proves the two agree. Fold it into a `zoneFor` export when line 1 merges.
+- **COD refused at the route** with `COD_UNAVAILABLE` and the quote's reason before the price check; no code is sent for a hidden COD.
+- **OTP rules:** a resend for the same binding reuses the challenge with a new code and fresh tries; the 30 s cooldown is per cart (any binding); the cart cap and phone cap sum `sends` on rows sent within the window. A verified code lets the order through for 15 minutes. Wrong, expired, locked, stale (binding changed, unknown or used challenge), cooldown, cart cap and IP cap each have one fixed sentence.
+- **Phone cap answers like a send:** over 5 sends per phone per hour, the route answers exactly as for a fresh phone and sends nothing (the challenge's code is never known), so no answer reveals that a number was used before.
+- **Rate limits:** `quote` has its own 60 per minute; `cod_otp_send` has only its 10 per IP per 15 minutes (so its own sentence shows, not the shared 10 per minute); verify and place keep the checkout limit.
+- **SMS:** `lib/messaging/sms.js` has only the `stub` provider (a `notifications` row, provider `sms-stub`), never in production. If a store saved SMS and the server has no provider, checkout sends the code by email instead of refusing COD. The email code sits in the `notifications` row body like the sign-in code does; `cod_otps` never holds it.
+- **Client retry:** placeOrder now retries only on `IDEMPOTENCY_CONFLICT`, not on every 409, since the COD answers are 409s too.
+- **Not built here:** "COD only in the base market" (decision 12) has no market to check until line 4 adds markets; line 4 adds the check to `termsFor`.
+- Needs the design pass (`ui-designer`): the payment step (nudge, Save badge, the COD-unavailable note), `CodOtpDialog`, and the Settings → Checkout "Cash on delivery and paying online" card.
+
 ## 2026-11-26 Phase 8 India and global checkout plan (on the owner's behalf)
 
 - **Schema:** four additive tenant migrations: 0036 `cod_otps` + `orders.payment_discount`, `cod_verified_at`; 0037 `customer_addresses` (copies each `default_address`); 0038 `bundles.starts_at`, `ends_at`; 0039 the order's market, rate and base-currency amounts. No platform migration.

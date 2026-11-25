@@ -820,9 +820,11 @@ const flowStubs = {
   "@/lib/checkout-price": checkoutPrice,
   "@/lib/checkout/confirm-payment": await import("../lib/checkout/confirm-payment.js"),
   "@/lib/track/client": { track() {} },
+  "@/lib/checkout/payment-terms": await import("../lib/checkout/payment-terms.js"),
 };
 // Phase 8 step 0: CheckoutFlow's own parts, loaded with the same stubs.
-for (const part of ["checkoutModel", "AddressStep", "PaymentStep", "OrderSummary"]) {
+// Phase 8 line 2: and the nudge, the code dialog, the quote hook and placeOrder.
+for (const part of ["checkoutModel", "AddressStep", "PrepaidNudge", "PaymentStep", "OrderSummary", "CodOtpDialog", "useQuote", "placeOrder"]) {
   flowStubs[`./${part}`] = await loadComponent(sources.get(`components/checkout/${part}.js`), flowStubs);
 }
 const realFlow = () => loadComponent(sources.get("components/checkout/CheckoutFlow.js"), flowStubs);
@@ -892,7 +894,7 @@ await t("checkout page (rendered): a closed checkout shows fixed text, never the
 });
 
 await t("checkout preview can fail: dropping the store's rates is caught", async () => {
-  const broken = plant("components/checkout/CheckoutFlow.js", ", config: shippingConfig }", " }");
+  const broken = plant("components/checkout/CheckoutFlow.js", "paymentTerms({ cart, shippingConfig, paymentConfig", "paymentTerms({ cart, paymentConfig");
   const { default: CheckoutFlow } = await loadComponent(broken, flowStubs);
   const html = renderToStaticMarkup(React.createElement(CheckoutFlow, { cart: checkoutFixture, razorpayEnabled: true, storeName: "Acme", shippingConfig: OWN_RATES }));
   ok(html.includes("₹128") && !html.includes("₹550"), "the broken wiring rendered correct numbers");
@@ -968,7 +970,10 @@ async function mount(src, stubs, props) {
     },
     useEffect() {},
   };
-  const { default: Component } = await loadComponent(src, { ...stubs, react: hooks });
+  // Phase 8 line 2: CheckoutFlow's quote hook runs on these hooks too
+  const own = { ...stubs, react: hooks };
+  if (stubs["./useQuote"]) own["./useQuote"] = await loadComponent(sources.get("components/checkout/useQuote.js"), own);
+  const { default: Component } = await loadComponent(src, own);
   const render = () => {
     cursor = 0;
     return Component(props);
