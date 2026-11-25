@@ -18,19 +18,11 @@ import { DataTable } from "@/components/kit/data-table";
 import { EmptyState } from "@/components/kit/empty-state";
 import { PageHeader } from "@/components/kit/page-header";
 import FleetStrip from "./FleetStrip";
-import { ATTENTION_WORDS, STATUS_FILTERS, STORE_STATUS, SUBSCRIPTION, healthWords, onboardingWords, word } from "./storesWords";
+import HealthMark from "./HealthMark";
+import { ATTENTION_WORDS, STATUS_FILTERS, STORE_STATUS, SUBSCRIPTION, onboardingWords, word } from "./storesWords";
 
 const selectClass =
-  "h-8 rounded-md border border-input bg-muted px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
-
-function HealthCell({ health }) {
-  const { label, tone } = healthWords(health);
-  return (
-    <Badge variant={tone} data-health={health?.state || "pending"} className="max-w-full whitespace-normal text-left">
-      {label}
-    </Badge>
-  );
-}
+  "h-8 rounded-md border border-input bg-muted px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 export default function StoresTable() {
   const router = useRouter();
@@ -109,8 +101,10 @@ export default function StoresTable() {
       key: "name",
       header: "Store",
       sortable: true,
+      // long names truncate; the whole name is the link's title
+      className: "max-w-64 min-w-44",
       cell: (r) => (
-        <span className="flex min-w-0 flex-col">
+        <span className="flex min-w-0 flex-col" title={r.name}>
           <span className="truncate">{r.name}</span>
           <span className="truncate font-mono text-xs font-normal text-muted-foreground">{r.id}</span>
         </span>
@@ -128,18 +122,19 @@ export default function StoresTable() {
         );
       },
     },
+    // health sits beside status: the two things an operator scans for
+    { key: "health", header: "Health", className: "min-w-60 max-w-72", cell: (r) => <HealthMark health={health[r.id]} /> },
     {
       key: "plan",
       header: "Plan",
       cell: (r) => (
-        <span className="flex flex-col text-sm">
+        <span className="flex flex-col whitespace-nowrap">
           <span>{data?.plans.find((p) => p.id === r.plan)?.name || r.plan || "No plan"}</span>
           {r.subscription && <span className="text-xs text-muted-foreground">{word(SUBSCRIPTION, r.subscription).label}</span>}
         </span>
       ),
     },
-    { key: "onboarding", header: "Onboarding", cell: (r) => <span className="font-mono text-sm tabular-nums">{onboardingWords(r.onboarding)}</span> },
-    { key: "health", header: "Health", className: "min-w-40", cell: (r) => <HealthCell health={health[r.id]} /> },
+    { key: "onboarding", header: "Onboarding", cell: (r) => <span className={`font-mono text-[0.8125rem] tabular-nums ${r.onboarding?.open ? "text-success" : ""}`}>{onboardingWords(r.onboarding)}</span> },
     {
       key: "flags",
       header: "Flags",
@@ -193,7 +188,7 @@ export default function StoresTable() {
           }
         />
 
-        <FleetStrip counts={data?.counts || null} />
+        <FleetStrip counts={data?.counts || (state.error ? false : null)} />
 
         <form
           role="search"
@@ -203,7 +198,7 @@ export default function StoresTable() {
             setParams({ q: search.trim() });
           }}
         >
-          <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
+          <div className="flex w-full min-w-0 flex-col gap-1 lg:w-auto lg:flex-1">
             <Label htmlFor="stores-q" className="text-xs text-muted-foreground">
               Search
             </Label>
@@ -240,8 +235,8 @@ export default function StoresTable() {
               <option value="none">No plan</option>
             </select>
           </div>
-          <label className="flex h-8 items-center gap-2 text-sm">
-            <input type="checkbox" id="stores-attention" className="size-4 accent-primary" checked={sp.get("attention") === "1"} onChange={(e) => setParams({ attention: e.target.checked ? "1" : null })} />
+          <label className="flex h-8 items-center gap-2 text-sm whitespace-nowrap">
+            <input type="checkbox" id="stores-attention" className="size-4 rounded-sm accent-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none" checked={sp.get("attention") === "1"} onChange={(e) => setParams({ attention: e.target.checked ? "1" : null })} />
             Needs attention{data ? ` (${data.counts.attention})` : ""}
           </label>
         </form>

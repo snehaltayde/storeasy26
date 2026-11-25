@@ -10,7 +10,7 @@ export default function StoreNotFound() {
         title="No store with that id"
         description="It may have been offboarded, or the link is wrong."
         action={
-          <a href="/platform" className="text-sm font-medium text-primary underline-offset-4 hover:underline">
+          <a href="/platform" className="rounded-md text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
             Back to Stores
           </a>
         }

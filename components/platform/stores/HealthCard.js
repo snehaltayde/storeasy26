@@ -6,11 +6,12 @@
 // store's database", never healthy.
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { healthWords, when } from "./storesWords";
+import { cn } from "@/components/ui/utils";
+import HealthMark from "./HealthMark";
+import { when } from "./storesWords";
 
 export default function HealthCard({ storeId }) {
   const [health, setHealth] = useState(null);
@@ -30,7 +31,6 @@ export default function HealthCard({ storeId }) {
     check();
   }, [check]);
 
-  const { label, tone } = healthWords(loading ? null : health);
   return (
     <Card data-card="health" aria-busy={loading || undefined}>
       <CardHeader>
@@ -43,14 +43,16 @@ export default function HealthCard({ storeId }) {
       </CardHeader>
       <CardContent className="space-y-3">
         {loading ? (
-          <Skeleton className="h-5 w-48" />
+          <div className="flex items-center gap-1.5">
+            <Skeleton className="size-5 rounded-full" />
+            <Skeleton className="h-5 w-56" />
+          </div>
         ) : (
-          <Badge variant={tone} data-health={health.state} className="whitespace-normal">
-            {label}
-          </Badge>
+          // the page's headline: the verdict in words, before the numbers
+          <HealthMark health={health} size="lg" />
         )}
         {!loading && health?.reachable && (
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border pt-3 text-sm sm:grid-cols-4">
             <div>
               <dt className="text-xs text-muted-foreground">Products</dt>
               <dd className="font-mono tabular-nums">{health.products}</dd>
@@ -65,7 +67,7 @@ export default function HealthCard({ storeId }) {
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">Failed pushes</dt>
-              <dd className="font-mono tabular-nums">{health.failedPushes}</dd>
+              <dd className={cn("font-mono tabular-nums", health.failedPushes > 0 && "text-warning-text")}>{health.failedPushes}</dd>
             </div>
           </dl>
         )}

@@ -32,7 +32,7 @@ function Section({ title, description = null, action = null, children, id }) {
 function Row({ label, children }) {
   return (
     <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-4">
-      <dt className="w-44 shrink-0 text-muted-foreground">{label}</dt>
+      <dt className="shrink-0 text-muted-foreground sm:w-36">{label}</dt>
       <dd className="min-w-0 break-words">{children}</dd>
     </div>
   );
