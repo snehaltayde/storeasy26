@@ -51,7 +51,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - [x] A merchant can upload, find, archive and delete media on the new UI
 - [ ] A merchant uses the editor (page list, section tree, inspector, preview, publish panel) in the new shell
 - [ ] An admin can manage settings (store details, checkout and payments, shipping, domains), integrations and billing on the new UI; staff and support cannot reach them, and signed-out visitors never see the support-access banner
-- [ ] An admin can invite a team member with a role and remove one; only the owner can grant or transfer ownership
+- [x] An admin can invite a team member with a role and remove one; only the owner can grant or transfer ownership
 - [ ] A merchant can see analytics, experiments, insights and automations on the new UI (the Publishing page is built with the editor line)
 - [ ] A merchant can create and edit product-finder quizzes on the new UI; support sees them read-only
 - [ ] The old console screens and their components are removed once every route has a new screen

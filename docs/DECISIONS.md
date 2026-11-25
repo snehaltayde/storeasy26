@@ -3,6 +3,14 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Team on the new UI and the ownership fixes (on the owner's behalf)
+
+- **Permissions (bugs fixed):** a role change, removal or transfer on someone who isn't a member answers 404 and writes nothing (before, a role change added any platform user to the store). The last-owner guard and "an admin can't touch an owner" are part of the same statement that writes (`setMemberRole`, `removeMembership`), so concurrent changes can't leave a store with no owner or let an admin demote someone who just became owner. Creating or revoking an owner invite needs `team.owner`. Nobody can remove themselves.
+- **Transfer (owner only):** one batch makes the target owner, the caller admin, and expires both people's pending invites; the server checks the typed store name (case and spaces folded; a store with no name asks for its id). The invite rules from the Phase 1 audit are unchanged.
+- **Mail:** invite emails go through `sendPlatformMail` only when mail is set up; otherwise the screen says nothing was sent and shows the one-time link. No log line or mail row carries the token.
+- **Decided by:** Claude
+- **Slice:** Phase 2 line 8
+
 ## 2026-11-25 Shell drill: what counts as support writing (on the owner's behalf)
 
 - **Decision:** a support pass counts writes until a new document loads (an init script marks each document's first request), so a `pushState` round trip or a write still in flight is caught; a Next `<Link>` soft navigation hands later writes to the destination page. The pass waits until nothing is pending and the server log stops growing, and must find its own `GET` line in the Next log (the drill refuses to start without `DRILL_LOG_DIR`); `sendBeacon` and keepalive-on-`pagehide`, which Playwright never sees, are caught from that log. `READ_POSTS` rows need a reason, a non-GET method and a path other than the page, and `page` may be a route pattern. Known limit: a raw `pushState` that stays on another path is treated like a soft navigation; a mark moved within one file keeps its count.
