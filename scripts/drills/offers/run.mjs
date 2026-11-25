@@ -195,7 +195,8 @@ async function supportPass(drill, page, made) {
   // React's development build says it needs eval() under the app's CSP (no
   // 'unsafe-eval', next.config.mjs) on a dev server: noted, only on a dev server
   const DEV_EVAL = /eval\(\) is not supported in this environment/;
-  page.on("console", (m) => m.type() === "error" && !(devServer && DEV_EVAL.test(m.text())) && errors.push(`${new URL(page.url()).pathname}: ${m.text().slice(0, 300)}`));
+  // filtered once the pass is over: the first page's message can come before its HMR socket
+  page.on("console", (m) => m.type() === "error" && errors.push(`${new URL(page.url()).pathname}: ${m.text().slice(0, 300)}`));
   page.on("pageerror", (e) => errors.push(`${new URL(page.url()).pathname}: ${String(e?.message || e).slice(0, 300)}`));
   const reads = [];
   page.on("request", (req) => READ_POSTS.some((r) => r.path === new URL(req.url()).pathname) && reads.push(req.method()));
@@ -215,7 +216,8 @@ async function supportPass(drill, page, made) {
     drill.check(reads.includes("POST"), "support: Try it is POST /api/admin/offers/simulate (a listed read)", reads);
   }
   drill.check(writes.length === 0, "support: no non-GET request but the listed reads", writes);
-  drill.check(errors.length === 0, "support: no console error or page error on the four pages", errors);
+  const realErrors = errors.filter((e) => !(devServer && DEV_EVAL.test(e)));
+  drill.check(realErrors.length === 0, "support: no console error or page error on the four pages", realErrors);
   drill.note(`dev server: ${devServer}; Next's dev overlay sent ${devOverlay} request(s) to /__nextjs_* (skipped only on a dev server)`);
   // the route's loading.js streams the page, so the status is already sent: the not-found page says it
   const missing = [];
