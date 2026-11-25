@@ -11,4 +11,6 @@ export const ALLOWLIST = [
   { path: "app/fonts/geist/", reason: "self-hosted woff2 files: loaded by url() in app/fonts/fonts.css and next/font/local src paths in app/fonts/fonts.js, which the walk does not read; test:fonts checks each is referenced and exists" },
   { path: "app/fonts/geist-mono/", reason: "self-hosted woff2 files: loaded by url() in app/fonts/fonts.css and next/font/local src paths in app/fonts/fonts.js, which the walk does not read; test:fonts checks each is referenced and exists" },
   { path: "app/fonts/fraunces/", reason: "self-hosted woff2 files: loaded by url() in app/fonts/fonts.css and next/font/local src paths in app/fonts/fonts.js, which the walk does not read; test:fonts checks each is referenced and exists" },
+  // Phase 3 line 3: billing and costs moved to /platform/billing; the old console no longer imports it
+  { path: "components/platform/BillingPanel.js", reason: "removed by Phase 3 line 7" },
 ];

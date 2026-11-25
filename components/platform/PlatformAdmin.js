@@ -12,10 +12,9 @@ import { Field, Input, Select, Textarea } from "@/components/console/fields";
 import { SkeletonText, EmptyState, ErrorState } from "@/components/console/bits";
 import { useToast } from "@/components/kit/toast";
 import QueuesPanel from "./QueuesPanel";
-import { FlagsPanel, CostsPanel } from "./GrowthOpsPanels";
+import { FlagsPanel } from "./GrowthOpsPanels";
 import CaseStudiesPanel from "./CaseStudiesPanel";
 import ThemesPanel from "./ThemesPanel";
-import BillingPanel from "./BillingPanel";
 import ProvisionRunsPanel from "./ProvisionRunsPanel";
 import TenantDetail from "./TenantDetail";
 import OverviewPanel from "./OverviewPanel";
@@ -35,9 +34,7 @@ const SECTIONS = [
   ["privacy", "Privacy"],
   ["provisioning", "Provisioning"],
   ["themes", "Themes"],
-  ["billing", "Billing"],
   ["flags", "Flags"],
-  ["costs", "Costs"],
   ["case-studies", "Case studies"],
   ["queues", "Queues"],
 ];
@@ -409,9 +406,7 @@ export default function PlatformAdmin() {
         <PrivacyOpsPanel />
         <ProvisionRunsPanel />
         <ThemesPanel />
-        <BillingPanel />
         <FlagsPanel />
-        <CostsPanel />
         <CaseStudiesPanel />
         <QueuesPanel />
       </main>
