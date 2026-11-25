@@ -52,7 +52,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - [ ] A merchant uses the editor (page list, section tree, inspector, preview, publish panel) in the new shell
 - [ ] An admin can manage settings (store details, checkout and payments, shipping, domains), integrations and billing on the new UI; staff and support cannot reach them, and signed-out visitors never see the support-access banner
 - [x] An admin can invite a team member with a role and remove one; only the owner can grant or transfer ownership
-- [ ] A merchant can see analytics, experiments, insights and automations on the new UI (the Publishing page is built with the editor line)
+- [x] A merchant can see analytics, experiments, insights and automations on the new UI (the Publishing page is built with the editor line)
 - [ ] A merchant can create and edit product-finder quizzes on the new UI; support sees them read-only
 - [ ] The old console screens and their components are removed once every route has a new screen
 
@@ -123,6 +123,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - **Archived pages and saved templates:** bringing back an archived page (archive is terminal today) and renaming or deleting saved templates (they sit in retired `cms_templates`; move templates to their own store first) need a line with its own design.
 - **Sidebar at 768px:** `docs/UI.md` says the console sidebar collapses to icons at tablet width; it stays fully open. Fix in the shell.
 - **Soft-navigation writes from support:** opening `/admin/onboarding` as support sends `POST /api/admin/preview-session` and `/admin/releases` sends `PUT /api/admin/documents`; the shell drill lists them under `found.softNav`. Check those pages' own support passes (the editor line covers releases).
+- **Insights model id:** `lib/ai/insights.js` hard-codes the model id (`AI_MODEL`); read it from config with a checked default before the AI line.
 - **Font licences (owner):** fonts are now self-hosted from `app/fonts/` (done 2026-11-25). Before the site is hosted, add each family's SIL OFL 1.1 text (`OFL.txt` for Geist/Geist Mono and for Fraunces) next to its files; no copy existed on this machine.
 - `requireAdmin`'s origin check passes a write with no Origin header; add a `Sec-Fetch-Site: cross-site` refusal as a second layer.
 

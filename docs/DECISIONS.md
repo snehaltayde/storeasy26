@@ -3,6 +3,14 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Analytics, experiments, insights and automations on the new UI (on the owner's behalf)
+
+- **Permissions:** starting or resuming an experiment needs `storefront.publish` (staff lose this; drafting, pausing and completing stay `storefront.write`); a start that changes nothing isn't audited again. Automations are owner/admin only; retries, the kill switch and insights dismiss/restore now write audit rows; a dry run with automations off stores nothing. Support's analytics carry aggregates only.
+- **Integrity:** CSV exports neutralise cells that start with `=`, `+`, `-`, `@`, tab or carriage return (shopper-typed search terms could run as spreadsheet formulas). Experiment weights summing to 100 is enforced in the form, not the server, so older experiments aren't rejected; a running experiment hides per-variant rates. Insights never call an AI provider without a key (Generate answers 503 and stores nothing).
+- **Left as found:** `lib/ai/insights.js` hard-codes its model id; recorded under Later.
+- **Decided by:** Claude
+- **Slice:** Phase 2 line 9
+
 ## 2026-11-25 Team on the new UI and the ownership fixes (on the owner's behalf)
 
 - **Permissions (bugs fixed):** a role change, removal or transfer on someone who isn't a member answers 404 and writes nothing (before, a role change added any platform user to the store). The last-owner guard and "an admin can't touch an owner" are part of the same statement that writes (`setMemberRole`, `removeMembership`), so concurrent changes can't leave a store with no owner or let an admin demote someone who just became owner. Creating or revoking an owner invite needs `team.owner`. Nobody can remove themselves.
