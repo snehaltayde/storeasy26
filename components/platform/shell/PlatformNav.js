@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Store, ListChecks, Plus } from "lucide-react";
+import { Wrench } from "lucide-react"; // line 6: Operations
 import {
   Sidebar,
   SidebarContent,
@@ -22,6 +23,7 @@ const ICONS = {
   stores: Store,
   onboarding: ListChecks,
   "new-store": Plus,
+  operations: Wrench,
 };
 
 // 240px from 1024px, icons with tooltips at 768-1023px, a sheet below 768px

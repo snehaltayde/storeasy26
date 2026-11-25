@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireOperator } from "@/lib/platform/require-operator";
-import { listJobs, listInbox, queueStats, replayJob, replayInbox } from "@/lib/platform/jobs";
+import { listJobs, listInbox, queueStats, replayJob, replayInbox, discardJob, discardInbox } from "@/lib/platform/jobs";
 import { runDueJobs, TICK_BUDGET_MS } from "@/lib/platform/worker";
 import { audit, operatorActor } from "@/lib/platform/audit";
 
@@ -10,6 +10,7 @@ import { audit, operatorActor } from "@/lib/platform/audit";
 // money paths change state once).
 //   GET  ?status=&tenant=&limit=     → { stats, jobs, inbox }
 //   POST {action:"replay", kind:"job"|"inbox", id}
+//   POST {action:"discard", kind:"job"|"inbox", id}   (Phase 3 line 6: dead rows only)
 //   POST {action:"tick"}             → drain due jobs now (operator button)
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,13 +41,18 @@ export async function POST(request) {
       const ok = await replayInbox(String(body.id || ""), { actor: operatorActor(auth.operator) });
       return NextResponse.json({ ok }, { status: ok ? 200 : 404 });
     }
+    if (body.action === "discard" && (body.kind === "job" || body.kind === "inbox")) {
+      const discard = body.kind === "job" ? discardJob : discardInbox;
+      const ok = await discard(String(body.id || ""), { actor: operatorActor(auth.operator) });
+      return NextResponse.json(ok ? { ok } : { error: "Only a dead letter can be discarded, and this one isn't (or no longer exists)." }, { status: ok ? 200 : 404 });
+    }
     if (body.action === "tick") {
       // same budget as the tick route, so catalog sync slices run too (GEN-02)
       const results = await runDueJobs({ limit: 25, budgetMs: TICK_BUDGET_MS });
-      await audit({ actor: auth.operator, action: "queue.tick", resource: "queue:jobs", tenantId: null, diff: { ran: results.length, failed: results.filter((r) => r.ok === false).length } });
+      await audit({ actor: operatorActor(auth.operator), action: "queue.tick", resource: "queue:jobs", tenantId: null, diff: { ran: results.length, failed: results.filter((r) => r.ok === false).length } });
       return NextResponse.json({ ok: true, ran: results.length, failed: results.filter((r) => r.ok === false).length });
     }
-    return NextResponse.json({ error: "action must be replay|tick" }, { status: 400 });
+    return NextResponse.json({ error: "action must be replay, discard or tick" }, { status: 400 });
   } catch (e) {
     return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 400 });
   }

@@ -55,6 +55,8 @@ export const PLATFORM_ROUTES = Object.freeze([
   { path: "queues", method: "GET", write: false },
   { path: "queues", method: "POST", write: true, variant: "replay-job", probe: { body: { action: "replay", kind: "job", id: "job_missing" } } },
   { path: "queues", method: "POST", write: true, variant: "replay-inbox", probe: { body: { action: "replay", kind: "inbox", id: "inbox_missing" } } },
+  { path: "queues", method: "POST", write: true, variant: "discard-job", probe: { body: { action: "discard", kind: "job", id: "job_missing" } } },
+  { path: "queues", method: "POST", write: true, variant: "discard-inbox", probe: { body: { action: "discard", kind: "inbox", id: "inbox_missing" } } },
   { path: "queues", method: "POST", write: true, variant: "tick", probe: { body: { action: "tick" } } },
   { path: "stores", method: "GET", write: false, probe: { query: "check=1&slug=probe-slug" } },
   { path: "stores", method: "POST", write: true, probe: { body: {} } },

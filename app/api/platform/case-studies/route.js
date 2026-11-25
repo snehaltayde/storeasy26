@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireOperator } from "@/lib/platform/require-operator";
 import { upsertCaseStudy, setCaseStudyPublished, listCaseStudies, deleteCaseStudy } from "@/lib/platform/case-studies";
-import { audit } from "@/lib/platform/audit";
+import { audit, operatorActor } from "@/lib/platform/audit";
 
 // Case-study authoring for the marketing site's /customers (MK06), operator
 // only. Publishing is gated in lib/platform/case-studies.js; every save,
@@ -25,17 +25,17 @@ export async function POST(request) {
   try {
     if (body?.case_study) {
       const caseStudy = await upsertCaseStudy(body.case_study);
-      await audit({ actor: auth.operator, action: "case_study.save", resource: `case:${caseStudy.slug}`, tenantId: null });
+      await audit({ actor: operatorActor(auth.operator), action: "case_study.save", resource: `case:${caseStudy.slug}`, tenantId: null });
       return NextResponse.json({ ok: true, caseStudy });
     }
     if (body?.publish_case) {
       const r = await setCaseStudyPublished(String(body.publish_case.slug || ""), !!body.publish_case.published);
-      await audit({ actor: auth.operator, action: "case_study.publish", resource: `case:${r.slug}`, diff: { published: r.published }, tenantId: null });
+      await audit({ actor: operatorActor(auth.operator), action: "case_study.publish", resource: `case:${r.slug}`, diff: { published: r.published }, tenantId: null });
       return NextResponse.json({ ok: true, ...r });
     }
     if (body?.delete_case) {
       const r = await deleteCaseStudy(String(body.delete_case.slug || ""));
-      await audit({ actor: auth.operator, action: "case_study.delete", resource: `case:${r.slug}`, tenantId: null });
+      await audit({ actor: operatorActor(auth.operator), action: "case_study.delete", resource: `case:${r.slug}`, tenantId: null });
       return NextResponse.json({ ok: true, ...r });
     }
     return NextResponse.json({ error: "Nothing to do" }, { status: 400 });

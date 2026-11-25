@@ -42,6 +42,7 @@
     "webhooks:register": "node --env-file=.env.local scripts/register-webhooks.js",
     "test:tenancy": "node scripts/test-tenancy.js",
     "test:platform-sync": "node scripts/test-platform-sync.js",
+    "test:platform-operations": "node scripts/test-platform-operations.js",
     "test:admin-console": "node scripts/test-admin-console.js",
     "test:refs": "node scripts/test-refs.js",
     "test:platform-ops": "node scripts/test-platform-ops.js",

@@ -155,7 +155,7 @@ async function platformShell(drill) {
   drill.check(Boolean(session), "an operator session row exists", null);
   await settle(page);
   const navIds = await page.locator("[data-nav-item]").evaluateAll((els) => els.map((e) => e.getAttribute("data-nav-item")));
-  drill.check(navIds.join(",") === "stores,onboarding,new-store", "the nav: Stores, Signups & onboarding, New store", navIds);
+  drill.check(navIds.slice(0, 3).join(",") === "stores,onboarding,new-store", "the nav: Stores, Signups & onboarding, New store", navIds);
   drill.check((await page.locator('[data-nav-item="stores"][aria-current="page"]').count()) === 1, "on /platform, Stores is the current item", null);
   drill.check((await page.locator(`${SHELL} [data-legacy]`).count()) >= 1 && !ERROR_TEXT.test(await text(page)), "the old /platform console renders in its [data-legacy] region inside the shell", null);
   await page.locator('[data-shell-control="account"]').click();
