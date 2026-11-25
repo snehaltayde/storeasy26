@@ -370,7 +370,7 @@ await t("static: the nav ends with Operations and platform-pages.js lists the pa
 
 await t("static: the page sends anyone who isn't an operator to /platform", async () => {
   const src = await readFile(join(ROOT, "app/(console)/platform/operations/page.js"), "utf8");
-  ok(/operatorFromCookie\(/.test(src) && /redirect\("\/platform"\)/.test(src), "guarded");
+  ok(/platformOperator\(/.test(src) && /redirect\("\/platform"\)/.test(src), "guarded");
 });
 
 await t("no network: nothing reached fetch()", async () => {

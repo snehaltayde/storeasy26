@@ -473,6 +473,15 @@ export const DRILLS = {
   },
   // Phase 2 line 8: the team screen on the roles store (invite, accept, roles, transfer); evidence in docs/cms-reviews/drills/TEAM/
   team: { id: "TEAM", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/team/run.mjs", ...c.headed])) },
+  // Phase 3 line 6: the operator's Operations page (queues, provisioning runs, privacy requests, themes, case studies), on the --p3 design store
+  "platform-ops": {
+    id: "PLATFORM-OPS",
+    warm: true,
+    async run(c) {
+      const seeded = await c.node(["scripts/seed-design-documents.js", "--p3"]);
+      return seeded !== 0 ? seeded : c.node(["scripts/drills/platform-ops/run.mjs", ...c.headed]);
+    },
+  },
   // the operator's Signups & onboarding screen (Phase 1 line 8 §5 item 16), on
   // the --p3 design store like signup
   "operator-onboarding": {
