@@ -286,6 +286,12 @@ async function roleAtWidth(drill, page, role, width, out) {
       if (role === "support" && width === 1280) check(o.enabledWrites.length === 0, `${href}: support sees no enabled control in the step panel`, o.enabledWrites);
       continue;
     }
+    if (href === "/admin/studio") {
+      // full screen (Phase 6): the studio covers the console shell, so its own top bar is the check
+      const studio = await page.evaluate(() => ({ top: !!document.querySelector("[data-studio-top]"), exit: [...document.querySelectorAll("[data-studio-top] a, [data-studio-top] button")].some((e) => /Exit studio/.test(e.textContent || "")) }));
+      check(r?.status() === 200 && !ERROR_TEXT.test(body) && studio.top && studio.exit, `${href} opens full screen (200, no error, its top bar with Exit studio)`, { status: r?.status(), error: ERROR_TEXT.test(body), ...studio });
+      continue;
+    }
     const content = await page.evaluate(contentOk);
     let current;
     if (width === 375) {
