@@ -86,7 +86,7 @@ stage("addresses", async (drill) => {
   await workCard.getByRole("button", { name: "Make default" }).click();
   await page.getByRole("status").filter({ hasText: "Default address changed." }).waitFor();
   const cards = await page.locator("li[data-address]").allInnerTexts();
-  drill.check(cards.length === 2 && cards[0].includes(WORK.line1) && /default/i.test(cards[0]) && !/default/i.test(cards[1]), "two saved, the second is now the default and listed first", cards);
+  drill.check(cards.length === 2 && cards[0].includes(WORK.line1) && !cards[0].includes("Make default") && cards[1].includes("Make default"), "two saved, the second is now the default and listed first", cards);
   const rows = await addressRows();
   drill.check(rows.length === 2 && rows.filter((r) => r.is_default).length === 1 && rows.find((r) => r.is_default).line1 === WORK.line1, "the store holds two addresses, one default", rows.map((r) => [r.line1, r.is_default]));
   await drill.shoot(page, "addresses-account");
