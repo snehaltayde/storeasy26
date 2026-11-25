@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { infraResponse } from "@/lib/infra-response";
 import { requireAdmin } from "@/lib/admin-auth";
 import { platformDb, platformConfigured } from "@/lib/platform/control";
-import { createInvite, addMembership, removeMembership } from "@/lib/platform/identity";
+import { createInvite, addMembership, removeMembership, expirePendingInvites } from "@/lib/platform/identity";
 import { currentTenant } from "@/lib/tenant-context";
 import { audit } from "@/lib/platform/audit";
 import { slog } from "@/lib/log";
@@ -93,12 +93,14 @@ export const POST = tenantHandler(async (request) => {
     if (body.action === "role") {
       if (!ROLES.includes(body.role)) return NextResponse.json({ error: `role must be one of ${ROLES.join(", ")}` }, { status: 422 });
       await addMembership(String(body.userId || ""), tenant.id, body.role); // final-owner guard inside
+      await expirePendingInvites(String(body.userId || ""), tenant.id); // Phase 1 audit (P1-A)
       slog("team_role_set", { user: body.userId, role: body.role });
       await audit({ actor: auth.actor, action: auditAction, resource: `member:${body.userId}`, diff: { role: body.role, targetWasOwner } });
       return NextResponse.json({ ok: true, ...(await view(tenant.id)) });
     }
     if (body.action === "remove") {
       await removeMembership(String(body.userId || ""), tenant.id); // final-owner guard inside
+      await expirePendingInvites(String(body.userId || ""), tenant.id); // Phase 1 audit (P1-A)
       slog("team_removed", { user: body.userId });
       await audit({ actor: auth.actor, action: auditAction, resource: `member:${body.userId}`, diff: { removed: true, targetWasOwner } });
       return NextResponse.json({ ok: true, ...(await view(tenant.id)) });
