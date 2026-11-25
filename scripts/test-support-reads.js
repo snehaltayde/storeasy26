@@ -71,6 +71,7 @@ const CNY = {
   bApp: "cnybapp0",
   // Phase 4 line 3: store B's custom app (its name), and A's webhook address path
   bWebhookApp: "cnybhookapp0",
+  bTheme: "cnybtheme0", // Phase 5 line 1: store B's uploaded theme's name
   hookPath: "cnyhookpath0",
 };
 const SECRET_KEYS = [
@@ -290,7 +291,14 @@ await a.run(async () => {
   await tdb.updateTable("plugin_deliveries").set({ status: "delivered", attempts: 1, last_status: 200, delivered_at: new Date().toISOString() }).execute();
 });
 
+// Phase 5 line 1: Aurora uploaded in A; a theme in B whose name and description are canaries
+const auroraText = await readFile(join(ROOT, "scripts/fixtures/themes/aurora.theme.json"), "utf8");
+const themeA = await call("owner", "themes", "POST", { body: JSON.parse(auroraText) });
+const themeB = await call("owner-b", "themes", "POST", { body: { ...JSON.parse(auroraText), id: "cnyb-theme", name: CNY.bTheme, description: CNY.bTheme }, host: b.tenant.domains[0] });
+
 const CTX = {
+  themeId: themeA.body?.package?.id ?? null,
+  bThemeId: themeB.body?.package?.id ?? null,
   appId: appA.body?.install?.id ?? null,
   secretAppId: secretApp.body?.install?.id ?? null,
   webhookAppId: hookA.body?.install?.id ?? null,
@@ -360,7 +368,7 @@ await t("setup: outside services blank, only file: databases, the fixture plante
   eq(secretSaved.status, 200, `the app secret saved: ${secretSaved.text?.slice(0, 200)}`);
   eq(appB.status, 200, `store B's app: ${appB.text?.slice(0, 200)}`);
   ok(CNY.webhookSecret.length >= 6 && hookB.status === 200, `the custom apps (line 3): ${hookA.text?.slice(0, 160)} | ${hookB.text?.slice(0, 160)}`);
-  for (const [k, v] of Object.entries({ appId: CTX.appId, secretAppId: CTX.secretAppId, bundleId: CTX.bundleId, experimentSlug: CTX.experimentSlug, quizSlug: CTX.quizSlug, collectionGid: CTX.collectionGid, appTokenSecret: /^[0-9a-f]{64}$/.test(CNY.appTokenSecret), appTokenHash: /^[0-9a-f]{64}$/.test(CNY.appTokenHash) })) ok(v, `fixture ${k} (${bundleA.text?.slice(0, 120)} | ${experimentA.text?.slice(0, 120)} | ${quizA.text?.slice(0, 120)})`);
+  for (const [k, v] of Object.entries({ appId: CTX.appId, secretAppId: CTX.secretAppId, themeId: CTX.themeId, bThemeId: CTX.bThemeId, bundleId: CTX.bundleId, experimentSlug: CTX.experimentSlug, quizSlug: CTX.quizSlug, collectionGid: CTX.collectionGid, appTokenSecret: /^[0-9a-f]{64}$/.test(CNY.appTokenSecret), appTokenHash: /^[0-9a-f]{64}$/.test(CNY.appTokenHash) })) ok(v, `fixture ${k} (${bundleA.text?.slice(0, 120)} | ${experimentA.text?.slice(0, 120)} | ${quizA.text?.slice(0, 120)})`);
   for (const k of H.OUTSIDE_SERVICE_ENV) eq(process.env[k], "", k);
   for (const tn of [a, b, c, d]) F.assertLocalDbUrl(tn.tenant.dbUrl);
   eq(CALLERS.join(","), "staff,support,operator-support,operator-support-entry", "least-trusted callers, derived from roleAllows:");
@@ -682,7 +690,7 @@ await t("P2-F analytics: a role without orders.read gets NoAccess (page words) a
 const pageRuns = {};
 for (const r of ADMIN_PAGES) {
   // "$order", "$offer", "$bundle", "$experiment" and "$quiz" are the fixture's rows (P2-D)
-  const FIXTURE = { $order: ORDER_ID, $offer: CTX.offerId, $bundle: CTX.bundleId, $experiment: CTX.experimentSlug, $quiz: CTX.quizSlug, $app: CTX.appId };
+  const FIXTURE = { $order: ORDER_ID, $offer: CTX.offerId, $bundle: CTX.bundleId, $experiment: CTX.experimentSlug, $quiz: CTX.quizSlug, $app: CTX.appId, $theme: CTX.themeId };
   const params = Object.fromEntries(Object.entries(r.params ?? {}).map(([k, v]) => [k, v in FIXTURE ? FIXTURE[v] : v]));
   pageRuns[r.page] = await pages.run(pageRel(r.page), { cookies: cookies.support, params });
 }
@@ -699,7 +707,7 @@ await t("page sweep: every console page runs as support (a page, a redirect or a
   ok(rendered.length >= 15, `most pages rendered props: ${rendered.length}; not: ${other.join(", ")}`);
   // P2-D: the dynamic pages read the fixture's rows, so support gets the page itself
   const dynamic = ADMIN_PAGES.filter((r) => Object.values(r.params ?? {}).some((v) => String(v).startsWith("$"))).map((r) => r.page);
-  eq(dynamic.sort().join(","), "apps/[id],bundles/[id],experiments/[slug],offers/[id],orders/[id],quizzes/[slug]", "dynamic rows on fixture ids:");
+  eq(dynamic.sort().join(","), "apps/[id],bundles/[id],experiments/[slug],offers/[id],orders/[id],quizzes/[slug],themes/[id]", "dynamic rows on fixture ids:");
   eq(dynamic.filter((p) => pageRuns[p].notFound || pageRuns[p].redirect || !pageRuns[p].props.length).join(","), "", "dynamic pages that did not render:");
 });
 
@@ -720,7 +728,7 @@ await t("page sweep (line 5): every console page runs as operator-support-entry,
   const bad = [];
   let rendered = 0;
   for (const r of ADMIN_PAGES) {
-    const params = Object.fromEntries(Object.entries(r.params ?? {}).map(([k, v]) => [k, v === "$order" ? ORDER_ID : v === "$app" ? CTX.appId : v]));
+    const params = Object.fromEntries(Object.entries(r.params ?? {}).map(([k, v]) => [k, v === "$order" ? ORDER_ID : v === "$app" ? CTX.appId : v === "$theme" ? CTX.themeId : v]));
     const run = await pages.run(pageRel(r.page), { cookies: cookies["operator-support-entry"], params });
     if (run.error) bad.push(`${r.page}: ${String(run.error?.message || run.error).split("\n")[0].slice(0, 200)}`);
     if (run.redirect === "/admin/login") bad.push(`${r.page}: sent to the sign-in (the __Host-support session was not accepted)`);

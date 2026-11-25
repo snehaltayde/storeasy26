@@ -10,6 +10,5 @@ export const ALLOWLIST = [
   { path: "app/fonts/geist/", reason: "self-hosted woff2 files: loaded by url() in app/fonts/fonts.css and next/font/local src paths in app/fonts/fonts.js, which the walk does not read; test:fonts checks each is referenced and exists" },
   { path: "app/fonts/geist-mono/", reason: "self-hosted woff2 files: loaded by url() in app/fonts/fonts.css and next/font/local src paths in app/fonts/fonts.js, which the walk does not read; test:fonts checks each is referenced and exists" },
   { path: "app/fonts/fraunces/", reason: "self-hosted woff2 files: loaded by url() in app/fonts/fonts.css and next/font/local src paths in app/fonts/fonts.js, which the walk does not read; test:fonts checks each is referenced and exists" },
-  { path: "lib/themes/styles.js", reason: "Phase 5 step 0 contract: the styles compiler line 2's storefront layout imports; only test:theme-format reaches it until then (remove this row when line 2 lands)" },
   { path: "scripts/fixtures/themes/", reason: "theme package fixtures read by name through a template literal (fixture(name) in test-theme-format.js, and lines 1-3's suites and drill), which the walk cannot resolve" },
 ];

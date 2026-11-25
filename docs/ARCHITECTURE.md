@@ -89,6 +89,7 @@ Merchant roles are per store (`memberships.role`) and nest: owner ⊇ admin ⊇ 
 | team.owner (grant or transfer owner) | allow | deny | deny | deny | deny | deny |
 | apps.read (see installed apps and the catalog) | allow | allow | allow | allow | deny | via support grant |
 | apps.manage (install, turn on or off, uninstall, settings; later placements, webhooks, tokens) | allow | allow | deny | deny | deny | deny (a grant is support only) |
+| themes.manage (upload and archive theme packages; reads use storefront.read) | allow | allow | deny | deny | deny | deny (a grant is support only) |
 | cart, checkout, account | — | — | — | — | own cart / own account only (confirmed by `test:shopper-reads`) | — |
 | platform console (tenants, provisioning, billing, flags, incidents) | deny | deny | deny | deny | deny | allow (TOTP sessions; bootstrap shared password until the first operator exists) |
 

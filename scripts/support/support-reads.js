@@ -17,6 +17,12 @@
 const DOC = (op, arg) => ({ path: "documents", method: "PUT", variant: op, name: `documents ${op}`, req: (ctx) => ({ body: { [op]: typeof arg === "function" ? arg(ctx) : arg } }) });
 
 export const SUPPORT_PROBES = Object.freeze([
+  // Phase 5 line 1: uploaded themes (list, archived list, a package, its file; store B's package is not on A)
+  { name: "themes", path: "themes", method: "GET", keys: ["ok", "builtins", "packages", "archived"] },
+  { name: "themes ?status=archived", path: "themes", method: "GET", req: () => ({ query: "status=archived" }), keys: ["ok", "builtins", "packages", "archived"] },
+  { name: "themes/[id]", path: "themes/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.themeId } }), keys: ["ok", "package", "content"] },
+  { name: "themes/[id] ?download", path: "themes/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.themeId }, query: "download=1" }), keys: ["format", "id", "name", "version", "author", "description", "base", "tokens", "surfaces", "templates", "styles"], note: "the stored package file itself" },
+  { name: "themes/[id] (store B's theme)", path: "themes/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.bThemeId } }), status: 404, keys: ["error", "code"], note: "another store's theme is not on this store" },
   // Phase 4 line 1: the apps list and an install's page (support gets no activity)
   { name: "apps", path: "apps", method: "GET", keys: ["ok", "installs", "catalog"] },
   { name: "apps/[id]", path: "apps/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.appId } }), keys: ["ok", "install", "plugin"] },

@@ -70,6 +70,8 @@ const MATRIX = {
   // Phase 4 line 1
   "apps.read": ["owner", "admin", "staff", "support"],
   "apps.manage": ["owner", "admin"],
+  // Phase 5 line 1
+  "themes.manage": ["owner", "admin"],
 };
 
 await t("matrix: the suite's copy equals ROLES × ACTIONS in authz.js exactly", () => {

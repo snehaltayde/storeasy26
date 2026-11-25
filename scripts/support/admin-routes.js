@@ -30,6 +30,11 @@ const SID = "ps_0000000000000000";
 
 export const ADMIN_ROUTES = Object.freeze([
   // Phase 4 line 1
+  // Phase 5 line 1: uploaded themes (probes are not a theme, or find no theme)
+  { path: "themes", method: "GET", action: "storefront.read" },
+  { path: "themes", method: "POST", action: "themes.manage", probe: { body: {} } },
+  { path: "themes/[id]", method: "GET", action: "storefront.read", probe: { params: { id: "thm_0000000000000000" } } },
+  { path: "themes/[id]", method: "POST", action: "themes.manage", probe: { params: { id: "thm_0000000000000000" }, body: { archive: true } } },
   { path: "apps", method: "GET", action: "apps.read" },
   { path: "apps", method: "POST", action: "apps.manage", probe: { body: { install: { pluginId: "no-such-app", scopes: [] } } } },
   { path: "apps/[id]", method: "GET", action: "apps.read", probe: { params: { id: "pin_0000000000000000" } } },

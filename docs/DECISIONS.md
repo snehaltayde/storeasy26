@@ -3,6 +3,19 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Phase 5 line 1: theme upload (on the owner's behalf)
+
+- **Permissions:** upload and archive check `themes.manage` before the body is read; list, detail and Download use `storefront.read` (support and operator support read, never write). The Upload and Archive controls are hidden (RoleGate `mode="hide"`), not disabled, for roles without `themes.manage`.
+- **Upload body:** the POST body is the theme file's own text (no JSON wrapper), so the 256 KB cap applies to the file; it is checked on `Content-Length` and again while streaming.
+- **Scanner normalising:** each key and string is matched in two forms, all whitespace stripped (catches `java\tscript:`) and whitespace collapsed to one space (so `<p onclick=` still shows its attribute boundary); both after entity decoding (repeated, for double encoding), NFKC and case folding, with controls, soft hyphens and zero-width and bidi marks removed.
+- **Registry setting names:** a key directly under a home section's `settings` that the section's kind declares (rich_text's `html`) is not a data-only key; its value is still scanned. Everywhere else `html`, `css`, `script` … are refused.
+- **Outside addresses** are allowed only in a home section's link `href` (still refused for `javascript:` and the rest).
+- **Role colours** in a style rule are resolved with `brandRoles(tokens, base kit)` overlaid by the package's own header and hero surfaces, then held to 4.5:1.
+- **Archived rows keep their slug and version:** re-uploading an archived version is 409; raise the version.
+- **Kill switch:** `ff_theme-packages` off refuses uploads (409); an unreadable control plane leaves uploads on (the `flagEnabled` fallback, as Phase 4's `isKilled`). Reads are not affected.
+- **Decided by:** Claude
+- **Slice:** Phase 5 line 1
+
 ## 2026-11-25 Phase 5 uploadable themes plan (on the owner's behalf)
 
 - **Schema:** one additive tenant table `theme_packages` (migration 0034). Rows are immutable and archived, never deleted; slug + version is unique. No platform migration.

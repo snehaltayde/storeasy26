@@ -293,3 +293,11 @@ Each Phase 3 line fills only its own sub-heading.
 - **States.** Loading: skeleton rows. Error: a destructive Alert in plain words with Try again. Empty: "This app doesn't add anything to your storefront." The app turned off: a warning Alert that nothing shows even when set to Live. A refusal (a link to another site, a block with nothing to show yet) is a persistent Alert and per-field messages; a success is a toast ("Badges is live.").
 - **Support and staff** (no `apps.manage`): the same rows as plain words (a Live / Off badge, the place's name, the settings as a list) and one line saying only an owner or admin can change them; no control that would be refused. Try again and Preview on store are their only controls (`data-read-control`, a row in `scripts/support/read-controls.js`).
 - **Light and dark** from the console tokens only; no raw colours.
+
+## Merchant screens: Themes (Phase 5)
+
+### Library and upload (line 1)
+- `/admin/themes` (nav "Themes", Store group, `storefront.read`): the built-in looks (Pulse, Glow) as cards with their swatch, then the uploaded themes as a `DataTable` (swatch, name, a "Live" / "In your draft" badge, version, author, uploaded by, when). An Installed / Archived filter is a pair of links. Empty state: "No uploaded themes yet".
+- "Upload theme" (`themes.manage`, hidden for staff, support and operator support): a dialog with a file picker; the file is read as text and posted as is; the button shows a spinner and "Uploading…". Success lists the base, the layouts, the home section count and the style rule count. A refusal is a destructive `Alert` listing every issue in plain words with its place (`templates.home.sections[1].settings.html`).
+- `/admin/themes/[id]`: the theme in words (brand tokens with colour dots, header and hero colours, layouts, home sections, style rules), "Download package" (the stored file) and "Archive" (`themes.manage`, hidden otherwise; an AlertDialog; refused while the theme is live or in the draft).
+- Needs the ui-designer pass: both pages (no `loading.js` yet).
