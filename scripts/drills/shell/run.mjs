@@ -138,9 +138,12 @@ function implicitSubmits() {
 //     is caught); a new document loading, or the pass ending, while the tab
 //     is still away hands them to the destination (a Next <Link> soft
 //     navigation: /admin/onboarding writes when it opens, its pass is its
-//     own), listed in found.softNav. The limit: a raw pushState that stays
-//     away looks the same as a soft navigation, so its writes go to that
-//     path too. Each
+//     own), listed in found.softNav. The tab is away from Next's RSC request
+//     for the other path (Chromium reports the history change only after the
+//     destination's first requests) or from the history change itself. The
+//     limit: a raw pushState (or a hand-made RSC request) that stays away
+//     looks the same as a soft navigation, so its writes go to that path
+//     too. Each
 //     document's first request is the drill's sentinel (an init script's GET
 //     /__shell-drill-doc?p=<path>, answered by page.route, never by Next), so a
 //     write the old document sends while it unloads still counts. A read link
@@ -278,6 +281,16 @@ async function supportNewUiControls(page, href) {
       return;
     }
     pending.add(req);
+    // a Next soft navigation's own RSC request for another path (not a
+    // prefetch) comes before the destination's requests; Chromium reports
+    // the history change itself only after them
+    if (counting && req.method() === "GET" && url.pathname !== target && req.headers().rsc === "1" && !req.headers()["next-router-prefetch"]) {
+      let main = false;
+      try {
+        main = req.frame() === page.mainFrame();
+      } catch {}
+      if (main) away = true;
+    }
     if (req.method() === "GET" || req.method() === "HEAD") return;
     seen.push({ method: req.method(), path: url.pathname });
     if (!counting || skip(req.method(), url.pathname)) return;
