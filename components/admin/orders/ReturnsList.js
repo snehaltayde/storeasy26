@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Info, Undo2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   AlertDialog,
@@ -64,11 +65,11 @@ function ReturnRow({ r, role, timeZone, onDecide }) {
           </Link>
           <span className="text-xs text-muted-foreground">Requested {orderTime(r.created_at, timeZone)}</span>
         </div>
-        <p className="text-sm text-foreground">“{r.reason}”</p>
+        <p className="max-w-prose text-sm break-words text-foreground">“{r.reason}”</p>
         {r.note && <p className="text-xs text-muted-foreground">Your note: {r.note}</p>}
       </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-        <MoneyCell amount={r.total} currency={r.currency} className="w-auto text-[0.8125rem]" />
+      {/* the amount is last at a fixed width, so amounts line up down the list */}
+      <div className="flex shrink-0 flex-wrap items-center gap-2 sm:flex-nowrap sm:justify-end">
         {OPEN.includes(r.status) && (
           <>
             {r.status === "requested" ? (
@@ -91,6 +92,7 @@ function ReturnRow({ r, role, timeZone, onDecide }) {
             </RoleGate>
           </>
         )}
+        <MoneyCell amount={r.total} currency={r.currency} className="order-first w-24 text-left text-[0.8125rem] sm:order-none sm:text-right" />
       </div>
     </li>
   );
@@ -138,9 +140,12 @@ export function ReturnsList({ returns = [], role, timeZone }) {
 
   return (
     <div className="space-y-6">
-      <p className="text-[0.8125rem] text-muted-foreground">Approving a return authorises the shopper to send items back. It moves no money: refund through your payment provider and the order mirrors it.</p>
+      <p className="flex gap-2 text-[0.8125rem] text-muted-foreground">
+        <Info aria-hidden className="mt-0.5 size-4 shrink-0 text-info" />
+        <span>Approving a return authorises the shopper to send items back. It moves no money: refund through your payment provider and the order mirrors it.</span>
+      </p>
       {open.length === 0 ? (
-        <EmptyState title="No open return requests" description="Requests shoppers make from their account pages show here." />
+        <EmptyState icon={Undo2} title="No open return requests" description="Requests shoppers make from their account pages show here." />
       ) : (
         <Card className="gap-0 py-0">
           <ul aria-label="Open return requests" className="divide-y divide-border">

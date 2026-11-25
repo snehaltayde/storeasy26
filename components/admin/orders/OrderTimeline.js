@@ -19,7 +19,7 @@ const metaOf = (e) => {
 
 export function OrderTimeline({ fulfillments = [], refunds = [], events = [], currency, timeZone }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
       <Card>
         <CardHeader>
           <CardTitle className="text-[1.125rem]">Shipments ({fulfillments.length})</CardTitle>
@@ -41,8 +41,7 @@ export function OrderTimeline({ fulfillments = [], refunds = [], events = [], cu
                     <span className="font-mono">{f.tracking_number || "No tracking yet"}</span>
                   )}
                   <span className="text-xs text-muted-foreground">
-                    {f.status ? String(f.status).toLowerCase().replace(/_/g, " ") : ""}
-                    {f.updated_at ? ` · ${orderTime(f.updated_at, timeZone)}` : ""}
+                    {[f.status ? String(f.status).toLowerCase().replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) : null, f.updated_at ? orderTime(f.updated_at, timeZone) : null].filter(Boolean).join(", ")}
                   </span>
                 </li>
               ))}
@@ -73,7 +72,7 @@ export function OrderTimeline({ fulfillments = [], refunds = [], events = [], cu
           )}
         </CardContent>
       </Card>
-      <Card className="lg:col-span-2">
+      <Card className="sm:col-span-2 lg:col-span-1 xl:col-span-2">
         <CardHeader>
           <CardTitle className="text-[1.125rem]">Timeline</CardTitle>
         </CardHeader>
@@ -81,15 +80,22 @@ export function OrderTimeline({ fulfillments = [], refunds = [], events = [], cu
           {events.length === 0 ? (
             <p className="text-sm text-muted-foreground">No events recorded.</p>
           ) : (
-            <ol className="space-y-2 text-sm">
-              {events.map((e) => {
+            // a sequence, oldest first: a rail with one mark per change; the
+            // latest change gets the accent mark
+            <ol className="text-sm">
+              {events.map((e, i) => {
                 const meta = metaOf(e);
                 const detail = meta && (meta.note || meta.reason || meta.error);
+                const last = i === events.length - 1;
                 return (
-                  <li key={e.id} className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
-                    <span className="w-44 shrink-0 text-xs text-muted-foreground">{orderTime(e.created_at, timeZone)}</span>
-                    <span className="font-medium text-foreground">{e.from_status ? `${word(e.from_status)} → ${word(e.to_status)}` : word(e.to_status)}</span>
-                    {detail && <span className="min-w-0 truncate text-xs text-muted-foreground">{String(detail)}</span>}
+                  <li key={e.id} className="relative grid grid-cols-[1rem_minmax(0,1fr)] gap-x-3 pb-4 last:pb-0">
+                    {!last && <span aria-hidden className="absolute top-3 bottom-0 left-[0.4375rem] w-px bg-border" />}
+                    <span aria-hidden className={`relative mt-1.5 size-2 justify-self-center rounded-full ${last ? "bg-primary ring-4 ring-primary/15" : "bg-muted-foreground/50"}`} />
+                    <div className="min-w-0">
+                      <p className="font-medium text-foreground">{e.from_status ? `${word(e.from_status)} → ${word(e.to_status)}` : word(e.to_status)}</p>
+                      <p className="text-xs text-muted-foreground">{orderTime(e.created_at, timeZone)}</p>
+                      {detail && <p className="mt-1 text-xs break-words text-muted-foreground">{String(detail)}</p>}
+                    </div>
                   </li>
                 );
               })}

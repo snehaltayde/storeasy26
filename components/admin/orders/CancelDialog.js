@@ -63,34 +63,35 @@ export function CancelDialog({ orderId, paymentCaptured = false, open, onOpenCha
           <AlertDialogDescription>If the order is in Shopify it is cancelled there too: items restock, no refund is issued and the customer is not emailed. This can&apos;t be undone.</AlertDialogDescription>
         </AlertDialogHeader>
         <div className="space-y-4">
+          {paymentCaptured && (
+            // the refund comes first: it is the one thing that must happen elsewhere
+            <div className="space-y-1.5 rounded-md border border-warning/40 bg-warning/10 p-3">
+              <Label htmlFor="cancel-refund-id">Razorpay refund id</Label>
+              <p id="cancel-refund-hint" className="text-xs text-foreground">
+                This order was paid online. Refund it in Razorpay first, then paste the refund id here (it starts with rfnd_). Cancelling here moves no money.
+              </p>
+              <Input id="cancel-refund-id" className="bg-card font-mono" value={refundId} maxLength={80} onChange={(e) => setRefundId(e.target.value)} placeholder="rfnd_…" aria-describedby="cancel-refund-hint" aria-required="true" />
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="cancel-reason">Reason</Label>
-            <Textarea id="cancel-reason" value={reason} maxLength={MAX_REASON} onChange={(e) => setReason(e.target.value.slice(0, MAX_REASON))} placeholder="e.g. The customer asked to cancel" aria-describedby="cancel-reason-hint" />
+            <Textarea id="cancel-reason" value={reason} maxLength={MAX_REASON} onChange={(e) => setReason(e.target.value.slice(0, MAX_REASON))} placeholder="e.g. The customer asked to cancel" aria-describedby="cancel-reason-hint" rows={3} />
             <p id="cancel-reason-hint" className="flex justify-between text-xs text-muted-foreground">
-              <span>Saved on the order&apos;s timeline.</span>
+              <span>Optional. Saved on the order&apos;s timeline.</span>
               <span className="font-mono tabular-nums">
                 {reason.length}/{MAX_REASON}
               </span>
             </p>
           </div>
-          {paymentCaptured && (
-            <div className="space-y-1.5">
-              <Label htmlFor="cancel-refund-id">Razorpay refund id</Label>
-              <Input id="cancel-refund-id" className="font-mono" value={refundId} maxLength={80} onChange={(e) => setRefundId(e.target.value)} placeholder="rfnd_…" aria-describedby="cancel-refund-hint" />
-              <p id="cancel-refund-hint" className="text-xs text-muted-foreground">
-                This payment was captured. Refund it in Razorpay first, then paste the refund id here. Cancelling here does not move money.
-              </p>
-            </div>
-          )}
           {error && (
-            <p role="alert" className="text-[0.8125rem] text-destructive">
+            <p role="alert" className="rounded-md bg-destructive/5 px-3 py-2 text-[0.8125rem] text-destructive">
               {error}
             </p>
           )}
         </div>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Keep the order</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" disabled={busy || needsRefund} onClick={cancel}>
+          <AlertDialogAction variant="destructive" disabled={busy || needsRefund} aria-describedby={needsRefund ? "cancel-refund-hint" : undefined} onClick={cancel}>
             {busy ? "Cancelling…" : "Cancel order"}
           </AlertDialogAction>
         </AlertDialogFooter>

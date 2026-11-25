@@ -1,5 +1,6 @@
 "use client";
 
+import { TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/kit/empty-state";
 
@@ -9,6 +10,8 @@ import { EmptyState } from "@/components/kit/empty-state";
 export default function OrdersError({ reset }) {
   return (
     <EmptyState
+      icon={TriangleAlert}
+      className="border-solid border-destructive/30"
       title="We couldn't load your orders"
       description="Your orders are safe; this page just didn't load. Try again, and contact support if it keeps happening."
       action={

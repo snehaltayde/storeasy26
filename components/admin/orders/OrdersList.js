@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Inbox, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/kit/data-table";
 import { EmptyState } from "@/components/kit/empty-state";
@@ -61,12 +62,14 @@ export function OrdersList({ orders: first, nextBefore: firstCursor, total, filt
     },
     { key: "payment_method", header: "Payment", cell: (o) => <span className="whitespace-nowrap">{paymentWords(o.payment_method)}</span> },
     { key: "status", header: "Status", cell: (o) => <StatusBadge kind="order" status={o.status} /> },
-    { key: "total", header: "Total", align: "right", cell: (o) => <MoneyCell amount={o.total} currency={o.currency} /> },
-    { key: "push", header: "Shopify", truncate: true, className: "min-w-40", cell: (o) => pushState(o) },
+    { key: "push", header: "Shopify", truncate: true, className: "min-w-40 text-muted-foreground", cell: (o) => pushState(o) },
+    // money last, at the right edge, so totals read down one line
+    { key: "total", header: "Total", align: "right", className: "w-px pl-6 whitespace-nowrap", cell: (o) => <MoneyCell amount={o.total} currency={o.currency} /> },
   ];
 
   const empty = filtered ? (
     <EmptyState
+      icon={SearchX}
       title="No orders match"
       description={piiSearch ? "Try another status, payment or search." : "Try another status or payment, or search by the full order id."}
       action={
@@ -78,7 +81,7 @@ export function OrdersList({ orders: first, nextBefore: firstCursor, total, filt
       }
     />
   ) : (
-    <EmptyState title="No orders yet" description="Orders show here the moment a shopper checks out on your storefront." />
+    <EmptyState icon={Inbox} title="No orders yet" description="Orders show here the moment a shopper checks out on your storefront." />
   );
 
   return (

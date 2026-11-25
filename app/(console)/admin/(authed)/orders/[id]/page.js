@@ -9,6 +9,7 @@ import { redactOrderForRole, shopifyMatchLine, orderTime } from "@/lib/admin/ord
 import { shopifyAdminUrl } from "@/lib/admin/shopify-admin-url";
 import { merchantTz } from "@/lib/reporting";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EyeOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { OrderHeader } from "@/components/admin/orders/OrderHeader";
 import { OrderActions } from "@/components/admin/orders/OrderActions";
@@ -25,7 +26,7 @@ export const metadata = { title: "Order · Admin", robots: { index: false } };
 // allows (canPush, canTransition), and OrderActions gates them again.
 function Fields({ items }) {
   return (
-    <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-[8rem_1fr]">
+    <dl className="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
       {items.map(([k, v, mono]) => (
         <div key={k} className="contents">
           <dt className="text-muted-foreground">{k}</dt>
@@ -80,58 +81,60 @@ export default async function AdminOrderDetail({ params }) {
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-[1.125rem]">Customer</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {order.pii_redacted ? (
-              <p className="text-sm text-muted-foreground">
-                <Badge variant="muted" className="mr-2">
-                  Hidden for support
-                </Badge>
-                Customer details are not shown with support access.
-              </p>
-            ) : (
-              <Fields items={[["Name", order.name || "—"], ["Email", order.email || "—"], ["Phone", order.phone || "—"], ["Address", address || "No address"]]} />
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-[1.125rem]">Payment and sync</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Fields
-              items={[
-                ["Placed", orderTime(order.created_at, timeZone)],
-                ["Paid", orderTime(order.paid_at, timeZone)],
-                ["Razorpay", order.razorpay_payment_id || order.razorpay_order_id || "—", true],
-                ["Shopify order", order.shopify_order_id ? String(order.shopify_order_id).split("/").pop() : "Not sent yet", true],
-                ["Push attempts", String(order.sync_attempts ?? 0)],
-              ]}
-            />
-            {shopifyUrl && (
-              <a href={shopifyUrl} target="_blank" rel="noopener noreferrer" data-read-control className="inline-flex rounded-md text-sm font-medium text-primary underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
-                View in Shopify
-              </a>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="mt-4">
-        <OrderLines
-          items={order.items}
-          shopifyLines={shopifyLines}
-          totals={{ subtotal: order.subtotal, discount_total: order.discount_total, coupon_code: order.coupon_code, shipping_total: order.shipping_total, total: order.total, refunded_total: order.refunded_total }}
-          currency={order.currency}
-        />
-      </div>
-
-      <div className="mt-4">
-        <OrderTimeline fulfillments={projection.fulfillments} refunds={projection.refunds} events={order.events} currency={order.currency} timeZone={timeZone} />
+      {/* The order's what (lines, totals, then what happened) leads; who and
+          where it stands in payment and Shopify sit in the side column from
+          1024px, and under the lines on narrower screens. */}
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="min-w-0 space-y-4">
+          <OrderLines
+            items={order.items}
+            shopifyLines={shopifyLines}
+            totals={{ subtotal: order.subtotal, discount_total: order.discount_total, coupon_code: order.coupon_code, shipping_total: order.shipping_total, total: order.total, refunded_total: order.refunded_total }}
+            currency={order.currency}
+          />
+          <OrderTimeline fulfillments={projection.fulfillments} refunds={projection.refunds} events={order.events} currency={order.currency} timeZone={timeZone} />
+        </div>
+        <aside aria-label="Customer and payment" className="min-w-0 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-[1.125rem]">Customer</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {order.pii_redacted ? (
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <Badge variant="muted">
+                    <EyeOff aria-hidden />
+                    Hidden for support
+                  </Badge>
+                  <p>Name, email, phone and address are not shown with support access.</p>
+                </div>
+              ) : (
+                <Fields items={[["Name", order.name || "—"], ["Email", order.email || "—"], ["Phone", order.phone || "—"], ["Address", address || "No address"]]} />
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-[1.125rem]">Payment and sync</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Fields
+                items={[
+                  ["Placed", orderTime(order.created_at, timeZone)],
+                  ["Paid", orderTime(order.paid_at, timeZone)],
+                  ["Razorpay", order.razorpay_payment_id || order.razorpay_order_id || "—", Boolean(order.razorpay_payment_id || order.razorpay_order_id)],
+                  ["Shopify order", order.shopify_order_id ? String(order.shopify_order_id).split("/").pop() : "Not sent yet", Boolean(order.shopify_order_id)],
+                  ["Push attempts", String(order.sync_attempts ?? 0)],
+                ]}
+              />
+              {shopifyUrl && (
+                <a href={shopifyUrl} target="_blank" rel="noopener noreferrer" data-read-control className="inline-flex rounded-md text-sm font-medium text-primary underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
+                  View in Shopify
+                </a>
+              )}
+            </CardContent>
+          </Card>
+        </aside>
       </div>
     </>
   );

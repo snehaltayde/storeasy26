@@ -29,16 +29,16 @@ export function OrderLines({ items = [], shopifyLines = [], totals = {}, currenc
                 ) : null}
               </p>
               <p className="text-xs text-muted-foreground">
-                {it.variant_title ? `${it.variant_title} · ` : ""}× {it.quantity}
+                {it.variant_title && it.variant_title !== "Default Title" ? `${it.variant_title}, ` : ""}qty <span className="font-mono tabular-nums">{it.quantity}</span>
               </p>
               {shopifyLines[i] && <p className={SHOPIFY_LINE_CLASS}>{shopifyLines[i]}</p>}
             </div>
-            <span className="font-mono tabular-nums">{money(it.line_total)}</span>
+            <span className="shrink-0 text-right font-mono tabular-nums">{money(it.line_total)}</span>
           </li>
         ))}
       </ul>
       <CardContent className="border-t border-border py-4">
-        <dl className="space-y-1 text-sm">
+        <dl className="ml-auto max-w-sm space-y-1 text-sm">
           <div className="flex justify-between text-muted-foreground">
             <dt>Subtotal</dt>
             <dd className="font-mono tabular-nums">{money(totals.subtotal)}</dd>
@@ -53,7 +53,7 @@ export function OrderLines({ items = [], shopifyLines = [], totals = {}, currenc
             <dt>Shipping</dt>
             <dd className="font-mono tabular-nums">{totals.shipping_total ? money(totals.shipping_total) : "Free"}</dd>
           </div>
-          <div className="flex justify-between text-base font-semibold text-foreground">
+          <div className="mt-2 flex justify-between border-t border-border pt-2 text-base font-semibold text-foreground">
             <dt>Total</dt>
             <dd className="font-mono tabular-nums">{money(totals.total)}</dd>
           </div>

@@ -28,18 +28,26 @@ export function OrderHeader({ order, timeZone, actions = null }) {
   return (
     <PageHeader
       breadcrumb={[{ label: "Orders", href: "/admin/orders" }, { label: order.id }]}
+      // The id is the heading (with Copy); the states sit under it so the
+      // heading's name stays the id and the badges wrap on a phone.
       title={
-        <span className="flex flex-wrap items-center gap-2">
-          <span className="font-mono">{order.id}</span>
+        <span className="inline-flex max-w-full items-center gap-1.5 py-0.5 pr-0.5">
+          <span className="truncate font-mono">{order.id}</span>
           <Button type="button" variant="ghost" size="icon-sm" data-read-control aria-label={copied ? "Order id copied" : "Copy order id"} onClick={copy}>
             {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
           </Button>
-          <StatusBadge kind="order" status={order.status} />
-          {order.financial_status && <Badge variant={order.refunded_total > 0 ? "warning" : "muted"}>{PLAIN(order.financial_status)}</Badge>}
-          {order.fulfillment_status && <Badge variant="muted">{PLAIN(order.fulfillment_status)}</Badge>}
         </span>
       }
-      description={`${paymentWords(order.payment_method)} · placed ${orderTime(order.created_at, timeZone)}`}
+      description={
+        <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+          <StatusBadge kind="order" status={order.status} />
+          {order.financial_status && <Badge variant={order.refunded_total > 0 ? "warning" : "muted"}>Shopify: {PLAIN(order.financial_status).toLowerCase()}</Badge>}
+          {order.fulfillment_status && <Badge variant="muted">{PLAIN(order.fulfillment_status)}</Badge>}
+          <span>
+            {paymentWords(order.payment_method)}, placed {orderTime(order.created_at, timeZone)}
+          </span>
+        </span>
+      }
       actions={actions}
     />
   );
