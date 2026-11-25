@@ -11,7 +11,7 @@ import { applyTreeOps, createTabStorage, framePathFor, inspectorPath, readOnlyAp
 import { createStudioModel, orderMessage, restoreOps } from "./studioModel";
 import StudioTopBar from "./StudioTopBar";
 import SectionsRail from "./SectionsRail";
-import DesignRail from "./DesignRail";
+import DesignRail, { designStoreFor } from "./DesignRail";
 
 // Phase 6 step 0 (docs/plans/phase-6.md): the studio's shell. A full-screen
 // frame over the console: top bar, a left rail with two tabs (Sections,
@@ -28,6 +28,13 @@ export const STUDIO_TABS = Object.freeze([
   { id: "sections", words: "Sections" },
   { id: "design", words: "Design" },
 ]);
+// below 1024px the rails become tabs (Phase 6 line 1 feature 1)
+export const STUDIO_PANES = Object.freeze([
+  { id: "sections", words: "Sections" },
+  { id: "edit", words: "Edit" },
+  { id: "design", words: "Design" },
+  { id: "preview", words: "Preview" },
+]);
 export const STUDIO_WORDS = Object.freeze({
   readOnly: "You can look at your store here but not change it.",
   loading: "Opening the studio…",
@@ -35,12 +42,24 @@ export const STUDIO_WORDS = Object.freeze({
   missing: "This page isn't there any more.",
 });
 
+export const DESIGN_DOC = "doc_design";
+// the store openDocument reuses for id, or null (make one): doc_design is
+// the Design tab's store when it has one (never a second store), any other
+// document the one this session kept
+export function storeToOpen(id, { kept = new Map(), design = null } = {}) {
+  if (id === DESIGN_DOC) return design && design.getState?.().id === DESIGN_DOC ? design : null;
+  return kept.get(id) || null;
+}
+
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const noSub = () => () => {};
 const noState = () => null;
 
 // The layout, all props (rendered on its own in test-studio).
-export function StudioView({ topBar = null, note = null, readOnly = false, tab = "sections", onTab, sections = null, design = null, preview = null, inspector = null }) {
+export function StudioView({ topBar = null, note = null, readOnly = false, tab = "sections", onTab, pane = "preview", onPane, sections = null, design = null, preview = null, inspector = null }) {
+  // small screens show one pane at a time; from lg all three columns show
+  const shown = (id) => (pane === id ? "flex" : "hidden");
+  const railPane = pane === "sections" || pane === "design";
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background text-foreground" data-studio="" data-studio-readonly={readOnly ? "" : undefined}>
       {topBar}
@@ -49,9 +68,29 @@ export function StudioView({ topBar = null, note = null, readOnly = false, tab =
           {note}
         </Notice>
       )}
+      <div role="tablist" aria-label="Studio panes" className="flex gap-1 border-b border-border p-2 lg:hidden" data-studio-panes="">
+        {STUDIO_PANES.map((p) => (
+          <Button
+            key={p.id}
+            type="button"
+            size="sm"
+            variant={pane === p.id ? "secondary" : "ghost"}
+            role="tab"
+            aria-selected={pane === p.id}
+            onClick={() => {
+              onPane?.(p.id);
+              if (p.id === "sections" || p.id === "design") onTab?.(p.id);
+            }}
+            data-studio-pane={p.id}
+            data-read-control=""
+          >
+            {p.words}
+          </Button>
+        ))}
+      </div>
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[18rem_minmax(0,1fr)_22rem]">
-        <aside aria-label="Studio tools" className="flex min-h-0 flex-col border-r border-border" data-studio-rail="">
-          <div role="tablist" aria-label="Studio tools" className="flex gap-1 border-b border-border p-2">
+        <aside aria-label="Studio tools" className={`${railPane ? "flex" : "hidden"} min-h-0 flex-col border-r border-border lg:flex`} data-studio-rail="">
+          <div role="tablist" aria-label="Studio tools" className="hidden gap-1 border-b border-border p-2 lg:flex">
             {STUDIO_TABS.map((t) => (
               <Button key={t.id} type="button" size="sm" variant={tab === t.id ? "secondary" : "ghost"} role="tab" aria-selected={tab === t.id} onClick={() => onTab?.(t.id)} data-studio-tab={t.id} data-read-control="">
                 {t.words}
@@ -62,10 +101,10 @@ export function StudioView({ topBar = null, note = null, readOnly = false, tab =
             {tab === "design" ? design : sections}
           </div>
         </aside>
-        <main className="flex min-h-0 min-w-0 flex-col p-3" data-studio-preview="">
+        <main className={`${shown("preview")} min-h-0 min-w-0 flex-col p-3 lg:flex`} data-studio-preview="">
           {preview}
         </main>
-        <aside aria-label="Inspector" className="min-h-0 overflow-y-auto border-l border-border p-3" data-studio-inspector="">
+        <aside aria-label="Inspector" className={`${pane === "edit" ? "block" : "hidden"} min-h-0 overflow-y-auto border-l border-border p-3 lg:block`} data-studio-inspector="">
           {inspector}
         </aside>
       </div>
@@ -84,9 +123,19 @@ export default function Studio({ document: entry, note = null, can = {}, role = 
   const [load, setLoad] = useState({ status: "loading" });
   const [selection, setSelection] = useState(null);
   const [tab, setTab] = useState("sections");
+  const [pane, setPane] = useState("preview");
   const [previewView, setPreviewView] = useState(null);
   const [published, setPublished] = useState(null);
   const storeRef = useRef(null);
+  // Phase 6 line 1: one store per document opened this session, kept open
+  // (still autosaving) when the founder switches, so undo can reach any of
+  // them and Publish flushes them all. Line 2's design store joins with
+  // registerStore(store) → unregister.
+  const storesRef = useRef(new Map());
+  // doc_design has one store: the Design tab's (designStoreFor) when it has
+  // one; else the studio makes it, the tab shares it, and on leaving it the
+  // studio flushes and disposes it (the tab then opens its own)
+  const ownDesign = useRef(null);
   const postRef = useRef(null);
   const openSeq = useRef(0);
   const tabStorage = useMemo(() => {
@@ -107,11 +156,28 @@ export default function Studio({ document: entry, note = null, can = {}, role = 
       const mine = ++openSeq.current;
       setLoad({ status: "loading" });
       setSelection(null);
+      const prev = storeRef.current;
+      if (prev && prev === ownDesign.current && id !== DESIGN_DOC) {
+        // saved before the studio moves on, so the Design tab's own store
+        // (opened when it sees the studio leave) reads the fresh revision
+        ownDesign.current = null;
+        if (!prev.readOnly) await prev.beforeNavigate().catch(() => null);
+        prev.dispose();
+        if (mine !== openSeq.current) return;
+      }
+      const kept = storeToOpen(id, { kept: storesRef.current, design: designStoreFor({ model }) });
+      if (kept) {
+        storeRef.current = kept;
+        setStore(kept);
+        setLoad({ status: "ready" });
+        return;
+      }
       const r = await api.call("getDocument", id);
       if (mine !== openSeq.current) return;
-      storeRef.current?.dispose();
       if (r?.ok && isObj(r.data?.document)) {
         const s = createDocumentStore({ api, document: r.data.document, tenant: typeof window !== "undefined" ? window.location.host : "", storage: tabStorage, readOnly: !canWrite });
+        if (s.getState().id === DESIGN_DOC) ownDesign.current = s;
+        else storesRef.current.set(s.getState().id, s);
         storeRef.current = s;
         setStore(s);
         await s.open();
@@ -122,17 +188,28 @@ export default function Studio({ document: entry, note = null, can = {}, role = 
       setStore(null);
       setLoad(r?.code === "NOT_FOUND" ? { status: "missing" } : { status: "failed", message: r?.message });
     },
-    [api, tabStorage, canWrite],
+    [api, tabStorage, canWrite, model],
   );
 
   useEffect(() => {
     api.call("listDocuments", true).then((r) => r?.ok && Array.isArray(r.data?.documents) && setDocs(r.data.documents));
     openDocument(entry?.id || "doc_home");
+    const all = storesRef.current;
     return () => {
-      storeRef.current?.dispose();
+      for (const s of all.values()) s.dispose();
+      all.clear();
+      ownDesign.current?.dispose();
+      ownDesign.current = null;
       model.close();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const registerStore = useCallback((s) => {
+    const id = s?.getState?.().id;
+    if (!id) return () => {};
+    storesRef.current.set(id, s);
+    return () => storesRef.current.get(id) === s && storesRef.current.delete(id);
+  }, []);
+  const refreshDocs = useCallback(() => api.call("listDocuments", true).then((r) => r?.ok && Array.isArray(r.data?.documents) && setDocs(r.data.documents)), [api]);
 
   // ---- writes (each one an undo step; the store saves it as a draft) ----
   const post = useCallback((msg) => (postRef.current ? postRef.current(msg) : false), []);
@@ -151,20 +228,28 @@ export default function Studio({ document: entry, note = null, can = {}, role = 
     const s = storeRef.current;
     if (s && ["moveUp", "moveDown", "move", "hide", "show"].includes(meta?.op)) post(orderMessage(s.getState().id, s.getState().body));
   };
+  // an undo or redo is a normal draft save on that step's document's own
+  // store (any document this session opened); never a publish
   const step = (dir) => {
-    const s = storeRef.current;
-    if (!s || !canWrite) return;
+    if (!canWrite) return;
+    const peek = dir === "undo" ? model.canUndo() : model.canRedo();
+    if (!peek) return;
     const st = dir === "undo" ? model.undo() : model.redo();
     if (!st) return;
-    if (st.docId !== s.getState().id) return; // another document's step: line 1 keeps a store per document
     if (model.handles(st.docId)) return; // doc_design: the Design tab's applier wrote it (never a whole-body snapshot here)
+    const s = storesRef.current.get(st.docId);
+    if (!s) return;
     for (const o of restoreOps(s.getState().body, dir === "undo" ? st.before : st.after)) s.setField(o.path, o.value);
-    post(orderMessage(s.getState().id, s.getState().body));
+    if (s === storeRef.current) {
+      post(orderMessage(s.getState().id, s.getState().body));
+      setSelection((sel) => (sel && (s.getState().body?.sections || []).some((x) => isObj(x) && x.id === sel) ? sel : null));
+    }
   };
-  const publish = async () => {
-    const s = storeRef.current;
-    if (!s || !canPublish) return;
-    setPublished(await s.publish());
+  // StudioPublishDialog sent the publishSet; this keeps its answer
+  const publish = (result) => {
+    if (!canPublish) return;
+    setPublished(result);
+    refreshDocs();
   };
 
   // ---- what the slots get ----
@@ -179,6 +264,8 @@ export default function Studio({ document: entry, note = null, can = {}, role = 
     docs,
     state,
     store,
+    stores: () => [...storesRef.current.values(), ...(ownDesign.current ? [ownDesign.current] : [])],
+    registerStore,
     model,
     history,
     selection,
@@ -235,6 +322,8 @@ export default function Studio({ document: entry, note = null, can = {}, role = 
       note={note}
       tab={tab}
       onTab={setTab}
+      pane={pane}
+      onPane={setPane}
       topBar={<StudioTopBar studio={studio} label={label} statusLine={statusLine} onPublish={publish} published={published} />}
       sections={<SectionsRail studio={studio} />}
       design={<DesignRail studio={studio} />}

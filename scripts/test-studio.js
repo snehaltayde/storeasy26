@@ -364,6 +364,58 @@ await t("source: the studio's writes go through the read-only api and store with
   ok(src.includes("onFrame={(p) => (postRef.current = p)}") && src.includes("fill"), "PreviewPane fill and onFrame");
 });
 
+// ---- Phase 6 line 1: publishing two open documents ---------------------------------
+console.log("— publish (line 1)");
+await t("unit: two stores saving at once with a slow save: Publish flushes both, then publishSet sends each one's fresh revision and draftHash; only touched documents that differ from live are ticked", async () => {
+  const P = await loadShell(join(ROOT, "components/admin/studio/StudioPublishDialog.js"));
+  const server = { doc_home: { revision: 1, n: 0 }, doc_design: { revision: 4, n: 0 } };
+  const sent = [];
+  let release = null;
+  const api = {
+    async call(op, args, extra) {
+      if (op === "saveDraft") {
+        const d = server[args.id];
+        sent.push(`save:${args.id}@${extra?.revision}`);
+        if (args.id === "doc_home" && !release) await new Promise((r) => (release = r)); // the slow one
+        d.revision++;
+        d.n++;
+        return { ok: true, data: { document: { id: args.id, type: args.id === "doc_home" ? "home" : "design", body: args.body, revision: d.revision, draftHash: `h_${args.id}_${d.n}` }, issues: [] } };
+      }
+      if (op === "listDocuments") return { ok: true, data: { documents: [{ id: "doc_home", label: "Home page", unpublishedChanges: true }, { id: "doc_design", label: "Brand", unpublishedChanges: true }, { id: "doc_about", label: "About us", unpublishedChanges: true }] } };
+      if (op === "publishSet") return (sent.push({ publishSet: args }), { ok: true, data: { published: args.map((x) => ({ id: x.id })) } });
+      return { ok: true, data: {} };
+    },
+    sendKeepalive() {},
+  };
+  const timers = { setTimeout: () => 0, clearTimeout() {} };
+  const home = St.createDocumentStore({ api, document: { id: "doc_home", type: "home", body: body(["A", "B"]), revision: 1, draftHash: "h0" }, timers, now: () => 0 });
+  const design = St.createDocumentStore({ api, document: { id: "doc_design", type: "design", body: { settings: { brand: null } }, revision: 4, draftHash: "d0" }, timers, now: () => 0 });
+  const model = M.createStudioModel();
+  const before = home.getState().body;
+  home.setField("sections", [...before.sections].reverse());
+  model.record({ docId: "doc_home", before, after: home.getState().body });
+  design.setField("settings", { brand: { accent: "#123456" } });
+  model.touch("doc_design");
+  const run = P.createPublishRun({ api, stores: () => [home, design], current: () => home });
+  const prepping = run.prepare();
+  await new Promise((r) => setTimeout(r, 5));
+  ok(release, "the home save is in flight");
+  release();
+  const prep = await prepping;
+  ok(prep.ok, `prepared: ${prep.message}`);
+  const rows = P.publishRows(prep.documents, { touched: model.touched() });
+  eq(rows.ticked.map((r) => r.id), ["doc_home", "doc_design"], "ticked (touched, differing):");
+  eq(rows.other.map((r) => r.id), ["doc_about"], "other drafts:");
+  const r = await run.publish(rows.ticked.map((x) => x.id));
+  const set = sent.find((x) => x.publishSet)?.publishSet;
+  eq(set, [
+    { id: "doc_home", revision: 2, draftHash: "h_doc_home_1" },
+    { id: "doc_design", revision: 5, draftHash: "h_doc_design_1" },
+  ], "publishSet:");
+  eq(r.outcome.phase, "done", "outcome:");
+  ok(!set.some((x) => x.id === "doc_about"), "an untouched draft stays a draft");
+});
+
 // ---- 4. nav and pages -------------------------------------------------------------
 console.log("— nav");
 const Nav = await import("../lib/admin/nav.js");

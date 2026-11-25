@@ -312,6 +312,14 @@ Each Phase 3 line fills only its own sub-heading.
 
 ## Merchant screens: Studio (Phase 6)
 
+### Studio (line 1)
+- `/admin/studio` (nav "Studio", `storefront.read`) fills the viewport (`fixed inset-0`, no console shell). Top bar: "Exit studio" (saves first; stays with words if a save fails), the document switcher (pages, home, layouts, header, footer, design), the save and preview line, Undo and Redo (⌘Z, ⇧⌘Z; `storefront.write`), Full screen, Publish (`storefront.publish`; staff read "Ask an admin to publish."). The device widths are the preview's own bar. Below 1024px the columns become tabs: Sections, Edit, Design, Preview.
+- **Sections rail:** each row has a 24px grip handle, a button "Reorder <label>" (`storefront.write`). Pointer drag starts from the handle after 4px; the row follows the pointer with a ring and shadow, a 2px primary line shows the drop spot, the rail scrolls near its edges, a refused spot rings the row in destructive and reads "Can't drop here: <reason>"; Escape cancels. Keyboard: Space or Enter picks up (the row is ringed, the handle `aria-pressed`), arrows / Home / End move it, Space or Enter drops, Escape returns it; focus stays on the handle. "Add a section here" insert points show between rows on hover or focus and open the section picker there. During a 409 the handles are disabled with "Choose which version to keep before moving sections."
+- **Live region:** one visually hidden `aria-live="assertive"` region reads "Picked up Hero, position 2 of 6. Arrow keys move it, Space drops it, Escape cancels." / "Hero, position 3 of 6." / "Can't go there: <reason>." / "Hero dropped at position 3 of 6." / "Move cancelled. Hero is back at position 2."
+- **Publish dialog:** "Publish your changes": the documents this session changed that differ from live, ticked ("Changed in this session"), then "Other drafts", unticked ("Has other edits"). Refusals in plain words, each blocker with "Go to the fix" (opens that document and section in the studio).
+- Support and operator support: no handle, insert point, Add, row button, Undo, Redo or Publish; rows only select.
+- Needs `ui-designer`: the top bar, the rail's handle and insert points, the drop line and refused state, the publish dialog, the small-screen tabs.
+
 ### Studio: design (line 2)
 - **Design tab** (left rail): doc_design's colours, type and spacing in three groups: "Colours" (accent, background, text: a colour picker plus a hex field each, DesignForm's `BrandColourInput`), "Type" (text size) and "Spacing and shape" (space between sections, corners, button shape: DesignForm's `BrandStepSelect`). Only `validateBrand`'s options; a half-typed hex shows the field's hint and isn't posted or saved.
 - **Instant:** each change draws in the preview at once (`storeasy:tokens`), then saves as a draft (doc_design's own store, 700 ms); "Show design changes" turns on for the session. Undo and redo in the top bar take token changes back too.

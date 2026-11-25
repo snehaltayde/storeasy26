@@ -14,6 +14,9 @@
 // onChange(sections, { op: "add", id, selectedId }) and onSelect(id), so the
 // new section, whose id was minted here, is selected at once (ED-04).
 // `open` only sets how it first renders (tests and hosts that want it open).
+// Phase 6 (the studio's "Add a section here" insert points): `onClose()` is
+// called when the picker closes (picked or closed), and `where` replaces the
+// "Adds below …" words.
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { cn } from "@/components/ui/utils";
@@ -22,9 +25,13 @@ import { RoleGate } from "@/components/kit/role-gate";
 import { roleAllows } from "@/lib/platform/authz";
 import { add, addOptions } from "./treeModel";
 
-export default function AddSection({ type, sections, index, collections = null, body = null, onChange, onSelect, afterLabel = "", open: openAtFirst = false, role = null }) {
-  const [open, setOpen] = useState(!!openAtFirst);
-  const where = afterLabel ? `Adds below the ${afterLabel}` : "Adds at the end";
+export default function AddSection({ type, sections, index, collections = null, body = null, onChange, onSelect, afterLabel = "", open: openAtFirst = false, role = null, onClose, where: whereWords = null }) {
+  const [open, setOpenState] = useState(!!openAtFirst);
+  const setOpen = (v) => {
+    setOpenState(v);
+    if (!v) onClose?.();
+  };
+  const where = whereWords || (afterLabel ? `Adds below the ${afterLabel}` : "Adds at the end");
   if (!roleAllows(role, "storefront.write")) return null;
   const options = open ? addOptions(type, sections, index, { body }) : [];
 

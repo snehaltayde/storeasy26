@@ -223,7 +223,9 @@ export function treeChangeOps(before, after, meta) {
       return i < 0 ? null : [{ kind: "insert", section: after[i], index: i }];
     }
     case "moveUp":
-    case "moveDown": {
+    case "moveDown":
+    case "move": {
+      // "move": the studio's drag and keyboard hold (Phase 6)
       const i = indexOf(after, id);
       return i < 0 ? null : [{ kind: "move", id, index: i }];
     }

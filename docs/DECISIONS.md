@@ -10,6 +10,18 @@ without asking the owner are marked so they are easy to review.
 - **Sonnet builds simple lines** (storefront UX, docs, simpler first-party plugins such as reviews and Shiprocket); Opus keeps payments, OTP, subscriptions, permissions, security and hard UI.
 - Unchanged: the full unit suite on every merge, a reviewer pass on every line, and the phase-end browser suite and least-trusted audit.
 
+## 2026-11-25 Phase 6 line 1: drag-and-drop studio (on the owner's behalf)
+
+- **Schema and permissions:** none. Handles, insert points and the keyboard hold follow `storefront.write` (`dragModel.canGrab`, the same check as `RoleGate`); Publish stays `storefront.publish`. Support's Space on a row only selects.
+- **One store per document, kept open for the session:** `Studio.js` keeps every store it opened (still autosaving) when the founder switches documents, so undo reaches any document's step and Publish flushes them all. `studio.registerStore(store)` lets line 2's design store join; `studio.stores()` lists them.
+- **Publish reads drafts after the flush:** the dialog flushes every open store, then lists `listDocuments` rows with `unpublishedChanges`; an open document's revision and draftHash come from its store, any other's from a fresh `getDocument`. The publishSet goes through an open store in the set (it holds its own autosave and marks itself published), else straight through the API. Outcomes reuse `publishModel.outcomeOf`.
+- **"Changed in this session" / "Has other edits":** ticked rows are the touched documents that differ from live and read "Changed in this session"; every other draft reads "Has other edits".
+- **A drop is op `move`:** `editorModel.treeChangeOps` treats `move` like moveUp/moveDown (a `moveSection` op, so it replays over a server rewrite) instead of replacing the whole list.
+- **The held section previews without saving:** while a section is held (keyboard) or dragged (pointer) the frame gets `storeasy:order` for each spot; only the drop is a store edit, so one move is one undo step and one save. Cancel posts the original order.
+- **Device widths stay in the preview's bar** (PreviewPane already has Phone / Tablet / Desktop) rather than a second set in the top bar.
+- **Publish flushes the design store too:** `StudioTopBar.studioStores` adds line 2's `designStoreFor(studio)` to the studio's stores (one per id), so a touched `doc_design` is flushed, pre-ticked and sent with its fresh revision and draftHash. Undo: line 2's `model.onStep` applies design steps; `Studio.js` applies a step only to a store it holds, and applying the same `restoreOps` twice changes nothing.
+- **The drill seeds through the documents API** (home with four rich text sections published with the design, an About draft) in stage `open`; the later line 1 stages import its helpers.
+
 ## 2026-11-25 Phase 6 line 2: design tokens in the studio (on the owner's behalf)
 
 - **Schema and permissions:** none. Token edits are documents `saveDraft` on doc_design (`storefront.write`); support and operator support get a read-only store and disabled inputs. Two reads grew a field, both `storefront.read`: `GET /api/admin/themes/[id]` answers `tokens` (the base kit's brand under the package's tokens, exactly what an apply with its brand writes: Reset to the theme's), and `GET /api/admin/themes` `state` answers `liveBrand` and `liveTheme` (the readability check compares with what shoppers see, as the publish rule does).
