@@ -96,7 +96,10 @@ async function ownerUninstalls(drill) {
   await page.locator(`[data-app-card="${PLUGIN}"] [data-app-install="${PLUGIN}"]`).waitFor({ timeout: 15_000 });
   const list = await api(page, "apps");
   drill.check(list.status === 200 && list.json?.installs?.length === 0, "owner: uninstalled, the Installed list is empty and Install is back on Browse", list.json?.installs);
-  drill.check((await open(page, `/admin/apps/${state.installId}`)) === 404, "owner: the uninstalled app's page is a not-found");
+  // the route's loading.js streams the page, so the status is already sent: the not-found page says it
+  const goneStatus = await open(page, `/admin/apps/${state.installId}`);
+  const goneText = await page.locator("body").innerText().catch(() => "");
+  drill.check(goneStatus === 404 || /Page not found/.test(goneText), "owner: the uninstalled app's page is a not-found", goneStatus);
   await drill.shoot(page, "owner-after-uninstall");
   await page.context().close();
 }
