@@ -27,7 +27,9 @@ async function studio(drill) {
     console.log(`— stage ${s.name}`);
     await s.fn(drill);
   }
-  drill.check(consoleErrors.length === 0, "no error in the browser console", consoleErrors);
+  // stage-design asks for one refused publish on purpose (the unreadable colour answers 422)
+  const unexpected = consoleErrors.filter((e) => !/status of 422 \(Unprocessable (Entity|Content)\)/.test(e));
+  drill.check(unexpected.length === 0, "no error in the browser console", unexpected);
 }
 
 runDrill({ id: "STUDIO", part: "main", title: "STUDIO — sections, drag, instant preview, design tokens, publish, roles" }, studio).then(

@@ -57,7 +57,8 @@ async function designDraft(drill, page, settings) {
   }
   return (await docsApi(page, { getDocument: "doc_design" })).body?.document;
 }
-async function publishDesign(drill, page) {
+// the design's publish set: a store's first publish must include its home page
+async function designSet(page) {
   let home = (await docsApi(page, { getDocument: "doc_home" })).body?.document ?? null;
   if (!home) {
     await docsApi(page, { createDocument: { type: "home", body: { schema: 1, type: "home", meta: {}, sections: [{ id: "sec_stdesign01", kind: "new", v: 1, enabled: true, settings: { title: "New arrivals", limit: 8 }, blocks: [] }] } } });
@@ -66,7 +67,10 @@ async function publishDesign(drill, page) {
   const d = (await docsApi(page, { getDocument: "doc_design" })).body.document;
   const set = [{ id: "doc_design", revision: d.revision, draftHash: d.draftHash }];
   if (home && !home.live) set.push({ id: "doc_home", revision: home.revision, draftHash: home.draftHash });
-  const r = await docsApi(page, { publishSet: set });
+  return set;
+}
+async function publishDesign(drill, page) {
+  const r = await docsApi(page, { publishSet: await designSet(page) });
   drill.check(r.status === 200, "design: published for the stage", r.body?.error || r.body?.code);
 }
 
@@ -151,7 +155,7 @@ stage("design", async (drill) => {
     await owner.waitForResponse((r) => r.url().endsWith("/api/admin/documents"), { timeout: 2000 }).catch(() => null);
     low = (await docsApi(owner, { getDocument: "doc_design" })).body.document;
   }
-  const refused = await docsApi(owner, { publish: { id: "doc_design", draftHash: low.draftHash }, revision: low.revision });
+  const refused = await docsApi(owner, { publishSet: await designSet(owner) });
   drill.check(refused.status === 422 && JSON.stringify(refused.body).includes("BRAND_UNREADABLE"), "design: publishing the unreadable text colour is refused", { status: refused.status, code: refused.body?.code });
   await fix.click();
   await owner.locator('[data-design-check="blocking"]').waitFor({ state: "detached" });
