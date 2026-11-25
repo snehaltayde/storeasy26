@@ -263,7 +263,8 @@ await t("incidents: two concurrent resolves: one wins (one audit row, its closin
 
 await t("incidents: audit rows are incident.*, carry the incident's store, name the operator, and never the note", async () => {
   const rows = (await db().execute({ sql: "SELECT action, tenant_id, actor, actor_kind, diff FROM audit_log WHERE resource IN (?, ?) ORDER BY at, id", args: [`incident:${storeInc.id}`, `incident:${platformInc.id}`] })).rows;
-  eq(rows.map((r) => r.action), ["incident.open", "incident.open", "incident.update", "incident.update", "incident.resolve"]);
+  // rows written in the same millisecond have random ids, so compare as a multiset
+  eq(rows.map((r) => r.action).sort(), ["incident.open", "incident.open", "incident.resolve", "incident.update", "incident.update"]);
   for (const r of rows) {
     eq(`${r.actor}/${r.actor_kind}`, `${operatorId}/operator`, r.action);
     ok(!String(r.diff).includes("tenant.status"), "no tenant.status");
