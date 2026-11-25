@@ -349,7 +349,9 @@ await t("consoleNotices(): only operator, reason, expires_at of a grant and id, 
     "../tenant-context.js": { currentTenant: () => ({ id: "roles" }) },
     "../console-request.js": { tfetch: (fn) => fn() },
   })(join(ROOT, "lib/admin/notices.js"));
-  const n = await notices.consoleNotices();
+  // Phase 2 line 7: without a signed-in member there is no grant, only incidents
+  eq((await notices.consoleNotices()).grant, null, "no member, no grant:");
+  const n = await notices.consoleNotices({ member: { kind: "merchant", role: "owner" } });
   eq(n, {
     grant: { operator: "op@storeasy.test", reason: "Checkout bug", expires_at: "2026-11-25T00:00:00.000Z" },
     incidents: [

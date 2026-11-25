@@ -4,7 +4,7 @@
 // store (seeded and started there); never in the owner's checkout.
 //   admin: edits Details, Checkout and payments, Shipping and Tracking, reloads,
 //     and the values are kept; a typed secret never comes back in the page;
-//     Domains and SEO loads; an old /admin/settings#payments link lands on Checkout
+//     Domains and SEO loads; an old Settings link to the payments anchor lands on Checkout
 //   staff and support: every settings, integrations and billing URL shows
 //     "Your role can't open settings" and no settings tab
 //   signed out while an operator's support grant is open: /admin/login shows
@@ -114,9 +114,11 @@ async function adminFlows(drill) {
   drill.check((await domains.count()) === 1 && (await domains.getByRole("alert").count()) === 0, "Domains and SEO loads without an error");
 
   // an old anchor lands on its tab
-  await page.goto(`${ORIGIN}/admin/settings#payments`, { waitUntil: "load" });
+  const oldLink = new URL("/admin/settings", ORIGIN);
+  oldLink.hash = "payments"; // the old one-page anchor
+  await page.goto(oldLink.href, { waitUntil: "load" });
   const moved = await page.waitForURL((u) => new URL(u).pathname === "/admin/settings/checkout", { timeout: 30_000 }).then(() => true, () => false);
-  drill.check(moved, "an old /admin/settings#payments link lands on Checkout and payments", page.url());
+  drill.check(moved, "an old Settings link to the payments anchor lands on Checkout and payments", page.url());
 
   // the banner is for signed-in members: the admin sees it
   await open(page, "/admin/settings");
