@@ -601,7 +601,44 @@ await t("a store one migration behind (no 0035 source column): uploads list and 
       const BS = await import("../lib/first-run/brand-step.js");
       const step = await BS.readBrandStep({ actor: { kind: "merchant", id: "u_test", role: "owner" } });
       eq(step.current.themeId, null, "Brand step themeId:");
+      let picked = null;
+      try {
+        await BS.saveBrandStep({ themeId: "bloom", paletteId: null }, { kind: "merchant", id: "u_test", role: "owner" });
+      } catch (e) {
+        picked = e;
+      }
+      eq(`${picked?.status} ${picked?.code} ${picked?.expose}`, "409 NOT_READY true", "Brand step theme pick:");
     });
+  } finally {
+    await old.cleanup?.().catch(() => {});
+  }
+});
+
+await t("the brand-step route answers refusals as 409 in plain words: a store without 0035, and a store holding an old volt@1.0.0 upload", async () => {
+  ok(new P.ThemeError(409, "X", "y").expose && !new P.ThemeError(500, "X", "y").expose, "ThemeError exposes 4xx only");
+  // the old upload: on store B, a pre-Phase-7 row holding volt 1.0.0 under an upload id
+  const text = JSON.stringify(V.parseThemePackage(JSON.stringify({ ...AURORA, id: "volt-old" })).pkg);
+  await sql(b, "INSERT INTO theme_packages (id, slug, version, name, base_kit, package, sha256, size_bytes, status, uploaded_by, uploaded_at) VALUES ('thm_0000000000000ab1', 'volt', '1.0.0', 'Volt (mine)', 'pulse', ?, ?, ?, 'archived', 'merchant:test', ?)", [text, "0".repeat(64), text.length, new Date().toISOString()]);
+  const r = await call("owner-b", "brand-step", "POST", { host: hostB(), body: { themeId: "volt", paletteId: null } });
+  eq(r.status, 409, r.text.slice(0, 300));
+  eq(`${r.body.code} ${r.body.error}`, "RESERVED_ID Volt 1.0.0 can't be installed on your store, because a theme you uploaded earlier has the same id and version. Contact Storeasy support.", "words:");
+  // a store without 0035 (a fixture tenant no harness member signs in to): saveBrandStep throws an
+  // exposed 409, which the route's `e?.expose` branch answers as is (the RESERVED_ID call above took it)
+  const TF = await import("./support/tenant-fixture.js");
+  const old = await TF.makeTenant({ name: "flagship-0034r", stage: "0034", mode: "documents" });
+  try {
+    const BS = await import("../lib/first-run/brand-step.js");
+    let e = null;
+    await old.run(async () => {
+      try {
+        await BS.saveBrandStep({ themeId: "loom", paletteId: null }, { kind: "merchant", id: "u_test", role: "owner" });
+      } catch (x) {
+        e = x;
+      }
+    });
+    ok(e?.expose, "exposed");
+    eq(`${e.status} ${e.code}`, "409 NOT_READY", "old store:");
+    ok(/aren't ready/.test(e.message), e.message);
   } finally {
     await old.cleanup?.().catch(() => {});
   }
