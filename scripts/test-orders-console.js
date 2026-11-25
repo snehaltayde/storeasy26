@@ -78,6 +78,11 @@ const { listAudit } = await import("../lib/platform/audit.js");
 // customer details: short canaries no casing or encoding can hide
 const CNY = { email: "cnyordc0@example.test", phone: "9811122233", name: "cnyordcname0", line1: "cnyordcline0" };
 const SHOPIFY_NO = "5550001234";
+// P2-A: raw push-failure text; P2-B: a return's free text
+const PUSH_CNY = { mail: "cnypushordc0@example.test", token: "SHOPIFY_ADMIN_TOKEN", error: "", meta: "" };
+PUSH_CNY.error = `userErrors: [{"field":["email"],"message":"Email ${PUSH_CNY.mail} is invalid"}]`;
+PUSH_CNY.meta = `Missing env ${PUSH_CNY.token}=shpat_cny; userErrors: ${PUSH_CNY.mail}`;
+const RET_CNY = { phone: "9822233344", email: "cnyretordc0@example.test" };
 
 // 120 orders, three sharing each timestamp; every fourth cash on delivery;
 // one pushed (a Shopify number), one carrying the canary customer
@@ -114,11 +119,17 @@ await inA(async () => {
       .execute();
   }
   await db.insertInto("return_requests").values({ id: "ret_ordc1", order_id: ids[7], customer_id: "cus_ordc", reason: "Too small", status: "requested", created_at: new Date(BASE).toISOString(), updated_at: new Date(BASE).toISOString() }).execute();
+  // P2-B: the shopper's free text can carry their own details
+  await db.insertInto("return_requests").values({ id: "ret_ordc2", order_id: ids[9], customer_id: "cus_ordc", reason: `Call me on ${RET_CNY.phone}`, note: `Mail ${RET_CNY.email}`, status: "requested", created_at: new Date(BASE).toISOString(), updated_at: new Date(BASE).toISOString() }).execute();
+  // P2-A: a failed push whose raw text echoes Shopify's userErrors and an env name
+  await db.updateTable("orders").set({ status: "sync_failed", sync_attempts: 2, sync_error: PUSH_CNY.error }).where("id", "=", ids[21]).execute();
+  await db.insertInto("order_events").values({ order_id: ids[21], from_status: "syncing_shopify", to_status: "sync_failed", meta: JSON.stringify({ error: PUSH_CNY.meta }), created_at: new Date(BASE).toISOString() }).execute();
 });
 const newestFirst = [...ids].reverse(); // created_at desc, then id desc
 const COD_ID = ids[4]; // cod_pending
 const CNY_ID = ids[5]; // paid online, the canary customer
 const PUSHED_ID = ids[7];
+const FAILED_ID = ids[21]; // sync_failed, raw push text carrying canaries
 
 // =============================================================================
 console.log("— 1. order ids, fingerprints, canPush");
@@ -195,6 +206,7 @@ await t("support: ?q=<email>, <phone> and <Shopify number> match nothing; rows c
   for (const q of [CNY.email, CNY.phone, SHOPIFY_NO]) {
     const r = await call("support", "orders", "GET", { query: `q=${encodeURIComponent(q)}` });
     eq([r.status, r.body?.orders?.length], [200, 0], `support ?q=${q}:`);
+    eq(r.body?.counts?.all, 0, `support ?q=${q} counts.all:`);
   }
   const all = await call("support", "orders", "GET", { query: "payment=online" });
   eq(all.status, 200, "support list:");
@@ -205,6 +217,36 @@ await t("support: ?q=<email>, <phone> and <Shopify number> match nothing; rows c
   for (const c of Object.values(CNY)) ok(!one.text.includes(c), `support detail leaks ${c}`);
   const byId = await call("support", "orders", "GET", { query: `q=${CNY_ID}` });
   eq(byId.body?.orders?.map((o) => o.id), [CNY_ID], "support finds it by id:");
+});
+
+const PUSH_CANARIES = [PUSH_CNY.mail, PUSH_CNY.token, "userErrors", "shpat_cny"];
+await t("P2-A support: GET /api/admin/orders/[id] and the list carry fixed words, never the raw push-failure text", async () => {
+  const one = await call("support", "orders/[id]", "GET", { params: { id: FAILED_ID } });
+  eq(one.status, 200, "support detail:");
+  for (const c of PUSH_CANARIES) ok(!one.text.includes(c), `support detail leaks ${c}`);
+  eq(one.body.order.sync_error, view.SUPPORT_PUSH_ERROR, "sync_error words:");
+  const ev = one.body.order.events.find((e) => e.to_status === "sync_failed");
+  eq(ev?.meta?.error, view.SUPPORT_PUSH_ERROR, "timeline meta.error words:");
+  const list = await call("support", "orders", "GET", { query: "status=sync_failed" });
+  eq(list.body?.orders?.map((o) => o.id), [FAILED_ID], "support list:");
+  for (const c of PUSH_CANARIES) ok(!list.text.includes(c), `support list leaks ${c}`);
+  for (const role of ["owner", "admin"]) {
+    const r = await call(role, "orders/[id]", "GET", { params: { id: FAILED_ID } });
+    eq(r.body?.order?.sync_error, PUSH_CNY.error, `${role} keeps sync_error:`);
+    eq(r.body?.order?.events?.find((e) => e.to_status === "sync_failed")?.meta?.error, PUSH_CNY.meta, `${role} keeps meta.error:`);
+  }
+});
+
+await t("P2-B support: GET /api/admin/returns hides the shopper's reason and note; staff and owner keep them", async () => {
+  const r = await call("support", "returns", "GET");
+  eq(r.status, 200, "support returns:");
+  for (const c of Object.values(RET_CNY)) ok(!r.text.includes(c), `support returns leak ${c}`);
+  const row = r.body.returns.find((x) => x.id === "ret_ordc2");
+  eq([row?.reason, row?.note, row?.status], [null, null, "requested"], "support row:");
+  for (const role of ["staff", "owner"]) {
+    const o = await call(role, "returns", "GET");
+    for (const c of Object.values(RET_CNY)) ok(o.text.includes(c), `${role} misses ${c}`);
+  }
 });
 
 await t("signed out: list, detail, push, cancel and returns answer 401", async () => {
@@ -347,8 +389,12 @@ await t("support's orders list: no customer detail in any prop, id-only search, 
   ok(list && list.orders.length === 50, `OrdersList rows: ${list?.orders?.length}`);
   eq(list.piiSearch, false, "id-only search:");
   eq(propsOf(run, "OrderFilters")[0]?.piiSearch, false, "the search box says id only:");
-  const q = await pages.run(LIST, { cookies: cookies.support, searchParams: { q: CNY.email } });
-  eq(propsOf(q, "OrdersList")[0]?.orders, [], "support ?q=<email>:");
+  for (const value of [CNY.email, CNY.phone, SHOPIFY_NO]) {
+    const q = await pages.run(LIST, { cookies: cookies.support, searchParams: { q: value } });
+    eq(propsOf(q, "OrdersList")[0]?.orders, [], `support ?q=${value}:`);
+    eq(propsOf(q, "OrderFilters")[0]?.counts?.all, 0, `support ?q=${value} counts.all:`);
+    eq(propsOf(q, "OrdersList")[0]?.total, 0, `support ?q=${value} total:`);
+  }
 });
 
 await t("the owner's orders list carries the order email (the positive control); the address's filters reach the list", async () => {
@@ -372,6 +418,9 @@ await t("?view=returns: the returns list for staff and support, no orders query;
     eq(r.role, role, `${role} role:`);
     eq(propsOf(run, "OrdersList").length, 0, `${role} no orders list:`);
     for (const c of Object.values(CNY)) ok(!run.text.includes(c), `${role} returns props leak ${c}`);
+    const mine = r.returns.find((x) => x.id === "ret_ordc2");
+    for (const c of Object.values(RET_CNY)) ok(role === "support" ? !run.text.includes(c) : run.text.includes(c), `${role} returns props and ${c}`);
+    if (role === "support") eq([mine?.reason, mine?.note], [null, null], "support's free text:");
   }
 });
 
@@ -385,6 +434,17 @@ await t("support's order page: no customer detail, the card says hidden, no push
   eq(actions?.can, { push: false, reconcile: false, cancel: false }, "support's actions:");
   const pushed = await pages.run(DETAIL, { cookies: cookies.support, params: { id: PUSHED_ID } });
   eq(propsOf(pushed, "OrderActions")[0]?.can, { push: false, reconcile: false, cancel: false }, "support on a pushed order:");
+});
+
+await t("P2-A support's order page: the failed-push banner and timeline say fixed words; the owner's keep the raw text", async () => {
+  const run = await pages.run(DETAIL, { cookies: cookies.support, params: { id: FAILED_ID } });
+  ok(!run.error && !run.notFound, `ran: ${run.error?.message}`);
+  for (const c of PUSH_CANARIES) ok(!run.text.includes(c), `support order page leaks ${c}`);
+  ok(run.text.includes(view.SUPPORT_PUSH_ERROR), "the banner says the fixed words:");
+  const tl = propsOf(run, "OrderTimeline")[0];
+  eq(tl?.events?.find((e) => e.to_status === "sync_failed")?.meta?.error, view.SUPPORT_PUSH_ERROR, "timeline prop:");
+  const owner = await pages.run(DETAIL, { cookies: cookies.owner, params: { id: FAILED_ID } });
+  ok(owner.text.includes(PUSH_CNY.mail) && owner.text.includes(PUSH_CNY.token), "the owner sees the raw text:");
 });
 
 await t("staff's order page: no push, reconcile or cancel; admin and owner get what the state allows", async () => {
@@ -479,7 +539,9 @@ await t("ReturnsList: staff may approve or reject an open request; support sees 
   ok(/>Approve</.test(staff) && />Reject</.test(staff), `staff decisions: ${staff}`);
   const support = html(h(RL.ReturnsList, { returns, role: "support", timeZone: "Asia/Kolkata" }));
   ok(!/>Approve</.test(support) && !/>Reject</.test(support) && !/<button/.test(support), `support decisions: ${support}`);
-  ok(support.includes("Too small") && /data-status="requested"/.test(support), "support sees the request and its status:");
+  ok(/data-status="requested"/.test(support), "support sees the request's status:");
+  const hidden = html(h(RL.ReturnsList, { returns: returns.map((x) => view.redactReturnForRole(x, "support")), role: "support", timeZone: "Asia/Kolkata" }));
+  ok(!hidden.includes("Too small") && hidden.includes("Reason hidden for support"), `support's row says the reason is hidden: ${hidden}`);
   ok(markedLink(support, `/admin/orders/${COD_ID}`), "the order link is a marked read:");
   ok(/No open return requests/.test(html(h(RL.ReturnsList, { returns: [], role: "staff" }))), "empty:");
 });

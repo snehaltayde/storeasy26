@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/platform/audit";
 import { listReturns, decideReturn } from "@/lib/returns";
 import { tenantHandler } from "@/lib/tenant-request";
+import { redactReturnForRole } from "@/lib/admin/order-view";
 
 // Returns admin API (S46 / SF21). State machine only: requested → approved |
 // rejected, approved → completed | rejected. APPROVAL MOVES NO MONEY — the
@@ -18,7 +19,9 @@ export const GET = tenantHandler(async (request) => {
   const auth = await requireAdmin(request, "orders.read");
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const status = new URL(request.url).searchParams.get("status") || null;
-  return NextResponse.json({ ok: true, returns: await listReturns({ status }) });
+  // P2-B: the shopper's reason and note are customer details (hidden for support)
+  const returns = (await listReturns({ status })).map((r) => redactReturnForRole(r, auth.actor.role));
+  return NextResponse.json({ ok: true, returns });
 });
 
 export const POST = tenantHandler(async (request) => {

@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { listOrders, orderStatusCounts } from "@/lib/admin/orders";
-import { orderFilters, redactOrderForRole, redactsPii } from "@/lib/admin/order-view";
+import { orderFilters, redactOrderForRole, redactReturnForRole, redactsPii } from "@/lib/admin/order-view";
 import { merchantTz } from "@/lib/reporting";
 import { listReturns } from "@/lib/returns";
 import { PageHeader } from "@/components/kit/page-header";
@@ -36,7 +36,7 @@ export default async function AdminOrdersPage({ searchParams }) {
       <>
         {header}
         <ViewTabs view="returns" total={counts.all ?? 0} openReturns={openReturns} />
-        <ReturnsList returns={returns} role={actor.role} timeZone={timeZone} />
+        <ReturnsList returns={returns.map((r) => redactReturnForRole(r, actor.role))} role={actor.role} timeZone={timeZone} />
       </>
     );
   }

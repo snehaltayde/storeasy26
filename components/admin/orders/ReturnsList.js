@@ -65,7 +65,11 @@ function ReturnRow({ r, role, timeZone, onDecide }) {
           </Link>
           <span className="text-xs text-muted-foreground">Requested {orderTime(r.created_at, timeZone)}</span>
         </div>
-        <p className="max-w-prose text-sm break-words text-foreground">“{r.reason}”</p>
+        {r.pii_redacted ? (
+          <p className="text-sm text-muted-foreground">Reason hidden for support</p>
+        ) : (
+          <p className="max-w-prose text-sm break-words text-foreground">“{r.reason}”</p>
+        )}
         {r.note && <p className="text-xs text-muted-foreground">Your note: {r.note}</p>}
       </div>
       {/* the amount is last at a fixed width, so amounts line up down the list */}
