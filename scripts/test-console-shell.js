@@ -339,9 +339,13 @@ await t("listMyStores: only the caller's own memberships, active stores only, UR
 });
 
 // ---------- 3b. consoleNotices drops what is not for display ----------
-await t("consoleNotices(): only operator, reason, expires_at of a grant and id, tenant_id, title, public_message of an incident", async () => {
+// Phase 3 line 5 (decision 5): the grant names the operator by name (operatorName), never the id
+await t("consoleNotices(): only operatorName, reason, expires_at of a grant and id, tenant_id, title, public_message of an incident", async () => {
   const notices = await world({
-    "../platform/support.js": { activeSupportGrant: async (id) => ({ id: "grt_1", tenant_id: id, operator: "op@storeasy.test", operator_id: "usr_op1", reason: "Checkout bug", expires_at: "2026-11-25T00:00:00.000Z", granted_by: "usr_x", created_at: "2026-11-24T00:00:00.000Z" }) },
+    "../platform/support.js": {
+      activeSupportGrant: async (id) => ({ id: "grt_1", tenant_id: id, operator: "usr_op1", operator_id: "usr_op1", reason: "Checkout bug", expires_at: "2026-11-25T00:00:00.000Z", granted_by: "usr_x", created_at: "2026-11-24T00:00:00.000Z" }),
+      operatorName: async (id) => (id === "usr_op1" ? "Asha Operator" : "A Storeasy operator"),
+    },
     "../platform/incidents.js": { openIncidentsFor: async () => [{ id: "inc_1", tenant_id: null, title: "Slow sync", public_message: "Catching up", internal_notes: `ask ${OTHER_EMAIL}`, severity: "high", created_by: "usr_op1" }, { id: "inc_2", tenant_id: "roles", title: "Payments", public_message: "", internal_notes: "secret" }] },
     "../tenant-context.js": { currentTenant: () => ({ id: "roles" }) },
     "../console-request.js": { tfetch: (fn) => fn() },
@@ -350,15 +354,16 @@ await t("consoleNotices(): only operator, reason, expires_at of a grant and id, 
   eq((await notices.consoleNotices()).grant, null, "no member, no grant:");
   const n = await notices.consoleNotices({ member: { kind: "merchant", role: "owner" } });
   eq(n, {
-    grant: { operator: "op@storeasy.test", reason: "Checkout bug", expires_at: "2026-11-25T00:00:00.000Z" },
+    grant: { operatorName: "Asha Operator", reason: "Checkout bug", expires_at: "2026-11-25T00:00:00.000Z" },
     incidents: [
       { id: "inc_1", tenant_id: null, title: "Slow sync", public_message: "Catching up" },
       { id: "inc_2", tenant_id: "roles", title: "Payments", public_message: null },
     ],
   }, "display fields only:");
   ok(!JSON.stringify(n).includes("internal") && !JSON.stringify(n).includes(OTHER_EMAIL) && !JSON.stringify(n).includes("secret"), "no internal notes:");
+  ok(!JSON.stringify(n).includes("usr_op1"), "no operator id:");
   const failed = await world({
-    "../platform/support.js": { activeSupportGrant: async () => { throw new Error("down"); } },
+    "../platform/support.js": { activeSupportGrant: async () => { throw new Error("down"); }, operatorName: async () => "A Storeasy operator" },
     "../platform/incidents.js": { openIncidentsFor: async () => [] },
     "../tenant-context.js": { currentTenant: () => ({ id: "roles" }) },
     "../console-request.js": { tfetch: (fn) => fn() },
@@ -491,10 +496,10 @@ await t("no notices: the layout passes none, so main has no empty box", async ()
 });
 
 await t("ConsoleNotices is the new UI's Alert: a grant is a warning, an incident is info, neither interrupts (role=status)", () => {
-  const html = renderToStaticMarkup(React.createElement(RealNotices.ConsoleNotices, { grant: { operator: "op@storeasy.test", reason: "checkout bug", expires_at: "2026-11-25T10:00:00.000Z" }, incidents: [{ id: "inc_1", tenant_id: null, title: "Slow sync", public_message: "Shopify is slow." }] }));
+  const html = renderToStaticMarkup(React.createElement(RealNotices.ConsoleNotices, { grant: { operatorName: "Asha Operator", reason: "checkout bug", expires_at: "2026-11-25T10:00:00.000Z" }, incidents: [{ id: "inc_1", tenant_id: null, title: "Slow sync", public_message: "Shopify is slow." }] }));
   ok(/data-slot="alert"[^>]*>|role="status"/.test(html) && (html.match(/data-slot="alert"/g) || []).length === 2, `two alerts: ${html}`);
   ok(!html.includes('role="alert"'), "no assertive alert on every page load:");
-  ok(html.includes("Platform support access is active") && html.includes("op@storeasy.test") && html.includes("Platform notice: Slow sync") && html.includes("Shopify is slow."), "the words:");
+  ok(html.includes("Platform support access is active") && html.includes("Asha Operator from Storeasy") && html.includes("Platform notice: Slow sync") && html.includes("Shopify is slow."), "the words:");
 });
 
 // ---------- 6. the old regions are gone; the editor preview ----------
