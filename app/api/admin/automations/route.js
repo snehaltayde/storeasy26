@@ -65,7 +65,12 @@ export const POST = tenantHandler(async (request) => {
       const r = await runOne(rule, { key: `dry`, order }, { dryRun: true });
       return NextResponse.json({ ok: true, sample: order.id, ...r });
     }
-    if (body.retry) return NextResponse.json({ ok: true, ...(await retryRun(String(body.retry.run || ""))) });
+    if (body.retry) {
+      const run = String(body.retry.run || "");
+      const r = await retryRun(run);
+      await audit({ actor: auth.actor, action: "settings.write", resource: `automation_run:${run}`, diff: { retried: true, status: r.status } });
+      return NextResponse.json({ ok: true, ...r });
+    }
     return NextResponse.json({ error: "Nothing to do" }, { status: 400 });
   } catch (e) {
     if (e?.errors) return NextResponse.json({ error: String(e.message).slice(0, 300), errors: e.errors }, { status: 422 }); // the automation's own problems

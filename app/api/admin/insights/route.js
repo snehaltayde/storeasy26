@@ -34,8 +34,13 @@ export const POST = tenantHandler(async (request) => {
       await audit({ actor: auth.actor, action: "storefront.write", resource: `ai_insight:${r.id}`, diff: { proposals: r.proposals.length, tokens: r.tokens_in + r.tokens_out } });
       return NextResponse.json({ ok: true, insight: { ...r, facts: undefined } });
     }
-    if (body.dismiss) return NextResponse.json({ ok: true, ...(await setInsightStatus(String(body.dismiss.id || ""), "dismissed")) });
-    if (body.restore) return NextResponse.json({ ok: true, ...(await setInsightStatus(String(body.restore.id || ""), "proposed")) });
+    if (body.dismiss || body.restore) {
+      const id = String((body.dismiss || body.restore).id || "");
+      const status = body.dismiss ? "dismissed" : "proposed";
+      const r = await setInsightStatus(id, status);
+      await audit({ actor: auth.actor, action: "storefront.write", resource: `ai_insight:${id}`, diff: { status } });
+      return NextResponse.json({ ok: true, ...r });
+    }
     if (body.apply) {
       // P2-WRITERS: through lib/content-writes.js, which reads the mode itself
       const r = await applyInsightDraft(String(body.apply.id || ""), Number(body.apply.index), { actor: auth.actor });

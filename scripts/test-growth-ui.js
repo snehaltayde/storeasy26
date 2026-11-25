@@ -88,6 +88,9 @@ await t("D6: starting an experiment needs storefront.publish: support and staff 
   eq([r.status, r.body?.status], [200, "running"], "admin start:");
   eq(await statusOf("gate-one"), "running");
   ok((await auditRows("experiment:gate-one")).includes("storefront.publish"), "the start is audited as storefront.publish:");
+  const again = await call("admin", "experiments", "POST", { body: { start: { slug: "gate-one" } } });
+  eq([again.status, again.body?.status, again.body?.changed], [200, "running", false], "starting a running one is a no-op:");
+  eq((await auditRows("experiment:gate-one")).filter((x) => x === "storefront.publish").length, 1, "audited once, when the status changed:");
 });
 
 await t("staff keeps everything else storefront.write: edit a draft, pause, complete and keep a variant; support is 403 on each and nothing changes", async () => {
@@ -111,6 +114,17 @@ await t("insights: every member reads them; Generate with no AI provider is 'not
   const g = await call("staff", "insights", "POST", { body: { generate: true } });
   eq([g.status, g.body?.code], [503, "AI_UNCONFIGURED"], "staff generate:");
   eq((await call("owner", "insights", "GET")).body.insights.length, 0, "nothing stored:");
+  {
+    const c = a.client();
+    try {
+      await c.execute({ sql: "INSERT INTO ai_insights (id, status, model, proposals, facts, created_at, updated_at) VALUES ('ins-gui1', 'proposed', 'stub', '[]', '[]', ?, ?)", args: [new Date().toISOString(), new Date().toISOString()] });
+    } finally {
+      c.close();
+    }
+  }
+  eq((await call("staff", "insights", "POST", { body: { dismiss: { id: "ins-gui1" } } })).body?.status, "dismissed", "staff dismisses:");
+  eq((await call("staff", "insights", "POST", { body: { restore: { id: "ins-gui1" } } })).body?.status, "proposed", "staff restores:");
+  eq(await auditRows("ai_insight:ins-gui1"), ["storefront.write", "storefront.write"], "dismiss and restore are audited:");
   for (const body of [{ generate: true }, { dismiss: { id: "x" } }, { restore: { id: "x" } }, { apply: { id: "x", index: 0 } }]) eq((await call("support", "insights", "POST", { body })).status, 403, `support ${Object.keys(body)[0]}:`);
 });
 
@@ -125,6 +139,7 @@ await t("automations stay admin-only: staff and support 403 on read and write; a
   const off = await call("admin", "automations", "POST", { body: { disable_all: { disabled: true } } });
   eq(off.body?.disabled, true, "kill switch:");
   eq((await call("admin", "automations", "POST", { body: { disable_all: { disabled: false } } })).body?.disabled, false, "back on:");
+  eq(await auditRows("automations:disable_all"), ["settings.write", "settings.write"], "both kill-switch changes are audited as settings.write:");
 });
 
 await t("the dry run is a settings.write POST (admins only), not a read: it sends nothing, and with automations on it stores no run and no audit row", async () => {
@@ -136,6 +151,11 @@ await t("the dry run is a settings.write POST (admins only), not a read: it send
   eq([r.status, r.body?.status], [200, "dry_run"], "admin:");
   eq((await call("admin", "automations", "GET")).body.runs.length, runsBefore, "no run row:");
   eq(Number((await C.platformDb().execute("SELECT COUNT(*) n FROM audit_log")).rows[0].n), auditBefore, "no audit row:");
+  eq((await call("admin", "automations", "POST", { body: { disable_all: { disabled: true } } })).body?.disabled, true);
+  const killed = await call("admin", "automations", "POST", { body: { dry_run: { id: rule.id } } });
+  eq([killed.status, killed.body?.status, killed.body?.wouldBe], [200, "dry_run", "skipped"], "a dry run with the kill switch on:");
+  eq((await call("admin", "automations", "POST", { body: { disable_all: { disabled: false } } })).body?.disabled, false);
+  eq((await call("admin", "automations", "GET")).body.runs.length, runsBefore, "it stores no run either:");
   const RC = await import("./support/read-controls.js");
   eq(RC.READ_POSTS.filter((x) => x.path === "/api/admin/automations"), [], "so it has no READ_POSTS row:");
 });
@@ -173,6 +193,7 @@ console.log("— 3. the pages");
 const { makePageHarness } = await import("./support/page-harness.js");
 const pages = await makePageHarness({ tenant: () => C.getTenant(a.id, { fresh: true }) });
 const P = (f) => `app/(console)/admin/(authed)/${f}/page.js`;
+const FORMULA = '=HYPERLINK("http://evil.example","x")';
 const CUSTOMER = { name: "Cnyname Shopper", email: "cny.shopper@example.test", phone: "9811122233" };
 {
   const c = a.client();
@@ -182,7 +203,9 @@ const CUSTOMER = { name: "Cnyname Shopper", email: "cny.shopper@example.test", p
       sql: "INSERT INTO orders (id, email, phone, name, address_line1, city, total, subtotal, currency, snapshot, payment_method, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       args: ["GUI-ORDER-1", CUSTOMER.email, CUSTOMER.phone, CUSTOMER.name, "12 Cny Street", "Pune", 3000, 3000, "INR", snapshot, "cod", "cod_pending", new Date(Date.now() - 86400000).toISOString()],
     });
-    await c.execute({ sql: "INSERT INTO events (name, props, created_at) VALUES ('search', ?, ?)", args: [JSON.stringify({ term: "whey", results: 0 }), new Date().toISOString()] }).catch(() => {});
+    for (const [i, [term, results]] of [["whey", 0], ["whey", 4], [FORMULA, 2]].entries()) {
+      await c.execute({ sql: "INSERT INTO events (event_id, name, payload, created_at) VALUES (?, 'search', ?, ?)", args: [`ev-gui-${i}`, JSON.stringify({ params: { search_term: term, results } }), new Date().toISOString()] });
+    }
   } finally {
     c.close();
   }
@@ -194,6 +217,8 @@ await t("analytics as support: aggregates only, no customer name, email, phone o
   for (const v of [...Object.values(CUSTOMER), "12 Cny Street", "GUI-ORDER-1"]) ok(!props.includes(v), `no ${v}:`);
   const tables = run.props.find((p) => p.component.endsWith("#AnalyticsTables"))?.props;
   eq([tables?.days, tables?.products.products.map((p) => [p.title, p.qty, p.revenue])], [7, [["Whey 1kg", 2, 3000]]], "the aggregate:");
+  eq(tables.terms.terms.find((x) => x.term === "whey"), { term: "whey", searches: 2, zero_results: 1 }, "the whey searches, one with no results:");
+  ok(tables.terms.terms.every((x) => Object.keys(x).sort().join() === "searches,term,zero_results"), "a search row carries only term and counts:");
   eq(Object.keys(run.props.find((p) => p.component.endsWith("#SalesNumbers")).props.sales).sort(), ["aov", "currency", "gross", "net", "orders", "refunds"], "the sales keys:");
   eq(run.props.find((p) => p.component.endsWith("#AnalyticsRange"))?.props.days, 7);
   eq((await pages.run(P("analytics"), { cookies: store.cookies.support, searchParams: { days: "12" } })).props.find((p) => p.component.endsWith("#AnalyticsRange"))?.props.days, 30, "an unknown range is 30:");
@@ -219,6 +244,42 @@ await t("automations as staff or support: the no-access note and no rule, run or
   }
   const admin = (await pages.run(P("automations"), { cookies: store.cookies.admin })).props.find((p) => p.component.endsWith("#RulesList"))?.props;
   ok(admin?.initial.automations.some((r) => r.name === RULE.name), "admin sees the rule:");
+});
+
+async function plantRun(id, status) {
+  const rule = (await call("admin", "automations", "GET")).body.automations.find((r) => r.name === RULE.name);
+  const c = a.client();
+  try {
+    await c.execute({ sql: "INSERT INTO automation_runs (id, automation_id, event_key, status, reason, created_at) VALUES (?, ?, ?, ?, 'simulated outage', ?)", args: [id, rule.id, `order_placed:${id === "run-gui-done" ? "GUI-OTHER" : "GUI-ORDER-1"}`, status, new Date().toISOString()] });
+  } finally {
+    c.close();
+  }
+  return rule;
+}
+const sends = async (ruleId) => {
+  const c = a.client();
+  try {
+    return Number((await c.execute({ sql: "SELECT COUNT(*) n FROM notifications WHERE idempotency_key LIKE ?", args: [`aut_${ruleId}_%`] })).rows[0].n);
+  } finally {
+    c.close();
+  }
+};
+await t("Retry a failed run: staff 403; a run that hasn't failed is refused; a double retry sends once; each retry is audited as settings.write", async () => {
+  const rule = await plantRun("run-gui-failed", "failed");
+  await plantRun("run-gui-done", "done");
+  eq((await call("staff", "automations", "POST", { body: { retry: { run: "run-gui-failed" } } })).status, 403, "staff:");
+  eq((await call("support", "automations", "POST", { body: { retry: { run: "run-gui-failed" } } })).status, 403, "support:");
+  const notFailed = await call("admin", "automations", "POST", { body: { retry: { run: "run-gui-done" } } });
+  eq(notFailed.status, 422, "a done run:");
+  ok(/only failed runs retry/.test(notFailed.body?.error || ""), `the words: ${notFailed.body?.error}`);
+  eq(await auditRows("automation_run:run-gui-done"), [], "a refused retry is not audited:");
+  const before = await sends(rule.id);
+  const both = await Promise.all([1, 2].map(() => call("admin", "automations", "POST", { body: { retry: { run: "run-gui-failed" } } })));
+  const sentNow = both.filter((r) => r.status === 200 && r.body?.status === "done");
+  eq(sentNow.length, 1, `one retry sends: ${JSON.stringify(both.map((r) => [r.status, r.body?.status, r.body?.error]))}`);
+  eq(await sends(rule.id), before + 1, "one email intent:");
+  eq((await call("admin", "automations", "POST", { body: { retry: { run: "run-gui-failed" } } })).status, 422, "a third retry: the run is gone:");
+  ok((await auditRows("automation_run:run-gui-failed")).every((x) => x === "settings.write") && (await auditRows("automation_run:run-gui-failed")).length >= 1, "audited as settings.write:");
 });
 
 console.log("— 4. the screens' markup");
@@ -285,6 +346,13 @@ await t("support's analytics markup: every control is a marked read (range links
   ok(html(h(AT.AnalyticsError, { days: 7 })).includes('href="/admin/analytics?days=7"'), "Try again re-reads the same range:");
   ok(html(h(AT.CoverageNote, { coverage: { sales: 4, event_coverage_pct: 25 } })).includes("Tracking is thin"), "the coverage note:");
   eq(html(h(AT.CoverageNote, { coverage: { sales: 4, event_coverage_pct: 80 } })), "", "no note when tracking is good:");
+});
+await t("CSV: a shopper's search term that starts with = (or + - @, a tab, a return) is prefixed with ' so it is never a formula", async () => {
+  const { toCsv } = await load("components/admin/analytics/CsvButton.js");
+  const csv = toCsv(prop("AnalyticsTables").terms.terms, [{ key: "term", header: "Search" }, { key: "searches", header: "Searches" }]);
+  const line = csv.split("\n").find((l) => l.includes("hyperlink"));
+  ok(line && line.startsWith(`"'=hyperlink(`), `the formula row: ${line}`);
+  eq(["+1", "-2", "@x", "\tx", "\rx", "ok"].map((v) => toCsv([{ v }], [{ key: "v", header: "v" }]).split("\n").slice(1).join("\n")), ["'+1", "'-2", "'@x", "'\tx", '"\'\rx"', "ok"], "every risky first character:");
 });
 await t("support's insights markup: no Generate, Apply, Dismiss or Restore; staff gets them, with Generate disabled while not configured", async () => {
   const sup = html(h(InsightsList, { initial: INSIGHTS, role: "support" }));

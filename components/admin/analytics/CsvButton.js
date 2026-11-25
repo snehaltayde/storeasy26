@@ -6,10 +6,14 @@ import { Button } from "@/components/ui/button";
 // One table's rows as a CSV file, built in the browser from the aggregated
 // rows on screen (never raw events or shopper details). Nothing is sent, so
 // it is a read for every role (data-read-control).
+// A cell that starts with = + - @, a tab or a carriage return is prefixed
+// with ' so a spreadsheet reads it as text, never as a formula (a shopper's
+// search term is shopper-typed).
 //   rows, columns: [{ key, header }], filename
 export function toCsv(rows, columns) {
   const esc = (v) => {
-    const s = String(v ?? "");
+    const raw = String(v ?? "");
+    const s = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
     return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   return [columns.map((c) => esc(c.header)).join(","), ...rows.map((r) => columns.map((c) => esc(r[c.key])).join(","))].join("\n");

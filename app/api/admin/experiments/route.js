@@ -50,7 +50,8 @@ export const POST = tenantHandler(async (request) => {
     if (body.start) {
       if (!roleAllows(auth.actor.role, "storefront.publish")) return NextResponse.json({ error: `Your role (${auth.actor.role}) can't start an experiment: it shows shoppers a variant, so it needs an owner or admin` }, { status: 403 });
       const r = await startExperiment(String(body.start.slug || ""));
-      await audit({ actor: auth.actor, action: "storefront.publish", resource: `experiment:${r.slug}`, diff: { status: "running" } });
+      // audited only when the status changed (a start of a running one is a no-op)
+      if (r.changed) await audit({ actor: auth.actor, action: "storefront.publish", resource: `experiment:${r.slug}`, diff: { status: "running" } });
       return NextResponse.json({ ok: true, ...r });
     }
     if (body.pause || body.complete) {
