@@ -532,10 +532,15 @@ await t("Brand step GET lists the five themes; a theme pick (Harvest + Forest) w
   eq(`${again.body.current.themeId} ${again.body.current.paletteId}`, "harvest forest", "current:");
   ok(again.body.themeLayouts.includes("doc_collection_layout"), "Open Store lists the layout drafts");
   const before = (await design()).revision;
+  const LAYOUTS = ["doc_header", "doc_footer", "doc_product_layout", "doc_collection_layout"];
+  const layoutState = () => a.run(async () => JSON.stringify(await Promise.all(LAYOUTS.map(async (id) => { const d = await Docs.getDocument(id); return [id, d.revision, d.draftHash]; }))));
+  const layoutsBefore = await layoutState();
   const sk = await call("owner", "brand-step", "POST", { body: { skip: true } });
   eq(sk.status, 200, sk.text.slice(0, 200));
   eq((await design()).revision, before, "Skip writes no document:");
-  eq((await call("support", "brand-step", "POST", { body: { themeId: "bloom", paletteId: null } })).status, 403, "support:");
+  eq(await layoutState(), layoutsBefore, "Skip leaves the layout documents untouched:");
+  for (const caller of ["support", ...OPS]) eq((await call(caller, "brand-step", "POST", { body: { themeId: "bloom", paletteId: null } })).status, 403, `${caller}:`);
+  eq((await design()).revision, before, "a refused pick writes nothing:");
   eq((await call("owner", "brand-step", "POST", { body: { themeId: "comic", paletteId: null } })).status, 400, "unknown theme:");
 });
 
@@ -547,6 +552,59 @@ await t("Theme's colours: paletteId null with a theme keeps the theme's own colo
   eq(s.status, 200, s.text.slice(0, 300));
   ok(!(await design()).body.settings.theme.package, "no package:");
   eq((await call("owner", "brand-step", "POST", { body: { paletteId: null } })).status, 400, "no palette and no theme:");
+});
+
+await t("a concurrent ensureFlagship (three at once, on store B) installs one row; exactly one call says it installed", async () => {
+  const all = await Promise.all([1, 2, 3].map(() => b.run(() => P.ensureFlagship("loom"))));
+  eq(new Set(all.map((x) => x.id)).size, 1, "one id:");
+  eq(all.filter((x) => x.installed).length, 1, "one install:");
+  eq((await sql(b, "SELECT COUNT(*) AS n FROM theme_packages WHERE slug = 'loom'"))[0].n, 1, "one row:");
+});
+
+await t("the flagship copy passes the banned-copy and claims scan (scanDocumentText on every home layout, plus names and descriptions)", async () => {
+  const BC = await import("./support/banned-copy.js");
+  for (const p of FS.FLAGSHIPS) {
+    const body = { ...R.emptyBody("home"), sections: p.templates.home.sections.map((x) => { const n = R.newSection(x.kind); return { ...n, settings: { ...n.settings, ...x.settings } }; }) };
+    eq(JSON.stringify(BC.scanDocumentText(body)), "[]", `${p.id} home:`);
+    for (const text of [p.name, p.description, FS.flagshipCard(p).vertical]) eq(JSON.stringify(BC.scanText(text, { shopper: true })), "[]", `${p.id} "${text}":`);
+  }
+});
+
+await t("a store one migration behind (no 0035 source column): uploads list and render, flagships read as not installed, install answers in plain words, the Brand step reads no theme", async () => {
+  const TF = await import("./support/tenant-fixture.js");
+  const old = await TF.makeTenant({ name: "flagship-0034", stage: "0034", mode: "documents" });
+  try {
+    const c = old.client();
+    const text = JSON.stringify(V.parseThemePackage(JSON.stringify(AURORA)).pkg);
+    try {
+      ok(!(await c.execute("SELECT name FROM pragma_table_info('theme_packages')")).rows.some((r) => r.name === "source"), "no source column");
+      await c.execute({ sql: "INSERT INTO theme_packages (id, slug, version, name, base_kit, package, sha256, size_bytes, status, uploaded_by, uploaded_at) VALUES ('thm_0034003400340034', 'aurora', '1.2.0', 'Aurora', 'pulse', ?, ?, ?, 'installed', 'merchant:test', ?)", args: [text, "0".repeat(64), text.length, new Date().toISOString()] });
+    } finally {
+      c.close();
+    }
+    await old.run(async () => {
+      const list = await P.listPackages();
+      eq(list.map((x) => `${x.slug}:${x.source}`).join(","), "aurora:upload", "uploads:");
+      const cards = await P.listFlagships();
+      eq(cards.length, 5, "five cards:");
+      ok(cards.every((x) => !x.installedOnStore && !x.inUse), "none installed");
+      eq((await LP.packageFor({ kit: "pulse", version: 1, package: "thm_0034003400340034" }))?.slug, "aurora", "the upload renders:");
+      let refused = null;
+      try {
+        await P.ensureFlagship("volt");
+      } catch (e) {
+        refused = e;
+      }
+      eq(`${refused?.status} ${refused?.code}`, "409 NOT_READY", "install:");
+      const up = await P.uploadPackage(JSON.stringify({ ...AURORA, version: "1.3.0" }), { actor: { kind: "merchant", id: "u_test" } });
+      eq(up.source, "upload", "an upload still works:");
+      const BS = await import("../lib/first-run/brand-step.js");
+      const step = await BS.readBrandStep({ actor: { kind: "merchant", id: "u_test", role: "owner" } });
+      eq(step.current.themeId, null, "Brand step themeId:");
+    });
+  } finally {
+    await old.cleanup?.().catch(() => {});
+  }
 });
 
 await t("no network", () => eq(network.calls?.length ?? 0, 0, "no network:"));
