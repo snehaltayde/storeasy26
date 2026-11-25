@@ -49,6 +49,7 @@ export const SUPPORT_PROBES = Object.freeze([
   { name: "catalog ?product=", path: "catalog", method: "GET", req: (ctx) => ({ query: `product=${encodeURIComponent(ctx.productGid)}` }), keys: ["ok", "product", "override", "surface"] },
   { ...DOC("listDocuments", true), keys: ["ok", "documents"] },
   { ...DOC("getDocument", (ctx) => ctx.docId), keys: ["ok", "document"] },
+  { ...DOC("getDocument", (ctx) => ctx.bDocId), name: "documents getDocument (store B's document)", status: 404, keys: ["error", "code"], note: "another store's document id is not on this store" },
   { ...DOC("listHistory", (ctx) => ctx.docId), keys: ["ok", "versions"] },
   { ...DOC("listRecentlyPublished", true), keys: ["ok", "rows"] },
   { ...DOC("listChanges", (ctx) => ctx.docId), keys: ["ok", "firstPublish", "rows", "sections"] },

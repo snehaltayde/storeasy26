@@ -312,6 +312,7 @@ const CTX = {
   webhookAppId: hookA.body?.install?.id ?? null,
   bWebhookAppId: hookB.body?.install?.id ?? null,
   docId: pageA.doc.id,
+  bDocId: pageB.doc.id,
   bundleId: bundleA.body?.bundle?.id ?? null,
   experimentSlug: experimentA.body?.experiment?.slug ?? null,
   quizSlug: quizA.body?.quiz?.slug ?? null,
@@ -747,6 +748,20 @@ await t("P5-A archived themes: support and operator support see only A's archive
     ok(!run.error && !run.redirect && !run.notFound && run.props.length, `${caller} archived page renders`);
     ok(run.text.includes("Archived A"), `${caller} archived page shows A's archived theme`);
     ok(!run.text.includes(CNY.bArchivedTheme), `${caller} archived page has no B canary`);
+  }
+});
+
+// P6-A: store B's real document id, asked of store A's studio, opens home with the missing note
+await t("studio page: store B's document id opens A's home with the missing note and no B text", async () => {
+  ok(CTX.bDocId && CTX.bDocId !== CTX.docId, "fixture bDocId");
+  for (const caller of ["support", "operator-support-entry"]) {
+    const run = await pages.run(pageRel("studio"), { cookies: cookies[caller], searchParams: { doc: CTX.bDocId } });
+    ok(!run.error && !run.redirect && !run.notFound && run.props.length, `${caller} studio renders`);
+    const all = `${run.text}\n${JSON.stringify(run.props)}`;
+    ok(all.includes("doc_home"), `${caller} studio opens doc_home`);
+    ok(all.includes("so the editor opened your home page"), `${caller} missing note shows`);
+    ok(!all.includes(CTX.bDocId), `${caller} studio has no B document id`);
+    ok(!all.includes(CNY.bDocument), `${caller} studio has no B canary`);
   }
 });
 
