@@ -22,6 +22,14 @@ orchestrating a phase. Keep it under about 80 lines: merge, reword or delete bef
   never by loosening a test. Tests on a shared list check membership, not position (Phase 3's "nav ends
   with Operations" broke on every later append); one named line pins the final order. After resolving a
   conflicted rebase, rerun lint and the unit suite before the merge.
+- A slice that touches shared storefront, order or nav code runs the full `pnpm test` in its builder's own check:
+  Phase 4's slots line broke seven render suites (unstubbed `PluginSlot`) and line 1 broke the onboarding
+  nav count, both found only at the merge check. Builders of isolated slices keep running their own suites.
+- Lines cut from a sibling's unmerged commit (to overlap work) rebase onto each sibling as it lands, in
+  merge order, and a reviewer confirms no sibling fix was dropped (Phase 4 line 4 was cut before line 3's
+  review fixes and would have reverted them).
+- A drill stage the builder "wrote but did not run" is unverified code: Phase 4's webhooks stage needed
+  three rounds (no catalog, checkout's confirm-the-total 409, the sign-in rate limit) at merge time.
 - A migration number reserved in the plan goes to whichever branch merges first: Phase 3 reserved 0016
   for line 5, line 3 needed one sooner and took it, line 5 moved to 0017. Never merge a lower number after
   a higher one has run.
