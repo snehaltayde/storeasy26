@@ -3,6 +3,15 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Read-only app tokens (on the owner's behalf)
+
+- **Schema:** tenant migration `0033_plugin_tokens.sql`; platform `0019_audit_actor_index.sql`; both additive.
+- **Tokens:** custom apps only; `sea_tok_<id>.<secret>`, stored as a SHA-256 hash compared in constant time, shown once; at most 5 active per app (counted inside the insert); 30/90/365-day expiry; uninstall revokes them. Effective scopes are the token's ∩ the app's current approval (narrowing is refused while the app's webhook events need that permission).
+- **Gate:** `requireAppToken` on `/api/apps/v1/*` only (Bearer, GET, no CORS); admin routes ignore Bearer and v1 ignores cookies. Every call, including a revoked or expired token whose secret matches, is rate-limited first (120 a minute per token across addresses; per server instance without Upstash) and then audited with `audit({strict: true})`; no audit row means 503 and no data. Unknown tokens are logged and limited by address.
+- **Data:** v1 orders are redacted as for support and cut to an allowlist (no customer fields, `cart_id` or `idempotency_key`); products and collections are live content only; offers are live offers only (enabled and in their dates), with allowlisted terms and no coupon codes.
+- **Decided by:** Claude
+- **Slice:** Phase 4 line 4
+
 ## 2026-11-25 Signed plugin webhooks through an outbox (on the owner's behalf)
 
 - **Schema:** tenant migration `0032_plugin_webhooks.sql` (`plugin_endpoints`, `plugin_events`, `plugin_deliveries`; `secret_enc` nullable so uninstall can clear it), additive.
