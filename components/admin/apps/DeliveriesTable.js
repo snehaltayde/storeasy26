@@ -13,7 +13,8 @@ import { useToast } from "@/components/kit/toast";
 import { DELIVERY_STATES, NO_MANAGE, aboutIn, postApp, shortDate } from "@/components/admin/apps/app-words";
 
 // The last 50 deliveries of an app (Phase 4 line 3): topic, event id, status
-// (Delivered / Retrying / Waiting / Failed / Skipped), attempts, the last HTTP
+// (Delivered / Retrying / Waiting / Failed / Skipped, with the reason under
+// it), attempts, the last HTTP
 // status, the next retry ("about": retries run on the job tick) and how long
 // the last attempt took. Status and Topic filters re-ask the GET (reads).
 // Resend on Failed or Skipped (admin and owner; RoleGate'd). View payload only
@@ -45,10 +46,18 @@ export function DeliveriesTable({ view, installId, role, filters, onFilter, onCh
       header: "Status",
       cell: (d) => {
         const [label, tone] = DELIVERY_STATES[d.status] ?? ["Unknown", "muted"];
+        // why it failed or was skipped, in the row (a retry's last error too)
         return (
-          <Badge variant={tone} data-delivery-status={d.status} title={d.lastError || undefined}>
-            {label}
-          </Badge>
+          <div className="space-y-1">
+            <Badge variant={tone} data-delivery-status={d.status}>
+              {label}
+            </Badge>
+            {d.lastError && d.status !== "delivered" && (
+              <p className="max-w-64 text-xs text-muted-foreground" data-delivery-reason>
+                {d.lastError}
+              </p>
+            )}
+          </div>
         );
       },
     },

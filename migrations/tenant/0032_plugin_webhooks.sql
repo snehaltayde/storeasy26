@@ -3,7 +3,8 @@
 --                      approved when it was saved (that app's egress allowlist),
 --                      its topics and its signing secret (encrypted; the
 --                      previous one keeps signing for 24 h after a rotation).
---                      Never sent to a browser: secret_enc stays server-side.
+--                      Never sent to a browser: secret_enc stays server-side,
+--                      and is cleared (NULL) when the app is uninstalled.
 --   plugin_events      the outbox: one row per store event, deduplicated by
 --                      idempotency_key. Payloads never carry customer names,
 --                      emails, phones or addresses (owner decision, Phase 4).
@@ -16,7 +17,7 @@ CREATE TABLE IF NOT EXISTS plugin_endpoints (
   url               TEXT NOT NULL,
   host              TEXT NOT NULL,
   topics            TEXT NOT NULL DEFAULT '[]',
-  secret_enc        TEXT NOT NULL,
+  secret_enc        TEXT,
   prev_secret_enc   TEXT,
   prev_secret_until TEXT,
   status            TEXT NOT NULL DEFAULT 'active',

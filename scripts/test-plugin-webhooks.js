@@ -25,6 +25,7 @@ process.env.DATABASE_URL = "file:.test-plwh-default.db";
 process.env.PLATFORM_SECRET = "test-plwh-platform-secret";
 process.env.PLATFORM_CACHE_MS = "50";
 process.env.STOREASY_PLUGIN_EGRESS_LOCAL = "1";
+process.env.NODE_ENV = "test"; // the local flag works only under test or development
 const network = H.blockNetwork();
 
 let pass = 0;
@@ -127,16 +128,27 @@ await t("egress URL rules: https and port 443 only, no user:pass, no IP literal 
     ok(!r.ok && r.reason, `refused even when allowlisted: ${u}`);
   }
   ok(!EG.checkUrl("https://other.example.com/x", { allowHosts: allow, env: NOFLAG }).ok, "off the allowlist");
+  // octal, hex and dotless forms become an IPv4 literal; full-width and IDN names are normalised first
+  for (const u of ["https://0177.0.0.1/x", "https://0177.1/x", "https://0x7f000001/x", "https://017700000001/x", "https://ｌｏｃａｌｈｏｓｔ/x", "https://１２７．０．０．１/x", "https://shop．myshopify．com/x"]) ok(!EG.checkUrl(u, { allowHosts: [new URL(u).hostname], env: NOFLAG }).ok, `refused: ${u}`);
+  const idn = EG.checkUrl("https://bücher.example/x", { allowHosts: ["xn--bcher-kva.example"], env: NOFLAG });
+  ok(idn.ok && idn.host === "xn--bcher-kva.example", "an IDN host is checked (and allowlisted) as its punycode");
+  ok(!EG.checkUrl("https://bücher.example/x", { allowHosts: ["bücher.example"], env: NOFLAG }).ok, "the Unicode spelling is not what is approved");
   ok(HOSTS.isShopifyHost("x.MyShopify.com"), "shopify host");
 });
 
-await t("egress local flag: 127.0.0.1 only with STOREASY_PLUGIN_EGRESS_LOCAL=1, and never with NODE_ENV=production", () => {
+await t("egress local flag: 127.0.0.1 only, only with STOREASY_PLUGIN_EGRESS_LOCAL=1 under NODE_ENV test or development, never on Vercel", () => {
   const allow = ["127.0.0.1"];
-  ok(EG.checkUrl(HOOK, { allowHosts: allow, env: { STOREASY_PLUGIN_EGRESS_LOCAL: "1" } }).ok, "flag on");
+  const LOCAL = (extra) => ({ STOREASY_PLUGIN_EGRESS_LOCAL: "1", ...extra });
+  ok(EG.checkUrl(HOOK, { allowHosts: allow, env: LOCAL({ NODE_ENV: "test" }) }).ok, "test");
+  ok(EG.checkUrl(HOOK, { allowHosts: allow, env: LOCAL({ NODE_ENV: "development" }) }).ok, "development");
+  ok(!EG.checkUrl(HOOK, { allowHosts: allow, env: LOCAL({}) }).ok, "NODE_ENV unset: refused");
+  ok(!EG.checkUrl(HOOK, { allowHosts: allow, env: LOCAL({ NODE_ENV: "staging" }) }).ok, "any other NODE_ENV: refused");
   ok(!EG.checkUrl(HOOK, { allowHosts: allow, env: NOFLAG }).ok, "flag off");
   ok(!EG.checkUrl(HOOK, { allowHosts: allow, env: PROD }).ok, "production ignores the flag");
-  ok(!EG.localEgressAllowed(PROD) && EG.localEgressAllowed({ STOREASY_PLUGIN_EGRESS_LOCAL: "1" }), "localEgressAllowed");
-  ok(!EG.checkUrl(`http://127.0.0.2:${PORT}/x`, { allowHosts: ["127.0.0.2"], env: { STOREASY_PLUGIN_EGRESS_LOCAL: "1" } }).ok, "only 127.0.0.1");
+  ok(!EG.checkUrl(HOOK, { allowHosts: allow, env: LOCAL({ NODE_ENV: "development", VERCEL_ENV: "preview" }) }).ok, "a Vercel preview ignores the flag");
+  ok(!EG.checkUrl(HOOK, { allowHosts: allow, env: LOCAL({ NODE_ENV: "test", VERCEL: "1" }) }).ok, "VERCEL set ignores the flag");
+  ok(!EG.localEgressAllowed(PROD) && !EG.localEgressAllowed(LOCAL({})) && EG.localEgressAllowed(LOCAL({ NODE_ENV: "test" })), "localEgressAllowed");
+  ok(!EG.checkUrl(`http://127.0.0.2:${PORT}/x`, { allowHosts: ["127.0.0.2"], env: LOCAL({ NODE_ENV: "test" }) }).ok, "only 127.0.0.1");
 });
 
 await t("blocked addresses: every listed range (v4 and v6), IPv4-mapped and -compatible forms; public addresses pass", () => {
@@ -145,7 +157,9 @@ await t("blocked addresses: every listed range (v4 and v6), IPv4-mapped and -com
   for (const [a] of EG.BLOCKED_V6) ok(EG.isBlockedAddress(a), `v6 ${a}`);
   for (const a of ["10.255.255.255", "100.127.0.1", "172.31.255.255", "192.168.1.1", "169.254.169.254", "198.19.0.1", "255.255.255.255", "fd12::1", "fe80::1%en0", "ff02::1", "2001:db8::9", "64:ff9b::a00:1"]) ok(EG.isBlockedAddress(a), `blocked ${a}`);
   for (const a of ["::ffff:127.0.0.1", "::ffff:7f00:1", "::ffff:10.0.0.1", "::ffff:a9fe:a9fe", "0:0:0:0:0:ffff:c0a8:0101", "::127.0.0.1"]) ok(EG.isBlockedAddress(a), `mapped ${a}`);
-  for (const a of ["8.8.8.8", "1.1.1.1", "172.32.0.1", "100.128.0.1", "2606:4700::1111", "::ffff:8.8.8.8"]) ok(!EG.isBlockedAddress(a), `public ${a}`);
+  // review additions: NAT64 local-use, 6to4 carrying a private IPv4, Teredo, SIIT, discard-only, site-local, IPv4-compatible small values
+  for (const a of ["64:ff9b:1::a00:1", "64:ff9b:1:ffff::1", "2002:7f00:1::1", "2002:0a00:0001::1", "2002:c0a8:0101::", "2001:0:4136:e378::1", "2001::1", "::ffff:0:127.0.0.1", "::ffff:0:a00:1", "100::1", "100::ffff:ffff:ffff:ffff", "fec0::1", "feff::1", "::2", "::ff", "::0.0.0.2", "::8.8.8.8"]) ok(EG.isBlockedAddress(a), `blocked ${a}`);
+  for (const a of ["8.8.8.8", "1.1.1.1", "172.32.0.1", "100.128.0.1", "2606:4700::1111", "::ffff:8.8.8.8", "::ffff:0:8.8.8.8", "2002:0808:0808::1", "2001:4860:4860::8888", "100:0:0:1::1"]) ok(!EG.isBlockedAddress(a), `public ${a}`);
   ok(EG.isBlockedAddress("not-an-ip") && EG.isBlockedAddress(""), "fail closed");
 });
 
@@ -194,6 +208,53 @@ await t("safeFetch: a name resolving to 127.0.0.1 never connects; a redirect is 
   answer = { status: 200 };
   const off = await EG.safeFetch("https://hooks.example.com:8443/x", { allowHosts: ["hooks.example.com"] });
   ok(off.refused && /443/.test(off.error), "port 8443 refused before connecting");
+});
+
+await t("safeFetch timeouts: 5 s to connect and 10 s in all by default; a trickled answer is cut at the total", async () => {
+  eq(EG.CONNECT_TIMEOUT_MS, 5000, "connect:");
+  eq(EG.TIMEOUT_MS, 10000, "total:");
+  const trickle = http.createServer((req, res) => {
+    res.writeHead(200);
+    const iv = setInterval(() => res.write("."), 100);
+    res.on("close", () => clearInterval(iv));
+  });
+  await new Promise((r) => trickle.listen(0, "127.0.0.1", r));
+  try {
+    const t0 = Date.now();
+    const r = await EG.safeFetch(`http://127.0.0.1:${trickle.address().port}/slow`, { allowHosts: ["127.0.0.1"], body: "{}", timeoutMs: 600 });
+    ok(!r.ok && /in time/.test(r.error || ""), `timed out: ${JSON.stringify(r)}`);
+    ok(Date.now() - t0 < 3000, "stopped at the total, not when the body ended");
+  } finally {
+    trickle.close();
+    trickle.closeAllConnections?.();
+  }
+});
+
+await t("safeFetch reads at most 4 KB: an answer that never ends still settles at once", async () => {
+  let wrote = 0;
+  const endless = http.createServer((req, res) => {
+    res.writeHead(200);
+    const chunk = "y".repeat(1024);
+    const iv = setInterval(() => {
+      if (!res.write(chunk)) return;
+      wrote += chunk.length;
+    }, 5);
+    res.on("close", () => clearInterval(iv));
+  });
+  await new Promise((r) => endless.listen(0, "127.0.0.1", r));
+  try {
+    const t0 = Date.now();
+    const r = await EG.safeFetch(`http://127.0.0.1:${endless.address().port}/big`, { allowHosts: ["127.0.0.1"], body: "{}", timeoutMs: 8000 });
+    ok(r.ok && r.status === 200, `ok: ${JSON.stringify(r)}`);
+    ok(Date.now() - t0 < 2000, `settled after the cap (${Date.now() - t0} ms), not at the timeout`);
+    await new Promise((res) => setTimeout(res, 300));
+    const after = wrote;
+    await new Promise((res) => setTimeout(res, 300));
+    ok(wrote === after, "the connection was dropped: nothing more was written");
+  } finally {
+    endless.close();
+    endless.closeAllConnections?.();
+  }
 });
 
 await t("manifest events and egress: unknown events, a missing scope, IP / Shopify / private egress hosts are refused", () => {
@@ -292,7 +353,7 @@ await t("create_custom: a custom install and endpoint; the whsec_ secret is answ
     const g = await call(caller, "apps/[id]/webhooks", "GET", { params: { id: appId } });
     eq(g.status, 200, `${caller} GET:`);
     ok(!g.text.includes(secret.slice(6)) && !g.text.includes("secret_enc") && !g.text.includes(ep.secret_enc.slice(-20)), `${caller}: no secret`);
-    eq(g.body.endpoint.url, HOOK, `${caller} url:`);
+    eq(g.body.endpoint.url, caller === "support" || OPS.includes(caller) ? `http://127.0.0.1:${PORT}/…` : HOOK, `${caller} url:`);
     eq(g.body.endpoint.status, "active", `${caller} status:`);
     const d = await call(caller, "apps/[id]", "GET", { params: { id: appId } });
     eq(d.status, 200, `${caller} detail:`);
@@ -347,6 +408,46 @@ await t("idempotency: a replayed emit, a re-run fan-out and a re-run delivery se
   const r = await inA(() => D.deliver(firstDlv));
   eq(r.already, "delivered", "a delivered row completes:");
   eq(got.length, n, "no request:");
+});
+
+await t("claim: two runs of one due delivery at once send exactly once", async () => {
+  const ev = await inA(() => E.emitPluginEvent("order.created", { key: "claim-test", data: { order: { id: "c" } } }));
+  await inA(() => E.fanOut(ev.id));
+  const d = (await deliveriesOf(appId)).find((x) => x.event_id === ev.id);
+  const n = got.length;
+  const rs = await Promise.all([inA(() => D.deliver(d.id)), inA(() => D.deliver(d.id))]);
+  eq(got.length, n + 1, "one request:");
+  eq(rs.filter((r) => r.status === "delivered").length, 1, "one delivered:");
+  ok(rs.some((r) => r.busy || r.already), `the other stood down: ${JSON.stringify(rs)}`);
+});
+
+await t("the job runner: plugin_delivery never runs without a budget (shopper after() runs); at most 2 sends per app per tick", async () => {
+  const W = await import("../lib/platform/worker.js");
+  ok(W.BUDGETED_ONLY_TYPES.includes("plugin_delivery"), "budgeted only");
+  for (const f of ["app/api/quiz/[slug]/route.js", "app/api/account/route.js", "app/api/jobs/forward-events/route.js", "app/api/jobs/sync-shopify/route.js"]) {
+    const src = readFileSync(join(ROOT, f), "utf8");
+    ok(/runDueJobs\(\{ limit: \d+ \}\)/.test(src) && !/budgetMs/.test(src), `${f} runs without a budget`);
+  }
+  // first, the earlier tests' queued deliveries go out
+  for (let i = 0; i < 20; i++) if (!(await W.runDueJobs({ limit: 25, budgetMs: 30_000 })).some((r) => r.type === "plugin_delivery")) break;
+  const evs = [];
+  for (let i = 0; i < 4; i++) evs.push(await inA(() => E.emitPluginEvent("order.created", { key: `cap-${i}`, data: { order: { id: `cap${i}` } } })));
+  for (const ev of evs) await inA(() => E.fanOut(ev.id));
+  const ids = (await deliveriesOf(appId)).filter((x) => evs.some((e) => e.id === x.event_id)).map((x) => x.id);
+  eq(ids.length, 4, "four deliveries:");
+  const jobs = await Promise.all(ids.map((id) => getJobByKey(`plugin_delivery:${a.id}:${id}`)));
+  ok(jobs.every((j) => j?.payload?.installId === appId), "the job payload carries the install id (ids only)");
+  const n = got.length;
+  const noBudget = await W.runDueJobs({ limit: 25 });
+  ok(!noBudget.some((r) => r.type === "plugin_delivery"), "an unbudgeted run leaves deliveries alone");
+  eq(got.length, n, "nothing sent:");
+  const tick = await W.runDueJobs({ limit: 25, budgetMs: 30_000 });
+  const mine = tick.filter((r) => r.type === "plugin_delivery" && ids.includes(r.result?.deliveryId ?? "") );
+  eq(mine.length, 2, "two sent this tick:");
+  eq(tick.filter((r) => r.deferred === "per_app_cap").length, 2, "two handed back:");
+  eq(got.length, n + 2, "two requests:");
+  await W.runDueJobs({ limit: 25, budgetMs: 30_000 });
+  eq(got.length, n + 4, "the rest go on the next tick:");
 });
 
 await t("order.fulfilled: emitted once when the projection moves to fulfilled, never again", async () => {
@@ -506,6 +607,10 @@ await t("payloads: owner, admin and staff see them; support and operator support
     ok(g.body.deliveries.length > 0, `${caller} rows`);
     ok(g.body.deliveries.every((d) => ("payload" in d) === !redacted), `${caller} payload presence`);
     noPii(g.text, caller);
+    if (redacted) {
+      eq(g.body.endpoint.url, "http://127.0.0.1:" + PORT + "/…", `${caller}: host only:`);
+      ok(!g.text.includes("/hooks"), `${caller}: no path`);
+    } else eq(g.body.endpoint.url, HOOK, `${caller}: the full address:`);
   }
 });
 
@@ -528,6 +633,7 @@ await t("first-party fixture: its handler runs with a narrow context; its fetch 
   const undoH = HANDLERS.registerPluginHandler("fixture-hooks", "order.created", async (ctx) => {
     seen.push({ keys: Object.keys(ctx).sort().join(","), event: ctx.event, install: ctx.install });
     seen.push({ off: await ctx.fetch("https://other.example.com/x", { body: "{}" }) });
+    seen.push({ override: await ctx.fetch("https://other.example.com/x", { body: "{}", allowHosts: ["other.example.com"], env: { STOREASY_PLUGIN_EGRESS_LOCAL: "1", NODE_ENV: "test" }, headers: { Host: "evil.example" } }) });
     fakeDns([{ address: "169.254.169.254", family: 4 }]);
     try {
       seen.push({ meta: await ctx.fetch("https://api.fixture.example/x", { body: "{}" }) });
@@ -548,7 +654,10 @@ await t("first-party fixture: its handler runs with a narrow context; its fetch 
     eq(seen[0].event.data.order.id, id, "event:");
     eq(seen[0].install.settings.greeting, "hi", "settings:");
     ok(seen[1].off.refused, "off-egress fetch refused");
-    ok(seen[2].meta.refused, "metadata address refused");
+    ok(seen[2].override.refused, "the handler can't widen its own allowlist");
+    ok(seen[3].meta.refused, "metadata address refused");
+    const o = D.handlerFetchOptions({ body: "b", headers: { Host: "evil", HOST: "x", "x-a": "1" }, allowHosts: ["x"], method: "DELETE", timeoutMs: 1, connectTimeoutMs: 1, env: {} });
+    eq(JSON.stringify(o), JSON.stringify({ body: "b", headers: { "x-a": "1" } }), "only body and headers, no host header:");
     noPii(JSON.stringify(seen[0].event), "handler event");
     eq((await call("owner", "apps/[id]", "POST", { params: { id: ins.body.install.id }, body: { uninstall: true } })).status, 200, "uninstall:");
   } finally {
@@ -559,13 +668,42 @@ await t("first-party fixture: its handler runs with a narrow context; its fetch 
 
 await t("limits: up to 10 custom apps per store; line items capped at 100 with line_items_truncated", async () => {
   const live = (await call("owner", "apps", "GET")).body.installs.filter((i) => i.kind === "custom").length;
-  for (let i = live; i < 10; i++) eq((await call("owner", "apps", "POST", { body: custom({ name: `App ${i}` }) })).status, 200, `app ${i}:`);
+  for (let i = live; i < 9; i++) eq((await call("owner", "apps", "POST", { body: custom({ name: `App ${i}` }) })).status, 200, `app ${i}:`);
+  // two creates at once with 9 live: exactly one is made (the count is inside the insert)
+  const both = await Promise.all([call("owner", "apps", "POST", { body: custom({ name: "Racer one" }) }), call("admin", "apps", "POST", { body: custom({ name: "Racer two" }) })]);
+  eq(both.map((r) => r.status).sort().join(","), "200,409", "racing at 9:");
+  ok(/Racer (one|two) wasn't created/.test(both.find((r) => r.status === 409).body.error), "the refusal names the app");
+  const count = await inA(() => db.selectFrom("plugin_installs").select(({ fn }) => fn.countAll().as("n")).where("kind", "=", "custom").where("status", "<>", "uninstalled").executeTakeFirst());
+  eq(Number(count.n), 10, "ten live:");
+  const orphans = await inA(() => db.selectFrom("plugin_endpoints as e").leftJoin("plugin_installs as i", "i.id", "e.install_id").select("e.id").where("i.id", "is", null).execute());
+  eq(orphans.length, 0, "no endpoint without its install:");
   eq((await call("owner", "apps", "POST", { body: custom({ name: "Eleventh" }) })).status, 409, "the 11th:");
   const snap = TOP.orderSnapshot({ id: "o" }, Array.from({ length: 120 }, (_, i) => ({ title: `t${i}`, position: i })));
   eq(snap.line_items.length, 100, "capped:");
   eq(snap.line_items_truncated, true, "flag:");
   const huge = TOP.webhookBody({ id: "evt_1", topic: "order.created", created_at: "x", payload: { order: { id: "o", line_items: Array.from({ length: 100 }, () => ({ title: "x".repeat(4000) })) } } }, "s");
   ok(new TextEncoder().encode(huge).length <= TOP.MAX_BODY_BYTES && JSON.parse(huge).data.order.line_items_truncated, "256 KB cap");
+});
+
+await t("dashboard keys on the pause reason: a pause by the team is no attention row", async () => {
+  const { actionQueue } = await import("../lib/admin/dashboard.js");
+  eq((await call("owner", "apps/[id]/webhooks", "POST", { params: { id: appId }, body: { pause: true } })).status, 200, "pause:");
+  ok(!(await inA(() => actionQueue({ role: "owner" }))).some((x) => x.id === "app_webhook_paused"), "no row");
+  eq((await call("owner", "apps/[id]/webhooks", "POST", { params: { id: appId }, body: { pause: true } })).body.error, "Order hooks's webhooks are already paused.", "named refusal:");
+  eq((await call("owner", "apps/[id]/webhooks", "POST", { params: { id: appId }, body: { resume: true } })).status, 200, "resume:");
+});
+
+await t("uninstalling a custom app clears its signing secrets; a pending delivery is then skipped", async () => {
+  const live = (await call("owner", "apps", "GET")).body.installs.filter((i) => i.kind === "custom" && i.id !== appId);
+  const victim = live[0].id;
+  const ev = await inA(() => E.emitPluginEvent("order.created", { key: "uninstall-test", data: { order: { id: "u" } } }));
+  await inA(() => E.fanOut(ev.id));
+  const d = (await deliveriesOf(victim)).find((x) => x.event_id === ev.id);
+  await call("owner", "apps/[id]/webhooks", "POST", { params: { id: victim }, body: { rotate_secret: true } });
+  eq((await call("owner", "apps/[id]", "POST", { params: { id: victim }, body: { uninstall: true } })).status, 200, "uninstall:");
+  const ep = await inA(() => db.selectFrom("plugin_endpoints").selectAll().where("install_id", "=", victim).executeTakeFirst());
+  ok(ep.secret_enc === null && ep.prev_secret_enc === null && ep.prev_secret_until === null, "secrets cleared");
+  eq((await inA(() => D.deliver(d.id))).status, "skipped", "skipped:");
 });
 
 await t("store isolation: A's app is not found from B; B's owner can't touch it", async () => {
@@ -621,20 +759,26 @@ function reaches(entries, targets) {
   return { bad, seen: seen.size };
 }
 
-// Entries: every components/ file and every app/(storefront) file except the
-// ones that declare runtime = "nodejs" (pricing, customer stories, the order
-// status page and the offline route, which already reach node: modules by
-// design). Those Node files are pinned in NODE_PAGES, so a new one is seen.
-const NODE_PAGES = ["app/(storefront)/customers/[slug]/page.js", "app/(storefront)/customers/page.js", "app/(storefront)/offline/route.js", "app/(storefront)/orders/[orderId]/page.js", "app/(storefront)/pricing/page.js"];
-const NODE_RUNTIME = /export\s+const\s+runtime\s*=\s*["']nodejs["']/;
-await t("egress.js and deliveries.js are unreachable from app/(storefront) (Edge files) and components/ (static and dynamic imports)", () => {
-  const sf = walk("app/(storefront)").filter(code);
-  const nodePages = sf.filter((f) => NODE_RUNTIME.test(readFileSync(join(ROOT, f), "utf8")));
-  eq(nodePages.sort().join(", "), NODE_PAGES.join(", "), "node-runtime storefront files (a new one is looked at first):");
-  const entries = [...sf.filter((f) => !nodePages.includes(f)), ...walk("components").filter(code)];
+// Entries: every app/(storefront) file (Edge and Node alike) and every
+// components/ file. A file that reaches egress, deliveries or custom apps is
+// flagged unless REACH_OK names it with a reason.
+const REACH_OK = {
+  "app/(storefront)/pricing/page.js":
+    "the platform's own pricing page (runtime nodejs, never a store's storefront): its signup flow reaches lib/platform/worker.js through signup-provision → onboarding → shopify-connect → sync-jobs, and the worker loads deliveries.js with a dynamic import only when a plugin_delivery job runs",
+};
+await t("egress.js, deliveries.js and custom-apps.js are unreachable from app/(storefront) and components/ (static and dynamic imports); the one known Node page is pinned", () => {
+  const entries = [...walk("app/(storefront)"), ...walk("components")].filter(code);
   ok(entries.length > 50, `entries: ${entries.length}`);
-  const r = reaches(entries, ["lib/plugins/egress.js", "lib/plugins/deliveries.js", "lib/plugins/custom-apps.js"]);
-  eq(r.bad.join("\n"), "", "reached:");
+  const bad = [];
+  const seenOk = new Set();
+  for (const e of entries) {
+    const r = reaches([e], ["lib/plugins/egress.js", "lib/plugins/deliveries.js", "lib/plugins/custom-apps.js"]);
+    if (!r.bad.length) continue;
+    if (REACH_OK[e]) seenOk.add(e);
+    else bad.push(...r.bad);
+  }
+  eq(bad.join("\n"), "", "reached:");
+  eq([...seenOk].join(","), Object.keys(REACH_OK).join(","), "REACH_OK lists only files that really reach them:");
 });
 
 await t("edge safety: hosts, topics, sign, handlers and events import no node: module", () => {

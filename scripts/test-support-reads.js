@@ -69,8 +69,9 @@ const CNY = {
   // Phase 4 line 1: an app's secret setting in A (no one reads it back) and store B's install
   appSecret: "cnyappsecret0",
   bApp: "cnybapp0",
-  // Phase 4 line 3: store B's custom app (its name)
+  // Phase 4 line 3: store B's custom app (its name), and A's webhook address path
   bWebhookApp: "cnybhookapp0",
+  hookPath: "cnyhookpath0",
 };
 const SECRET_KEYS = [
   "platformSecret", "orderLinkSecret", "adminPassword", "shopifyAdminToken", "shopifyClientSecret", "storefrontToken", "storefrontPrivateToken",
@@ -268,7 +269,9 @@ await call("owner-b", "apps/[id]", "POST", { params: { id: appB.body?.install?.i
 // Phase 4 line 3: a custom app in A with a delivered order.created event for
 // the fixture order (its secret a canary), and a custom app in B (its name a canary)
 process.env.STOREASY_PLUGIN_EGRESS_LOCAL = "1";
-const hookBody = (name) => ({ create_custom: { name, url: "http://127.0.0.1:9/hooks", topics: ["order.created"], scopes: ["orders.read"] } });
+process.env.NODE_ENV ||= "test"; // the local flag needs test or development
+// the address's path is a canary: support sees the host only
+const hookBody = (name) => ({ create_custom: { name, url: `http://127.0.0.1:9/${CNY.hookPath}/in`, topics: ["order.created"], scopes: ["orders.read"] } });
 const hookA = await call("owner", "apps", "POST", { body: hookBody("Support webhook app") });
 const hookB = await call("owner-b", "apps", "POST", { body: hookBody(CNY.bWebhookApp), host: b.tenant.domains[0] });
 // the secret's longest letters-and-digits run, lower-cased (the search is case-blind)
@@ -342,7 +345,8 @@ const roleOf = (caller) => (OPERATOR_SUPPORT.includes(caller) ? "support" : call
 const CALLERS = [...LEAST, ...(LEAST.includes("support") ? OPERATOR_SUPPORT : [])];
 // the roles that lose customer PII (lib/admin/order-view.js); the others keep it by design
 const REDACTED = (caller) => roleOf(caller) === "support";
-const ORDER_PII = ["orderEmail", "orderPhone", "orderName", "orderAddress", "orderCity", "orderPincode", "orderSnapshot", "customerId"];
+// (line 3: a webhook address's path is redacted with them)
+const ORDER_PII = ["orderEmail", "orderPhone", "orderName", "orderAddress", "orderCity", "orderPincode", "orderSnapshot", "customerId", "hookPath"];
 // a caller's own session token is not a leak to itself
 const OWN_TOKEN = { owner: "ownerAdmin", admin: "adminAdmin", staff: "staffAdmin", support: "supportAdmin", "operator-support": "operatorPlatform", "operator-support-entry": "operatorSupport" };
 const skipFor = (caller) => [...(REDACTED(caller) ? [] : ORDER_PII), OWN_TOKEN[caller]];

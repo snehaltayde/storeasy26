@@ -56,11 +56,13 @@ export const DELIVERY_STATES = Object.freeze({
   failed: ["Failed", "danger"],
   skipped: ["Skipped", "muted"],
 });
-// "about 5 min" / "about 2 h": retries run on the job tick, so times are approximate
+// "in about 5 minutes" / "in about 2 hours": retries run on the job tick, so times are approximate
 export function aboutIn(iso, nowMs = Date.now()) {
   const ms = Date.parse(iso || "") - nowMs;
   if (!Number.isFinite(ms)) return "";
-  if (ms <= 60_000) return "about a minute";
-  if (ms < 3600_000) return `in about ${Math.round(ms / 60_000)} min`;
-  return `in about ${Math.round(ms / 3600_000)} h`;
+  if (ms <= 0) return "Any moment now";
+  if (ms < 90_000) return "In about a minute";
+  if (ms < 3600_000) return `In about ${Math.round(ms / 60_000)} minutes`;
+  const h = Math.round(ms / 3600_000);
+  return `In about ${h} ${h === 1 ? "hour" : "hours"}`;
 }

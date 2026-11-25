@@ -21,7 +21,7 @@ import { NO_MANAGE, postApp, shortDate } from "@/components/admin/apps/app-words
 // GET /api/admin/apps/[id]/webhooks. A custom app shows its address (mono),
 // Active / Paused with the reason, its events, and Edit address, Rotate
 // secret (behind an AlertDialog; the new secret shows once), Send test event
-// and Pause / Resume (admin and owner; RoleGate'd for staff and support). A
+// and Pause (behind an AlertDialog) / Resume (admin and owner; RoleGate'd for staff and support). A
 // first-party app shows only its deliveries, and nothing at all until it has
 // some. Then the Deliveries table. The signing secret is never read back.
 //   install: the install view; role: the actor's role
@@ -36,6 +36,7 @@ export function WebhooksCard({ install, role }) {
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
   const [rotateOpen, setRotateOpen] = useState(false);
+  const [pauseOpen, setPauseOpen] = useState(false);
   const [secret, setSecret] = useState(null);
   const base = `apps/${encodeURIComponent(install.id)}/webhooks`;
 
@@ -199,7 +200,7 @@ export function WebhooksCard({ install, role }) {
                 </Button>
               </RoleGate>
               <RoleGate role={role} action="apps.manage" reason={NO_MANAGE}>
-                <Button type="button" variant="outline" size="sm" disabled={Boolean(busy)} data-webhooks-action={paused ? "resume" : "pause"} onClick={() => (paused ? act("resume", { resume: true }, "Webhooks are on again.") : act("pause", { pause: true }, "Webhooks are paused."))}>
+                <Button type="button" variant="outline" size="sm" disabled={Boolean(busy)} data-webhooks-action={paused ? "resume" : "pause"} onClick={() => (paused ? act("resume", { resume: true }, "Webhooks are on again.") : setPauseOpen(true))}>
                   {paused ? <CirclePlay aria-hidden="true" /> : <CirclePause aria-hidden="true" />}
                   {paused ? "Resume" : "Pause"}
                 </Button>
@@ -209,6 +210,28 @@ export function WebhooksCard({ install, role }) {
         )}
         <DeliveriesTable view={view} installId={install.id} role={role} filters={filters} onFilter={filter} onChanged={() => load()} loading={loading} />
       </CardContent>
+      <AlertDialog open={pauseOpen} onOpenChange={(v) => !v && busy !== "pause" && setPauseOpen(false)}>
+        <AlertDialogContent data-apps="pause-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{`Pause webhooks for ${install.name}?`}</AlertDialogTitle>
+            <AlertDialogDescription>Nothing is sent to its address until you resume. Events while paused are recorded as Skipped, and you can resend them afterwards.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy === "pause"}>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              disabled={busy === "pause"}
+              data-apps="pause-go"
+              onClick={async () => {
+                await act("pause", { pause: true }, "Webhooks are paused.");
+                setPauseOpen(false);
+              }}
+            >
+              {busy === "pause" ? "Pausing…" : "Pause webhooks"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={rotateOpen} onOpenChange={(v) => !v && busy !== "rotate" && setRotateOpen(false)}>
         <AlertDialogContent data-apps="rotate-confirm">
           <AlertDialogHeader>
