@@ -365,6 +365,20 @@ await t("logout on the store's host clears __Host-support and revokes the sessio
   eq(await S.verifySession(s, "support"), null, "revoked");
 });
 
+await t("P3-E the operator signing out of /platform ends their __Host-support session on store B (401) and their unspent entry tokens", async () => {
+  const { session: s } = await enterB(); // the logout probe's grant is still open
+  eq((await asSupport(s, "orders", "GET", { host: hostB })).status, 200, "before");
+  const unspent = (await platform("operator", "POST", { body: { action: "enter", tenant: b.id } })).body.token;
+  const opToken = (await S.createSession({ userId: operatorId, kind: "operator", ttlMs: 10 * 60_000 })).token;
+  const route = await import(pathToFileURL(join(ROOT, "app/api/platform/logout/route.js")).href);
+  const res = await route.POST(new NextRequest(`http://${OPERATOR_HOST}/api/platform/logout`, { method: "POST", headers: { host: OPERATOR_HOST, origin: `http://${OPERATOR_HOST}`, cookie: `_platform=${opToken}` } }));
+  eq(res.status, 200, "logout");
+  eq(await S.verifySession(opToken, "operator"), null, "the operator session is revoked");
+  eq((await asSupport(s, "orders", "GET", { host: hostB })).status, 401, "the support session on B after sign-out");
+  eq((await enter(unspent, hostB)).status, 400, "an unspent entry token after sign-out");
+  ok(await S.verifySession(JARS.operator._platform, "operator"), "the operator's other console sessions are untouched");
+});
+
 await t("a support session for one grant is refused once another grant is the open one", async () => {
   const { session: s } = await enterB(); // the logout probe's grant is still open
   await db().execute({ sql: "UPDATE support_grants SET revoked_at = ? WHERE tenant_id = ? AND revoked_at IS NULL", args: [new Date().toISOString(), b.id] });
