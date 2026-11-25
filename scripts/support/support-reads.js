@@ -11,6 +11,7 @@
 //   variant the admin-routes.js row variant it covers (body-selected reads)
 //   req     (ctx) => { body, params, query }: ctx holds the fixture's ids
 //   keys    every top-level key the answer may have
+//   inner   { <top-level key>: [every key that object may have] } (optional)
 //   status  the status every probe caller must get (default 200)
 //   note    why a probe answers a non-200
 
@@ -18,8 +19,8 @@ const DOC = (op, arg) => ({ path: "documents", method: "PUT", variant: op, name:
 
 export const SUPPORT_PROBES = Object.freeze([
   // Phase 5 line 1: uploaded themes (list, archived list, a package, its file; store B's package is not on A)
-  { name: "themes", path: "themes", method: "GET", keys: ["ok", "builtins", "packages", "archived", "state"] },
-  { name: "themes ?status=archived", path: "themes", method: "GET", req: () => ({ query: "status=archived" }), keys: ["ok", "builtins", "packages", "archived", "state"] },
+  { name: "themes", path: "themes", method: "GET", keys: ["ok", "builtins", "packages", "archived", "state"], inner: { state: ["live", "liveBrand", "liveTheme", "liveArchived", "draft", "design", "publishSet"] } },
+  { name: "themes ?status=archived", path: "themes", method: "GET", req: () => ({ query: "status=archived" }), keys: ["ok", "builtins", "packages", "archived", "state"], inner: { state: ["live", "liveBrand", "liveTheme", "liveArchived", "draft", "design", "publishSet"] } },
   { name: "themes/[id]", path: "themes/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.themeId } }), keys: ["ok", "package", "content", "tokens"], note: "tokens: Phase 6 line 2, the studio's Reset to the theme's" },
   { name: "themes/[id] ?download", path: "themes/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.themeId }, query: "download=1" }), keys: ["format", "id", "name", "version", "author", "description", "base", "tokens", "surfaces", "templates", "styles"], note: "the stored package file itself" },
   { name: "themes/[id] (store B's theme)", path: "themes/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.bThemeId } }), status: 404, keys: ["error", "code"], note: "another store's theme is not on this store" },

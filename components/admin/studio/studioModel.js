@@ -20,7 +20,12 @@
 //                                     (doc_design, DesignRail.js) applies its
 //                                     own steps: undo()/redo() call
 //                                     fn(step, "undo"|"redo") for that docId
-//                                     before returning the step
+//                                     before returning the step; that
+//                                     store alone applies it
+//     handles(docId) → boolean        an applier is registered for docId
+//     onClose(fn) → unsubscribe       fn() when the studio closes
+//     close()                         the studio closed (Studio.js unmount):
+//                                     every onClose fn runs once
 //     subscribe(fn) → unsubscribe     fn() after every change
 //     getSnapshot() → {touched, undo, redo}  (counts; stable between changes)
 //
@@ -47,6 +52,7 @@ export function createStudioModel({ limit = HISTORY_LIMIT } = {}) {
   let future = [];
   const listeners = new Set();
   const appliers = new Map();
+  const closers = new Set();
   let snap = null;
   const applied = (step, dir) => {
     const out = { docId: step.docId, before: copy(step.before), after: copy(step.after) };
@@ -98,6 +104,17 @@ export function createStudioModel({ limit = HISTORY_LIMIT } = {}) {
     redo,
     canUndo: () => past.length > 0,
     canRedo: () => future.length > 0,
+    handles: (docId) => appliers.has(docId),
+    onClose(fn) {
+      if (typeof fn !== "function") return () => {};
+      closers.add(fn);
+      return () => closers.delete(fn);
+    },
+    close() {
+      const fns = [...closers];
+      closers.clear();
+      for (const fn of fns) fn();
+    },
     onStep(docId, fn) {
       if (typeof docId !== "string" || !docId || typeof fn !== "function") return () => {};
       appliers.set(docId, fn);

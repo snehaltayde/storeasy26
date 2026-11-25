@@ -128,7 +128,10 @@ export default function Studio({ document: entry, note = null, can = {}, role = 
   useEffect(() => {
     api.call("listDocuments", true).then((r) => r?.ok && Array.isArray(r.data?.documents) && setDocs(r.data.documents));
     openDocument(entry?.id || "doc_home");
-    return () => storeRef.current?.dispose();
+    return () => {
+      storeRef.current?.dispose();
+      model.close();
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- writes (each one an undo step; the store saves it as a draft) ----
@@ -154,6 +157,7 @@ export default function Studio({ document: entry, note = null, can = {}, role = 
     const st = dir === "undo" ? model.undo() : model.redo();
     if (!st) return;
     if (st.docId !== s.getState().id) return; // another document's step: line 1 keeps a store per document
+    if (model.handles(st.docId)) return; // doc_design: the Design tab's applier wrote it (never a whole-body snapshot here)
     for (const o of restoreOps(s.getState().body, dir === "undo" ? st.before : st.after)) s.setField(o.path, o.value);
     post(orderMessage(s.getState().id, s.getState().body));
   };

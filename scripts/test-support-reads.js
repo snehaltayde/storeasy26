@@ -446,6 +446,11 @@ for (const caller of CALLERS) {
       if (r.status !== (p.status ?? 200)) bad.push(`${p.name}: status ${r.status} ${r.text.slice(0, 160)}`);
       const extra = Object.keys(r.body ?? {}).filter((k) => !p.keys.includes(k));
       if (extra.length) bad.push(`${p.name}: unlisted keys ${extra.join(",")} (has ${Object.keys(r.body ?? {}).join(",")})`);
+      for (const [k, allowed] of Object.entries(p.inner || {})) {
+        const v = r.body?.[k];
+        const more = v && typeof v === "object" && !Array.isArray(v) ? Object.keys(v).filter((x) => !allowed.includes(x)) : [];
+        if (more.length) bad.push(`${p.name}: unlisted ${k} keys ${more.join(",")}`);
+      }
     }
     eq(bad.join("\n"), "", "");
   });

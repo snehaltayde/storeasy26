@@ -29,6 +29,12 @@
 //                                          severity, message, fix: {token,
 //                                          value, words} | null }] }
 //   applyFix(brand, fix, start)            the brand with a suggestFix applied
+//   stepOps(step, dir) → [{path, value}]   an undo step as store.setField
+//                                          calls for only what the step changed
+//                                          (settings.<key>, or a top-level key),
+//                                          never a whole-body snapshot, so a
+//                                          change made since (another key, or
+//                                          the same store's other edits) stays
 import { checkBrand, validateBrand, KIT_SURFACES, DEFAULT_KIT } from "../../../lib/brand.js";
 import { BRAND_FIELDS, design } from "../editor/fields/inspectorModel.js";
 import { paletteById, DEFAULT_PALETTE_ID } from "../../../lib/themes/palettes.js";
@@ -118,4 +124,21 @@ export function readability(brand, { theme = null, surfaces = null, live = null,
 export function applyFix(brand, fix, startingBrand = null) {
   if (!isObj(fix) || !TOKEN_WORDS[fix.token]) return brand;
   return setToken(brand, fix.token, fix.value, startingBrand);
+}
+
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const copy = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
+export function stepOps(step, dir) {
+  if (!isObj(step) || (dir !== "undo" && dir !== "redo")) return [];
+  const from = isObj(step.before) ? step.before : {};
+  const to = isObj(step.after) ? step.after : {};
+  const target = dir === "undo" ? from : to;
+  const out = [];
+  for (const k of new Set([...Object.keys(from), ...Object.keys(to)])) {
+    if (same(from[k], to[k])) continue;
+    if (k === "settings" && isObj(from[k]) && isObj(to[k])) {
+      for (const sk of new Set([...Object.keys(from[k]), ...Object.keys(to[k])])) if (!same(from[k][sk], to[k][sk])) out.push({ path: `settings.${sk}`, value: copy(target[k][sk]) });
+    } else out.push({ path: k, value: copy(target[k]) });
+  }
+  return out;
 }

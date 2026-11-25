@@ -174,7 +174,8 @@ function frame({ ok: okay = true, look = { kit: "pulse-1", surfaces: null } } = 
     addEventListener() {},
     removeEventListener() {},
   };
-  const parent = { postMessage() {} };
+  const toParent = [];
+  const parent = { postMessage: (msg) => toParent.push(msg) };
   const stranger = { postMessage() {} };
   let onMessage = null;
   const window = {
@@ -188,7 +189,7 @@ function frame({ ok: okay = true, look = { kit: "pulse-1", surfaces: null } } = 
   const send = (data, source = parent, origin = window.location.origin) => onMessage?.({ data, source, origin });
   send({ type: "storeasy:editor:hello", v: 2 });
   const draft = () => document.getElementById(Bridge.DRAFT_STYLE_ID)?.textContent ?? null;
-  return { send, draft, stranger, stop, vars };
+  return { send, draft, stranger, stop, vars, toParent };
 }
 
 await t("tokens handler: draws only validateBrand's output; ignores \"accent\":\"red;}body{\", extra keys, a sender that isn't the parent and ok:false", () => {
@@ -294,13 +295,23 @@ await t("undo/redo: model.onStep hands doc_design's steps to its own store's app
 
 await t("source: a token change posts storeasy:tokens before the store saves, then records the undo step; Studio turns showDesign on when doc_design is touched", async () => {
   const src = await readFile(join(ROOT, "components/admin/studio/DesignRail.js"), "utf8");
-  const write = src.slice(src.indexOf("const write = (next) =>"));
-  ok(write.indexOf("studio.post(msg)") < write.indexOf('store.setField("settings.brand"') && write.indexOf('store.setField("settings.brand"') < write.indexOf("studio.model.record"), "post, save, record");
-  ok(src.includes("BrandColourInput") && src.includes("BrandStepSelect"), "the editor's own controls");
   const studio = await readFile(join(ROOT, "components/admin/studio/Studio.js"), "utf8");
+  const write = src.slice(src.indexOf("export function writeBrand("));
+  ok(write.indexOf("s.studio.post(msg)") < write.indexOf('s.store.setField("settings.brand"') && write.indexOf('s.store.setField("settings.brand"') < write.indexOf("s.model.record"), "post, save, record");
+  ok(studio.includes("if (model.handles(st.docId)) return;"), "Studio.js never writes a doc_design step itself");
+  ok(src.includes("BrandColourInput") && src.includes("BrandStepSelect"), "the editor's own controls");
   ok(studio.includes('showDesign={history.touched.includes("doc_design")}'), "showDesign");
   const pane = await readFile(join(ROOT, "components/admin/editor/PreviewPane.js"), "utf8");
   ok(pane.includes("if (!showDesign || designRef.current) return;"), "PreviewPane turns it on once, without a reload");
+});
+
+await t("stepOps: an undo writes back only the keys its step changed (settings.brand), never the whole body, so a theme or logo changed since stays", () => {
+  const b0 = { type: "design", settings: { brand: GOOD, theme: { kit: "pulse", version: 1 }, logo: null } };
+  const b1 = T.withBrand(b0, T.setToken(GOOD, "accent", "#e11d48"));
+  eq(T.stepOps({ before: b0, after: b1 }, "undo"), [{ path: "settings.brand", value: GOOD }]);
+  eq(T.stepOps({ before: b0, after: b1 }, "redo"), [{ path: "settings.brand", value: b1.settings.brand }]);
+  eq(T.stepOps({ before: { a: 1 }, after: { a: 2 } }, "undo"), [{ path: "a", value: 1 }], "a top-level key:");
+  eq(T.stepOps({ before: b0, after: b0 }, "undo"), [], "no change:");
 });
 
 // ---- 6. roles ---------------------------------------------------------------------------------------
@@ -400,6 +411,149 @@ await t("roles: support and operator support see every value with no enabled tok
   ok(pkg.includes('data-design-reset="theme"') && pkg.includes("Reset to the theme&#x27;s"), "Reset to the theme's");
   ok(!railHtml(studioOf("owner"), { body, look: { ...look, tokens: null } }).includes("data-design-reset"), "no Reset before the theme's tokens are read");
   ok(!railHtml(studioOf("support"), { body, look }).includes("data-design-reset"), "support: no Reset");
+});
+
+// ---- 6b. one doc_design store, its 409, the reload race ------------------------------
+console.log("— the design store");
+const St = await import("../components/admin/editor/store.js");
+const designDoc = (brand = GOOD, revision = 1) => ({ id: T.DESIGN_DOC, type: "design", label: "Design", body: { type: "design", settings: { brand, theme: { kit: "pulse", version: 1 }, logo: null } }, revision, draftHash: `h_${revision}` });
+function fakeApi({ conflict = false } = {}) {
+  const calls = [];
+  let doc = designDoc();
+  return {
+    calls,
+    async call(op, args, extra) {
+      calls.push([op, args, extra]);
+      if (op === "getDocument") return args === T.DESIGN_DOC ? { ok: true, data: { document: doc } } : { ok: true, data: { document: { id: args, type: "home", body: { type: "home", sections: [] }, revision: 1, draftHash: "h" } } };
+      if (op === "saveDraft") {
+        if (conflict) return { conflict: true, code: "DOCUMENT_CHANGED", message: "changed", current: { ...doc, revision: doc.revision + 5, draftHash: "h_other", updatedByName: "Asha" } };
+        doc = { ...doc, body: args.body, revision: doc.revision + 1, draftHash: `h_${doc.revision + 1}` };
+        return { ok: true, data: { document: doc } };
+      }
+      return { ok: true, data: {} };
+    },
+    sendKeepalive: () => false,
+  };
+}
+const storeOf = (api, document) => St.createDocumentStore({ api, document, tenant: "t", storage: null, readOnly: false });
+const writer = (api, extra = {}) => ({ api, model: M.createStudioModel(), can: { write: true, publish: true }, readOnly: false, role: "owner", store: null, state: null, post: () => true, ...extra });
+const noFetch = async () => null;
+
+await t("one store: opening ?doc=doc_design before the studio has loaded waits, then shares the studio's store (no second getDocument); an own store is dropped when the studio opens doc_design", async () => {
+  const api = fakeApi();
+  const studio = writer(api);
+  const s = Rail.sessionFor(studio, { fetchJson: noFetch });
+  eq(Rail.syncDesign(s, studio), undefined);
+  eq(api.calls.length, 0, "nothing asked before the studio loads:");
+  eq(s.store, null);
+  const shared = storeOf(api, designDoc());
+  const loaded = { ...studio, store: shared, state: shared.getState() };
+  Rail.sessionFor(loaded);
+  Rail.syncDesign(s, loaded);
+  ok(s.store === shared && s.shared, "the studio's store is shared");
+  eq(api.calls.filter((c) => c[0] === "getDocument").length, 0, "no second doc_design store:");
+  ok(Rail.writeBrand(s, T.setToken(GOOD, "accent", "#e11d48")), "written");
+  eq(T.brandOf(shared.getState().body).accent, "#e11d48", "on the shared store:");
+  Rail.closeSession(s);
+  shared.dispose();
+
+  // the other way round: an own store first, then the studio opens doc_design
+  const api2 = fakeApi();
+  const home = storeOf(api2, { id: "doc_home", type: "home", body: { type: "home", sections: [] }, revision: 1, draftHash: "h" });
+  const st2 = writer(api2, { store: home, state: home.getState() });
+  const s2 = Rail.sessionFor(st2, { fetchJson: noFetch });
+  await Rail.syncDesign(s2, st2);
+  const own = s2.store;
+  ok(own && !s2.shared, "an own store while the studio shows home");
+  let disposed = false;
+  const dispose = own.dispose;
+  own.dispose = () => ((disposed = true), dispose());
+  const shared2 = storeOf(api2, designDoc());
+  const st3 = { ...st2, store: shared2, state: shared2.getState() };
+  Rail.sessionFor(st3);
+  Rail.syncDesign(s2, st3);
+  ok(s2.store === shared2 && s2.shared, "switched to the studio's store");
+  await new Promise((r) => setTimeout(r, 0));
+  ok(disposed, "the own store was flushed and disposed");
+  Rail.closeSession(s2);
+  home.dispose();
+  shared2.dispose();
+});
+
+await t("a disposed shared store is never edited: once the studio moves on, a write is refused until an own store is open, and undo doesn't reach the old one", async () => {
+  const api = fakeApi();
+  const shared = storeOf(api, designDoc());
+  const studio = writer(api, { store: shared, state: shared.getState() });
+  const s = Rail.sessionFor(studio, { fetchJson: noFetch });
+  Rail.syncDesign(s, studio);
+  ok(Rail.writeBrand(s, T.setToken(GOOD, "accent", "#e11d48")), "first write on the shared store");
+  // the studio opens home: it disposes the design store and has a new one
+  shared.dispose();
+  let edits = 0;
+  const setField = shared.setField;
+  shared.setField = (...a) => (edits++, setField(...a));
+  const home = storeOf(api, { id: "doc_home", type: "home", body: { type: "home", sections: [] }, revision: 1, draftHash: "h" });
+  const moved = { ...studio, store: home, state: home.getState() };
+  Rail.sessionFor(moved); // render: the session sees the new studio store
+  eq(Rail.writeBrand(s, T.setToken(GOOD, "accent", "#16a34a")), false, "refused before the sync:");
+  studio.model.undo();
+  eq(edits, 0, "neither the write nor the undo touched the disposed store:");
+  await Rail.syncDesign(s, moved);
+  ok(s.store && s.store !== shared && !s.shared, "an own store now");
+  ok(Rail.writeBrand(s, T.setToken(GOOD, "accent", "#16a34a")), "writes go to it");
+  eq(edits, 0, "still none on the old one:");
+  // the studio closes: the applier goes and the own store is disposed
+  const own = s.store;
+  let gone = false;
+  const dispose = own.dispose;
+  own.dispose = () => ((gone = true), dispose());
+  studio.model.close();
+  ok(!studio.model.handles(T.DESIGN_DOC) && s.store === null, "closed: no applier, no store");
+  await new Promise((r) => setTimeout(r, 0));
+  ok(gone, "the own store was flushed, then disposed");
+  home.dispose();
+});
+
+await t("a 409 on the design store shows in the rail (Load theirs / Keep mine)", async () => {
+  const api = fakeApi({ conflict: true });
+  const home = storeOf(api, { id: "doc_home", type: "home", body: { type: "home", sections: [] }, revision: 1, draftHash: "h" });
+  const studio = writer(api, { store: home, state: home.getState() });
+  const s = Rail.sessionFor(studio, { fetchJson: noFetch });
+  await Rail.syncDesign(s, studio);
+  Rail.writeBrand(s, T.setToken(GOOD, "accent", "#e11d48"));
+  await s.store.flush();
+  ok(s.store.getState().conflict, "the store is in conflict");
+  const html = renderToStaticMarkup(React.createElement(Rail.default, { studio }));
+  ok(html.includes("data-design-save") && html.includes("data-conflict-banner"), "the conflict banner is in the rail");
+  ok(/Keep mine/.test(html), "Keep mine offered");
+  Rail.closeSession(s);
+  home.dispose();
+});
+
+await t("reload race: a section save reloads the frame within 700 ms of an accent change, before the design save; the new frame's ready gets the accent again, so it is still drawn", async () => {
+  const api = fakeApi();
+  const home = storeOf(api, { id: "doc_home", type: "home", body: { type: "home", sections: [] }, revision: 1, draftHash: "h" });
+  let current = frame();
+  const studio = writer(api, { store: home, state: home.getState(), post: (msg) => (current.send(msg), true) });
+  const s = Rail.sessionFor(studio, { fetchJson: noFetch });
+  await Rail.syncDesign(s, studio);
+  const accent = T.setToken(GOOD, "accent", "#e11d48");
+  Rail.writeBrand(s, accent);
+  const want = tokensCss(T.tokensMessage(accent).brand, { kit: "pulse-1", surfaces: null });
+  eq(current.draft(), want, "drawn at once:");
+  eq(api.calls.filter((c) => c[0] === "saveDraft").length, 0, "the design save hasn't gone (700 ms pause):");
+  // the home save's ack reloads the frame: a fresh page, no draft style
+  current.stop();
+  current = frame();
+  eq(current.draft(), null, "the reloaded frame has no draft yet:");
+  const ready = current.toParent.find((m) => m?.type === "storeasy:ready" && m.v === 2);
+  ok(ready, "the reloaded frame says ready (v2)");
+  ok(Rail.frameMessage(s, ready), "the rail posts the tokens again");
+  eq(current.draft(), want, "still drawn:");
+  eq(Rail.frameMessage(s, { type: "storeasy:ready", v: 2, ok: false }), false, "a frame that isn't ok gets nothing:");
+  current.stop();
+  Rail.closeSession(s);
+  home.dispose();
 });
 
 // ---- 7. the store: getPackage tokens, themeState's live brand, the shopper's HTML -------------------
