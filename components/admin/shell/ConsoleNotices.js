@@ -1,6 +1,7 @@
 import { Info, ShieldAlert } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { incidentBannerTitle } from "@/lib/platform/incident-words";
+import { supportTime } from "@/components/admin/team/team-words";
 
 // The support-access and incident notices (moved from the old admin root
 // layout in Phase 0 line 8; on the new UI's Alert since Phase 2 line 11): at
@@ -25,12 +26,11 @@ export function ConsoleNotices({ grant = null, incidents = [], className = "spac
         <Alert variant="warning" role="status">
           <ShieldAlert aria-hidden />
           <AlertTitle>Platform support access is active</AlertTitle>
-          <AlertDescription className="text-warning-text/90">
+          <AlertDescription className="text-warning-text/90 [&_p:not(:last-child)]:mb-1">
             <p>
-              {grant.operatorName} from Storeasy, reason: “{grant.reason}”, until{" "}
-              {new Date(grant.expires_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}. Support access is
-              read-only and never sees customer contact details. An owner or admin can end it from Settings, Team.
+              {grant.operatorName} from Storeasy can see this console until <span className="tabular-nums">{supportTime(grant.expires_at)}</span>, for: “{grant.reason}”.
             </p>
+            <p>It's read-only and never sees customer contact details. An owner or admin can end it now from Settings, Team.</p>
           </AlertDescription>
         </Alert>
       )}

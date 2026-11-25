@@ -49,6 +49,14 @@ export function dateWords(iso) {
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
+// "25 Nov 2026, 18:30 UTC": when support access opened or ends (the banner and
+// the Support access card), 24-hour UTC, the same on the server and in the browser.
+export function supportTime(iso) {
+  const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return "—";
+  return `${d.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" })} UTC`;
+}
+
 // When an invite stops working, in words: "Expires today", "Expires tomorrow",
 // "Expires in 5 days", "Expired 2 days ago". Counted in whole UTC days so the
 // server and the browser agree. soon: a day or less left (or gone).

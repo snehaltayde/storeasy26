@@ -7,7 +7,7 @@
 // console (read-only) and Close now, and the last 20 grants. `initial` is the
 // store page's support summary, shown until /api/platform/support?view=store
 // answers. The onboarding sheet's own open and close actions are unchanged.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { when } from "@/components/platform/stores/storesWords";
 import { EnterConsole } from "./EnterConsole";
 import { STATE_WORDS, SUPPORT_HOURS, hoursLabel, supportApi } from "./supportApi";
@@ -38,29 +39,66 @@ const mailWords = (m) => {
   return m.sent ? `The store's owners and admins were emailed (${m.sent}).` : "The store has no owner or admin to email yet.";
 };
 
-export function SupportHistory({ history }) {
-  if (!history?.length) return <p className="text-muted-foreground">No support access yet.</p>;
+const SHOWN = 5;
+
+function HistoryRow({ h }) {
+  const w = STATE_WORDS[h.state] || STATE_WORDS.closed;
   return (
-    <ul className="divide-y divide-border" data-support="history">
-      {history.map((h) => {
-        const w = STATE_WORDS[h.state] || STATE_WORDS.closed;
-        return (
-          <li key={h.id} className="space-y-0.5 py-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">{h.operatorName}</span>
-              <Badge variant={w.tone}>{w.label}</Badge>
-            </div>
-            <p className="break-words">{h.reason}</p>
-            <p className="text-xs text-muted-foreground">
-              Opened {when(h.openedAt)}
-              {h.state === "open" && ` · until ${when(h.expiresAt)}`}
-              {h.state === "closed" && ` · closed ${when(h.endedAt)}${h.endedBy ? ` by ${h.endedBy}` : ""}`}
-              {h.state === "expired" && ` · expired ${when(h.endedAt)}`}
-            </p>
-          </li>
-        );
-      })}
-    </ul>
+    <li className="space-y-1 py-3">
+      <div className="min-w-0 space-y-0.5">
+        <p className="flex flex-wrap items-center gap-2">
+          <span className="font-medium">{h.operatorName}</span>
+          <Badge variant={w.tone}>{w.label}</Badge>
+        </p>
+        <p className="break-words text-muted-foreground">{h.reason}</p>
+      </div>
+      <p className="text-xs text-muted-foreground tabular-nums">
+        <span className="block">Opened {when(h.openedAt)}</span>
+        {h.state === "open" && <span className="block">Until {when(h.expiresAt)}</span>}
+        {h.state === "closed" && <span className="block">Closed {when(h.endedAt)}{h.endedBy ? ` by ${h.endedBy}` : ""}</span>}
+        {h.state === "expired" && <span className="block">Expired {when(h.endedAt)}</span>}
+      </p>
+    </li>
+  );
+}
+
+export function SupportHistory({ history }) {
+  const [all, setAll] = useState(false);
+  if (!history?.length) return <p className="text-muted-foreground">No support access yet.</p>;
+  const shown = all ? history : history.slice(0, SHOWN);
+  return (
+    <>
+      <ul className="divide-y divide-border" data-support="history" id="store-support-history">
+        {shown.map((h) => (
+          <HistoryRow key={h.id} h={h} />
+        ))}
+      </ul>
+      {history.length > SHOWN && (
+        <Button type="button" variant="ghost" size="sm" className="-ml-2" aria-expanded={all} aria-controls="store-support-history" onClick={() => setAll((x) => !x)}>
+          {all ? "Show fewer" : `Show all ${history.length}`}
+        </Button>
+      )}
+    </>
+  );
+}
+
+const HistorySkeleton = () => (
+  <div aria-busy="true" aria-label="Loading the last 20 grants" className="space-y-3 py-2">
+    {[0, 1, 2].map((i) => (
+      <div key={i} className="space-y-1.5">
+        <Skeleton className="h-3.5 w-40" />
+        <Skeleton className="h-3.5 w-3/4" />
+      </div>
+    ))}
+  </div>
+);
+
+function Fact({ label, children }) {
+  return (
+    <div className="grid gap-0.5 sm:grid-cols-[7rem_1fr] sm:gap-4">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 break-words">{children}</dd>
+    </div>
   );
 }
 
@@ -76,13 +114,18 @@ export default function SupportAccessCard({ storeId, initial }) {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const reasonField = useRef(null);
+  const closed = useRef(false);
 
   const load = useCallback(async () => {
     try {
       const json = await supportApi("GET", null, `?view=store&tenant=${encodeURIComponent(storeId)}`);
       setView({ open: json.open, history: json.history, mail: json.mail });
+      setLoadFailed(false);
     } catch (e) {
       setError(e.message);
+      setLoadFailed(true);
     }
   }, [storeId]);
   useEffect(() => {
@@ -114,6 +157,7 @@ export default function SupportAccessCard({ storeId, initial }) {
     setNotice(null);
     try {
       await supportApi("POST", { action: "revoke", id: view.open.id });
+      closed.current = true;
       setNotice("Support access is closed. Any open support session on the store ended with it.");
       await load();
     } catch (err) {
@@ -130,7 +174,7 @@ export default function SupportAccessCard({ storeId, initial }) {
         <CardTitle>Support access</CardTitle>
         <CardDescription>Read-only access to the store's console, with customer contact details hidden. The store's team sees a banner while it is open.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4 text-sm">
+      <CardContent className="space-y-6 text-sm">
         {error && (
           <Alert variant="destructive" role="alert">
             <AlertDescription>{error}</AlertDescription>
@@ -143,24 +187,16 @@ export default function SupportAccessCard({ storeId, initial }) {
         )}
 
         {view.open ? (
-          <div className="space-y-3" data-support="open">
+          <div className="space-y-4 rounded-card border border-info/30 bg-info/5 p-4" data-support="open">
             <dl className="space-y-2">
-              <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-4">
-                <dt className="shrink-0 text-muted-foreground sm:w-36">Status</dt>
-                <dd>
-                  <Badge variant="info">Open until {when(view.open.expiresAt)}</Badge>
-                </dd>
-              </div>
-              <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-4">
-                <dt className="shrink-0 text-muted-foreground sm:w-36">Opened by</dt>
-                <dd>{view.open.operatorName}</dd>
-              </div>
-              <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-4">
-                <dt className="shrink-0 text-muted-foreground sm:w-36">Reason</dt>
-                <dd className="min-w-0 break-words">{view.open.reason}</dd>
-              </div>
+              <Fact label="Status">
+                <Badge variant="info">Open until {when(view.open.expiresAt)}</Badge>
+              </Fact>
+              <Fact label="Opened by">{view.open.operatorName}</Fact>
+              {view.open.openedAt && <Fact label="Opened">{when(view.open.openedAt)}</Fact>}
+              <Fact label="Reason">{view.open.reason}</Fact>
             </dl>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 border-t border-info/20 pt-4">
               <EnterConsole storeId={storeId} onError={setError} />
               <Button type="button" variant="destructive" disabled={busy || !view.open.id} onClick={() => setConfirmClose(true)} data-support="close">
                 Close now
@@ -168,39 +204,69 @@ export default function SupportAccessCard({ storeId, initial }) {
             </div>
           </div>
         ) : (
-          <form onSubmit={openAccess} className="space-y-3" data-support="open-form" noValidate>
+          <form onSubmit={openAccess} className="space-y-4" data-support="open-form" noValidate>
             <div className="space-y-1.5">
               <Label htmlFor="support-reason">Reason</Label>
-              <Input id="support-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} placeholder="What you need to look at, in a few words" aria-describedby="support-reason-help" />
+              <Input
+                id="support-reason"
+                ref={reasonField}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                maxLength={300}
+                placeholder="What you need to look at, in a few words"
+                aria-describedby="support-reason-help"
+                aria-invalid={error && tooShort ? true : undefined}
+              />
               <p id="support-reason-help" className="text-xs text-muted-foreground">
                 At least 5 characters. The store's team sees it.
               </p>
             </div>
-            <div className="space-y-1.5 sm:w-48">
-              <Label htmlFor="support-hours">For</Label>
-              <select id="support-hours" className={selectClass} value={hours} onChange={(e) => setHours(Number(e.target.value))}>
-                {SUPPORT_HOURS.map((h) => (
-                  <option key={h} value={h}>
-                    {hoursLabel(h)}
-                  </option>
-                ))}
-              </select>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="w-40 space-y-1.5">
+                <Label htmlFor="support-hours">For</Label>
+                <select id="support-hours" className={selectClass} value={hours} onChange={(e) => setHours(Number(e.target.value))}>
+                  {SUPPORT_HOURS.map((h) => (
+                    <option key={h} value={h}>
+                      {hoursLabel(h)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <Button type="submit" disabled={busy} data-support="open-access">
+                {busy ? "Opening…" : "Open access"}
+              </Button>
             </div>
             {view.mail === false && <p className="text-xs text-muted-foreground">Email is off on this server: the store's owners and admins won't be emailed, only shown the banner.</p>}
-            <Button type="submit" disabled={busy} data-support="open-access">
-              {busy ? "Opening…" : "Open access"}
-            </Button>
           </form>
         )}
 
-        <div className="space-y-2">
+        <div className="space-y-1">
           <h3 className="text-sm font-medium">History</h3>
-          {view.history ? <SupportHistory history={view.history} /> : <p className="text-muted-foreground">Loading the last 20 grants…</p>}
+          {view.history ? (
+            <SupportHistory history={view.history} />
+          ) : loadFailed ? (
+            <p className="text-muted-foreground">
+              The history didn't load.{" "}
+              <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={load}>
+                Try again
+              </Button>
+            </p>
+          ) : (
+            <HistorySkeleton />
+          )}
         </div>
       </CardContent>
 
       <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
-        <AlertDialogContent>
+        <AlertDialogContent
+          onCloseAutoFocus={(e) => {
+            // Close now is gone once access closes: focus moves to the Reason field
+            if (!closed.current) return;
+            closed.current = false;
+            e.preventDefault();
+            reasonField.current?.focus();
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>Close support access now?</AlertDialogTitle>
             <AlertDialogDescription>Anyone in the store's console under this access is signed out of it on their next click.</AlertDialogDescription>

@@ -4,9 +4,9 @@
 // stores (soonest to end first) with Close. Each store links to its page,
 // where access is opened and the console entered. Data through
 // /api/platform/support?view=open.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { LifeBuoy } from "lucide-react";
+import { LifeBuoy, RefreshCw } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,15 +25,31 @@ import { PageHeader } from "@/components/kit/page-header";
 import { when } from "@/components/platform/stores/storesWords";
 import { supportApi } from "./supportApi";
 
+// "in 3 h 20 min", "in 12 min", "any moment now": how long a grant has left.
+// The rows load in the browser only, so this never meets the server render.
+function left(iso, now) {
+  const ms = Date.parse(iso || "") - now;
+  if (!Number.isFinite(ms)) return "";
+  const min = Math.round(ms / 60_000);
+  if (min < 1) return "any moment now";
+  const h = Math.floor(min / 60);
+  return `in ${h ? `${h} h ` : ""}${min % 60 || !h ? `${min % 60} min` : ""}`.trim();
+}
+
 export default function OpenGrants() {
   const [grants, setGrants] = useState(null);
   const [error, setError] = useState(null);
   const [closing, setClosing] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [now, setNow] = useState(0);
+  const refreshButton = useRef(null);
+  const closed = useRef(false);
 
   const load = useCallback(async () => {
     try {
       setGrants((await supportApi("GET", null, "?view=open")).grants);
+      setNow(Date.now());
+      setError(null);
     } catch (e) {
       setError(e.message);
       setGrants((g) => g ?? []);
@@ -48,6 +64,7 @@ export default function OpenGrants() {
     setError(null);
     try {
       await supportApi("POST", { action: "revoke", id: closing.id });
+      closed.current = true;
     } catch (e) {
       setError(e.message);
     } finally {
@@ -62,12 +79,30 @@ export default function OpenGrants() {
     { key: "operatorName", header: "Opened by" },
     { key: "reason", header: "Reason", truncate: true },
     { key: "openedAt", header: "Opened", className: "hidden tabular-nums lg:table-cell", cell: (g) => when(g.openedAt) },
-    { key: "expiresAt", header: "Ends", className: "tabular-nums", cell: (g) => when(g.expiresAt) },
+    {
+      key: "expiresAt",
+      header: "Ends",
+      className: "tabular-nums",
+      cell: (g) => (
+        <span className="flex flex-col">
+          <span>{when(g.expiresAt)}</span>
+          {now > 0 && <span className={Date.parse(g.expiresAt) - now < 3600_000 ? "text-xs text-warning-text" : "text-xs text-muted-foreground"}>{left(g.expiresAt, now)}</span>}
+        </span>
+      ),
+    },
   ];
 
   return (
     <div className="mx-auto max-w-[1200px] px-4 py-6 md:px-6" data-screen="platform-support-access">
-      <PageHeader title="Support access" description="Every store with support access open right now. Closing it signs the operator out of that store's console at once." />
+      <PageHeader
+        title="Support access"
+        description={`${grants?.length ? `${grants.length} open, soonest to end first. ` : ""}Closing access signs the operator out of that store's console on their next click.`}
+        actions={
+          <Button ref={refreshButton} variant="outline" size="sm" onClick={load} disabled={grants === null}>
+            <RefreshCw className="size-3.5" aria-hidden /> Refresh
+          </Button>
+        }
+      />
       {error && (
         <Alert variant="destructive" role="alert" className="mb-4">
           <AlertDescription>{error}</AlertDescription>
@@ -86,7 +121,15 @@ export default function OpenGrants() {
         )}
       />
       <AlertDialog open={Boolean(closing)} onOpenChange={(o) => !o && setClosing(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent
+          onCloseAutoFocus={(e) => {
+            // the closed row is gone: focus lands on Refresh, not the page's top
+            if (!closed.current) return;
+            closed.current = false;
+            e.preventDefault();
+            refreshButton.current?.focus();
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>Close support access to {closing?.storeName}?</AlertDialogTitle>
             <AlertDialogDescription>Anyone in the store's console under this access is signed out of it on their next click.</AlertDialogDescription>

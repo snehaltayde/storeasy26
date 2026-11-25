@@ -40,7 +40,7 @@ export function EnterConsole({ storeId, onError }) {
     }
   }
   return (
-    <Button type="button" variant="outline" onClick={enter} disabled={busy} data-support="enter">
+    <Button type="button" onClick={enter} disabled={busy} data-support="enter">
       <LogIn aria-hidden /> {busy ? "Opening the console…" : "Enter store console (read-only)"}
     </Button>
   );
