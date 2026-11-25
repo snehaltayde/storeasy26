@@ -370,7 +370,150 @@ await t("every write writes an audit row; owner-related writes are team.owner, t
   eq((await lastAudit(`member:${m.user.id}`)).action, "team.manage", "remove (an admin again):");
 });
 
-// @@SCREEN@@
+console.log("— 6. the page");
+const { makePageHarness } = await import("./support/page-harness.js");
+const pages = await makePageHarness({ tenant: () => C.getTenant(a.id, { fresh: true }) });
+const PAGE = "app/(console)/admin/(authed)/settings/team/page.js";
+const CANARY = users.support.email;
+await t("as support and staff the page is the no-access page: no props at all, no email anywhere (canary)", async () => {
+  for (const caller of ["support", "staff", "operator-support"]) {
+    const run = await pages.run(PAGE, { cookies: store.cookies[caller] });
+    eq([run.error?.message ?? null, run.unresolved, run.redirect ?? null], [null, [], null], `${caller}:`);
+    ok(run.props.some((p) => p.component.endsWith("#TeamNoAccess")) && !run.props.some((p) => p.component.endsWith("#TeamPage")), `${caller} gets TeamNoAccess:`);
+    const all = JSON.stringify(run.props.map((p) => p.props)) + (run.text || "");
+    ok(!all.includes(CANARY) && !/[\w.+-]+@[\w-]+\.\w+/.test(all), `${caller}: no email in the page:`);
+  }
+  eq((await pages.run(PAGE, { cookies: {} })).redirect, "/admin/login", "signed out:");
+});
+await t("as admin and owner the page hands TeamPage the team, the caller's role and the store name, and no token", async () => {
+  for (const caller of ["admin", "owner"]) {
+    const run = await pages.run(PAGE, { cookies: store.cookies[caller] });
+    eq([run.error?.message ?? null, run.unresolved], [null, []]);
+    const screen = run.props.find((p) => p.component.endsWith("#TeamPage"));
+    ok(screen, `${caller}: TeamPage:`);
+    eq(Object.keys(screen.props).sort(), ["initial", "role", "storeName", "supported"]);
+    eq([screen.props.role, screen.props.supported, screen.props.storeName, screen.props.initial.you.role], [caller, true, a.tenant.name, caller]);
+    ok(screen.props.initial.members.some((m) => m.email === CANARY), "members:");
+    ok(!/token/.test(JSON.stringify(screen.props.initial.invites)), "no token in the invites:");
+  }
+});
+
+console.log("— 7. the screen's markup and words");
+const swc = require("next/dist/build/swc/index.js");
+await swc.loadBindings();
+const React = require("react");
+const { renderToStaticMarkup } = require("react-dom/server");
+const cache = new Map();
+const resolveLocal = (id) => [`${id.slice(2)}.js`, id.slice(2)].find((c) => {
+  try {
+    readFileSync(join(ROOT, c));
+    return true;
+  } catch {
+    return false;
+  }
+});
+async function load(rel) {
+  const file = join(ROOT, rel);
+  if (cache.has(file)) return cache.get(file);
+  const out = (await swc.transform(readFileSync(file, "utf8"), { filename: file, jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } }, target: "es2022" }, module: { type: "commonjs" } })).code;
+  const deps = new Map();
+  for (const [, , id] of out.matchAll(/require\((["'])([^"']+)\1\)/g)) {
+    if (deps.has(id)) continue;
+    if (/^@\/(components\/(ui|kit|admin\/team)|lib)\//.test(id)) deps.set(id, await load(resolveLocal(id)));
+    else if (id.startsWith("./") && rel.startsWith("lib/")) deps.set(id, await load(join(dirname(rel), id)));
+    else if (id.startsWith("@/") || id.startsWith(".")) throw new Error(`${rel} imports ${id}`);
+    else deps.set(id, require(id));
+  }
+  const mod = { exports: {} };
+  new Function("require", "module", "exports", out)((id) => deps.get(id), mod, mod.exports);
+  cache.set(file, mod.exports);
+  return mod.exports;
+}
+const W = await load("components/admin/team/team-words.js");
+const { TeamPage, TeamNoAccess } = await load("components/admin/team/TeamPage.js");
+const { RoleSelect } = await load("components/admin/team/RoleSelect.js");
+const { InviteLink } = await load("components/admin/team/InviteDialog.js");
+const { TooltipProvider } = await load("components/ui/tooltip.js");
+const html = (el) => renderToStaticMarkup(React.createElement(TooltipProvider, null, el));
+const T = await import("../lib/admin/team.js");
+const viewAs = async (caller) => T.teamView(a.id, { id: users[caller].id, role: caller });
+await post("owner", { action: "invite", email: "pending-owner@team.test", role: "owner" });
+await post("owner", { action: "invite", email: "pending-staff@team.test", role: "staff" });
+const screen = async (caller, extra = {}) => html(React.createElement(TeamPage, { initial: await viewAs(caller), supported: true, role: caller, storeName: a.tenant.name, ...extra }));
+const rowOf = (s, text) => {
+  const i = s.indexOf(text);
+  return i < 0 ? "" : s.slice(s.lastIndexOf("<tr", i), s.indexOf("</tr>", i));
+};
+await t("owner's screen: members owners first with a You marker; Change role on every row, Remove on every row but its own; Transfer and Invite; both invites revocable", async () => {
+  const s = await screen("owner");
+  ok(s.indexOf(users.owner.email) < s.indexOf(users.admin.email) && s.indexOf(users.admin.email) < s.indexOf(users.support.email), "owners first:");
+  ok(rowOf(s, users.owner.email).includes('data-team="you"') && !rowOf(s, users.admin.email).includes('data-team="you"'), "the You marker:");
+  ok(rowOf(s, users.owner.email).includes("Change role") && !rowOf(s, users.owner.email).includes('data-team="remove"'), "own row: Change role, no Remove:");
+  ok(rowOf(s, users.admin.email).includes('data-team="remove"'), "others: Remove:");
+  ok(s.includes('data-team="transfer"') && s.includes('data-team="invite"'), "Transfer and Invite:");
+  for (const e of ["pending-owner@team.test", "pending-staff@team.test"]) ok(rowOf(s, e).includes('data-team="revoke"') && rowOf(s, e).includes("Send a new link"), `${e}:`);
+  ok(s.includes("Joined") && s.includes("Expires") && s.includes("Sent"), "the columns:");
+});
+await t("admin's screen: no Transfer; an owner's row has no Change role or Remove; an owner invite has no Revoke or Send a new link; the staff invite has both", async () => {
+  const s = await screen("admin");
+  ok(!s.includes('data-team="transfer"') && s.includes('data-team="invite"'), "no Transfer:");
+  const ownerRow = rowOf(s, users.owner.email);
+  ok(ownerRow && !ownerRow.includes("Change role") && !ownerRow.includes("Remove"), "owner row hidden controls:");
+  ok(rowOf(s, users.staff.email).includes("Change role") && rowOf(s, users.staff.email).includes("Remove"), "staff row:");
+  const oi = rowOf(s, "pending-owner@team.test");
+  ok(oi && !oi.includes("Revoke") && !oi.includes("Send a new link"), "owner invite:");
+  ok(rowOf(s, "pending-staff@team.test").includes("Revoke"), "staff invite:");
+  ok(!s.includes("data-role-gate"), "hidden, not disabled:");
+});
+await t("the role select offers Owner only to an owner", () => {
+  const opts = (role) => [...html(React.createElement(RoleSelect, { actorRole: role, value: "staff", onChange() {} })).matchAll(/<option value="(\w+)"/g)].map((m) => m[1]);
+  eq(opts("owner"), ["owner", "admin", "staff", "support"]);
+  eq(opts("admin"), ["admin", "staff", "support"]);
+});
+await t("states: no access, not supported, a failed read with Try again (a marked read); no React warning", async () => {
+  const errs = [];
+  const orig = console.error;
+  console.error = (...x) => errs.push(x.map(String).join(" ").slice(0, 300));
+  try {
+    const na = html(React.createElement(TeamNoAccess));
+    ok(na.includes('data-team="no-access"') && na.includes("Only the store&#x27;s owners and admins") && !/<button/.test(na), "no access:");
+    const un = html(React.createElement(TeamPage, { initial: null, supported: false, role: "owner", storeName: null }));
+    ok(un.includes("platform control plane") && !un.includes('data-team="invite"'), "unsupported:");
+    const er = html(React.createElement(TeamPage, { initial: null, supported: true, role: "owner", storeName: "x" }));
+    ok(er.includes('role="alert"') && /<button[^>]*data-read-control[^>]*>Try again/.test(er), "error:");
+    await screen("owner");
+    await screen("admin");
+  } finally {
+    console.error = orig;
+  }
+  eq(errs, []);
+});
+await t("words: the already-a-member warning (at or above the role), the mail outcomes, dates in UTC", () => {
+  const members = [{ email: "a@x.test", name: "Asha", role: "admin" }];
+  ok(/already on the team as Admin/.test(W.inviteWarning(members, " A@x.test ", "staff")), "lower:");
+  ok(W.inviteWarning(members, "a@x.test", "admin"), "same:");
+  eq(W.inviteWarning(members, "a@x.test", "owner"), null, "a raise:");
+  eq(W.inviteWarning(members, "b@x.test", "staff"), null, "someone new:");
+  eq(W.mailWords({ status: "sent" }, "z@x.test").tone, "success");
+  ok(/couldn't email/.test(W.mailWords({ status: "failed" }, "z@x.test").text));
+  ok(/isn't set up/.test(W.mailWords({ status: "not-configured" }, "z@x.test").text));
+  eq(W.dateWords("2026-11-03T23:30:00.000Z"), "3 Nov 2026");
+  eq(W.refusalWords({ error: "Plain words." }), "Plain words.");
+  eq(W.refusalWords(null), W.TEAM_WORDS.failed);
+});
+await t("the invite link view: the link, Copy, and the mail words (failed and not set up)", () => {
+  const s = html(React.createElement(InviteLink, { result: { email: "n@x.test", role: "staff", inviteUrl: "/admin/accept-invite?token=abc", mail: { status: "failed" } } }));
+  ok(s.includes("/admin/accept-invite?token=abc") && s.includes("Copy link") && s.includes('data-mail="failed"') && s.includes("couldn&#x27;t email"), "failed:");
+  ok(html(React.createElement(InviteLink, { result: { email: "n@x.test", role: "staff", inviteUrl: "/x", mail: { status: "not-configured" } } })).includes("isn&#x27;t set up"), "not set up:");
+});
+await t("the screen never writes outside /api/admin/team; transfer reloads from the server", () => {
+  for (const f of ["TeamPage", "MembersTable", "InvitesTable", "InviteDialog", "RoleSelect", "RemoveDialog", "TransferDialog"]) {
+    const src = read(`components/admin/team/${f}.js`);
+    ok(!/fetch\((?!"\/api\/admin\/team")/.test(src), `${f} fetches only the team route:`);
+    ok(!/components\/(console|admin\/(?!team))/.test(src), `${f}: no old console imports:`);
+  }
+  ok(/window\.location\.reload\(\)/.test(read("components/admin/team/TeamPage.js")), "reload:");
+});
 
 await store.cleanup();
 console.log(`\n${pass} passed, ${fail} failed (${((Date.now() - started) / 1000).toFixed(1)}s)`);

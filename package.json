@@ -53,6 +53,8 @@
     "member:set": "node --env-file=.env.local scripts/member-set.js",
     "test:authz": "node scripts/test-authz.js",
     "test:permissions": "node scripts/test-permissions.js",
+    "test:team": "node scripts/test-team.js",
+    "drill:team": "node scripts/drills/run-isolated.mjs team",
     "test:support-reads": "node scripts/test-support-reads.js",
     "test:shopper-reads": "node scripts/test-shopper-reads.js",
     "test:platform-core": "node scripts/test-platform-core.js",

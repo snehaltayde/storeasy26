@@ -47,6 +47,8 @@ export const READ_CONTROLS = [
   { path: "components/admin/catalog/ProductsTable.js", reason: "the search box, the content and stock filter buttons, a row's name opening the product sheet, Clear, Try again and the onboarding link: GET reads and navigation", marks: 6 },
   { path: "components/admin/catalog/ProductSheet.js", reason: "the editor link (View content for support), View on store, View in Shopify and the sheet's close button: navigation only", marks: 4 },
   { path: "components/admin/catalog/CollectionsTable.js", reason: "a collection's title opens its products in a sheet, and Try again re-reads the list: GET reads", marks: 2 },
+  // Phase 2 line 8: the team screen
+  { path: "components/admin/team/TeamPage.js", reason: "Try again re-reads GET /api/admin/team after a failed load", marks: 1 },
 ];
 
 // Reads sent as a non-GET request: { page, method, path, reason }. page is a

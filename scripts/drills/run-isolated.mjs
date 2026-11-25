@@ -465,6 +465,8 @@ export const DRILLS = {
       });
     },
   },
+  // Phase 2 line 8: the team screen on the roles store (invite, accept, roles, transfer); evidence in docs/cms-reviews/drills/TEAM/
+  team: { id: "TEAM", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/team/run.mjs", ...c.headed])) },
   // the operator's Signups & onboarding screen (Phase 1 line 8 §5 item 16), on
   // the --p3 design store like signup
   "operator-onboarding": {

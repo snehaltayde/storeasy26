@@ -11,6 +11,7 @@ import { audit } from "@/lib/platform/audit";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
 import { roleAllows } from "@/lib/platform/authz";
+import { teamView } from "@/lib/admin/team";
 
 // Team & permissions API (S43 / MC23) over the S26/S27 identity primitives.
 //   GET  → members (email, name, role) + pending invites
@@ -29,27 +30,7 @@ export const dynamic = "force-dynamic";
 
 const ROLES = ["owner", "admin", "staff", "support"];
 
-async function view(tenantId, actor) {
-  const members = (
-    await platformDb().execute({
-      sql: `SELECT u.id, u.email, u.name, u.status, m.role, m.created_at
-            FROM memberships m JOIN users u ON u.id = m.user_id
-            WHERE m.tenant_id = ? ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'staff' THEN 2 ELSE 3 END, u.email`,
-      args: [tenantId],
-    })
-  ).rows.map((r) => ({ ...r }));
-  const invites = (
-    await platformDb().execute({
-      sql: `SELECT id, email, role, created_at, expires_at FROM invitations
-            WHERE tenant_id = ? AND kind = 'invite' AND accepted_at IS NULL AND expires_at > ?
-            ORDER BY created_at DESC`,
-      args: [tenantId, new Date().toISOString()],
-    })
-  ).rows.map((r) => ({ ...r }));
-  // the caller's own row as it is now (after a transfer it says admin)
-  const you = actor ? { id: actor.id, role: members.find((m) => m.id === actor.id)?.role ?? actor.role } : null;
-  return { members, invites, you };
-}
+const view = teamView; // lib/admin/team.js, shared with the team page
 
 const LAST_OWNER_WORDS = "A store needs at least one owner, so the last owner can't be changed or removed. Make someone else an owner first.";
 const NOT_MEMBER_WORDS = "That person isn't on this store's team any more. Reload the page to see the team as it is now.";
@@ -111,7 +92,7 @@ export const POST = tenantHandler(async (request) => {
       // Phase 2 line 8: only a member of this store can be changed or removed
       if (!target.rows[0]) return fail(NOT_MEMBER_WORDS, 404);
       targetWasOwner = target.rows[0].role === "owner";
-      if (targetWasOwner && !roleAllows(auth.actor.role, "team.owner")) return NextResponse.json({ error: `Your role (${auth.actor.role}) can't change an owner` }, { status: 403 });
+      if (targetWasOwner && !roleAllows(auth.actor.role, "team.owner")) return fail("Only an owner can change or remove an owner.", 403);
     }
     // Phase 2 line 8: revoking an owner invite is owner-only, like sending one.
     // Read the invite in any state, so the answer to a non-owner is the same
@@ -121,13 +102,13 @@ export const POST = tenantHandler(async (request) => {
       const r = await platformDb().execute({ sql: "SELECT id, email, role FROM invitations WHERE id = ? AND tenant_id = ? AND kind = 'invite'", args: [String(body.inviteId || ""), tenant.id] });
       revoking = r.rows[0] ? { ...r.rows[0] } : null;
       if (!revoking) return fail("That invite isn't pending any more. Reload the page to see the invites as they are now.", 404);
-      if (revoking.role === "owner" && !roleAllows(auth.actor.role, "team.owner")) return fail(`Your role (${auth.actor.role}) can't revoke an owner invite`, 403);
+      if (revoking.role === "owner" && !roleAllows(auth.actor.role, "team.owner")) return fail("Only an owner can revoke an owner invite.", 403);
     }
     const auditAction = targetWasOwner || needsOwner || revoking?.role === "owner" ? "team.owner" : "team.manage";
     if (body.action === "invite") {
       const email = String(body.email || "").trim().toLowerCase();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return NextResponse.json({ error: "valid email required" }, { status: 422 });
-      if (!ROLES.includes(body.role)) return NextResponse.json({ error: `role must be one of ${ROLES.join(", ")}` }, { status: 422 });
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return fail("Enter a full email address, like name@example.com.", 422);
+      if (!ROLES.includes(body.role)) return fail(`Pick a role: ${ROLES.join(", ")}.`, 422);
       const inv = await createInvite({ email, tenantId: tenant.id, role: body.role, invitedBy: auth.actor.id });
       slog("team_invited", { email, role: body.role });
       await audit({ actor: auth.actor, action: auditAction, resource: `invite:${email}`, diff: { role: body.role } });
@@ -149,7 +130,7 @@ export const POST = tenantHandler(async (request) => {
       return NextResponse.json({ ok: true, ...(await view(tenant.id, auth.actor)) });
     }
     if (body.action === "role") {
-      if (!ROLES.includes(body.role)) return NextResponse.json({ error: `role must be one of ${ROLES.join(", ")}` }, { status: 422 });
+      if (!ROLES.includes(body.role)) return fail(`Pick a role: ${ROLES.join(", ")}.`, 422);
       const set = await setMemberRole(userId, tenant.id, body.role); // final-owner guard inside, never adds a member
       if (!set) return fail(NOT_MEMBER_WORDS, 404);
       await expirePendingInvites(userId, tenant.id); // Phase 1 audit (P1-A)

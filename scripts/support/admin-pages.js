@@ -32,4 +32,5 @@ export const ADMIN_PAGES = Object.freeze([
   { page: "orders/[id]", action: "orders.read", params: { id: "$order" } },
   { page: "releases", action: "storefront.read" },
   { page: "settings", action: "settings.read" },
+  { page: "settings/team", action: "team.manage", note: "staff and support get the no-access page; the team is never read for them (Phase 2 line 8)" },
 ]);
