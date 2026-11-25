@@ -72,6 +72,7 @@ const CNY = {
   // Phase 4 line 3: store B's custom app (its name), and A's webhook address path
   bWebhookApp: "cnybhookapp0",
   bTheme: "cnybtheme0", // Phase 5 line 1: store B's uploaded theme's name
+  bArchivedTheme: "cnybarchived0", // P5-A: store B's archived package's name
   hookPath: "cnyhookpath0",
 };
 const SECRET_KEYS = [
@@ -295,6 +296,13 @@ await a.run(async () => {
 const auroraText = await readFile(join(ROOT, "scripts/fixtures/themes/aurora.theme.json"), "utf8");
 const themeA = await call("owner", "themes", "POST", { body: JSON.parse(auroraText) });
 const themeB = await call("owner-b", "themes", "POST", { body: { ...JSON.parse(auroraText), id: "cnyb-theme", name: CNY.bTheme, description: CNY.bTheme }, host: b.tenant.domains[0] });
+
+// P5-A: an archived package in each store (A's under its own id, B's name a canary)
+const archivedA = await call("owner", "themes", "POST", { body: { ...JSON.parse(auroraText), id: "archived-a", name: "Archived A" } });
+const archivedB = await call("owner-b", "themes", "POST", { body: { ...JSON.parse(auroraText), id: "cnyb-archived", name: CNY.bArchivedTheme, description: CNY.bArchivedTheme }, host: b.tenant.domains[0] });
+const archA = await call("owner", "themes/[id]", "POST", { params: { id: archivedA.body?.package?.id }, body: { archive: true } });
+const archB = await call("owner-b", "themes/[id]", "POST", { params: { id: archivedB.body?.package?.id }, body: { archive: true }, host: b.tenant.domains[0] });
+ok(archA.body?.package?.status === "archived" && archB.body?.package?.status === "archived", `fixture archived packages (${archA.text?.slice(0, 120)} | ${archB.text?.slice(0, 120)})`);
 
 const CTX = {
   themeId: themeA.body?.package?.id ?? null,
@@ -720,6 +728,21 @@ await t("page sweep (S1, S2): no prop on any console page holds a canary for sup
     if (found.length) bad.push(`${page}: ${found.join(", ")}`);
   }
   eq(bad.join("\n"), "", "");
+});
+
+await t("P5-A archived themes: support and operator support see only A's archived package, on the route and the page, never B's canary", async () => {
+  for (const caller of ["support", "operator-support"]) {
+    const r = results[caller]["themes ?status=archived"];
+    eq(r.status, 200, `${caller} status:`);
+    eq((r.body?.packages ?? []).map((p) => p.name).join(","), "Archived A", `${caller} archived list:`);
+    ok(!r.text.includes(CNY.bArchivedTheme), `${caller} archived list has no B canary`);
+  }
+  for (const [caller, jar] of [["support", cookies.support], ["operator-support-entry", cookies["operator-support-entry"]]]) {
+    const run = await pages.run(pageRel("themes"), { cookies: jar, searchParams: { status: "archived" } });
+    ok(!run.error && !run.redirect && !run.notFound && run.props.length, `${caller} archived page renders`);
+    ok(run.text.includes("Archived A"), `${caller} archived page shows A's archived theme`);
+    ok(!run.text.includes(CNY.bArchivedTheme), `${caller} archived page has no B canary`);
+  }
 });
 
 // Phase 3 line 5: the operator's cross-host support session (__Host-support) opens

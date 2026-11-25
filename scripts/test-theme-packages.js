@@ -269,6 +269,7 @@ await t("signed out and another store's owner: 401 on every themes route of stor
     eq((await call(caller, "themes", "GET")).status, 401, `${caller} GET:`);
     eq((await upload(caller, aurora())).status, 401, `${caller} POST:`);
     eq((await call(caller, "themes/[id]", "GET", { params: { id: "thm_0000000000000000" } })).status, 401, `${caller} GET [id]:`);
+    eq((await call(caller, "themes/[id]", "GET", { params: { id: "thm_0000000000000000" }, query: "download=1" })).status, 401, `${caller} GET [id] ?download:`);
     eq((await call(caller, "themes/[id]", "POST", { params: { id: "thm_0000000000000000" }, body: { archive: true } })).status, 401, `${caller} POST [id]:`);
   }
 });
