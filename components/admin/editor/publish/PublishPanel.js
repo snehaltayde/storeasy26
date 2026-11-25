@@ -1,9 +1,8 @@
 "use client";
 
+import { buttonVariants } from "@/components/ui/button";
+import { Badge, Banner, Button } from "../fields/parts";
 import { useMemo, useSyncExternalStore } from "react";
-import { Banner } from "@/components/console/Banner";
-import { Badge } from "@/components/console/Badge";
-import { Button } from "@/components/console/Button";
 import UndoNotice from "./UndoNotice";
 import { WORDS, LEVEL_WORDS, actionLabel, allLoaded, createPublishFlow, openingActionLabel, openingBlocks, openingWarns } from "./publishModel";
 
@@ -16,7 +15,10 @@ import { WORDS, LEVEL_WORDS, actionLabel, allLoaded, createPublishFlow, openingA
 //               (one for the editor's Publish; several for "Publish all
 //               changes"; a missing revision or hash is read with getDocument)
 //   mode        "one" (default) | "all"
-//   access      { canPublish, reason } from getDocument (staff: disabled, reason shown)
+//   label       the trigger's words (Publishing's "Publish selected")
+//   disabled    the trigger is off (nothing selected)
+//   access      { canPublish, reason } from getDocument (staff and support:
+//               the reason, and no Publish button; Phase 2 line 6)
 //   call        documentsApi.call, or the store's wrapper (plan A5)
 //   loadChanges(id)                 listChanges (default: call)
 //   keepLiveSection(id, sectionId)  the store's server-replace (default: call)
@@ -30,8 +32,8 @@ import { WORDS, LEVEL_WORDS, actionLabel, allLoaded, createPublishFlow, openingA
 const levelTone = { blocks: "danger", warns: "warning", inherited: "neutral" };
 
 function ChangeList({ list, canKeep, busy, onKeepLive }) {
-  if (!list || list.status === "loading") return <p className="text-[13px] text-fg-muted">{WORDS.loadingChanges}</p>;
-  if (list.status === "failed") return <p className="text-[13px] text-danger">{list.message}</p>;
+  if (!list || list.status === "loading") return <p className="text-[13px] text-muted-foreground">{WORDS.loadingChanges}</p>;
+  if (list.status === "failed") return <p className="text-[13px] text-destructive">{list.message}</p>;
   if (list.firstPublish) {
     return (
       <div className="text-[13px]">
@@ -46,14 +48,14 @@ function ChangeList({ list, canKeep, busy, onKeepLive }) {
       </div>
     );
   }
-  if (!list.rows.length) return <p className="text-[13px] text-fg-muted">{WORDS.nothingChanged}</p>;
+  if (!list.rows.length) return <p className="text-[13px] text-muted-foreground">{WORDS.nothingChanged}</p>;
   return (
-    <ul className="divide-y divide-edge text-[13px]">
+    <ul className="divide-y divide-border text-[13px]">
       {list.rows.map((r, i) => (
         <li key={i} className="flex items-start justify-between gap-3 py-1.5">
           <div className="min-w-0">
             <p>{r.words}</p>
-            {r.affects.length > 0 && <p className="text-fg-muted">{r.affects.join(" · ")}</p>}
+            {r.affects.length > 0 && <p className="text-muted-foreground">{r.affects.join(" · ")}</p>}
           </div>
           {canKeep && r.sectionId && (
             <Button size="sm" variant="ghost" disabled={busy} onClick={() => onKeepLive(r.sectionId)}>
@@ -74,13 +76,13 @@ function IssueRow({ issue, offerSize, hidePublishBoth, busy, onAct, onFocus }) {
     <li className="py-2 text-[13px]" data-issue="">
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone={levelTone[level] || "neutral"}>{LEVEL_WORDS[level] || LEVEL_WORDS.warns}</Badge>
-        {issue.where && <span className="font-medium text-fg">{issue.where}</span>}
+        {issue.where && <span className="font-medium text-foreground">{issue.where}</span>}
       </div>
       <p className="mt-1">{issue.message}</p>
       <div className="mt-1.5 flex flex-wrap items-center gap-2">
         {actions.map((a, i) =>
           a.type === "openField" ? (
-            <a key={i} href={issue.anchor ? `#${issue.anchor}` : undefined} className="text-[13px] underline focus-ring" onClick={(e) => (e.preventDefault(), onAct(a, issue))}>
+            <a key={i} href={issue.anchor ? `#${issue.anchor}` : undefined} className="text-[13px] underline rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={(e) => (e.preventDefault(), onAct(a, issue))}>
               {actionLabel(a)}
             </a>
           ) : (
@@ -90,7 +92,7 @@ function IssueRow({ issue, offerSize, hidePublishBoth, busy, onAct, onFocus }) {
           ),
         )}
         {!hasOpenField && issue.anchor && (
-          <a href={`#${issue.anchor}`} className="text-[13px] underline focus-ring" onClick={(e) => (e.preventDefault(), onFocus({ anchor: issue.anchor, documentId: issue.documentId, sectionId: issue.sectionId ?? null, field: issue.field ?? null }))}>
+          <a href={`#${issue.anchor}`} className="text-[13px] underline rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={(e) => (e.preventDefault(), onFocus({ anchor: issue.anchor, documentId: issue.documentId, sectionId: issue.sectionId ?? null, field: issue.field ?? null }))}>
             {WORDS.fixIt}
           </a>
         )}
@@ -111,8 +113,8 @@ function IssueList({ issues, labelOf, offerSize, hidePublishBoth, busy, onAct, o
     <div className="space-y-2">
       {groups.map((g) => (
         <div key={g.id || "none"}>
-          {groups.length > 1 && <p className="text-[13px] font-semibold text-fg">{labelOf(g.id)}</p>}
-          <ul className="divide-y divide-edge">
+          {groups.length > 1 && <p className="text-[13px] font-semibold text-foreground">{labelOf(g.id)}</p>}
+          <ul className="divide-y divide-border">
             {g.issues.map((i, n) => (
               <IssueRow key={n} issue={i} offerSize={offerSize} hidePublishBoth={hidePublishBoth} busy={busy} onAct={onAct} onFocus={onFocus} />
             ))}
@@ -140,13 +142,13 @@ function OpeningItem({ item, busy, onAct, legalLine }) {
     <li className="py-2 text-[13px]" data-opening-item={item.id} data-level={item.level}>
       <div className="flex flex-wrap items-center gap-2">
         {mark && <Badge tone={mark[0]}>{mark[1]}</Badge>}
-        {item.title && <span className="font-medium text-fg">{item.title}</span>}
+        {item.title && <span className="font-medium text-foreground">{item.title}</span>}
       </div>
-      {item.message && <p className={item.level === "ok" ? "mt-1 text-fg-muted" : "mt-1"}>{item.message}</p>}
+      {item.message && <p className={item.level === "ok" ? "mt-1 text-muted-foreground" : "mt-1"}>{item.message}</p>}
       {(link || actions.length > 0 || testOrder) && (
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
           {link && (
-            <a href={link} className="text-[13px] underline focus-ring" data-opening-link="">
+            <a href={link} className="text-[13px] underline rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" data-opening-link="">
               {item.linkLabel || WORDS.fixThis}
             </a>
           )}
@@ -163,7 +165,7 @@ function OpeningItem({ item, busy, onAct, legalLine }) {
         </div>
       )}
       {policy && legalLine && (
-        <p className="mt-1 text-fg-muted" data-not-legal-advice="">
+        <p className="mt-1 text-muted-foreground" data-not-legal-advice="">
           {WORDS.notLegalAdvice}
         </p>
       )}
@@ -174,7 +176,7 @@ function OpeningItem({ item, busy, onAct, legalLine }) {
 function OpeningItems({ items, busy, onAct }) {
   const firstPolicy = items.findIndex((i) => (i.actions || []).some(isPolicyAction));
   return (
-    <ul className="divide-y divide-edge" data-opening-items="">
+    <ul className="divide-y divide-border" data-opening-items="">
       {items.map((item, n) => (
         <OpeningItem key={item.id || n} item={item} busy={busy} onAct={onAct} legalLine={n === firstPolicy} />
       ))}
@@ -188,7 +190,7 @@ function Lists({ state, canKeep, onKeepLive }) {
     <div className="space-y-3">
       {state.order.map((id) => (
         <div key={id} data-change-list="">
-          {many && <p className="text-[13px] font-semibold text-fg">{state.lists[id]?.label}</p>}
+          {many && <p className="text-[13px] font-semibold text-foreground">{state.lists[id]?.label}</p>}
           <ChangeList list={state.lists[id]} canKeep={canKeep} busy={state.busy} onKeepLive={(sectionId) => onKeepLive(id, sectionId)} />
         </div>
       ))}
@@ -196,12 +198,12 @@ function Lists({ state, canKeep, onKeepLive }) {
   );
 }
 
-export function PublishPanelView({ state, canConfirm = false, access = null, mode = "one", call, on = {}, createHomeHref = "/admin/editor?path=%2F" }) {
+export function PublishPanelView({ state, canConfirm = false, access = null, mode = "one", label = null, disabled = false, call, on = {}, createHomeHref = "/admin/editor?path=%2F" }) {
   const s = state || { phase: "closed", order: [], lists: {}, items: [] };
   const noop = () => {};
   const h = { open: noop, confirm: noop, close: noop, act: noop, keepLive: noop, retry: noop, focus: noop, openDocument: null, conflict: null, createHome: null, openEarlierVersions: null, document: noop, ...on };
   const staff = access && access.canPublish === false;
-  const trigger = mode === "all" ? "Publish all changes" : WORDS.publish;
+  const trigger = label || (mode === "all" ? "Publish all changes" : WORDS.publish);
   const o = s.outcome || {};
   // P6-OPEN-UI: a store-level issue (no document, e.g. POLICY_PAGE_MISSING) is the store's
   const labelOf = (id) => (id == null ? WORDS.storeWide : [...(s.items || []), ...(s.offerItems || []), ...(o.documents || [])].find((d) => d?.id === id)?.label || "This page");
@@ -210,10 +212,15 @@ export function PublishPanelView({ state, canConfirm = false, access = null, mod
   if (s.phase === "closed") {
     return (
       <div className="space-y-1" data-publish="">
-        <Button variant="primary" disabled={staff} onClick={h.open}>
-          {trigger}
-        </Button>
-        {staff && <p className="text-[13px] text-fg-muted">{access.reason || WORDS.staffReason}</p>}
+        {staff ? (
+          <p className="max-w-xs text-[13px] text-muted-foreground" data-publish-reason="">
+            {access.reason || WORDS.staffReason}
+          </p>
+        ) : (
+          <Button variant="primary" disabled={disabled} onClick={h.open}>
+            {trigger}
+          </Button>
+        )}
       </div>
     );
   }
@@ -239,7 +246,7 @@ export function PublishPanelView({ state, canConfirm = false, access = null, mod
     case "review":
       content = (
         <>
-          <p className="text-sm font-semibold text-fg">{WORDS.reviewTitle}</p>
+          <p className="text-sm font-semibold text-foreground">{WORDS.reviewTitle}</p>
           <Lists state={s} canKeep onKeepLive={h.keepLive} />
           {footer(trigger)}
         </>
@@ -250,13 +257,13 @@ export function PublishPanelView({ state, canConfirm = false, access = null, mod
       const confirmLabel = o.reason === "home" ? "Publish with the home page" : actionLabel({ type: "publishBoth" }, { offerSize: s.order.length });
       content = (
         <>
-          <p className="text-sm font-semibold text-fg">{WORDS.offerTitle}</p>
+          <p className="text-sm font-semibold text-foreground">{WORDS.offerTitle}</p>
           {o.message && <p className="text-[13px]">{o.message}</p>}
           <p className="text-[13px]">{o.reason === "home" ? WORDS.offerHome : WORDS.offerLinks}</p>
           {(o.issues || []).length > 0 && <IssueList issues={o.issues} labelOf={labelOf} offerSize={offerSize} hidePublishBoth busy={s.busy} onAct={h.act} onFocus={h.focus} />}
           <Lists state={s} canKeep={false} onKeepLive={noop} />
           {o.otherBlocks && <p className="text-[13px] text-warning">{WORDS.offerOtherBlocks}</p>}
-          {!loaded && <p className="text-[13px] text-fg-muted">{WORDS.offerWaiting}</p>}
+          {!loaded && <p className="text-[13px] text-muted-foreground">{WORDS.offerWaiting}</p>}
           {footer(confirmLabel)}
         </>
       );
@@ -273,19 +280,19 @@ export function PublishPanelView({ state, canConfirm = false, access = null, mod
       const lead = o.message || (cannot ? WORDS.openingCannot : allOk ? WORDS.openingAllDone : WORDS.openingLead);
       content = (
         <>
-          <p className="text-sm font-semibold text-fg">{WORDS.openingTitle}</p>
+          <p className="text-sm font-semibold text-foreground">{WORDS.openingTitle}</p>
           <p className="text-[13px]">{lead}</p>
           {items.length > 0 && <OpeningItems items={items} busy={s.busy} onAct={h.act} />}
-          {!cannot && blocks && <p className="text-[13px] text-danger">{WORDS.openingBlocks}</p>}
-          {!blocks && warns && <p className="text-[13px] text-fg-muted">{WORDS.openingWarns}</p>}
+          {!cannot && blocks && <p className="text-[13px] text-destructive">{WORDS.openingBlocks}</p>}
+          {!blocks && warns && <p className="text-[13px] text-muted-foreground">{WORDS.openingWarns}</p>}
           <div className="flex flex-wrap gap-2">
             <Button size="sm" disabled={s.busy} onClick={() => h.act({ type: "checkAgain" })}>
               {WORDS.checkAgain}
             </Button>
           </div>
           {!cannot && s.order.length > 0 && (
-            <div className="space-y-2 border-t border-edge pt-2">
-              <p className="text-[13px] font-semibold text-fg">{WORDS.openingGoesLive}</p>
+            <div className="space-y-2 border-t border-border pt-2">
+              <p className="text-[13px] font-semibold text-foreground">{WORDS.openingGoesLive}</p>
               <Lists state={s} canKeep={false} onKeepLive={noop} />
             </div>
           )}
@@ -308,7 +315,7 @@ export function PublishPanelView({ state, canConfirm = false, access = null, mod
     case "republish":
       content = (
         <>
-          <p className="text-sm font-semibold text-fg">{o.title}</p>
+          <p className="text-sm font-semibold text-foreground">{o.title}</p>
           <p className="text-[13px]">{o.words}</p>
           <div className="flex justify-end gap-2 pt-2">
             <Button onClick={h.close} disabled={s.busy}>
@@ -329,7 +336,7 @@ export function PublishPanelView({ state, canConfirm = false, access = null, mod
           </Banner>
           <IssueList issues={o.issues} labelOf={labelOf} offerSize={offerSize} busy={s.busy} onAct={h.act} onFocus={h.focus} />
           {s.busy && (
-            <p className="text-[13px] text-fg-muted" role="status" data-keeps-running="">
+            <p className="text-[13px] text-muted-foreground" role="status" data-keeps-running="">
               {WORDS.keepsRunning}
             </p>
           )}
@@ -355,14 +362,14 @@ export function PublishPanelView({ state, canConfirm = false, access = null, mod
               <li key={p.id} className="flex items-center justify-between gap-2">
                 <span>{p.label}</span>
                 {p.liveUrl && (
-                  <a href={p.liveUrl} target="_blank" rel="noreferrer" className="underline focus-ring">
+                  <a href={p.liveUrl} target="_blank" rel="noreferrer" className="underline rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     {WORDS.seeLive}
                   </a>
                 )}
               </li>
             ))}
           </ul>
-          {o.skipped?.length > 0 && <p className="text-[13px] text-fg-muted">{`${WORDS.alreadyLive} ${o.skipped.join(", ")}`}</p>}
+          {o.skipped?.length > 0 && <p className="text-[13px] text-muted-foreground">{`${WORDS.alreadyLive} ${o.skipped.join(", ")}`}</p>}
           {o.warnings?.length > 0 && <IssueList issues={o.warnings} labelOf={labelOf} offerSize={offerSize} busy={s.busy} onAct={h.act} onFocus={h.focus} />}
           <UndoNotice target={undoTarget} note={note} call={call} access={access} onDocument={h.document} onOpenEarlierVersions={h.openEarlierVersions} />
           {closeOnly}
@@ -413,7 +420,7 @@ export function PublishPanelView({ state, canConfirm = false, access = null, mod
           <Banner tone="warning" title={o.title}>
             {o.words}
           </Banner>
-          {o.by && <p className="text-[13px] text-fg-muted">{WORDS.lastSavedBy(o.by)}</p>}
+          {o.by && <p className="text-[13px] text-muted-foreground">{WORDS.lastSavedBy(o.by)}</p>}
           {o.conflicts?.length > 0 && (
             <ul className="list-disc pl-5 text-[13px]">
               {o.conflicts.map((c, i) => (
@@ -440,7 +447,7 @@ export function PublishPanelView({ state, canConfirm = false, access = null, mod
                 {WORDS.noHomeAction}
               </Button>
             ) : (
-              <a href={createHomeHref} className="inline-flex items-center rounded-ctl bg-primary px-3.5 py-2 text-sm font-medium text-primary-fg focus-ring">
+              <a href={createHomeHref} className={buttonVariants({ variant: "default" })}>
                 {WORDS.noHomeAction}
               </a>
             )}
@@ -468,14 +475,14 @@ export function PublishPanelView({ state, canConfirm = false, access = null, mod
   }
 
   return (
-    <section className="w-full max-w-md space-y-3 rounded-card border border-edge bg-surface p-4 text-fg shadow-overlay" aria-label={s.phase === "opening" || s.phase === "cannotOpen" ? WORDS.openingTitle : WORDS.reviewTitle} data-publish="" data-phase={s.phase}>
+    <section className="w-full max-w-md space-y-3 rounded-lg border border-border bg-card p-4 text-foreground shadow-md" aria-label={s.phase === "opening" || s.phase === "cannotOpen" ? WORDS.openingTitle : WORDS.reviewTitle} data-publish="" data-phase={s.phase}>
       {s.notice && (
-        <p className="text-[13px] text-fg-muted" role="status">
+        <p className="text-[13px] text-muted-foreground" role="status">
           {s.notice}
           {s.noticeLink && (
             <>
               {" "}
-              <a href={s.noticeLink.href} className="underline focus-ring" data-notice-link="">
+              <a href={s.noticeLink.href} className="underline rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" data-notice-link="">
                 {s.noticeLink.label}
               </a>
             </>
@@ -513,6 +520,8 @@ export default function PublishPanel(props) {
       canConfirm={flow.canConfirm()}
       access={access}
       mode={mode}
+      label={props.label || null}
+      disabled={props.disabled === true}
       call={call}
       createHomeHref={props.createHomeHref}
       on={{

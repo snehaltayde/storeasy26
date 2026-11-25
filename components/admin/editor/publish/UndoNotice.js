@@ -1,7 +1,7 @@
 "use client";
 
+import { Button } from "../fields/parts";
 import { useMemo, useSyncExternalStore } from "react";
-import { Button } from "@/components/console/Button";
 import TakeOfflineConfirm from "./TakeOfflineConfirm";
 import { WORDS, createUndoFlow, undoDenied, undoDeniedReason } from "./publishModel";
 
@@ -15,39 +15,38 @@ import { WORDS, createUndoFlow, undoDenied, undoDeniedReason } from "./publishMo
 //   call      documentsApi.call or the editor store's wrapper
 //   note      shown instead of Undo (a singleton's first publish)
 //   access    { canPublish, reason } (or { canUndo, reason }): without the
-//             right to undo, the button is disabled and the reason is shown
-//             as text next to it (P3-FIX3)
+//             right to undo there is no button, only the reason as text
+//             (P3-FIX3; Phase 2 line 6: staff and support see no Undo)
 //   onDocument, onUndone, onOpenEarlierVersions
 //   flow      an existing createUndoFlow() (tests, or a host that shares one)
 
 export function UndoNoticeView({ state, target, note = null, label, access = null, onStart, onConfirm, onCancel, onOpenEarlierVersions }) {
-  if (note) return <p className="text-[13px] text-fg-muted">{note}</p>;
+  if (note) return <p className="text-[13px] text-muted-foreground">{note}</p>;
   if (!target) return null;
   const s = state || { phase: "idle" };
   const v = s.view;
   const denied = undoDenied(access);
-  const reasonId = denied ? `undo-reason-${target.kind}-${target.setId || target.undo?.logId || target.id || "this"}` : undefined;
   return (
     <div className="space-y-2" data-undo="">
-      {(s.phase === "idle" || s.phase === "loading") && (
-        <Button size="sm" busy={s.phase === "loading"} disabled={denied} aria-describedby={reasonId} onClick={denied ? undefined : onStart}>
+      {!denied && (s.phase === "idle" || s.phase === "loading") && (
+        <Button size="sm" busy={s.phase === "loading"} onClick={onStart}>
           {label || (target.kind === "set" ? WORDS.undoAll(target.members.length) : target.kind === "offline" ? WORDS.offlineConfirm : WORDS.undo)}
         </Button>
       )}
       {denied && (s.phase === "idle" || s.phase === "loading") && (
-        <p id={reasonId} className="text-[13px] text-fg-muted" data-undo-reason="">
+        <p className="text-[13px] text-muted-foreground" data-undo-reason="">
           {undoDeniedReason(access)}
         </p>
       )}
       {s.phase === "checking" && s.outcome && (
-        <p className="text-[13px] text-fg-muted" role="status">
+        <p className="text-[13px] text-muted-foreground" role="status">
           {s.outcome.words}
         </p>
       )}
-      {s.phase === "loading" && <p className="text-[13px] text-fg-muted">{WORDS.undoLoading}</p>}
+      {s.phase === "loading" && <p className="text-[13px] text-muted-foreground">{WORDS.undoLoading}</p>}
       {s.phase === "confirm" && v && !v.willTakeOffline && (
-        <div className="rounded-ctl border border-edge bg-surface-sunken p-3 text-[13px]">
-          <p className="font-semibold text-fg">{v.title}</p>
+        <div className="rounded-md border border-border bg-muted p-3 text-[13px]" data-undo-confirm="">
+          <p className="font-semibold text-foreground">{v.title}</p>
           {v.changes.length ? (
             <>
               <p className="mt-1">{WORDS.undoWillChange}</p>
@@ -74,18 +73,18 @@ export function UndoNoticeView({ state, target, note = null, label, access = nul
       {s.phase === "confirm" && v && v.willTakeOffline && <TakeOfflineConfirm open view={v} busy={s.busy} onConfirm={onConfirm} onCancel={onCancel} />}
       {s.phase === "result" && s.outcome && (
         <div className="text-[13px]" role="status">
-          <p className={s.outcome.phase === "error" ? "text-danger" : "text-fg"}>{s.outcome.words}</p>
+          <p className={s.outcome.phase === "error" ? "text-destructive" : "text-foreground"}>{s.outcome.words}</p>
           {(s.outcome.lines || []).map((l, i) => (
             <p key={i}>{l}</p>
           ))}
-          {s.outcome.by && <p className="text-fg-muted">{WORDS.lastSavedBy(s.outcome.by)}</p>}
+          {s.outcome.by && <p className="text-muted-foreground">{WORDS.lastSavedBy(s.outcome.by)}</p>}
           {s.outcome.retry && !denied && (
             <Button size="sm" className="mt-1" onClick={onStart}>
               {WORDS.tryAgain}
             </Button>
           )}
           {s.outcome.savedVersion && onOpenEarlierVersions && (
-            <button type="button" className="mt-1 underline focus-ring" onClick={onOpenEarlierVersions}>
+            <button type="button" className="mt-1 underline rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={onOpenEarlierVersions}>
               {WORDS.earlierVersionsLink}
             </button>
           )}

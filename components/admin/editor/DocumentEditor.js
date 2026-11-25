@@ -21,8 +21,7 @@ import { fetchRefs } from "../shared/RefPicker";
 import { PublishPanelView } from "./publish/PublishPanel";
 import UndoNotice from "./publish/UndoNotice";
 import EarlierVersions from "./publish/EarlierVersions";
-import RecentlyPublished from "./publish/RecentlyPublished";
-import { createPublishFlow } from "./publish/publishModel";
+import { createPublishFlow, WORDS as PUBLISH_WORDS } from "./publish/publishModel";
 import { SwitcherView, ProductCounts } from "./Switcher";
 import PreviewPane from "./PreviewPane";
 import StatusLine, { Notice } from "./StatusLine";
@@ -274,13 +273,17 @@ export function EditorView({
   // Phase 2 line 6 (6b): support's inspector is read-only, every field and
   // picker disabled, with these words above it
   const canPublish = can?.publish === true;
+  // Phase 2 line 6 (6c): without storefront.publish (staff, support) the bar
+  // shows the reason where Publish would be, and no Publish, Take offline or
+  // Undo button; the page's can.publish wins over a document read before it
+  const publishAccess = can?.publish !== false ? access : { canPublish: false, reason: access?.reason || PUBLISH_WORDS.staffReason };
   const tab = PANES.includes(paneTab) ? paneTab : "edit";
   const ready = Boolean(state) && !staleEntity;
   const loading = load.status === "loading" || (!state && load.status === "ready");
 
   const actions = state && (
     <div className="flex flex-wrap items-start gap-2" data-editor-actions="">
-      {publish && <PublishPanelView state={publish.state} canConfirm={publish.canConfirm} access={access} call={call} on={publish.on} />}
+      {publish && <PublishPanelView state={publish.state} canConfirm={publish.canConfirm} access={publishAccess} call={call} on={publish.on} />}
       {changed && !goBack?.confirming && (
         <RoleGate role={role} action="storefront.write" mode="hide">
           <Button size="sm" variant="outline" onClick={on.goBack} disabled={Boolean(state.busy)} data-go-back="">
@@ -306,14 +309,7 @@ export function EditorView({
       {route && live && !staff && canPublish && (
         <UndoNotice target={{ kind: "offline", label, id: state.id, revision: state.revision }} label="Take this page offline" call={call} access={access} onUndone={on.afterUndo} />
       )}
-      {route && live && (staff || !canPublish) && canWrite && (
-        <div className="space-y-1">
-          <Button size="sm" variant="outline" disabled>
-            Take this page offline
-          </Button>
-          <p className="text-[13px] text-muted-foreground">{access?.reason}</p>
-        </div>
-      )}
+
       <Button size="sm" variant="ghost" onClick={on.toggleVersions} data-versions-toggle="" data-read-control="">
         {versions ? "Hide earlier versions" : "Earlier versions"}
       </Button>
@@ -1122,23 +1118,4 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
   );
 }
 
-// ---- /admin/releases in documents mode (PUB-04) ---------------------------------------
-
-// Recently published, with Undo through documentsApi. `access` is passed on
-// (P3-FIX3 adds the prop to RecentlyPublished and UndoNotice): staff see
-// Undo disabled with the reason (PUB-02).
-// The rows are read from the documents API (listRecentlyPublished), again
-// after each Undo. initialRows: rows already in hand (tests).
-export function PublishingHistory({ initialRows = null, access = null, api = documentsApi }) {
-  const [list, setList] = useState(initialRows ? { status: "ready", rows: initialRows } : { status: "loading", rows: [] });
-  const load = useCallback(async () => {
-    const r = await api.call("listRecentlyPublished", { limit: 20 });
-    setList(r?.ok ? { status: "ready", rows: Array.isArray(r.data?.rows) ? r.data.rows : [] } : { status: "failed", rows: [], message: r?.message });
-  }, [api]);
-  useEffect(() => {
-    if (!initialRows) load();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  if (list.status === "loading") return <p className="text-sm text-fg-muted" role="status">Loading what was published…</p>;
-  if (list.status === "failed") return <Notice tone="warning" title={list.message || "We couldn't load what was published. Reload the page."} />;
-  return <RecentlyPublished rows={list.rows} call={api.call} access={access} editorHref={(id) => editorHref(id)} onUndone={() => load()} />;
-}
+// /admin/releases (PUB-04) moved to components/admin/releases/ (Phase 2 line 6).

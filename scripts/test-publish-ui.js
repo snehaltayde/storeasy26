@@ -616,11 +616,11 @@ await t("whole-set Undo shows the server's words, which say which pages are live
   ok(!text.includes("Undone.") && !text.includes("Live now"), `no words of its own on top: ${text}`);
 });
 
-await t("staff see Publish disabled with access.reason, and nothing opens", async () => {
+await t("staff see access.reason where Publish would be (Phase 2 line 6: no button), and nothing opens", async () => {
   const access = clone(SHAPES.getDocument.outcomes.ok.body.document.access);
   const call = stub({});
   const page = html(h(Panel.default, { documents: [HOME], access, call }));
-  ok(/<button[^>]*disabled=""[^>]*>Publish<\/button>/.test(page), "Publish disabled");
+  ok(!/<button[^>]*>Publish<\/button>/.test(page) && page.includes("data-publish-reason"), "no Publish button, the reason instead");
   ok(textOf(page).includes(access.reason), "the reason is shown");
   plain(page, "staff");
   const flow = M.createPublishFlow({ call });
@@ -1023,31 +1023,26 @@ await t("P3-FIX3 round 1: the whole-set Undo confirm names the page that goes of
   eq(f3.getState().view.title, M.WORDS.undoSetTitle(2), "the generic title then:");
 });
 
-await t("P3-FIX3 rendered: without undo rights, Undo is disabled with the reason as text (RecentlyPublished, UndoNotice, the publish answer); start() sends nothing", async () => {
+await t("P3-FIX3 rendered: without undo rights, there is no Undo, only the reason as text (RecentlyPublished, UndoNotice, the publish answer; Phase 2 line 6); start() sends nothing", async () => {
   const access = clone(SHAPES.getDocument.outcomes.ok.body.document.access);
   ok(access.canPublish === false && access.reason, "the shapes' staff access");
   const row = clone(SHAPES.listRecentlyPublished.outcomes.ok.body.rows[0]);
   const rows = [row, { ...row, logId: "log_2", documentId: SALE.id, label: "Diwali sale", undo: { id: SALE.id, revision: 2, logId: "log_2" } }];
   const page = html(h(Recent.default, { rows, call: async () => ({}), access, timeZone: "UTC" }));
-  const buttons = page.match(/<button[^>]*>(Undo|Undo all 2)<\/button>/g) || [];
-  eq(buttons.length, 3, "two rows and the set:");
-  ok(buttons.every((b) => /disabled=""/.test(b)), `all disabled: ${buttons}`);
-  for (const b of buttons) {
-    const id = /aria-describedby="([^"]+)"/.exec(b)?.[1];
-    ok(id && page.includes(`id="${id}"`), `the reason is named: ${b}`);
-  }
+  eq(page.match(/<button[^>]*>(Undo|Undo all 2)<\/button>/g) || [], [], "no Undo button on the two rows or the set:");
+  eq((page.match(/data-undo-reason=""/g) || []).length, 3, "a reason on each, in place of the button:");
   eq((textOf(page).match(new RegExp(access.reason.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length, 3, "the reason is shown as text, each time:");
   const owner = html(h(Recent.default, { rows, call: async () => ({}), access: { canPublish: true, reason: null }, timeZone: "UTC" }));
   ok(!/disabled=""[^>]*>Undo/.test(owner) && !owner.includes("data-undo-reason"), "an owner's Undo is enabled");
   const notice = html(h(Undo.default, { target: { kind: "one", label: "Diwali sale", undo: { id: SALE.id, revision: 2, logId: "log_2" } }, call: async () => ({}), access }));
-  ok(/<button[^>]*disabled=""[^>]*>Undo<\/button>/.test(notice) && textOf(notice).includes(access.reason), "UndoNotice");
+  ok(!/<button[^>]*>Undo<\/button>/.test(notice) && textOf(notice).includes(access.reason), "UndoNotice");
   ok(textOf(html(h(Undo.UndoNoticeView, { state: { phase: "idle" }, target: SET_T(), access: { canUndo: false } }))).includes(M.WORDS.staffUndoReason), "the default reason");
   // the publish answer's Undo, for a host that passes staff access
   const ok2 = clone(P.ok);
   ok2.body.published[0].id = SALE.id;
   const out = M.outcomeOf(answer(ok2), { items: [SALE] });
   const done = html(h(Panel.PublishPanelView, { state: { phase: "done", outcome: out, items: [SALE], order: [], lists: {} }, access, call: async () => ({}) }));
-  ok(/<button[^>]*disabled=""[^>]*>Undo<\/button>/.test(done), "the publish answer's Undo");
+  ok(!/<button[^>]*>Undo<\/button>/.test(done) && textOf(done).includes(access.reason), "the publish answer: the reason, no Undo");
   const call = stub({});
   eq(await M.createUndoFlow({ call, access }).start({ kind: "one", label: "x", undo: { id: SALE.id, revision: 2, logId: "log_2" } }), null, "start refused:");
   eq(call.calls.length, 0, "no call:");

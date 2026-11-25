@@ -75,6 +75,11 @@ export const READ_CONTROLS = [
   { path: "components/admin/editor/tree/SectionTree.js", reason: "a row's own button selects the section (nothing is sent); a section's blocks open and close", marks: 2 },
   { path: "components/admin/editor/templates/TemplatesList.js", reason: "Open it in the editor is a link to the new page (a GET)", marks: 1 },
   { path: "app/(console)/admin/(authed)/editor/error.js", reason: "Try again re-renders the editor segment (reset(), a re-read, no write)", marks: 1 },
+  // Phase 2 line 6 (6c): the preview and Publishing
+  { path: "components/admin/editor/PreviewPane.js", reason: "the device widths (and their group, which Radix makes focusable) only resize the frame; Show design changes (and its label) is setShowDesign on the preview session (POST /api/admin/preview-session, storefront.read); Reload reloads the frame or opens an ended session again (the same POST); Open in a new tab is a GET of the store page", marks: 6 },
+  { path: "components/admin/editor/publish/RecentlyPublished.js", reason: "Open in the editor is a link to that page in the editor (a GET)", marks: 1 },
+  { path: "components/admin/releases/WaitingList.js", reason: "Open in the editor is a link to that page in the editor (a GET)", marks: 1 },
+  { path: "components/admin/releases/PublishingPage.js", reason: "Try again reads the pages waiting to publish again (listDocuments, a document read)", marks: 1 },
 ];
 
 // Reads sent as a non-GET request: { page, method, path, reason, body? }. page

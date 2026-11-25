@@ -24,18 +24,18 @@ import { WORDS, createUndoFlow, recentGroupsOf } from "./publishModel";
 export function RecentlyPublishedView({ groups, state, access = null, onUndo, onConfirm, onCancel, editorHref = null, onOpenEarlierVersions }) {
   const active = state?.target || null;
   const undoBlock = (target) => <UndoNoticeView state={active === target ? state : { phase: "idle" }} target={target} access={access} onStart={() => onUndo(target)} onConfirm={onConfirm} onCancel={onCancel} onOpenEarlierVersions={onOpenEarlierVersions} />;
-  if (!groups.length) return <p className="text-[13px] text-fg-muted">{WORDS.recentEmpty}</p>;
+  if (!groups.length) return <p className="text-[13px] text-muted-foreground">{WORDS.recentEmpty}</p>;
   return (
     <ul className="space-y-3" aria-label="Recently published" data-recently-published="">
       {groups.map((g, gi) => (
-        <li key={gi} className="rounded-ctl border border-edge p-3" data-set={g.rows.length > 1 ? "" : undefined}>
-          <ul className="divide-y divide-edge">
+        <li key={gi} className="rounded-md border border-border p-3" data-set={g.rows.length > 1 ? "" : undefined}>
+          <ul className="divide-y divide-border">
             {g.rows.map((r) => (
               <li key={r.logId} className="space-y-1 py-2 text-[13px]" data-row="">
-                <p className="text-fg">
+                <p className="text-foreground">
                   <span>{r.actionWords}</span> <span className="font-semibold">{r.label}</span>
                 </p>
-                <p className="text-fg-muted">{[r.byName, r.when].filter(Boolean).join(" · ")}</p>
+                <p className="text-muted-foreground">{[r.byName, r.when].filter(Boolean).join(" · ")}</p>
                 {r.summary.length > 0 && (
                   <ul className="list-disc pl-5">
                     {r.summary.map((w, i) => (
@@ -43,11 +43,11 @@ export function RecentlyPublishedView({ groups, state, access = null, onUndo, on
                     ))}
                   </ul>
                 )}
-                {r.note && <p className="text-fg-muted">{r.note}</p>}
+                {r.note && <p className="text-muted-foreground">{r.note}</p>}
                 <div className="flex flex-wrap items-center gap-3">
                   {r.canUndo && r.target && undoBlock(r.target)}
                   {editorHref && (
-                    <a href={editorHref(r.documentId)} className="underline focus-ring">
+                    <a href={editorHref(r.documentId)} data-read-control="" className="underline rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
                       {WORDS.openInEditor}
                     </a>
                   )}
@@ -55,7 +55,7 @@ export function RecentlyPublishedView({ groups, state, access = null, onUndo, on
               </li>
             ))}
           </ul>
-          {g.undoSet && <div className="border-t border-edge pt-2">{undoBlock(g.undoSet)}</div>}
+          {g.undoSet && <div className="border-t border-border pt-2">{undoBlock(g.undoSet)}</div>}
         </li>
       ))}
     </ul>

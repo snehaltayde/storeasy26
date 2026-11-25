@@ -955,13 +955,13 @@ await t("rendered: a closed store shows the opening copy: 'Your store isn't open
   ok(M.isStoreClosed([]) && !M.isStoreClosed(null) && !M.isStoreClosed([{ live: true }]), "isStoreClosed");
 });
 
-await t("rendered: staff see Publish disabled with the reason, and Take offline disabled with the reason; an owner's are enabled", () => {
+await t("rendered: staff see the reason where Publish and Take offline would be (Phase 2 line 6: no buttons); an owner's are enabled", () => {
   const reason = "Only the store owner or an admin can publish. You can edit and preview.";
   const s = snap({ document: { ...snap().document, access: { canPublish: false, reason } } });
   const m = view({ entry: entryOf(s), state: s, can: { write: true, publish: false, offersWrite: true }, role: "staff", publish: { state: { phase: "closed", order: [], lists: {}, items: [] }, canConfirm: false, on: {} } });
-  ok(/<button[^>]*disabled=""[^>]*>Publish<\/button>/.test(m), `Publish disabled: ${m.match(/<button[^>]*>Publish<\/button>/)?.[0]}`);
-  ok(textOf(m).includes(reason), "the reason is shown");
-  ok(/<button[^>]*disabled=""[^>]*>Take this page offline<\/button>/.test(m), "Take offline disabled for staff");
+  ok(!/<button[^>]*>Publish<\/button>/.test(m), `no Publish button: ${m.match(/<button[^>]*>Publish<\/button>/)?.[0]}`);
+  ok(textOf(m).includes(reason) && m.includes("data-publish-reason"), "the reason is shown");
+  ok(!/<button[^>]*>Take this page offline<\/button>/.test(m), "no Take offline for staff");
   const owner = view({ entry: entryOf(snap()), state: snap(), publish: { state: { phase: "closed", order: [], lists: {}, items: [] }, canConfirm: false, on: {} } });
   ok(/<button[^>]*>Publish<\/button>/.test(owner) && !/<button[^>]*disabled=""[^>]*>Publish<\/button>/.test(owner), "an owner's Publish is enabled");
   ok(!textOf(owner).includes(reason), "no reason for an owner");
@@ -982,6 +982,7 @@ await t("rendered: conflict, backup offer and a link held for a failed save show
 });
 
 const RELEASES = join(ROOT, "app/(console)/admin/(authed)/releases/page.js");
+const History = await load(join(ROOT, "components/admin/releases/PublishingHistory.js"));
 const Releases = (await load(RELEASES)).default;
 const renderReleases = async () => html(await Releases());
 
@@ -994,7 +995,7 @@ await t("rendered: /admin/releases renders RecentlyPublished, with access passed
   const page = await renderReleases();
   ok(/data-recently-published-page=""/.test(page) && textOf(page).includes("Loading what was published"), `the page mounts the documents list: ${page.slice(0, 400)}`);
   // the list once its rows are read (listRecentlyPublished through the documents API)
-  const m = html(h(Editor.PublishingHistory, { initialRows: S.rows, access: { canPublish: true, reason: null } }));
+  const m = html(h(History.PublishingHistory, { initialRows: S.rows, access: { canPublish: true, reason: null } }));
   ok(/data-recently-published=""/.test(m), `RecentlyPublished: ${m.slice(0, 500)}`);
   ok(textOf(m).includes("Published Home page") && textOf(m).includes("Hero: title changed") && textOf(m).includes("Publish it again from the editor"), "rows");
   eq((m.match(/>Undo</g) || []).length, 1, "Undo only where canUndo:");
@@ -1007,18 +1008,18 @@ await t("rendered: /admin/releases renders RecentlyPublished, with access passed
 
 await t("unit: PublishingHistory hands access to RecentlyPublished (staff: Undo disabled with the reason, once P3-FIX3's prop lands)", async () => {
   const seen = [];
-  const load2 = world({ ...stubs, "./publish/RecentlyPublished": { __esModule: true, default: (p) => (seen.push(p), null) } });
-  const E2 = await load2(join(ROOT, "components/admin/editor/DocumentEditor.js"));
+  const load2 = world({ ...stubs, "@/components/admin/editor/publish/RecentlyPublished": { __esModule: true, default: (p) => (seen.push(p), null) } });
+  const E2 = await load2(join(ROOT, "components/admin/releases/PublishingHistory.js"));
   const access = { canPublish: false, reason: "Only the store owner or an admin can publish or undo. You can edit and preview." };
   html(h(E2.PublishingHistory, { initialRows: [], access }));
   eq(seen[0].access, access, "access passed:");
-  // the page hands staff access { canPublish: false, reason } to the list
-  const load3 = world({ ...stubs, "@/components/admin/editor/DocumentEditor": { PublishingHistory: marker("PublishingHistory") } });
+  // the page hands staff access { canPublish: false, reason } to PublishingPage
+  const load3 = world({ ...stubs, "@/components/admin/releases/PublishingPage": { __esModule: true, default: marker("PublishingPage") } });
   const R3 = (await load3(RELEASES)).default;
   const propsFor = async (role) => {
     S.actor = { kind: "member", role };
     const out = html(await R3());
-    return JSON.parse(out.match(/data-stub="PublishingHistory" data-props="([^"]*)"/)[1].replace(/&quot;/g, '"'));
+    return JSON.parse(out.match(/data-stub="PublishingPage" data-props="([^"]*)"/)[1].replace(/&quot;/g, '"'));
   };
   eq((await propsFor("staff")).access, { canPublish: false, reason: "Only the store owner or an admin can publish or undo. You can edit and preview." }, "staff:");
   eq((await propsFor("owner")).access, { canPublish: true, reason: null }, "owner:");

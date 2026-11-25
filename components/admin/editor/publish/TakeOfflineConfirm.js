@@ -1,7 +1,6 @@
 "use client";
 
-import { Dialog } from "@/components/console/Dialog";
-import { Button } from "@/components/console/Button";
+import { Button } from "../fields/parts";
 import { WORDS } from "./publishModel";
 
 // P3-PUBLISHUI (PUB-04): the confirm before a page goes offline, from
@@ -17,7 +16,7 @@ export function TakeOfflineBody({ view }) {
       <p>{WORDS.offlineWhat}</p>
       {linkers.length ? (
         <div>
-          <p className="font-medium text-fg">{WORDS.offlineLinkers}</p>
+          <p className="font-medium text-foreground">{WORDS.offlineLinkers}</p>
           <ul className="mt-1 list-disc pl-5">
             {linkers.map((l, i) => (
               <li key={i}>{l}</li>
@@ -29,7 +28,7 @@ export function TakeOfflineBody({ view }) {
       )}
       {changes.length > 0 && (
         <div>
-          <p className="font-medium text-fg">{WORDS.undoWillChange}</p>
+          <p className="font-medium text-foreground">{WORDS.undoWillChange}</p>
           <ul className="mt-1 list-disc pl-5">
             {changes.map((w, i) => (
               <li key={i}>{w}</li>
@@ -41,25 +40,30 @@ export function TakeOfflineBody({ view }) {
   );
 }
 
-export default function TakeOfflineConfirm({ open = true, view, busy = false, onConfirm, onCancel }) {
+// Phase 2 line 6 (6c): the confirm is a panel in place (as Undo's own
+// confirm is), not a modal: it sits where the founder pressed the button, and
+// names the pages that link here before anything goes offline.
+export function TakeOfflineFooter({ busy = false, onConfirm, onCancel }) {
   return (
-    <Dialog
-      open={open}
-      onClose={busy ? undefined : onCancel}
-      title={view?.title || WORDS.offlineConfirm}
-      size="sm"
-      footer={
-        <>
-          <Button onClick={onCancel} disabled={busy}>
-            {WORDS.cancel}
-          </Button>
-          <Button variant="danger" busy={busy} onClick={onConfirm}>
-            {WORDS.offlineConfirm}
-          </Button>
-        </>
-      }
-    >
+    <div className="flex flex-wrap gap-2">
+      <Button size="sm" variant="danger" busy={busy} onClick={onConfirm}>
+        {WORDS.offlineConfirm}
+      </Button>
+      <Button size="sm" onClick={onCancel} disabled={busy}>
+        {WORDS.cancel}
+      </Button>
+    </div>
+  );
+}
+
+export default function TakeOfflineConfirm({ open = true, view, busy = false, onConfirm, onCancel }) {
+  if (!open) return null;
+  const title = view?.title || WORDS.offlineConfirm;
+  return (
+    <section role="group" aria-label={title} className="max-w-md space-y-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-[13px]" data-take-offline-confirm="">
+      <p className="font-semibold text-foreground">{title}</p>
       <TakeOfflineBody view={view} />
-    </Dialog>
+      <TakeOfflineFooter busy={busy} onConfirm={onConfirm} onCancel={onCancel} />
+    </section>
   );
 }

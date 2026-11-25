@@ -416,6 +416,100 @@ await t("the 6b files import no old console part (only useToast) and the pickers
   for (const f of ["components/admin/shared/MediaPicker.js", "components/admin/shared/RefPicker.js"]) ok(/import \{[^}]*\bDialog\b[^}]*\} from "@\/components\/admin\/editor\/fields\/parts"/.test(read(f)), `${f} uses it`);
 });
 
+// ---- 4c. preview and publishing (6c) -------------------------------------------------
+console.log("— 4c. preview and publishing");
+const CLOSED = { state: { phase: "closed", order: [], lists: {}, items: [] }, canConfirm: false, on: {} };
+const VERSIONS = { status: "ready", rows: [{ id: "ver_2", kind: "publish", createdAt: "2026-11-02T10:00:00.000Z", by: "Asha", note: null, live: true }, { id: "ver_1", kind: "checkpoint", createdAt: "2026-11-01T10:00:00.000Z", by: "Asha", note: null, live: false }] };
+const liveRoute = (role) => snap(role, { id: "doc_about", type: "page", body: { schema: 1, type: "page", meta: { slug: "about", title: "About" }, sections: [] }, document: { ...snap(role).document, id: "doc_about", type: "page", label: "About us", slug: "about" } });
+await t("the bar: an owner has Publish and Take offline; staff and support see the publish reason and no Publish, Take offline, Undo or Restore; support's Earlier versions read with no Restore", () => {
+  const bar = (role) => view(role, { state: liveRoute(role), publish: CLOSED, versions: VERSIONS, on: { restore() {} } });
+  const owner = bar("owner");
+  ok(/<button[^>]*>Publish<\/button>/.test(owner) && owner.includes("Take this page offline") && !owner.includes("data-publish-reason"), "owner: Publish and Take offline");
+  for (const role of ["staff", "support"]) {
+    const m = bar(role);
+    eq(enabledWith(m, ["Publish", "Take this page offline", "Undo", ...(role === "support" ? ["Restore"] : [])]), [], `${role}: publish buttons:`);
+    ok(!/<button[^>]*>(Publish|Take this page offline|Undo)<\/button>/.test(m), `${role}: none at all, not even disabled`);
+    ok(m.includes("data-publish-reason") && m.includes(ACCESS[role].reason), `${role}: the reason`);
+  }
+  ok(bar("staff").includes(">Restore to draft<"), "staff can restore a version to the draft (storefront.write)");
+  const sup = bar("support");
+  ok(sup.includes("data-earlier-versions") && sup.includes("Live now") && !sup.includes("Restore"), "support: the versions, no Restore");
+  // a page whose access says yes, for a session whose can.publish is false: the page wins
+  ok(view("support", { state: snap("owner"), publish: CLOSED }).includes("data-publish-reason"), "can.publish false wins over the document's access");
+});
+await t("the preview bar: device widths 375/768/1280, Show design changes, Reload, Open in a new tab; every control a marked read; on the design itself the colours stay on", async () => {
+  const P = await loadJsx(join(ROOT, "components/admin/editor/PreviewPane.js"));
+  eq(P.DEVICES.map((d) => d.width), [375, 768, 1280], "widths:");
+  const api = { startDocumentsPreview: async () => ({ ok: true, sid: "ps_0000000000000000" }), setShowDesign: async () => ({ ok: true }) };
+  const m = html(h(P.default, { api, documentId: "doc_home", path: "/", label: "Home page" }));
+  for (const d of ["phone", "tablet", "desktop"]) ok(m.includes(`data-device="${d}"`), `device ${d}`);
+  ok(m.includes("data-show-design") && m.includes("Show design changes") && m.includes("data-preview-reload") && /<a [^>]*href="\/"[^>]*target="_blank"/.test(m), "the bar's controls");
+  ok(m.includes('data-preview-device="desktop"') && m.includes("data-preview-frame"), "desktop first, the frame");
+  const controls = tags(m, /<(button|a|label)\b[^>]*>/g);
+  eq(controls.filter((c) => !c.includes("data-read-control")), [], "unmarked controls:");
+  const design = html(h(P.default, { api, documentId: "doc_design", path: "/", label: "Design" }));
+  const sw = tags(design, /<button[^>]*data-show-design[^>]*>/g)[0] || "";
+  ok(/disabled=""/.test(sw) && /aria-checked="true"/.test(sw), `on the design the switch is on and fixed: ${sw}`);
+});
+await t("Publishing: Waiting to publish lists drafts (never published, or changed) with links into the editor; an owner ticks and publishes selected; staff and support see the reason, no boxes, no button", async () => {
+  const W = await loadJsx(join(ROOT, "components/admin/releases/WaitingList.js"));
+  const rows = W.waitingRows(DOCS);
+  eq(rows.map((r) => r.id).sort(), ["doc_about", "doc_home"], "the drafts (archived, live and system documents left out):");
+  const owner = html(h(W.default, { documents: DOCS, access: ACCESS.owner, call: async () => ({}) }));
+  ok((owner.match(/data-waiting-select=""/g) || []).length === 2 && /<button[^>]*disabled=""[^>]*>Publish selected<\/button>/.test(owner), "owner: boxes, Publish selected off until one is ticked");
+  ok(owner.includes('href="/admin/editor?doc=doc_about"'), "rows link into the editor");
+  for (const role of ["staff", "support"]) {
+    const m = html(h(W.default, { documents: DOCS, access: ACCESS[role], call: async () => ({}) }));
+    ok(!m.includes("data-waiting-select") && !m.includes("<button") && m.includes(ACCESS[role].reason), `${role}: the reason only`);
+    eq(tags(m, /<a [^>]*>/g).filter((a) => !a.includes("data-read-control")), [], `${role}: every link a marked read`);
+  }
+  ok(html(h(W.default, { documents: [], access: ACCESS.owner })).includes("Nothing is waiting to publish"), "empty");
+  const R = await loadJsx(join(ROOT, "components/admin/editor/publish/RecentlyPublished.js"));
+  const row = { logId: "log_1", setId: "set_1", documentId: "doc_home", label: "Home page", action: "publish", actionWords: "Published", byName: "Asha", at: "2026-11-02T10:00:00.000Z", summary: [], canUndo: true, undo: { id: "doc_home", revision: 3, logId: "log_1" } };
+  const sup = html(h(R.default, { rows: [row], call: async () => ({}), access: ACCESS.support, editorHref: (id) => `/admin/editor?doc=${id}` }));
+  ok(!/<button/.test(sup) && sup.includes("data-undo-reason") && sup.includes("data-read-control"), "support's Recently published: the reason, no Undo; the editor link a marked read");
+});
+await t("the releases page: owner, staff and support get their access; signed out goes to the login; the loading page has skeletons", async () => {
+  const Authz = await import("../lib/platform/authz.js");
+  const seen = [];
+  let actor = null;
+  const stubs = {
+    "next/headers": { cookies: async () => ({ get: () => ({ value: "c" }) }) },
+    "next/navigation": { redirect: (to) => { throw Object.assign(new Error("redirect"), { to }); } },
+    "@/lib/admin-auth": { adminActor: async () => actor, ADMIN_COOKIE: "_a", PLATFORM_COOKIE: "_p" },
+    "@/lib/platform/authz": Authz,
+    "@/lib/console-request": { tfetch: (fn) => fn() },
+    "@/components/kit/page-header": { PageHeader: () => null },
+    "@/components/admin/releases/PublishingPage": { __esModule: true, default: (p) => (seen.push(p.access), null) },
+  };
+  const file = join(ROOT, "app/(console)/admin/(authed)/releases/page.js");
+  const code = (await swc.transform(readFileSync(file, "utf8"), { filename: file, jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } }, target: "es2022" }, module: { type: "commonjs" } })).code;
+  const mod = { exports: {} };
+  new Function("require", "module", "exports", code)((id) => (id in stubs ? stubs[id] : require(id)), mod, mod.exports);
+  const Page = mod.exports.default;
+  for (const role of ["owner", "staff", "support"]) {
+    actor = { kind: "member", role };
+    renderToStaticMarkup(await Page());
+  }
+  eq(seen.map((a) => a.canPublish), [true, false, false], "canPublish:");
+  ok(seen[1].reason.includes("You can edit") && !seen[2].reason.includes("You can edit"), "staff and support each get their own reason");
+  actor = null;
+  let to = null;
+  await Page().catch((e) => (to = e.to));
+  eq(to, "/admin/login", "signed out:");
+  const L = (await loadJsx(join(ROOT, "app/(console)/admin/(authed)/releases/loading.js"))).default;
+  ok((html(h(L)).match(/data-slot="skeleton"/g) || []).length >= 6, "the loading page");
+});
+await t("the 6c files import no old console part and use no old tokens", () => {
+  const files = ["components/admin/editor/PreviewPane.js", ...["PublishPanel", "EarlierVersions", "RecentlyPublished", "TakeOfflineConfirm", "UndoNotice"].map((f) => `components/admin/editor/publish/${f}.js`), ...["PublishingPage", "WaitingList", "PublishingHistory"].map((f) => `components/admin/releases/${f}.js`), "app/(console)/admin/(authed)/releases/page.js", "app/(console)/admin/(authed)/releases/loading.js"];
+  for (const f of files) {
+    const src = read(f);
+    ok(!/from "(@\/components\/console\/|(\.\.\/)+console\/)/.test(src), `${f}: no old console part`);
+    ok(!/\b(text-fg|bg-surface|border-edge|divide-edge|rounded-ctl|rounded-card|focus-ring)\b/.test(src), `${f}: no old tokens`);
+  }
+  ok(!/export function PublishingHistory/.test(read("components/admin/editor/DocumentEditor.js")), "PublishingHistory moved out of DocumentEditor.js");
+});
+
 // ---- 5. the page list -------------------------------------------------------------------
 console.log("— 5. the page list");
 await t("pageGroups: Home, Pages, Header and footer, Design, Policies in order; Live or Draft, the unpublished dot; archived only with the switch", () => {

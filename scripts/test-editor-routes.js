@@ -422,13 +422,15 @@ await t("rendered: the shell's nav links the storefront to /admin/editor; Media 
   eq((html.match(/aria-current="page"/g) || []).length, 1, "exactly one current item:");
   ok(html.includes(">Editor<") && /data-badge="publish"/.test(html), "label or Publishing badge missing");
   eq(links.filter((h) => h === "/admin/editor").length, 1, "one sidebar (the phone sheet renders nothing on the server):");
-  ok(html.includes("<p>page</p>") && /data-legacy[^>]*>(<div[^>]*>)?<p>page<\/p>|data-legacy[^>]*><p>page<\/p>/.test(html), "the page renders inside [data-legacy]:");
+  // Phase 2 line 6: the editor (and its templates) is a new-UI route: the page sits in main, no [data-legacy] around it
+  ok(html.includes("<p>page</p>") && !/data-legacy[^>]*>(<div[^>]*>)?<p>page<\/p>/.test(html), "the page renders straight in main:");
 });
 
 await t("rendered: /admin/editor keeps the shell's sidebar and top bar (no route steps the shell aside since the Designer went)", () => {
   const ed = shell({}, "/admin/editor");
   ok(navHrefs(ed).includes("/admin/editor") && ed.includes('data-shell="topbar"') && ed.includes("<p>page</p>"), "the sidebar, the top bar and the page:");
-  ok(!/isEditorRoute|SheetContent|ConsoleNavContext/.test(read("components/admin/shell/AdminShell.js")), "the editor-route branch is gone from AdminShell.js");
+  // Phase 2 line 6 (6a): isEditorRoute only makes main full-bleed; nothing steps the sidebar or the top bar aside
+  ok(!/SheetContent|ConsoleNavContext/.test(read("components/admin/shell/AdminShell.js")), "the editor-route branch is gone from AdminShell.js");
 });
 
 await t("rendered: staff see no Settings; Setup is gone for everyone and Onboarding is there for staff", () => {

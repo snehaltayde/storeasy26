@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { applyDesignToggle, createPreviewController, WORDS } from "./editorModel";
+import { ExternalLink, Monitor, RotateCw, Smartphone, Tablet } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/components/ui/utils";
+import { Button } from "./fields/parts";
+import { applyDesignToggle, createPreviewController, showDesignFor, WORDS } from "./editorModel";
 
 // P3-EDITOR (PV-01, PUB-11, ED-04): the preview frame. The logic is
 // editorModel.createPreviewController (pure, unit-tested); this file only
@@ -19,6 +25,21 @@ import { applyDesignToggle, createPreviewController, WORDS } from "./editorModel
 // reports ok:false (the session ended, or "See the live store" left it on the
 // live store) or when no ready arrives within 3 seconds of a load, and shows
 // "Reconnecting…" meanwhile.
+// Phase 2 line 6 (6c): the frame's bar, all reads (support has every one):
+//   device       375 / 768 / 1280 (toggle-group): the frame's width; the
+//                frame is still the store's own page, so its styles are the
+//                storefront's (drill:sf-styles)
+//   show design  the design draft's colours on every page of the preview
+//                (setShowDesign on the session, a storefront.read POST); on
+//                the design itself they are always on
+//   reload       the frame again at its address; a session that has ended
+//                (an expired preview) is opened again (the controller's retry)
+//   open         the page in a new tab (the same preview cookie)
+export const DEVICES = Object.freeze([
+  { id: "phone", width: 375, words: "Phone", icon: Smartphone },
+  { id: "tablet", width: 768, words: "Tablet", icon: Tablet },
+  { id: "desktop", width: 1280, words: "Desktop", icon: Monitor },
+]);
 
 export default function PreviewPane({ api, documentId, path, ack = null, problem = null, select = null, adding = false, hidden = false, label = "", retry = 0, onPick, onView }) {
   const frameRef = useRef(null);
@@ -28,6 +49,9 @@ export default function PreviewPane({ api, documentId, path, ack = null, problem
   const viewRef = useRef(onView);
   const openedRef = useRef(documentId);
   const [view, setView] = useState(null);
+  const [device, setDevice] = useState("desktop");
+  const [design, setDesign] = useState(false);
+  const designRef = useRef(false);
   pathRef.current = path;
   pickRef.current = onPick;
   viewRef.current = onView;
@@ -62,8 +86,15 @@ export default function PreviewPane({ api, documentId, path, ack = null, problem
           }
         },
       };
+      // the founder's "Show design changes" rides on every session the
+      // controller opens or steers (it only knows the design's own rule)
+      const steered = {
+        ...api,
+        startDocumentsPreview: (o = {}) => api.startDocumentsPreview({ ...o, showDesign: Boolean(o.showDesign) || designRef.current }),
+        setShowDesign: (sid, on) => api.setShowDesign(sid, Boolean(on) || designRef.current),
+      };
       ctl = createPreviewController({
-        api,
+        api: steered,
         frame,
         documentId: openedRef.current,
         pathFor: () => pathRef.current || "/",
@@ -118,6 +149,27 @@ export default function PreviewPane({ api, documentId, path, ack = null, problem
     ctlRef.current?.select(select);
   }, [select, view?.phase]);
 
+  const designDoc = showDesignFor(documentId);
+  const failed = view?.phase === "failed";
+  const toggleDesign = async (on) => {
+    designRef.current = on;
+    setDesign(on);
+    const sid = ctlRef.current?.view().sid;
+    if (sid) await api.setShowDesign(sid, on);
+    ctlRef.current?.pathChanged();
+  };
+  const reload = () => (failed ? ctlRef.current?.retry() : ctlRef.current?.pathChanged());
+  const openHref = () => {
+    try {
+      const at = frameRef.current?.contentWindow?.location;
+      if (at && at.origin === window.location.origin) return `${at.pathname}${at.search}`;
+    } catch {
+      /* the frame is navigating */
+    }
+    return path || "/";
+  };
+  const width = DEVICES.find((d) => d.id === device)?.width || 1280;
+
   return (
     <section
       aria-label={label ? `Preview of ${label}` : "Preview"}
@@ -129,14 +181,54 @@ export default function PreviewPane({ api, documentId, path, ack = null, problem
       data-preview-reconnecting={view?.reconnecting ? "" : undefined}
       data-adding={adding ? "" : undefined}
       data-preview-log={(ctlRef.current?.log || []).slice(-16).join(" ")}
+      data-preview-device={device}
     >
+      <div className="flex flex-wrap items-center gap-2" data-preview-bar="">
+        <ToggleGroup type="single" variant="outline" size="sm" spacing={0} value={device} onValueChange={(v) => v && setDevice(v)} aria-label="Preview width" data-read-control="">
+          {DEVICES.map((d) => (
+            <ToggleGroupItem key={d.id} value={d.id} aria-label={`${d.words}, ${d.width} pixels wide`} title={`${d.words} (${d.width}px)`} data-device={d.id} data-read-control="">
+              <d.icon aria-hidden />
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        <div className="flex items-center gap-1.5">
+          <Switch id="preview-show-design" size="sm" checked={designDoc || design} disabled={designDoc} onCheckedChange={toggleDesign} data-show-design="" data-read-control="" />
+          <Label htmlFor="preview-show-design" className="text-xs font-normal text-muted-foreground" data-read-control="">
+            {designDoc ? "Showing your design changes" : "Show design changes"}
+          </Label>
+        </div>
+        <div className="ml-auto flex items-center gap-1">
+          <Button size="sm" variant="ghost" onClick={reload} icon={<RotateCw aria-hidden />} data-preview-reload="" data-read-control="">
+            {failed ? "Open the preview again" : "Reload"}
+          </Button>
+          <a
+            href={path || "/"}
+            target="_blank"
+            rel="noopener"
+            onClick={(e) => (e.currentTarget.href = openHref())}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-4"
+            data-preview-open=""
+            data-read-control=""
+          >
+            <ExternalLink aria-hidden />
+            Open in a new tab
+          </a>
+        </div>
+      </div>
       {adding && (
-        <p className="text-[13px] text-fg-muted" role="status" data-adding-note="">
+        <p className="text-[13px] text-muted-foreground" role="status" data-adding-note="">
           {WORDS.adding}
         </p>
       )}
-      <div className="overflow-hidden rounded-card border border-edge bg-surface-sunken">
-        <iframe ref={frameRef} title={label ? `Your store: ${label}` : "Your store"} className="block h-[70vh] w-full bg-white" onLoad={() => ctlRef.current?.frameLoad()} data-preview-frame="" />
+      <div className="overflow-x-auto rounded-lg border border-border bg-muted">
+        <iframe
+          ref={frameRef}
+          title={label ? `Your store: ${label}` : "Your store"}
+          className={cn("mx-auto block h-[70vh] bg-white", device === "desktop" ? "w-full" : "max-w-none shrink-0")}
+          style={device === "desktop" ? undefined : { width: `${width}px` }}
+          onLoad={() => ctlRef.current?.frameLoad()}
+          data-preview-frame=""
+        />
       </div>
     </section>
   );
