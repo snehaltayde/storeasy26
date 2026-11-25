@@ -3,6 +3,20 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Phase 5 uploadable themes plan (on the owner's behalf)
+
+- **Schema:** one additive tenant table `theme_packages` (migration 0034). Rows are immutable and archived, never deleted; slug + version is unique. No platform migration.
+- **Permissions:** new `themes.manage` (owner, admin) for upload and archive. Reads reuse `storefront.read`, applying a theme to the draft reuses `storefront.write`, and going live reuses `storefront.publish`.
+- **Live theme = `doc_design.settings.theme.package`:** switching is a draft plus the existing Publish, preview is the existing preview session, and history and rollback come from releases.
+- **Format:** one JSON file `storeasy-theme/1`, 256 KB at most; no zip, no new dependency. The zip/`.stml` design in `lib/types/ecosystem.ts` is replaced.
+- **Constrained CSS:** declarative `styles` rules over 15 allowlisted parts and allowlisted properties, compiled by Storeasy; a raw CSS key is refused.
+- **Refusal, not sanitising:** unsafe packages are refused at upload with every issue's location in plain words.
+- **No assets or external URLs in Phase 5 packages;** fonts come from the base kit only.
+- **Templates** only choose among existing layout variants and registry sections, and rank below the founder's own choices.
+- **Protected parts** (buy box, cart, checkout) carry `data-protected`, never `data-part`; themes reach them only through brand tokens.
+- **Operator kill switch** `ff_theme-packages`: base kit renders and uploads are refused.
+- **A theme's home layout is opt-in** at apply time and lands as a draft.
+
 ## 2026-11-25 Phase 4 least-trusted audit fixes (on the owner's behalf)
 
 - **Kill switch for custom apps:** the flag key is `ff_plugin-custom-<hex>` (the route accepts it); delivery and fan-out check it too; first-party ids may not start with `custom-`.
