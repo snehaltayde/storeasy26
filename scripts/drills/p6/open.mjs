@@ -282,10 +282,11 @@ export async function paymentStage(drill) {
   const s = await ctx.newPage();
   await s.goto(p6Url(drill, pay.link), { waitUntil: "load", timeout: 120_000 });
   await settle(s);
-  await s.locator("#sa-checkout-mode").selectOption("direct");
-  await s.getByRole("button", { name: "Save settings" }).first().click();
+  // Phase 2 line 7: the Checkout and payments tab, its own Save
+  await s.locator("#st-checkout-mode").selectOption("direct");
+  await s.getByRole("button", { name: "Save checkout and payments", exact: true }).click();
   const on = await waitFor(async () => (await tenantConfig())?.checkout_mode === "direct", 30_000, 300);
-  drill.check(Boolean(on), "Settings > Commerce: checkout mode set to direct and saved", (await tenantConfig())?.checkout_mode);
+  drill.check(Boolean(on), "Settings > Checkout and payments: checkout turned on and saved", (await tenantConfig())?.checkout_mode);
   await drill.screenshot(s, "d-settings-checkout-on-1440");
   await s.close();
   await sleep(2500); // the store's settings cache (PLATFORM_CACHE_MS)
