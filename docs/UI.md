@@ -205,6 +205,13 @@ Phase 2 line 11. `/admin/login`, `/admin/reset` and `/admin/accept-invite` take 
 - **Staff and support:** the card and table read-only (every action disabled with the reason in a tooltip); support and operator support get no View.
 - **Dashboard:** an attention row "An app's webhook address isn't answering" linking to Apps while Storeasy has paused an endpoint.
 
+### API access (line 4)
+
+- **API access card** (`ApiAccessCard.js`, custom apps only, at the line 4 anchor after Webhooks): title and one sentence; "What the app can see" as the `APP_PERMISSIONS` sentences with Edit permissions (an inline checkbox form, Save and Cancel; taking one away applies to every token at once; adding one opens an AlertDialog "Give <app> more access?" listing the added sentences, Approve). "Tokens (n of 5 active)" with Create token (an outline button with a plus icon, disabled at 5), then the kit's `DataTable`: Name, Token (`sea_tok_…` mono, muted), Can see (mono outline badges), Created (date and who), Expires, Last used (or "Never"), Status (Active success, Expiring soon warning within 7 days, Expired muted, Revoked muted). Row action Revoke behind an AlertDialog (destructive). Empty: "No tokens yet". A failed read shows one sentence and Try again.
+- **Create token dialog** (`CreateTokenDialog.js`): Name, "What it can see" checkboxes (only the app's permissions, all checked) with the line that customer details are never shared, "Expires after" select (30, 90, 365 days; 90 default), a refusal `Alert`, Cancel and Create token. On success: "<name> is ready", a warning `Alert` "Copy the token now" and the kit's Copy box, then Done; the token is dropped when the dialog closes.
+- **Recent calls** (`CallLog.js`, inside the card, owner and admin only, `audit.read`): Refresh (a read), then a `DataTable` of the last 100 calls: Time, Call (method and path, mono), Answer (the status as a mono badge: 2xx success, 401/403/429 warning, 5xx danger), Token. Empty: "No calls yet".
+- **Staff and support:** the card read-only (Edit permissions, Create token and Revoke disabled with the reason in a tooltip); no Recent calls.
+
 ## Operator screens (Phase 3)
 
 Each Phase 3 line fills only its own sub-heading.

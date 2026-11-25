@@ -120,6 +120,7 @@ Routes outside `app/api/admin/`, by class (`scripts/support/shopper-routes.js`; 
 | operator | `platform/*` (except the billing webhook) | `lib/platform/admin-auth.js` |
 | webhook | `shopify/webhooks`, `razorpay/webhook`, `platform/billing/webhook` | the provider's signature |
 | job | `jobs/*`, `health` | the job secret |
+| app-token | `apps/v1/*` | a Bearer token in `plugin_tokens`, its scopes ∩ the app's approval (Phase 4 line 4; cookies ignored, GET only, every call audited strictly) |
 
 "own only" means the cart, order or account must belong to the caller's session. Anything not listed is denied. The operator column is **unconfirmed** cell by cell: operator access to a store goes through `support_grants` and `lib/platform/admin-auth.js`, read but not tested here.
 
