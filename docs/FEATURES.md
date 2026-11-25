@@ -45,7 +45,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 ## Phase 2: merchant console on shadcn
 
 - [x] A merchant sees the dashboard (sales today, orders to act on, store status) on the new UI
-- [ ] A merchant can list, search and open orders, and admins can push or cancel them, on the new UI; support sees orders read-only
+- [x] A merchant can list, search and open orders, and admins can push or cancel them, on the new UI; support sees orders read-only
 - [ ] A merchant can browse products and collections and open a product's content in the editor, on the new UI
 - [x] A merchant can create and edit offers and bundles on the new UI; support sees them read-only
 - [x] A merchant can upload, find, archive and delete media on the new UI

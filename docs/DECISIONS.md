@@ -3,6 +3,14 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Orders on the new UI (on the owner's behalf)
+
+- **Schema:** tenant 0029 adds two orders indexes only. The list cursor is `(created_at, id)` (base64url); a plain ISO `before` still works and an unreadable one returns the first page. New order ids carry 64 random bits (`PREFIX-` + 16 hex, 20 characters, inside Shopify's tag limit); old ids stay valid.
+- **Permissions:** push, reconcile and cancel are `RoleGate`d (`orders.push`, `orders.cancel`), so staff and support no longer see them; staff still decide returns. An unknown order (another store's included) answers 404 for GET, push, reconcile and cancel with no audit row; a non-database failure answers 502 in plain words with the raw error only in the server log. Cancelling a captured payment needs a Razorpay refund id of the form `rfnd_…`, checked on the server.
+- **Search:** "Shopify order number" matches the numeric Shopify order id the console shows; the `#1001` name is not stored and no column was added. Times show in the store's timezone.
+- **Decided by:** Claude
+- **Slice:** Phase 2 line 2
+
 ## 2026-11-25 Phase 2 lines 6–11: shape of the rest (on the owner's behalf)
 
 - **Schema:** no migrations in lines 6–11 (next free numbers stay tenant 0030, platform 0016).
