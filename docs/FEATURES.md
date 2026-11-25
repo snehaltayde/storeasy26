@@ -58,7 +58,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 
 ## Phase 3: operator console on shadcn
 
-- [ ] An operator can list, search and open stores, with each store's status, plan and health
+- [x] An operator can list, search and open stores, with each store's status, plan and health
 - [ ] An operator can suspend or resume a store and rotate its secrets, with an audit row for each
 - [ ] An operator can manage plans, subscriptions and billing events
 - [x] An operator can manage feature flags and incidents

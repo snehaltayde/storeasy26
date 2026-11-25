@@ -3,6 +3,17 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Operator stores list and store page (on the owner's behalf)
+
+- **Permissions and data:** `GET /api/platform/tenants` (and `?legacy=1`, `?health=`) and `GET tenants/[id]` go through `requireOperator`. No `db_url`, database token, secret value or password hash leaves the server in any mode (canary-tested); secrets appear by name only. `scrubSecrets` now strips any `libsql://`, `file:` or Turso https address, and run, sync and overview errors are scrubbed with the store's own address.
+- **Health:** a `SELECT 1` probe with a 5-second limit per store; a failed, slow or missing-file store is never reachable or healthy. The overview runs at most 10 stores at once with a ~15-second overall deadline; a store not done in time is unreachable, never zero revenue. `?health=` takes at most 50 valid ids.
+- **"Needs attention"** uses control-plane facts only (Shopify uninstalled, onboarding problem, open incident, lapsed subscription); live health reasons aren't stored.
+- **Money:** fleet revenue and MRR are shown in INR (plan prices are paise); mixed currencies aren't handled.
+- **Old console:** moved unchanged to `/platform/legacy` (nav "Old console", before Operations) until line 7.
+- **Also fixed:** flag history breaks same-millisecond ties by insertion order (it flaked under load).
+- **Decided by:** Claude
+- **Slice:** Phase 3 line 1
+
 ## 2026-11-25 Operator flags and incidents on the new UI (on the owner's behalf)
 
 - **Schema:** none; the existing `incidents` and `feature_flags` tables.
