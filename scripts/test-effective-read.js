@@ -724,7 +724,8 @@ const BASE = JSON.parse(String.raw`{"newest":[{"handle":"whey","title":"Old Whey
 //     own sync_generation column;
 //   · quiz results say display_type;
 //   · a gift line carries Shopify's title and the SKU (OVL-06), which the
-//     order freezes; the browser never sees them (shopperCart).
+//     order freezes; the browser never sees them (shopperCart);
+//   · the cart carries `progress`, the drawer's nudges (Phase 7 line 3).
 const rename = (o, from, to) => {
   if (!o || !(from in o)) return o;
   const { [from]: v, ...rest } = o;
@@ -747,6 +748,8 @@ function today(base) {
   b.cart.gifts = b.cart.gifts.map(giftNow);
   b.orderSnapshot.gifts = b.orderSnapshot.gifts.map(giftNow);
   b.orderLines = b.orderLines.map((l) => (l.is_gift ? { ...l, catalog_title: "Steel Shaker", sku: "SKU-2" } : l));
+  // Phase 7 line 3: the drawer's nudges; the applied gift is named by its line's title
+  b.cart.progress = { nudges: [], unlocked: [{ id: "gift-shaker", label: "Free Stored Shaker Name" }] };
   return b;
 }
 async function record(tn) {

@@ -132,6 +132,10 @@ A plugin never ships markup or JavaScript to the storefront. Its manifest declar
 ### Search filters (Phase 7 line 2)
 `/search` parses its URL once (`lib/catalog/facets.js` `parseFacetParams`: capped, backticks and control characters stripped) and reads through `lib/catalog/facet-search.js`: Typesense `multi_search` (one main query plus one count query per selected group, `filter_by` built only from the parsed values, each in backticks) when the tenant has its own namespace, else, or on any Typesense error, the SQL engine (`facetSearchDb`, one statement, bound parameters, effective values through `lib/catalog/effective.js`). OR within a group, AND across groups, disjunctive counts. Logs `search_facets` and `search_facets_fallback`. Tags are never a facet.
 
+### Cart nudges (Phase 7 line 3)
+
+The cart drawer's nudges are part of the cart read: `getCart` (`lib/cart.js`) calls `offerProgress()` (`lib/offers/progress.js`, pure, Edge-safe) with the same lines, active offers and coupon the engine just priced, and returns `progress: { nudges, unlocked }`. A nudge is shown only after the engine proves it: the cart plus the amount it asks for (a plain line that matches no offer target) or plus the quantity on the line it names goes through `evaluateOffers` (and `computeShipping` for free shipping, only when the store chose its rates), and must really give the gift, land the tier's percent on that line, make the coupon valid, or make shipping free. Otherwise it is dropped. Kinds: the nearest spend goal (gifts need strictly over the threshold, so the smallest whole amount that crosses; free shipping steps on the net basis), the nearest quantity tier, and the shopper's own entered coupon short of its minimum; at most two. Nothing is posted back: no route reads a progress or discount field, and checkout recomputes and keeps its confirm-the-total 409. The output carries offer and gift titles and money, never an offer's target, tags or product type.
+
 ## Event flow
 
 - **Every merchant or operator write** → an `audit_log` row (control plane) via `lib/platform/audit.js`.

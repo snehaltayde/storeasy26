@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "@/components/cart/CartContext";
 import { formatMoney, discountPercent } from "@/lib/format";
+import StickyBuyBar from "@/components/pdp/StickyBuyBar";
 
 // Phase 4 line 2: underPrice and underAtc are server-rendered plugin slots
 // (components/plugins/PluginSlot.js) passed in by the PDP layouts.
@@ -17,7 +18,7 @@ export default function ProductPurchase({ product, underPrice = null, underAtc =
     available: productAvailable,
   } = product;
 
-  const { addItem, setOpen } = useCart();
+  const { addItem, setOpen, open: drawerOpen } = useCart();
 
   const defaultVariant = variants.find((v) => v.available) || variants[0] || null;
   const [selected, setSelected] = useState(() => {
@@ -29,6 +30,8 @@ export default function ProductPurchase({ product, underPrice = null, underAtc =
   });
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const optionsRef = useRef(null);
 
   const currentVariant = useMemo(() => {
     if (!variants.length) return null;
@@ -63,6 +66,23 @@ export default function ProductPurchase({ product, underPrice = null, underAtc =
     return state;
   }, [options, variants, selected]);
 
+  // Phase 7 line 3: the bar's "Choose …" names the first option group without a
+  // value that fits (none chosen, or one that doesn't exist with the others)
+  const unchosen =
+    showOptions && !currentVariant
+      ? options.find((o) => !selected[o.name] || valueState[`${o.name}:${selected[o.name]}`] !== "ok") || options[0]
+      : null;
+  const variantLabel =
+    currentVariant && showOptions ? (currentVariant.selectedOptions || []).map((o) => o.value).join(" · ") : "";
+
+  function chooseFirstGroup() {
+    const group = unchosen && optionsRef.current?.querySelector(`[data-option-group="${CSS.escape(unchosen.name)}"]`);
+    if (!group) return;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    group.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+    group.querySelector("button")?.focus({ preventScroll: true });
+  }
+
   function choose(name, value) {
     setSelected((s) => ({ ...s, [name]: value }));
     setAdded(false);
@@ -72,18 +92,42 @@ export default function ProductPurchase({ product, underPrice = null, underAtc =
   // button scrolls out of view (small screens only).
   const addRef = useRef(null);
   const [showSticky, setShowSticky] = useState(false);
+  // Phase 7 line 3: only once the button has scrolled out above the screen
+  // (not while it is still below the fold on first load).
   useEffect(() => {
     if (!addRef.current || typeof IntersectionObserver === "undefined") return;
-    const obs = new IntersectionObserver(([entry]) => setShowSticky(!entry.isIntersecting), { threshold: 0 });
+    const obs = new IntersectionObserver(([entry]) => setShowSticky(!entry.isIntersecting && entry.boundingClientRect.top < 0), { threshold: 0 });
     obs.observe(addRef.current);
     return () => obs.disconnect();
   }, []);
 
-  function handleAdd() {
-    if (!currentVariant || !available) return;
-    // Server derives price/title/image from the catalog by variant GID.
-    addItem(currentVariant.id, qty);
-    setAdded(true);
+  // the page's spacer below lg: room at the end so the bar never covers the footer
+  useEffect(() => {
+    const mq = window.matchMedia?.("(max-width: 1023.98px)");
+    if (!mq) return;
+    const body = document.body;
+    const prev = body.style.paddingBottom;
+    const apply = () => {
+      body.style.paddingBottom = mq.matches ? "calc(5rem + env(safe-area-inset-bottom))" : prev;
+    };
+    apply();
+    mq.addEventListener?.("change", apply);
+    return () => {
+      mq.removeEventListener?.("change", apply);
+      body.style.paddingBottom = prev;
+    };
+  }, []);
+
+  async function handleAdd() {
+    if (!currentVariant || !available || adding) return; // no double tap
+    setAdding(true);
+    try {
+      // Server derives price/title/image from the catalog by variant GID.
+      await addItem(currentVariant.id, qty);
+      setAdded(true);
+    } finally {
+      setAdding(false);
+    }
   }
 
   return (
@@ -109,9 +153,9 @@ export default function ProductPurchase({ product, underPrice = null, underAtc =
       {underPrice}
 
       {showOptions && (
-        <div className="mt-6 space-y-5">
+        <div ref={optionsRef} className="mt-6 space-y-5">
           {options.map((opt) => (
-            <div key={opt.name}>
+            <div key={opt.name} role="group" aria-label={opt.name} data-option-group={opt.name}>
               <p className="mb-2 text-sm font-semibold text-sf-text-body">
                 {opt.name}
                 {selected[opt.name] ? (
@@ -199,25 +243,21 @@ export default function ProductPurchase({ product, underPrice = null, underAtc =
         </button>
       )}
 
-      {/* S38 (SF04): sticky mobile CTA — shows once the main button scrolls away */}
-      {showSticky && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-sf-border bg-sf-surface/95 px-4 py-3 shadow-sf-bar backdrop-blur lg:hidden">
-          <div className="mx-auto flex max-w-7xl items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-sf-text">{title}</p>
-              <p className="text-sm font-bold text-sf-text">{formatMoney(price, currency)}</p>
-            </div>
-            <button
-              type="button"
-              onClick={added ? () => setOpen(true) : handleAdd}
-              disabled={!added && (!available || !currentVariant)}
-              className="rounded-sf-control bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent transition enabled:hover:bg-sf-accent-hover disabled:cursor-not-allowed disabled:bg-sf-surface-strong disabled:text-sf-text-faint"
-            >
-              {added ? "View cart" : available ? (currentVariant ? "Add to cart" : "Select options") : "Sold out"}
-            </button>
-          </div>
-        </div>
-      )}
+      {/* S38 (SF04) → Phase 7 line 3: the phone buy bar (components/pdp/StickyBuyBar.js) */}
+      <StickyBuyBar
+        visible={showSticky && !drawerOpen}
+        title={title}
+        image={currentVariant?.image_url || featured_image}
+        variantLabel={variantLabel}
+        price={price}
+        compareAt={compareAt}
+        currency={currency}
+        state={adding ? "adding" : added && available && currentVariant ? "view" : unchosen ? "choose" : !available ? "soldout" : "add"}
+        chooseLabel={unchosen ? `Choose ${unchosen.name.toLowerCase()}` : undefined}
+        onAdd={handleAdd}
+        onView={() => setOpen(true)}
+        onChoose={chooseFirstGroup}
+      />
     </div>
   );
 }

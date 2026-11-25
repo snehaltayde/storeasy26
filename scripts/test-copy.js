@@ -906,6 +906,8 @@ async function renderRealDrawer(initialCart) {
     "next/link": passthrough,
     "@/lib/format": format,
     "./CartContext": { useCart: () => ({ ...ctx.useCart(), open: true }) },
+    // Phase 7 line 3: the real progress block (the free-shipping nudge moved into it)
+    "./OfferProgress": await loadComponent(await readFile(join(ROOT, "components/cart/OfferProgress.js"), "utf8")),
   });
   return renderToStaticMarkup(React.createElement(ctx.CartProvider, { initialCart }, React.createElement(CartDrawer)));
 }

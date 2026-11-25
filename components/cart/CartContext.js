@@ -16,6 +16,7 @@ const EMPTY = {
   discountTotal: 0,
   total: 0,
   couponStatus: null,
+  progress: { nudges: [], unlocked: [] },
 };
 
 // DB-backed cart. State is seeded from the server (SSR-read cookie → Turso) so
@@ -57,6 +58,7 @@ export function CartProvider({ children, initialCart }) {
           items: [{ id: it.variantNumericId, name: it.title, price: it.price, quantity }],
         });
       }
+      return next;
     },
     [mutate],
   );
@@ -106,6 +108,8 @@ export function CartProvider({ children, initialCart }) {
     grandTotal: cart.grandTotal ?? cart.total ?? cart.subtotal,
     couponStatus: cart.couponStatus || null,
     changes: cart.changes || [], // S32 (SF06): price/availability change notices
+    // Phase 7 line 3: the server's nudges (lib/offers/progress.js), shown as sent; never posted back
+    progress: cart.progress || EMPTY.progress,
     open,
     setOpen,
     pending,

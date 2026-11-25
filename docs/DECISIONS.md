@@ -16,6 +16,19 @@ without asking the owner are marked so they are easy to review.
 - **Review fixes:** backslashes are stripped from filter values; a page past the end redirects to the last page; with six groups selected the rail hides groups with nothing selected and says "Remove a filter to filter by something else."; rail element ids come from the group's position.
 - **Sort and price are GET forms** (sort submits on change with JavaScript, a Sort button without it); a facet value or chip is a plain link, so Back/Forward restore filters. Without JavaScript the phone shows the rail inline (a `<noscript>` copy) instead of the sheet.
 
+## 2026-11-26 Phase 7 line 3: phone buy bar and cart nudges (on the owner's behalf)
+
+- **No schema or permission change.** The nudges ride on the cart read; shoppers still read only the cart their cookie names.
+- **Progress shape:** `progress: { nudges: [{ kind: "spend" | "tier" | "coupon", id, text, … }], unlocked: [{ id, label }] }`, at most two nudges in the order spend, tier, coupon. Bar positions are percentages, not threshold amounts.
+- **Proof line:** spend nudges are proved with a plain line worth the amount that matches no offer target. Adding a product an offer discounts could still fall short of a net-basis free-shipping goal; the plain line is the honest best case, and the nudge says "Add ₹X more", not "Add this product".
+- **Coupon nudges name only the code the shopper entered** (codes are otherwise secret).
+- **A gift not yet reached is named by the offer's stored gift title**; an unlocked gift by its line's (published) title. Resolving every offer's gift title would add a statement to every cart read (`test-effective-read` holds the read at three statements).
+- **Tier nudges:** the nearest next tier per offer, proved on each matching line in turn; a line a higher-priority offer claims gets none. The tier's quantity counts every matching line, so a claimed line can make the nudge fail its proof and drop rather than over-promise.
+- **Variant preselection stays** (the first in-stock variant is chosen on load, as before; the drills rely on it). "Choose size" names the first option group whose value doesn't fit the others (none chosen, or a pair that doesn't exist).
+- **The buy bar is always in the page** (inert and hidden until shown) so focus can return to its button when the drawer closes; the drawer is inert while closed too.
+- **The old free-shipping line under the drawer's totals moved** into the progress block (same GEN-03 rule: only with rates the store chose).
+- **Page room for the bar** is the body's bottom padding below `lg` while a product page is open (set by `ProductPurchase`), not a CSS rule, so `app/globals.css` (line 1's) is untouched.
+
 ## 2026-11-26 Phase 7 flagship themes and storefront UX plan (on the owner's behalf)
 
 - **Schema:** tenant 0035 adds `theme_packages.source` (`upload` | `storeasy`). Only uploads count toward the 30 limit and obey the uploaded-themes kill switch.

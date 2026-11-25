@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "@/components/StoreImage";
 import Link from "next/link";
 import { useCart } from "./CartContext";
+import OfferProgress from "./OfferProgress";
 import { formatMoney } from "@/lib/format";
 
 // Cart-drawer upsell slot (Session 23): shown only when the merchant has a
@@ -58,6 +59,12 @@ function UpsellSlot({ open, items, addItem, pending, currency }) {
   );
 }
 
+// Phase 7 line 3: the drawer is a modal dialog. Focus moves in on open and
+// Tab / Shift+Tab stay inside; Escape closes it and focus goes back to the
+// control that opened it (the buy bar, the header's cart button, …). The page
+// behind doesn't scroll while it is open.
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export default function CartDrawer() {
   const {
     items,
@@ -71,7 +78,6 @@ export default function CartDrawer() {
     discountTotal,
     total,
     shipping,
-    shippingRatesSet,
     grandTotal,
     open,
     setOpen,
@@ -80,7 +86,10 @@ export default function CartDrawer() {
     setQty,
     setCoupon,
     pending,
+    progress,
   } = useCart();
+  const panelRef = useRef(null);
+  const tierNudge = progress?.nudges?.find((n) => n.kind === "tier") || null;
   const [code, setCode] = useState("");
 
   // Pop the "You save" figure whenever the total discount jumps up (an offer landed).
@@ -92,11 +101,39 @@ export default function CartDrawer() {
   }, [discountTotal]);
 
   useEffect(() => {
+    if (!open) return;
+    const panel = panelRef.current;
+    const opener = document.activeElement instanceof HTMLElement && !panel?.contains(document.activeElement) ? document.activeElement : null;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    panel?.querySelector("[data-cart-close]")?.focus({ preventScroll: true });
     function onKey(e) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setOpen(false);
+        return;
+      }
+      if (e.key !== "Tab" || !panel) return;
+      const els = [...panel.querySelectorAll(FOCUSABLE)].filter((el) => el.getClientRects().length > 0);
+      if (!els.length) return;
+      const first = els[0];
+      const last = els[els.length - 1];
+      const inside = panel.contains(document.activeElement);
+      if (e.shiftKey && (document.activeElement === first || !inside)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (document.activeElement === last || !inside)) {
+        e.preventDefault();
+        first.focus();
+      }
     }
-    if (open) document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = overflow;
+      // back to the opener once it can take focus again (the buy bar shows when the drawer closes)
+      if (opener?.isConnected) requestAnimationFrame(() => opener.focus({ preventScroll: true }));
+    };
   }, [open, setOpen]);
 
   function applyCoupon(e) {
@@ -116,18 +153,23 @@ export default function CartDrawer() {
         aria-hidden="true"
       />
       <aside
+        ref={panelRef}
         data-protected="cart"
-        className={`fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col bg-sf-surface shadow-xl transition-transform duration-300 ${
-          open ? "translate-x-0" : "translate-x-full"
+        className={`fixed right-0 top-0 z-50 flex h-dvh w-full max-w-md flex-col bg-sf-surface shadow-xl transition-transform duration-300 motion-reduce:transition-none ${
+          open ? "translate-x-0" : "invisible translate-x-full"
         }`}
         role="dialog"
+        aria-modal="true"
         aria-label="Shopping cart"
+        aria-hidden={open ? undefined : true}
+        inert={!open}
       >
         <header className="flex items-center justify-between border-b border-sf-border-soft px-5 py-4">
           <h2 className="text-lg font-bold">
             Your cart {count > 0 && <span className="text-sf-text-faint">({count})</span>}
           </h2>
           <button
+            data-cart-close
             onClick={() => setOpen(false)}
             aria-label="Close cart"
             className="rounded-full p-1.5 text-sf-text-subtle hover:bg-sf-surface-sunken"
@@ -137,6 +179,8 @@ export default function CartDrawer() {
             </svg>
           </button>
         </header>
+
+        {items.length > 0 && <OfferProgress progress={progress} />}
 
         {items.length === 0 ? (
           pending ? (
@@ -173,6 +217,17 @@ export default function CartDrawer() {
                   <p className="line-clamp-2 text-sm font-medium text-sf-text">{it.title}</p>
                   {it.variantTitle && it.variantTitle !== "Default Title" && (
                     <p className="text-xs text-sf-text-subtle">{it.variantTitle}</p>
+                  )}
+                  {tierNudge?.variantId === it.variantId && (
+                    <button
+                      type="button"
+                      data-nudge-add
+                      onClick={() => setQty(it.variantId, it.quantity + tierNudge.add)}
+                      disabled={pending}
+                      className="mt-1 self-start rounded-sf-small border border-sf-accent-border bg-sf-accent-subtle px-2 py-0.5 text-xs font-semibold text-sf-on-accent-soft disabled:opacity-50"
+                    >
+                      Add {tierNudge.add} more
+                    </button>
                   )}
                   <div className="mt-auto flex items-center justify-between pt-2">
                     <div className="inline-flex items-center rounded-sf-small border border-sf-border">
@@ -254,7 +309,7 @@ export default function CartDrawer() {
         <UpsellSlot open={open} items={items} addItem={addItem} pending={pending} currency={currency} />
 
         {items.length > 0 && (
-          <footer className="border-t border-sf-border-soft px-5 py-4">
+          <footer className="border-t border-sf-border-soft px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             {/* Coupon — validated by the engine (try BEAST10, FLAT200, SOLO25) */}
             <div className="mb-4">
               {couponStatus?.valid ? (
@@ -340,17 +395,12 @@ export default function CartDrawer() {
                   )}
                 </div>
               )}
-              {/* GEN-03: this nudge is a promise in the store's name, so it needs
-                  rates the store actually chose. The charge above always shows. */}
-              {shippingRatesSet && shipping?.remainingForFree > 0 && (
-                <p className="text-right text-xs text-sf-text-subtle">
-                  Add {formatMoney(shipping.remainingForFree, currency)} more for{" "}
-                  <span className="font-semibold text-sf-accent-text">free shipping</span>
-                </p>
-              )}
+              {/* GEN-03: the free-shipping nudge is a promise in the store's name, so
+                  it needs rates the store chose; it now lives in the progress block
+                  at the top (lib/offers/progress.js gets the rates only then). */}
               <div className="flex items-center justify-between border-t border-sf-border-soft pt-2">
                 <span className="font-semibold">Total</span>
-                <span className="text-base font-bold">{formatMoney(grandTotal ?? total, currency)}</span>
+                <span data-cart-total className="text-base font-bold">{formatMoney(grandTotal ?? total, currency)}</span>
               </div>
               {discountTotal > 0 && (
                 <p

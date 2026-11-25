@@ -413,11 +413,13 @@ await t("buy box (both PDP layouts), cart drawer and checkout: byte-identical wi
   eq(attr(htmlTag(base), "data-theme"), null, "killed: base kit:");
   const p1 = protectedParts(themedA);
   const p0 = protectedParts(base);
-  eq(p1.map((p) => p.kind).join(","), "buy-box,buy-box,checkout,cart", "the protected parts rendered:");
+  // Phase 7 line 3: the phone buy bar is its own protected part, inside each buy box
+  eq(p1.map((p) => p.kind).join(","), "buy-box,buy-bar,buy-box,buy-bar,checkout,cart", "the protected parts rendered:");
   eq(p0.length, p1.length, "same parts:");
   for (let i = 0; i < p1.length; i++) {
     eq(p1[i].html, p0[i].html, `${p1[i].kind} #${i} markup:`);
     ok(!p1[i].html.includes("data-part="), `${p1[i].kind}: a data-part inside`);
+    if (p1[i].kind === "buy-bar") ok(!/data-plugin-slot/.test(p1[i].html), "buy-bar: a plugin slot inside");
   }
   // and the theme's colours reach them only through token variables: no hex of the package inside
   for (const p of p1) for (const hex of Object.values(AURORA.surfaces).flatMap((s) => Object.values(s))) ok(!p.html.includes(hex), `${p.kind} holds ${hex}`);
@@ -426,7 +428,7 @@ await t("buy box (both PDP layouts), cart drawer and checkout: byte-identical wi
 await t("static scan: no data-part in the protected components or anything they import from components/, and every one of the 15 PARTS has a hook in the storefront", async () => {
   const { PARTS } = await import("../lib/themes/package-format.js");
   const reached = new Set();
-  const queue = ["components/ProductPurchase.js", "components/cart/CartDrawer.js", "components/checkout/CheckoutFlow.js"];
+  const queue = ["components/ProductPurchase.js", "components/pdp/StickyBuyBar.js", "components/cart/CartDrawer.js", "components/checkout/CheckoutFlow.js"];
   while (queue.length) {
     const f = queue.shift();
     if (reached.has(f)) continue;
@@ -439,7 +441,10 @@ await t("static scan: no data-part in the protected components or anything they 
       if (r.startsWith("components/") && existsSync(join(ROOT, r))) queue.push(r);
     }
   }
-  ok(reached.size > 3, `reached: ${[...reached].join(", ")}`);
+  ok(reached.size > 4 && reached.has("components/cart/OfferProgress.js"), `reached: ${[...reached].join(", ")}`);
+  // the buy bar takes no plugin slot (its props are the variant's words, never a slot)
+  const bar = await readFile(join(ROOT, "components/pdp/StickyBuyBar.js"), "utf8");
+  ok(/data-protected="buy-bar"/.test(bar) && !/PluginSlot|underAtc|underPrice/.test(bar), "the buy bar is protected and has no plugin slot");
   // the hooks themselves
   const files = ["components/Header.js", "components/Footer.js", "components/ProductCard.js", "components/CollectionCard.js", "components/sections/HeroSection.js", "components/sections/RichTextSection.js"];
   const all = (await Promise.all(files.map((f) => readFile(join(ROOT, f), "utf8")))).join("\n");
