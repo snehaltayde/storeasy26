@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { cx } from "./cx";
-import { useToast } from "./Toast";
+import { useToast } from "@/components/kit/toast";
 
 // Clipboard pieces (S50). SecretReveal is the house pattern for one-time
 // values (provisioned passwords, invite codes, approval links): a mono
