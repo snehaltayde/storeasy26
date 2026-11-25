@@ -147,6 +147,7 @@ Line 9. `/admin/analytics`, `/admin/experiments`, `/admin/experiments/[slug]`, `
 - **Automations:** admins and owners only; anyone else gets the no-access note and no data. Header: "Turn all off" / "Turn automations back on" (asks first) and "New rule" (`RuleSheet`: name, when, total at least, paid by, then, subject, message, a daily cap, quiet hours in store time, "Turn it on after saving"). Rules `DataTable` with a Switch per rule and Dry run (sends nothing; the result in words above the table), Edit and Remove (asks first). Recent runs: result badge, rule, what happened, when, Retry on a failed one.
 - **States:** a `loading.js` skeleton for each page; errors in words with Try again; empty lists in one sentence.
 - **Support:** analytics, experiments and insights as above with no write control in the markup (hidden); every read (range links, CSV, tabs, row links, Try again, Show the numbers) carries `data-read-control` (`scripts/support/read-controls.js`). No non-GET read on these pages, so no `READ_POSTS` row.
+
 ### Quizzes
 
 `/admin/quizzes` and `/admin/quizzes/[slug]` (`new` is the create form) (Phase 2 line 10), a Catalog nav item after Catalog. Parts in `components/admin/quizzes/`: `QuizList`, `QuizEditor`, `QuestionList`, `TagPicker`, `QuizTry`, `DeleteQuizDialog`; words in `quiz-words.js`. Data: `GET /api/admin/quiz` (with `?view=usage|tags|try`), `lib/admin/quiz-usage.js`; the rules are `lib/quiz-rules.js` (`validateQuiz`, `scoreQuiz`), shared with the API and the store.
