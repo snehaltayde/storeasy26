@@ -538,6 +538,25 @@ await t("operator: resuming a signup run makes its job due (not run inline); the
   ok(await I.findUserByEmail(s.f.email), "user");
 });
 
+await t("operator (Phase 3 line 6): a discarded dead signup job runs again on Resume; the signup finishes", async () => {
+  const s = await start("Discarded Job Co");
+  await fault({ route: "create", status: 402 });
+  await verify(s);
+  await H.drainAfter();
+  const row = await rowFor(s.f.email);
+  const op = { _platform: store.cookies["operator-support"]._platform };
+  await one("UPDATE jobs SET status = 'dead' WHERE id = ?", [row.job_id]);
+  const d = await api("platform/queues", "POST", { body: { action: "discard", kind: "job", id: row.job_id }, cookies: op });
+  eq(d.status, 200, d.text);
+  eq((await J.getJobByKey(`provision_store:${row.id}`)).status, "discarded", "discarded");
+  const r = await api("platform/provisions", "POST", { body: { action: "resume", run: row.provision_run_id }, cookies: op });
+  eq(r.status, 200, r.text);
+  eq((await J.getJobByKey(`provision_store:${row.id}`)).status, "pending", "the resume made the discarded job due");
+  await H.drainAfter();
+  eq((await rowFor(s.f.email)).status, "done", "the job really ran: the signup is done, not stuck in provisioning");
+  eq((await J.getJobByKey(`provision_store:${row.id}`)).status, "done", "job done");
+});
+
 // --- least-trusted (§4) ---------------------------------------------------------------------
 
 await t("least-trusted: status with no cookie or another browser's cookie: the same generic 400", async () => {

@@ -347,6 +347,47 @@ await t("queueStats + prune: counts are sane; OLD done rows age out, recent done
   ok((await J.listJobs({ status: "dead" })).some((j) => j.id === "job_newdead"), "recent dead kept");
 });
 
+// --- Phase 3 line 6: discarded dead letters --------------------------------------------
+const actor = { kind: "operator", id: "u_ops_test" };
+await t("discard: only a dead job; the tick never runs a discarded job", async () => {
+  await C.platformDb().execute("UPDATE jobs SET status = 'done' WHERE status IN ('pending','leased')");
+  const { id } = await J.enqueueJob({ type: "noop_discard", idempotencyKey: "k-discard-tick" });
+  eq(await J.discardJob(id, { actor }), false, "a pending job is not discarded:");
+  await C.platformDb().execute({ sql: "UPDATE jobs SET status = 'dead' WHERE id = ?", args: [id] });
+  eq(await J.discardJob(id, { actor }), true, "a dead job is discarded:");
+  let ran = 0;
+  const results = await W.runDueJobs({ handlers: { noop_discard: async () => void ran++ } });
+  eq(ran, 0, "handler never called:");
+  ok(!results.some((r) => r.id === id), "not in the tick's results");
+  eq((await J.listJobs({})).find((j) => j.id === id).status, "discarded", "still discarded:");
+});
+
+await t("an explicit retry (makeJobDue) takes a discarded job back to pending with a fresh budget, and the tick runs it", async () => {
+  const { id } = await J.enqueueJob({ type: "noop_retry", idempotencyKey: "k-discard-retry" });
+  await C.platformDb().execute({ sql: "UPDATE jobs SET status = 'dead', attempts = 5 WHERE id = ?", args: [id] });
+  await J.discardJob(id, { actor });
+  await J.makeJobDue(id);
+  const r = (await J.listJobs({})).find((j) => j.id === id);
+  same([r.status, Number(r.attempts), r.run_after], ["pending", 0, null], "due again:");
+  let ran = 0;
+  await W.runDueJobs({ handlers: { noop_retry: async () => void ran++ } });
+  eq(ran, 1, "the handler ran:");
+});
+
+await t("prune: a discarded job ages out on the dead-letter schedule and frees its idempotency key; a recent one stays", async () => {
+  const old = new Date(Date.now() - 61 * 24 * 3600 * 1000).toISOString();
+  const now = new Date().toISOString();
+  await C.platformDb().execute({
+    sql: "INSERT INTO jobs (id, type, status, idempotency_key, updated_at, created_at) VALUES ('job_olddisc','x','discarded','k-old-disc', ?, ?), ('job_newdisc','x','discarded','k-new-disc', ?, ?)",
+    args: [old, old, now, now],
+  });
+  await J.pruneQueues({ deadDays: 60 });
+  const ids = (await J.listJobs({ limit: 200 })).map((j) => j.id);
+  eq(ids.includes("job_olddisc"), false, "old discarded pruned:");
+  ok(ids.includes("job_newdisc"), "recent discarded kept");
+  eq((await J.enqueueJob({ type: "x", idempotencyKey: "k-old-disc" })).existed, false, "the key is free again:");
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 tenantClient.close?.();
 for (const f of dbs) await rm(join(here, "..", f), { force: true });

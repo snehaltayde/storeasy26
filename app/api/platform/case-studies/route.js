@@ -35,7 +35,8 @@ export async function POST(request) {
     }
     if (body?.delete_case) {
       const r = await deleteCaseStudy(String(body.delete_case.slug || ""));
-      await audit({ actor: operatorActor(auth.operator), action: "case_study.delete", resource: `case:${r.slug}`, tenantId: null });
+      // the row is gone, so the audit row keeps what was removed (Phase 3 line 6)
+      await audit({ actor: operatorActor(auth.operator), action: "case_study.delete", resource: `case:${r.slug}`, tenantId: null, diff: { slug: r.slug, removed: "the study with its consent record and measurements" } });
       return NextResponse.json({ ok: true, ...r });
     }
     return NextResponse.json({ error: "Nothing to do" }, { status: 400 });

@@ -43,6 +43,7 @@ async function t(name, fn) {
     console.error(`✗ ${name}\n    ${String(e?.message || e).split("\n").join("\n    ")}`);
   }
 }
+const same = (a, b, m = "") => eq(JSON.stringify(a), JSON.stringify(b), m);
 const eq = (a, b, m = "") => {
   if (a !== b) throw new Error(`${m} expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`);
 };
@@ -96,6 +97,7 @@ const CANARY_CUSTOMER = "gid://shopify/Customer/canary-551";
 const CANARY_FOUNDER = "founder-canary-91@ops.test";
 const CANARY_DB = "libsql://canary-db-ops.turso.io";
 const CANARY_PAYLOAD = "payload-canary-shopper@ops.test";
+const CANARY_SHOP = "canary-shop-44.myshopify.com";
 
 const now = new Date().toISOString();
 async function seedJobs() {
@@ -121,12 +123,13 @@ const auditFor = async (action, resource) => sql("SELECT * FROM audit_log WHERE 
 async function seedRun(id) {
   await pdb().execute({ sql: "DELETE FROM provision_runs WHERE id = ?", args: [id] });
   await pdb().execute({
-    sql: `INSERT INTO provision_runs (id, tenant_id, status, steps, refs, params, error, created_at, updated_at) VALUES (?, 'ops-ghost', 'failed', ?, ?, ?, 'create_db: quota', ?, ?)`,
+    sql: `INSERT INTO provision_runs (id, tenant_id, status, steps, refs, params, error, created_at, updated_at) VALUES (?, 'ops-ghost', 'failed', ?, ?, ?, ?, ?, ?)`,
     args: [
       id,
-      JSON.stringify([{ name: "create_db", status: "failed", detail: "quota" }, { name: "register_tenant", status: "pending" }]),
+      JSON.stringify([{ name: "create_db", status: "failed", detail: `could not reach ${CANARY_DB}: quota` }, { name: "register_tenant", status: "pending" }]),
       JSON.stringify({ dbUrl: CANARY_DB }),
       JSON.stringify({ id: "ops-ghost", supportEmail: CANARY_FOUNDER, siteName: "Ghost", dbUrl: CANARY_DB, source: "operator" }),
+      `create_db: could not reach ${CANARY_DB}: quota`,
       now,
       now,
     ],
@@ -136,12 +139,12 @@ async function seedRun(id) {
 async function seedPrivacy(id) {
   await tenantDb.execute({ sql: "DELETE FROM privacy_requests WHERE id = ?", args: [id] });
   await tenantDb.execute({
-    sql: "INSERT INTO privacy_requests (id, kind, email, phone, customer_id, shop_domain, status, notes, created_at) VALUES (?, 'customer_redact', ?, ?, ?, 'ops.myshopify.com', 'manual', NULL, ?)",
-    args: [id, CANARY_EMAIL, CANARY_PHONE, CANARY_CUSTOMER, now],
+    sql: "INSERT INTO privacy_requests (id, kind, email, phone, customer_id, shop_domain, status, notes, created_at) VALUES (?, 'customer_redact', ?, ?, ?, ?, 'manual', NULL, ?)",
+    args: [id, CANARY_EMAIL, CANARY_PHONE, CANARY_CUSTOMER, CANARY_SHOP, now],
   });
 }
 const noCanary = (text, m) => {
-  for (const c of [CANARY_EMAIL, CANARY_PHONE, CANARY_CUSTOMER, CANARY_FOUNDER, CANARY_DB, CANARY_PAYLOAD]) ok(!String(text).includes(c), `${m}: no ${c}`);
+  for (const c of [CANARY_EMAIL, CANARY_PHONE, CANARY_CUSTOMER, CANARY_FOUNDER, CANARY_DB, CANARY_PAYLOAD, CANARY_SHOP]) ok(!String(text).includes(c), `${m}: no ${c}`);
 };
 
 await seedJobs();
@@ -248,6 +251,7 @@ await t("operator: runs list steps and state, never params or refs (founder emai
   eq(run.source, "operator", "source:");
   eq(run.steps.map((s) => s.name).join(","), "create_db,register_tenant", "steps:");
   ok(!("params" in run) && !("refs" in run), "no params or refs");
+  ok(run.steps[0].detail.includes("[redacted]") && run.error.includes("[redacted]"), "the database address in a step's detail and the run error is scrubbed");
   noCanary(r.text, "provisions");
 });
 
@@ -259,6 +263,33 @@ await t("abandon: a failed run is compensated, audited with the operator's id; t
   const rows = await auditFor("tenant.provision", "run:run_ops_failed");
   eq(rows.at(-1)?.actor, operatorId, "actor:");
   ok(!String(rows.at(-1)?.diff).includes(CANARY_FOUNDER), "diff holds no founder email");
+});
+
+await t("resume: a successful resume returns the console password once; a later list never carries it", async () => {
+  const P = await import("../lib/platform/provision.js");
+  const failed = await P.runProvision({ id: "ops-resume", name: "Ops Resume", shopDomain: "ops-resume.myshopify.com", domains: ["ops-resume.test"], dbUrl: "file:.test-platform-ops-resume.db" }, { failAt: "register_tenant" });
+  eq(failed.failedStep, "register_tenant", "failed first:");
+  const r = await call("provisions", { method: "POST", cookies: operator, body: { action: "resume", run: failed.run.id } });
+  eq(r.status, 200, r.text);
+  eq(r.body.run.status, "done", `resumed (${r.body.failedStep}):`);
+  const password = r.body.generated?.admin_password;
+  ok(typeof password === "string" && password.length >= 8, "the password, once");
+  same(Object.keys(r.body.generated), ["admin_password"], "nothing else generated is sent:");
+  ok(!("params" in r.body.run) && !("refs" in r.body.run), "the run view, not the raw run");
+  const later = await call("provisions", { cookies: operator });
+  ok(later.body.runs.some((x) => x.id === failed.run.id), "listed");
+  ok(!later.text.includes(password), "a later GET never carries the password");
+  ok(!(await sql("SELECT * FROM provision_runs WHERE id = ?", [failed.run.id])).some((row) => JSON.stringify(row).includes(password)), "not stored in the run");
+});
+
+await t("tick: a discarded job is never run", async () => {
+  await pdb().execute({ sql: "UPDATE jobs SET status = 'dead' WHERE id = 'job_ops_dead2'", args: [] });
+  eq((await call("queues", { method: "POST", cookies: operator, body: { action: "discard", kind: "job", id: "job_ops_dead2" } })).status, 200);
+  const before = (await sql("SELECT updated_at, attempts FROM jobs WHERE id = 'job_ops_dead2'"))[0];
+  const r = await call("queues", { method: "POST", cookies: operator, body: { action: "tick" } });
+  eq(r.status, 200, r.text);
+  const after = (await sql("SELECT status, updated_at, attempts FROM jobs WHERE id = 'job_ops_dead2'"))[0];
+  same([after.status, after.updated_at, after.attempts], ["discarded", before.updated_at, before.attempts], "untouched by the tick:");
 });
 
 // ---------------------------------------------------------------------------
@@ -341,6 +372,18 @@ await t("case studies: create, publish and archive, each audited with the operat
   }
 });
 
+await t("case studies: delete is audited with the operator's id, the slug and a note of what was removed", async () => {
+  eq((await call("case-studies", { method: "POST", cookies: operator, body: { case_study: { ...MEASURED, slug: "ops-gone" } } })).status, 200);
+  eq((await call("case-studies", { method: "POST", cookies: operator, body: { delete_case: { slug: "ops-gone" } } })).status, 200);
+  eq((await sql("SELECT 1 FROM case_studies WHERE slug = 'ops-gone'")).length, 0, "gone:");
+  const rows = await auditFor("case_study.delete", "case:ops-gone");
+  eq(rows.length, 1, "one row:");
+  eq(rows[0].actor, operatorId, "actor:");
+  const diff = JSON.parse(rows[0].diff);
+  eq(diff.slug, "ops-gone", "slug kept:");
+  ok(/consent/.test(diff.removed) && /measurement/.test(diff.removed), `note: ${diff.removed}`);
+});
+
 await t("case studies: an edit of a published study takes it back to draft", async () => {
   await call("case-studies", { method: "POST", cookies: operator, body: { publish_case: { slug: "ops-growth", published: true } } });
   eq((await call("case-studies", { method: "POST", cookies: operator, body: { case_study: { ...MEASURED, title: "Ops grew 2x" } } })).status, 200);
@@ -380,6 +423,6 @@ await t("no network: nothing reached fetch()", async () => {
 tenantDb.close();
 await store.cleanup();
 const { rm } = await import("node:fs/promises");
-for (const f of [".test-platform-ops-default.db", ".test-platform-ops-default.db-wal", ".test-platform-ops-default.db-shm"]) await rm(join(ROOT, f), { force: true });
+for (const f of [".test-platform-ops-resume.db", ".test-platform-ops-resume.db-wal", ".test-platform-ops-resume.db-shm", ".test-platform-ops-default.db", ".test-platform-ops-default.db-wal", ".test-platform-ops-default.db-shm"]) await rm(join(ROOT, f), { force: true });
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
