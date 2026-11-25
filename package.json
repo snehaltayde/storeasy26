@@ -186,6 +186,7 @@
     "drill:operator-create-store": "node scripts/drills/run-isolated.mjs operator-create-store",
     "drill:platform-shell": "node scripts/drills/run-isolated.mjs platform-shell",
     "drill:platform-ops": "node scripts/drills/run-isolated.mjs platform-ops",
+    "drill:flags-incidents": "node scripts/drills/run-isolated.mjs flags-incidents",
     "drill:all": "node scripts/drills/run-isolated.mjs all",
     "media:reindex": "node scripts/reindex-document-refs.js",
     "icons:gen": "node scripts/gen-icons.js",

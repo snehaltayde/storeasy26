@@ -4,7 +4,7 @@
 // and its data are never touched: a drill seeds and wipes only the worktree's
 // own folders, and this runner fails if the owner's seed files change anyway.
 //
-//   node scripts/drills/run-isolated.mjs <p5|p6|orders|smoke|agency-gone|shell|editor|signup|connect|operator-onboarding|operator-create-store|platform-shell|sf-styles|console-styles|all> [stage,…] [--keep] [--headed]
+//   node scripts/drills/run-isolated.mjs <p5|p6|orders|smoke|agency-gone|shell|flags-incidents|editor|signup|connect|operator-onboarding|operator-create-store|platform-shell|sf-styles|console-styles|all> [stage,…] [--keep] [--headed]
 //   (pnpm drill:p5, drill:p6, drill:smoke, drill:agency-gone, drill:shell, drill:signup, drill:sf-styles,
 //   drill:console-styles, drill:all; sf-styles and console-styles are not in all)
 //
@@ -438,6 +438,9 @@ export const DRILLS = {
         return annex !== 0 ? annex : c.node(["scripts/drills/shell/run.mjs", ...c.headed]);
       }),
   },
+  // Phase 3 line 4: feature flags and incidents on the operator console; the
+  // incident banner is checked on the roles store's own console
+  "flags-incidents": { id: "FLAGS-INCIDENTS", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/flags-incidents/run.mjs", ...c.headed])) },
   // Phase 2 line 6: the editor in the new shell, on the roles store (owner,
   // staff, support; 375, 768, 1280); evidence in docs/cms-reviews/drills/EDITOR/
   editor: { id: "EDITOR", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/editor/run.mjs", ...c.headed])) },
