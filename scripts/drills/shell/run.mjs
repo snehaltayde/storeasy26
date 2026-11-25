@@ -150,8 +150,15 @@ const logSize = () => {
     return 0;
   }
 };
-// the server log's non-GET request lines between two offsets: [{ method, path }]
+// The self-test pages never reach Next: the drill's own route answers them,
+// so it is their server and keeps their log here ({ method, path }).
+const SELFTEST_SERVER_LOG = [];
+const serverMark = () => ({ next: logSize(), own: SELFTEST_SERVER_LOG.length });
+// the server's non-GET request lines between two marks: [{ method, path }]
 function loggedWrites(from, to) {
+  return [...nextLogWrites(from.next, to.next), ...SELFTEST_SERVER_LOG.slice(from.own, to.own).filter((w) => w.method !== "GET" && w.method !== "HEAD")];
+}
+function nextLogWrites(from, to) {
   if (!NEXT_LOG || to <= from) return [];
   const buf = Buffer.alloc(to - from);
   const fd = openSync(NEXT_LOG, "r");
@@ -176,13 +183,13 @@ async function supportNewUiControls(page, href) {
   const skip = (method, path) => (devServer && path.startsWith("/__nextjs")) || readPost(target, method, path);
   const closeLogWindow = () => {
     if (logFrom == null) return;
-    for (const w of loggedWrites(logFrom, logSize())) if (!skip(w.method, w.path)) writes.push(`${w.method} ${w.path} (server log)`);
+    for (const w of loggedWrites(logFrom, serverMark())) if (!skip(w.method, w.path)) writes.push(`${w.method} ${w.path} (server log)`);
     logFrom = null;
   };
   const onNavigated = (frame) => {
     if (frame !== page.mainFrame()) return;
     counting = new URL(frame.url()).pathname === target;
-    if (counting && logFrom == null) logFrom = logSize();
+    if (counting && logFrom == null) logFrom = serverMark();
     if (!counting) closeLogWindow();
   };
   const onSocket = (ws) => {
@@ -298,9 +305,10 @@ const SELFTEST_PAGES = {
   // the same write, each hiding where it came from: none may pass
   "referrer-origin": `<main><button type="button" data-read-control onclick="fetch('${SELFTEST}/w',{method:'POST',keepalive:true,referrerPolicy:'origin'});location.href='${SELFTEST}/posts-on-load'">Open</button></main>`,
   "custom-referrer": `<main><button type="button" data-read-control onclick="fetch('${SELFTEST}/w',{method:'POST',keepalive:true,referrer:location.origin+'${SELFTEST}/posts-on-load'});location.href='${SELFTEST}/posts-on-load'">Open</button></main>`,
-  worker: `<main><button type="button" data-read-control onclick="new Worker(URL.createObjectURL(new Blob(['fetch(&quot;'+location.origin+'${SELFTEST}/w&quot;,{method:&quot;POST&quot;})'],{type:'text/javascript'})))">Open</button></main>`,
+  worker: `<main><button type="button" data-read-control onclick="new Worker(window.URL.createObjectURL(new Blob(['fetch(&quot;'+location.origin+'${SELFTEST}/w&quot;,{method:&quot;POST&quot;})'],{type:'text/javascript'})))">Open</button></main>`,
   "blank-form": `<main><form id="bf" method="post" action="${SELFTEST}/w" target="_blank"></form><button type="button" data-read-control onclick="document.getElementById('bf').submit()">Open</button></main>`,
-  "window-open": `<main><button type="button" data-read-control onclick="const w=window.open('about:blank','_blank');w.fetch(location.origin+'${SELFTEST}/w',{method:'POST'})">Open</button></main>`,
+  // (an inline handler sees document.URL as URL: hence window.URL above)
+  "window-open": `<main><button type="button" data-read-control onclick="const w=window.open('${SELFTEST}/blank','_blank');w.addEventListener('load',()=>w.fetch(location.origin+'${SELFTEST}/w',{method:'POST'}))">Open</button></main>`,
   // a Radix portal: its empty focus guards are not controls; a button in it is,
   // and so is a "guard" with text
   "radix-portal": `<main><button type="button" data-read-control onclick="document.body.insertAdjacentHTML('beforeend','<div data-radix-portal><span data-radix-focus-guard tabindex=0></span><div role=dialog><button>Delete store</button><span data-radix-focus-guard tabindex=0>x</span></div><span data-radix-focus-guard tabindex=0></span></div>')">More</button></main>`,
@@ -308,6 +316,7 @@ const SELFTEST_PAGES = {
 async function supportSelfTest(drill, ctx) {
   const page = await ctx.newPage();
   await ctx.route(`${ORIGIN}${SELFTEST}/**`, (route) => {
+    SELFTEST_SERVER_LOG.push({ method: route.request().method(), path: new URL(route.request().url()).pathname });
     const name = new URL(route.request().url()).pathname.split("/").pop();
     return route.fulfill(SELFTEST_PAGES[name] ? { status: 200, contentType: "text/html", body: `<!doctype html><html><body>${SELFTEST_PAGES[name]}</body></html>` } : { status: 204, body: "" });
   });
