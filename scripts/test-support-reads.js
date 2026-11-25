@@ -271,7 +271,8 @@ process.env.STOREASY_PLUGIN_EGRESS_LOCAL = "1";
 const hookBody = (name) => ({ create_custom: { name, url: "http://127.0.0.1:9/hooks", topics: ["order.created"], scopes: ["orders.read"] } });
 const hookA = await call("owner", "apps", "POST", { body: hookBody("Support webhook app") });
 const hookB = await call("owner-b", "apps", "POST", { body: hookBody(CNY.bWebhookApp), host: b.tenant.domains[0] });
-CNY.webhookSecret = hookA.body?.secret ?? "";
+// the secret's longest letters-and-digits run, lower-cased (the search is case-blind)
+CNY.webhookSecret = ((hookA.body?.secret ?? "").slice(6).match(/[A-Za-z0-9]+/g) ?? [""]).sort((x, y) => y.length - x.length)[0].toLowerCase();
 SECRET_KEYS.push("webhookSecret");
 await a.run(async () => {
   const { emitOrderEvent, fanOut } = await import("../lib/plugins/events.js");
@@ -349,7 +350,7 @@ const skipFor = (caller) => [...(REDACTED(caller) ? [] : ORDER_PII), OWN_TOKEN[c
 await t("setup: outside services blank, only file: databases, the fixture planted", () => {
   eq(secretSaved.status, 200, `the app secret saved: ${secretSaved.text?.slice(0, 200)}`);
   eq(appB.status, 200, `store B's app: ${appB.text?.slice(0, 200)}`);
-  ok(/^whsec_/.test(CNY.webhookSecret) && hookB.status === 200, `the custom apps (line 3): ${hookA.text?.slice(0, 160)} | ${hookB.text?.slice(0, 160)}`);
+  ok(CNY.webhookSecret.length >= 6 && hookB.status === 200, `the custom apps (line 3): ${hookA.text?.slice(0, 160)} | ${hookB.text?.slice(0, 160)}`);
   for (const [k, v] of Object.entries({ appId: CTX.appId, secretAppId: CTX.secretAppId, bundleId: CTX.bundleId, experimentSlug: CTX.experimentSlug, quizSlug: CTX.quizSlug, collectionGid: CTX.collectionGid })) ok(v, `fixture ${k} (${bundleA.text?.slice(0, 120)} | ${experimentA.text?.slice(0, 120)} | ${quizA.text?.slice(0, 120)})`);
   for (const k of H.OUTSIDE_SERVICE_ENV) eq(process.env[k], "", k);
   for (const tn of [a, b, c, d]) F.assertLocalDbUrl(tn.tenant.dbUrl);
