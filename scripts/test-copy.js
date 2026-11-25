@@ -825,6 +825,7 @@ const flowStubs = {
 // Phase 8 line 1: the PIN field and the estimate line AddressStep renders.
 flowStubs["@/lib/pincode/client"] = await import("../lib/pincode/client.js");
 flowStubs["@/lib/delivery-estimate"] = await import("../lib/delivery-estimate.js");
+flowStubs["./DeliveryEstimate"] = await loadComponent(sources.get("components/checkout/DeliveryEstimate.js"), flowStubs);
 // PincodeField keeps hooks (the lookup), which this file's mount() only gives the
 // top component, so a stateless stand-in renders the PIN input and the rest of
 // the address; the PIN field's own copy is checked through its constants below.
@@ -849,6 +850,7 @@ async function renderCheckoutPage(inTenant, cartId, flow) {
     "next/headers": { cookies: async () => ({ get: () => ({ value: cartId }) }) },
     "@/lib/cart": cartLib,
     "@/lib/tenant-context": tenantContext,
+    "@/lib/delivery-estimate": await import("../lib/delivery-estimate.js"), // Phase 8 line 1
     "@/lib/commerce/adapter": commerceAdapter,
     "@/lib/site": site,
     "@/lib/content/resolve": { resolvedContentPageList: async () => [] },

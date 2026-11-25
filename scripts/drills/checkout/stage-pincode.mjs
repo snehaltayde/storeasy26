@@ -41,7 +41,7 @@ stage("pincode", async (drill) => {
   await check.getByText("Bengaluru, Karnataka").waitFor();
   const pdp = await check.innerText();
   drill.check(/Delivery by \w{3} \d{1,2} \w{3}/.test(pdp), "Check delivery shows the estimate", pdp);
-  drill.check(pdp.includes("Cash on delivery available"), "Check delivery says cash on delivery is available", pdp);
+  drill.check(pdp.includes("Cash on delivery available for this PIN code"), "Check delivery says cash on delivery is available for this PIN code (zone and store allow it)", pdp);
   drill.check((await page.evaluate(() => localStorage.getItem("sf_pin"))) === "560001", "the PIN is kept in localStorage (sf_pin)");
   await drill.shoot(page, "pdp-check-delivery");
 
@@ -64,7 +64,7 @@ stage("pincode", async (drill) => {
   const pin = f.locator('input[name="pincode"]');
   await f.locator("[data-pincode-place]").getByText("Bengaluru, Karnataka").waitFor();
   drill.check((await pin.inputValue()) === "560001", "the PIN checked on the product page prefills the checkout");
-  drill.check(/Delivery by/.test(await f.locator("[data-delivery-estimate]").innerText()), "the estimate shows under the PIN");
+  drill.check(/Delivery by/.test(await f.locator("[data-pincode-field] [data-delivery-estimate]").innerText()), "the estimate shows under the PIN");
   await drill.shoot(page, "checkout-pin-filled");
 
   // Change opens city and state; a typed city survives a PIN change
@@ -94,6 +94,9 @@ stage("pincode", async (drill) => {
   await f.getByRole("heading", { name: "Review your order" }).waitFor();
   await f.getByRole("button", { name: "Continue to payment" }).click();
   await f.getByRole("heading", { name: "Payment" }).waitFor();
+  const summaryEstimate = f.locator('aside [data-delivery-estimate="delivery"]');
+  await summaryEstimate.waitFor();
+  drill.check(/^Delivery by \w{3} \d{1,2} \w{3}( – \w{3} \d{1,2} \w{3})?$/.test((await summaryEstimate.innerText()).trim()), "the order summary shows the delivery estimate", await summaryEstimate.innerText());
   const answered = page.waitForResponse((x) => x.url().endsWith("/api/checkout") && x.request().method() === "POST");
   await f.getByRole("button", { name: /^Place order · / }).click();
   const res = await answered;

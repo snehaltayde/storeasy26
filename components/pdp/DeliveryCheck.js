@@ -7,7 +7,7 @@ import { BAD_PIN, NOT_FOUND, PIN_RE, lookupPin, savePin, savedPin } from "@/lib/
 
 // Phase 8 line 1: "Check delivery" on the product page. A PIN code gives this
 // store's delivery estimate, whether cash on delivery is open there (the
-// zone's `cod`) and the zone's free-shipping amount. The PIN is kept in
+// checkout's own rule: shown only when certain) and the zone's free-shipping amount. The PIN is kept in
 // localStorage (sf_pin) and prefills the checkout.
 export default function DeliveryCheck({ currency = "INR" }) {
   const [pin, setPin] = useState("");
@@ -83,9 +83,11 @@ export default function DeliveryCheck({ currency = "INR" }) {
             {answer.found === true && <p className="text-sf-text-body">{answer.city}, {answer.state}</p>}
             {answer.found === false && <p className="text-xs text-sf-text-subtle">{NOT_FOUND}</p>}
             <DeliveryEstimate estimate={answer.estimate} timeZone={answer.timeZone} />
-            <p data-delivery-cod={answer.cod ? "yes" : "no"} className="text-sf-text-muted">
-              {answer.cod ? "Cash on delivery available" : "Cash on delivery isn't available for this PIN code"}
-            </p>
+            {answer.cod != null && (
+              <p data-delivery-cod={answer.cod ? "yes" : "no"} className="text-sf-text-muted">
+                {answer.cod ? "Cash on delivery available for this PIN code" : "Cash on delivery isn't available for this PIN code"}
+              </p>
+            )}
             {answer.freeThreshold != null && (
               <p className="text-sf-text-muted">
                 {answer.freeThreshold > 0 ? `Free shipping on orders of ${formatMoney(answer.freeThreshold, currency)} or more` : "Free shipping"}

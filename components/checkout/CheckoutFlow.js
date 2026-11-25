@@ -7,6 +7,7 @@ import { formatMoney } from "@/lib/format";
 import { friendlyCheckoutError } from "@/lib/shopper-errors";
 import { track } from "@/lib/track/client";
 import { paymentTerms } from "@/lib/checkout/payment-terms";
+import { computeShipping } from "@/lib/shipping";
 import AddressStep from "./AddressStep";
 import PaymentStep from "./PaymentStep";
 import OrderSummary from "./OrderSummary";
@@ -17,7 +18,7 @@ import { emptyForm, applyAddress, addressValid } from "./checkoutModel";
 
 const STEPS = ["Address", "Review", "Payment"];
 
-export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeName = "Store", logo = null, policies = [], shippingConfig: pageShippingConfig, paymentConfig = null }) {
+export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeName = "Store", logo = null, policies = [], shippingConfig: pageShippingConfig, paymentConfig = null, timeZone }) {
   const [step, setStep] = useState(0);
   // P1-RATES: the cart and rates this page prices with. They start as the
   // page's and are replaced by the server's when it refuses a total that has
@@ -55,7 +56,9 @@ export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeNam
   // COD hidden here (zone or limit) → paying online is the method
   const chosen = method === "cod" && !terms.cod.available ? "razorpay" : method;
   const selected = chosen === "cod" ? terms.cod : terms.prepaid;
-  const shipping = { total: selected.shipping, codFee: chosen === "cod" ? terms.cod.fee : 0 };
+  // Phase 8 line 1: the store's delivery estimate for this PIN (lib/shipping.js), shown in the summary
+  const estimate = computeShipping({ subtotal: 0, pincode: form.pincode || null, config: shippingConfig ?? undefined }).estimate ?? null;
+  const shipping = { total: selected.shipping, codFee: chosen === "cod" ? terms.cod.fee : 0, estimate };
   const grandTotal = selected.total;
 
   const eventItems = () =>
@@ -268,7 +271,7 @@ export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeNam
         </div>
 
         {/* sticky order summary — mirrors the cart drawer exactly */}
-        <OrderSummary cart={cart} shipping={shipping} grandTotal={grandTotal} paymentDiscount={chosen === "cod" ? 0 : terms.prepaid.discount} />
+        <OrderSummary cart={cart} shipping={shipping} grandTotal={grandTotal} paymentDiscount={chosen === "cod" ? 0 : terms.prepaid.discount} timeZone={timeZone} />
       </div>
       {otp && (
         <CodOtpDialog

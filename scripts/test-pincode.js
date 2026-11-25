@@ -279,6 +279,30 @@ await t("settings: dispatch 0–10 and delivery 1–30 are the limits", () => {
   }
 });
 
+await t("codForPin is checkout's COD rule: zone off → false; closed, no link secret or an SMS code it can't send → null; else true", async () => {
+  const { codForPin, paymentTerms } = await import("../lib/checkout/payment-terms.js");
+  const ship = { flatRate: 79, freeThreshold: 999, codFee: 49, zones: [{ label: "Isles", prefixes: ["74", "68"], cod: false }, { label: "North", prefixes: ["11"] }] };
+  const shippingConfig = validateShippingConfig(ship).value;
+  const pins = ["744101", "682001", "110001", "560001"];
+  const pays = [null, { cod: { otp: "off", maxTotal: 500 } }, { cod: { otp: "always", otpChannel: "sms" } }, { cod: { otp: "above", otpAbove: 2000, otpChannel: "sms" } }, { cod: { otp: "always", otpChannel: "email" } }];
+  for (const pin of pins)
+    for (const paymentConfig of pays)
+      for (const smsAvailable of [true, false])
+        for (const storeOpen of [true, false])
+          for (const linkSecret of [true, false]) {
+            const got = codForPin({ shippingConfig, paymentConfig, pincode: pin, smsAvailable, storeOpen, linkSecret });
+            const zoneOff = pin.startsWith("74") || pin.startsWith("68");
+            const smsBlocked = paymentConfig?.cod?.otp === "always" && paymentConfig.cod.otpChannel === "sms" && !smsAvailable;
+            eq(got, zoneOff ? false : !storeOpen || !linkSecret || smsBlocked ? null : true, `${pin} ${JSON.stringify(paymentConfig)} sms=${smsAvailable} open=${storeOpen} link=${linkSecret}:`);
+            // whenever the product page says yes, checkout offers COD for a small cart there
+            if (got === true) {
+              const cart = { subtotal: 100, discountTotal: 0, total: 100, currency: "INR" };
+              ok(paymentTerms({ cart, shippingConfig, paymentConfig, pincode: pin, smsAvailable }).cod.available, `PDP yes, checkout no: ${pin} ${JSON.stringify(paymentConfig)}`);
+            }
+            if (got === false) ok(!paymentTerms({ cart: { subtotal: 100, discountTotal: 0, total: 100 }, shippingConfig, paymentConfig, pincode: pin, smsAvailable }).cod.available, `PDP no, checkout yes: ${pin}`);
+          }
+});
+
 // ---- 3. checkout fill rule --------------------------------------------------------
 console.log("— checkout fill rule");
 
@@ -307,6 +331,18 @@ const sA = await F.makeTenant({ name: "pin-a", mode: "documents", products: 1, c
 const sB = await F.makeTenant({ name: "pin-b", mode: "documents", products: 1, config: { shipping_config: SHIP_B, timezone: "Asia/Kolkata" } });
 const sC = await F.makeTenant({ name: "pin-c", mode: "documents", products: 1 });
 for (const s of [sA, sB, sC]) F.assertLocalDbUrl(s.tenant.dbUrl);
+// open A and B (a store that never published takes no orders, so C offers no COD)
+for (const s of [sA, sB]) {
+  const c = s.client();
+  const now = new Date().toISOString();
+  const { emptyList } = await import("../lib/documents/release-list.js");
+  const Reg = await import("../lib/registry/index.js");
+  const types = Reg.singletonTypes();
+  const list = emptyList(Math.max(1, ...types.map((x) => Reg.documentType(x).sinceManifest || 1)), types);
+  await c.execute({ sql: "INSERT INTO releases (id, content, content_hash, note, created_at, published_at) VALUES ('rel_open', ?, 'h', 'open', ?, ?)", args: [JSON.stringify(list), now, now] });
+  await c.execute({ sql: "INSERT OR REPLACE INTO release_state (id, live_release_id, updated_at) VALUES (1, 'rel_open', ?)", args: [now] });
+  c.close();
+}
 const { NextRequest } = await import("./support/next-server-stub.js");
 const route = await import("../app/api/pincode/route.js");
 setPincodeProvider(fixture);
@@ -325,7 +361,7 @@ await t("route: runtime nodejs, and only this store's rates shape the answer", a
   const b = await get(sB.tenant.domains[0], "560001");
   eq(b.body, { found: true, city: "Bengaluru", state: "Karnataka", estimate: { minDays: 12, maxDays: 17 }, cod: false, freeThreshold: 7777, timeZone: "Asia/Kolkata" }, "store B:");
   const c = await get(sC.tenant.domains[0], "560001");
-  eq([c.body.estimate, c.body.cod], [null, true], "a store with no delivery days shows no estimate:");
+  eq([c.body.estimate, c.body.cod], [null, null], "a store with no delivery days shows no estimate; a closed store says nothing about COD:");
   // and A again after B, so nothing B set lingers
   eq((await get(sA.tenant.domains[0], "560001")).body, a.body, "A after B:");
   eq((await get(sA.tenant.domains[0], "999999")).body.found, false, "unknown pin on A:");

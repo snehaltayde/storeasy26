@@ -3,10 +3,13 @@
 // Phase 8 step 0: the sticky order summary, split out of CheckoutFlow.
 // Stateless: it shows the cart and the shipping CheckoutFlow priced.
 import { formatMoney } from "@/lib/format";
+import DeliveryEstimate from "./DeliveryEstimate";
 
 // Phase 8 line 2: `paymentDiscount` is the quote's prepaid discount, shown when
 // paying online is the chosen method.
-export default function OrderSummary({ cart, shipping, grandTotal, paymentDiscount = 0 }) {
+// Phase 8 line 1: `shipping.estimate` and the store's `timeZone` give the
+// "Delivery by …" line under the total (nothing when the store set no days).
+export default function OrderSummary({ cart, shipping, grandTotal, paymentDiscount = 0, timeZone }) {
   return (
     <aside className="h-fit rounded-sf-card border border-sf-border p-5 lg:sticky lg:top-6">
       <h3 className="mb-3 text-sm font-bold">Order summary</h3>
@@ -56,6 +59,7 @@ export default function OrderSummary({ cart, shipping, grandTotal, paymentDiscou
           You save {formatMoney(cart.discountTotal + paymentDiscount, cart.currency)}
         </p>
       )}
+      <DeliveryEstimate estimate={shipping.estimate} timeZone={timeZone} className="mt-3 border-t border-sf-border-soft pt-3" />
     </aside>
   );
 }
