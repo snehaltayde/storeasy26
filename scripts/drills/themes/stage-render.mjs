@@ -17,6 +17,12 @@ import { ROLES_PROFILE } from "../../seed-roles-store.js";
 import { ORIGIN, open, signIn, stage, state } from "./lib.mjs";
 import { CONSENT_COOKIE, serializeConsent } from "../../../lib/track/names.js";
 
+// The roles store's fixture products point at cdn.shopify.com pictures that don't exist, so Next's
+// image route answers 404 and the console check would fail on a missing picture, not on the theme.
+// Serve a 1x1 gif for them; nothing this stage checks is about the pictures.
+const GIF = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
+const stubImages = (ctx) => ctx.route("**/_next/image**", (route) => route.fulfill({ status: 200, contentType: "image/gif", body: GIF }));
+
 const AURORA_TEXT = readFileSync(join(ROOT, "scripts/fixtures/themes/aurora.theme.json"), "utf8");
 const AURORA = JSON.parse(AURORA_TEXT);
 const PKG_ID = "thm_d1d1d1d1d1d1d1d1";
@@ -53,6 +59,7 @@ stage("render", async (drill) => {
   drill.check(typeof handle === "string" && handle.length > 0, "the roles store has a product to open", rows);
 
   const owner = await signIn(drill, "owner");
+  await stubImages(owner.context());
   await open(owner, "/admin");
   let home = (await docsApi(owner, { getDocument: "doc_home" })).body?.document ?? null;
   if (!home) {
@@ -80,6 +87,7 @@ stage("render", async (drill) => {
   // --- the anonymous shopper: a fresh context with no cookies ---
   const ctx = await drill.browser.newContext({ viewport: { width: 1280, height: 900 } });
   // the shopper has already answered the cookie banner (declined), so it doesn't cover the cart's Checkout link
+  await stubImages(ctx);
   await ctx.addCookies([{ name: CONSENT_COOKIE, value: encodeURIComponent(serializeConsent({ analytics: false, marketing: false })), url: ORIGIN }]);
   ctx.setDefaultTimeout(30_000);
   const anon = await ctx.newPage();
