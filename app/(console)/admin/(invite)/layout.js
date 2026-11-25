@@ -1,22 +1,19 @@
-import { siteName } from "@/lib/site";
-import { tfetch } from "@/lib/console-request";
 import { consoleNotices } from "@/lib/admin/notices";
 import { ConsoleNotices } from "@/components/admin/shell/ConsoleNotices";
 
-// Accepting an invite (Phase 1 line 9 polish): new UI on components/ui, in
-// the same flat 640px column as /signup, the signup handoff and the sign-in
-// pages (admin/(auth)/layout.js), headed by the store's name. The incident
-// notices show above it.
+// Accepting an invite (Phase 1 line 9; the sign-in frame since Phase 2 line
+// 11): the same centred 384px column as the sign-in pages
+// (admin/(auth)/layout.js); the page draws its lockup and card
+// (components/admin/auth/AuthFrame.js). The incident notices show above it.
 export default async function AdminInviteLayout({ children }) {
   // no member on this page, so incidents only: never the support-access banner (Phase 2 line 7)
-  const [name, notices] = await Promise.all([tfetch(() => siteName()).catch(() => null), consoleNotices()]);
+  const notices = await consoleNotices();
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-[640px] flex-col px-4 pt-8 pb-16 text-sm text-foreground md:px-6 md:pt-16">
-      <ConsoleNotices {...notices} className="mb-8 space-y-2" />
-      <p className="mb-12 truncate text-base font-semibold tracking-[-0.01em]" title={name || undefined}>
-        {name || "Your store"}
-      </p>
-      {children}
+    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12 text-sm text-foreground">
+      <div className="w-full max-w-sm">
+        <ConsoleNotices {...notices} className="mb-6 space-y-2" />
+        {children}
+      </div>
     </main>
   );
 }

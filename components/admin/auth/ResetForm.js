@@ -10,8 +10,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AuthFrame, StoreName } from "@/components/admin/auth/AuthFrame";
 
-export default function ResetForm({ token }) {
+export default function ResetForm({ token, storeName = null }) {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
@@ -36,32 +37,32 @@ export default function ResetForm({ token }) {
       return;
     }
     const data = res ? await res.json().catch(() => ({})) : {};
-    setError(data.error || (res ? `Reset failed (${res.status})` : "We couldn't reach your store. Check your connection, then try again."));
+    setError(data.error || (res ? "We couldn't set your password. Try again in a moment." : "We couldn't reach your store. Check your connection, then try again."));
     setBusy(false);
   }
 
   if (done) {
     return (
-      <section data-auth="reset-done" role="status" className="space-y-3">
-        <CircleCheck aria-hidden className="size-6 text-success" />
-        <h1 className="text-[1.75rem] leading-tight font-semibold tracking-[-0.01em]">Password updated</h1>
-        <p className="text-muted-foreground">All your other sessions are signed out. Taking you to the sign-in page…</p>
-      </section>
+      <AuthFrame data-auth="reset-done" role="status" title="Password updated" intro={<StoreName name={storeName} />}>
+        <div className="flex items-start gap-3 py-2">
+          <CircleCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-success" />
+          <p className="text-muted-foreground">All your other sessions are signed out. Taking you to the sign-in page…</p>
+        </div>
+      </AuthFrame>
     );
   }
 
   return (
-    <section data-auth="reset" className="space-y-8">
-      <h1 className="text-[1.75rem] leading-tight font-semibold tracking-[-0.01em]">Choose a new password</h1>
-      <form onSubmit={submit} className="space-y-6">
-        <div className="space-y-2">
+    <AuthFrame data-auth="reset" title="Choose a new password" intro={<StoreName name={storeName} />}>
+      <form onSubmit={submit} className="space-y-5 py-2">
+        <div className="space-y-1.5">
           <Label htmlFor="reset-pw">New password</Label>
           <Input id="reset-pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus autoComplete="new-password" required aria-describedby="reset-pw-hint" className="h-10" />
           <p id="reset-pw-hint" className="text-[0.8125rem] text-muted-foreground">
             At least 8 characters.
           </p>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <Label htmlFor="reset-pw2">Confirm password</Label>
           <Input id="reset-pw2" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" required className="h-10" />
         </div>
@@ -71,13 +72,13 @@ export default function ResetForm({ token }) {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-        <div className="border-t border-border pt-8">
-          <Button type="submit" size="lg" disabled={busy} className="h-10 w-full px-4 sm:w-auto">
+        <div className="pt-1">
+          <Button type="submit" size="lg" disabled={busy} className="h-10 w-full">
             {busy && <LoaderCircle aria-hidden className="motion-safe:animate-spin" />}
             Set password
           </Button>
         </div>
       </form>
-    </section>
+    </AuthFrame>
   );
 }

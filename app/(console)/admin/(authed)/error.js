@@ -10,7 +10,7 @@ export default function AdminError({ error, reset }) {
   return (
     <div role="alert" data-console-error="" className="mx-auto max-w-xl rounded-card border border-border bg-card p-6 shadow-card">
       <TriangleAlert aria-hidden className="size-5 text-destructive" />
-      <p className="mt-3 text-base font-semibold text-foreground">This page hit an error</p>
+      <h1 className="mt-3 text-base font-semibold text-foreground">This page hit an error</h1>
       <p className="mt-1 text-sm text-muted-foreground">Nothing was saved. If it keeps happening, Settings → Help has the diagnostics.</p>
       {error?.digest && <p className="mt-2 font-mono text-xs text-muted-foreground">{`Reference: ${error.digest}`}</p>}
       <Button size="sm" variant="outline" className="mt-4" onClick={() => reset?.()} data-read-control="">

@@ -35,7 +35,8 @@ these parts.
   controls use IconButton (label required). No unicode glyphs as controls.
 - **Status chips**: StatusBadge over the one map in `status.js`; humanized
   label, raw status kept on `title`.
-- **Type ramp**: page title 24px semibold (PageHeader), section 14px
+- **Type ramp**: page title 24px semibold (each old screen's own h1; the old
+  PageHeader is gone, the new one is `components/kit/page-header.js`), section 14px
   semibold (CardHeader), body 14px, supporting 12px, chips 11px medium.
 - **Motion** behind `motion-safe:`; focus via the shared `focus-ring`
   utility on every interactive element.

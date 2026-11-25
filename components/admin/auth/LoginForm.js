@@ -1,7 +1,7 @@
 "use client";
 
 // Sign in to the store's console (S26; on components/ui since Phase 2 line 11,
-// in the accept-invite and signup screens' column and words). Email and
+// in the operator sign-in's shape: a lockup above one 384px card, AuthFrame). Email and
 // password; leaving the email empty falls back to the store's setup password,
 // which the server accepts only while the store has no member accounts. The
 // lockout and every refusal are the server's (POST /api/admin/login): this
@@ -14,8 +14,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AuthFrame, StoreName } from "@/components/admin/auth/AuthFrame";
 
-export default function LoginForm() {
+export default function LoginForm({ storeName = null }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -39,7 +40,7 @@ export default function LoginForm() {
       return;
     }
     const data = res ? await res.json().catch(() => ({})) : {};
-    setError(data.error || (res ? `Sign-in failed (${res.status})` : "We couldn't reach your store. Check your connection, then try again."));
+    setError(data.error || (res ? "We couldn't sign you in. Try again in a moment." : "We couldn't reach your store. Check your connection, then try again."));
     setBusy(false);
   }
 
@@ -61,20 +62,16 @@ export default function LoginForm() {
   }
 
   return (
-    <section data-auth="login" className="space-y-8">
-      <div className="space-y-3">
-        <h1 className="text-[1.75rem] leading-tight font-semibold tracking-[-0.01em]">Sign in</h1>
-        <p className="text-muted-foreground">Orders, offers, your storefront and settings.</p>
-      </div>
-      <form onSubmit={submit} className="space-y-6">
-        <div className="space-y-2">
+    <AuthFrame data-auth="login" title="Sign in" intro={<StoreName name={storeName} />}>
+      <form onSubmit={submit} className="space-y-5 py-2">
+        <div className="space-y-1.5">
           <Label htmlFor="login-email">Email</Label>
           <Input id="login-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus autoComplete="username" autoCapitalize="none" spellCheck={false} aria-describedby="login-email-hint" className="h-10" />
           <p id="login-email-hint" className="text-[0.8125rem] text-muted-foreground">
             No account email yet? Leave it empty to use the setup password.
           </p>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <Label htmlFor="login-password">Password</Label>
           <Input id="login-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required className="h-10" />
         </div>
@@ -90,16 +87,18 @@ export default function LoginForm() {
             <AlertDescription className="text-info">{notice}</AlertDescription>
           </Alert>
         )}
-        <div className="flex flex-col gap-3 border-t border-border pt-8 sm:flex-row sm:items-center">
-          <Button type="submit" size="lg" disabled={busy || !password} className="h-10 w-full px-4 sm:w-auto">
+        <div className="space-y-2 pt-1">
+          <Button type="submit" size="lg" disabled={busy || !password} className="h-10 w-full">
             {busy && <LoaderCircle aria-hidden className="motion-safe:animate-spin" />}
             Sign in
           </Button>
-          <Button type="button" variant="link" onClick={forgot} disabled={busy} className="h-10 px-0 text-muted-foreground sm:ml-auto">
-            Forgot password?
-          </Button>
+          <div className="flex justify-center">
+            <Button type="button" variant="link" onClick={forgot} disabled={busy} className="h-10 px-2 text-muted-foreground">
+              Forgot password?
+            </Button>
+          </div>
         </div>
       </form>
-    </section>
+    </AuthFrame>
   );
 }

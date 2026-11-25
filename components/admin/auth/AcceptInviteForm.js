@@ -5,8 +5,8 @@
 // show the store and the invited email; an existing Storeasy account signs in
 // with its current password (a wrong one leaves the invite usable), a new one
 // chooses a name and password. Then /admin, which leads a new owner to
-// /admin/onboarding. Built on components/ui in the signup screens' words and
-// shapes (data-invite="<state>": reading, unusable, new, existing).
+// /admin/onboarding. Built on components/ui in the sign-in frame (AuthFrame:
+// a lockup above one 384px card) (data-invite="<state>": reading, unusable, new, existing).
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, CircleAlert, Eye, EyeOff, LoaderCircle, Mail } from "lucide-react";
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/components/ui/utils";
+import { AuthFrame } from "@/components/admin/auth/AuthFrame";
 
 const OFFLINE = "We couldn't reach your store. Check your connection, then try again. Your invitation still works.";
 const THROTTLED = "Too many tries. Wait up to 15 minutes, then try again. Your invitation still works.";
@@ -21,7 +22,7 @@ const LOGIN = "/admin/login";
 
 function Field({ id, label, hint, error, children }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       <label htmlFor={id} className="block text-sm font-medium">
         {label}
       </label>
@@ -170,34 +171,34 @@ export default function AcceptInviteForm({ token, storeName }) {
 
   if (peekError) {
     return (
-      <section data-invite="unusable" role="alert" className="space-y-6">
-        <div className="space-y-3">
-          <h1 ref={headingRef} tabIndex={-1} className="text-[1.75rem] leading-tight font-semibold tracking-[-0.01em] outline-none">
-            This invitation can&apos;t be used
-          </h1>
+      <AuthFrame data-invite="unusable" role="alert" title="This invitation can't be used" headingRef={headingRef}>
+        <div className="space-y-4 py-2">
           <p className="text-muted-foreground">{peekError}</p>
+          <Button asChild variant="outline" className="h-10 w-full">
+            <a href={LOGIN}>Go to the sign-in page</a>
+          </Button>
         </div>
-        <Button asChild variant="outline" size="lg" className="h-10 px-4">
-          <a href={LOGIN}>Go to the sign-in page</a>
-        </Button>
-      </section>
+      </AuthFrame>
     );
   }
   if (!invite) {
     return (
-      <section data-invite="reading" aria-busy="true" aria-label="Reading your invitation" className="space-y-8">
-        <div className="space-y-3">
-          <Skeleton className="h-9 w-2/3" />
-          <Skeleton className="h-5 w-1/2" />
+      <section data-invite="reading" aria-busy="true" aria-label="Reading your invitation" className="space-y-6">
+        <div className="flex items-start gap-3">
+          <Skeleton className="size-8 shrink-0" />
+          <div className="flex-1 space-y-2 pt-1">
+            <Skeleton className="h-6 w-2/3" />
+            <Skeleton className="h-4 w-full" />
+          </div>
         </div>
-        <div className="space-y-6">
+        <div className="space-y-5 rounded-card border border-border bg-card p-6 shadow-card">
           {[0, 1].map((i) => (
-            <div key={i} className="space-y-2">
+            <div key={i} className="space-y-1.5">
               <Skeleton className="h-4 w-28" />
               <Skeleton className="h-10 w-full" />
             </div>
           ))}
-          <Skeleton className="h-10 w-44" />
+          <Skeleton className="h-10 w-full" />
         </div>
       </section>
     );
@@ -207,77 +208,98 @@ export default function AcceptInviteForm({ token, storeName }) {
   const pwNotEmail = password.length > 0 && password.trim().toLowerCase() !== invite.email.trim().toLowerCase();
 
   return (
-    <section data-invite={existing ? "existing" : "new"} className="space-y-8">
-      <div className="space-y-3">
-        <h1 className="text-[1.75rem] leading-tight font-semibold tracking-[-0.01em] break-words">Join {store}</h1>
-        <p className="text-muted-foreground">{existing ? "You already have a Storeasy account. Sign in with it to add this store to it." : "You've been invited to run this store's console. Choose a password to accept."}</p>
-        <p className="inline-flex max-w-full items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
+    <AuthFrame
+      data-invite={existing ? "existing" : "new"}
+      title={`Join ${store}`}
+      intro={existing ? "You already have a Storeasy account. Sign in with it to add this store to it." : "You've been invited to run this store's console. Choose a password to accept."}
+    >
+      <div className="space-y-5 py-2">
+        <p className="flex min-w-0 items-center gap-2 border-b border-border pb-4">
           <Mail aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-          <span className="text-muted-foreground">Invited as</span>
+          <span className="shrink-0 text-muted-foreground">Invited as</span>
           <span className="min-w-0 truncate font-medium" title={invite.email}>
             {invite.email}
           </span>
         </p>
-      </div>
 
-      {formError && (
-        <div role="alert" className="flex items-start gap-3 rounded-card border border-destructive/30 bg-destructive/5 p-3">
-          <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
-          <p className="min-w-0 text-destructive">{formError}</p>
-        </div>
-      )}
-
-      <form onSubmit={submit} noValidate className="space-y-8">
-        {existing ? (
-          <Field
-            id="inv-pw"
-            label="Your Storeasy password"
-            error={errors.password}
-            hint={
-              <>
-                Forgot it? On the{" "}
-                <a href={LOGIN} className="font-medium text-primary underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
-                  sign-in page
-                </a>
-                , type {invite.email} and choose “Forgot password?”. Then open this invitation again.
-              </>
-            }
-          >
-            <PasswordInput id="inv-pw" value={password} onChange={(e) => (setPassword(e.target.value), errors.password && setErrors({}))} show={show} onToggle={() => setShow((v) => !v)} autoComplete="current-password" error={errors.password} hint autoFocus />
-          </Field>
-        ) : (
-          <fieldset className="space-y-6">
-            <legend className="sr-only">Your account</legend>
-            <Field id="inv-name" label="Your name">
-              <Input id="inv-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" maxLength={80} autoFocus className="h-10" />
-            </Field>
-            <Field
-              id="inv-pw"
-              label="Password"
-              error={errors.password}
-              hint={
-                <ul className="space-y-1" aria-label="Your password needs">
-                  <Rule met={pwLong}>At least 8 characters</Rule>
-                  <Rule met={pwNotEmail}>Not the same as your email</Rule>
-                </ul>
-              }
-            >
-              <PasswordInput id="inv-pw" value={password} onChange={(e) => (setPassword(e.target.value), errors.password && setErrors({}))} show={show} onToggle={() => setShow((v) => !v)} autoComplete="new-password" error={errors.password} hint />
-            </Field>
-            <Field id="inv-pw2" label="Confirm password" error={errors.confirm}>
-              <PasswordInput id="inv-pw2" value={confirm} onChange={(e) => (setConfirm(e.target.value), errors.confirm && setErrors({}))} show={show} autoComplete="new-password" error={errors.confirm} />
-            </Field>
-          </fieldset>
+        {formError && (
+          <div role="alert" className="flex items-start gap-3 rounded-card border border-destructive/30 bg-destructive/5 p-3">
+            <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
+            <p className="min-w-0 text-destructive">{formError}</p>
+          </div>
         )}
 
-        <div className="space-y-3 border-t border-border pt-8">
-          <Button type="submit" size="lg" disabled={busy} className="h-10 w-full px-4 sm:w-auto">
-            {busy && <LoaderCircle aria-hidden className="motion-safe:animate-spin" />}
-            {busy ? "Accepting…" : "Accept invitation"}
-          </Button>
-          <p className="text-[0.8125rem] text-muted-foreground">{existing ? "Your password and your other stores stay as they are." : "You'll use this email and password to sign in to the store's console."}</p>
-        </div>
-      </form>
-    </section>
+        <form onSubmit={submit} noValidate className="space-y-5">
+          {existing ? (
+            <Field
+              id="inv-pw"
+              label="Your Storeasy password"
+              error={errors.password}
+              hint={
+                <>
+                  Forgot it? On the{" "}
+                  <a href={LOGIN} className="font-medium text-primary underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
+                    sign-in page
+                  </a>
+                  , type {invite.email} and choose “Forgot password?”. Then open this invitation again.
+                </>
+              }
+            >
+              <PasswordInput
+                id="inv-pw"
+                value={password}
+                onChange={(e) => (setPassword(e.target.value), errors.password && setErrors({}))}
+                show={show}
+                onToggle={() => setShow((v) => !v)}
+                autoComplete="current-password"
+                error={errors.password}
+                hint
+                autoFocus
+              />
+            </Field>
+          ) : (
+            <fieldset className="space-y-5">
+              <legend className="sr-only">Your account</legend>
+              <Field id="inv-name" label="Your name">
+                <Input id="inv-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" maxLength={80} autoFocus className="h-10" />
+              </Field>
+              <Field
+                id="inv-pw"
+                label="Password"
+                error={errors.password}
+                hint={
+                  <ul className="space-y-1" aria-label="Your password needs">
+                    <Rule met={pwLong}>At least 8 characters</Rule>
+                    <Rule met={pwNotEmail}>Not the same as your email</Rule>
+                  </ul>
+                }
+              >
+                <PasswordInput
+                  id="inv-pw"
+                  value={password}
+                  onChange={(e) => (setPassword(e.target.value), errors.password && setErrors({}))}
+                  show={show}
+                  onToggle={() => setShow((v) => !v)}
+                  autoComplete="new-password"
+                  error={errors.password}
+                  hint
+                />
+              </Field>
+              <Field id="inv-pw2" label="Confirm password" error={errors.confirm}>
+                <PasswordInput id="inv-pw2" value={confirm} onChange={(e) => (setConfirm(e.target.value), errors.confirm && setErrors({}))} show={show} autoComplete="new-password" error={errors.confirm} />
+              </Field>
+            </fieldset>
+          )}
+
+          <div className="space-y-2 pt-1">
+            <Button type="submit" size="lg" disabled={busy} className="h-10 w-full">
+              {busy && <LoaderCircle aria-hidden className="motion-safe:animate-spin" />}
+              {busy ? "Accepting…" : "Accept invitation"}
+            </Button>
+            <p className="text-[0.8125rem] text-muted-foreground">{existing ? "Your password and your other stores stay as they are." : "You'll use this email and password to sign in to the store's console."}</p>
+          </div>
+        </form>
+      </div>
+    </AuthFrame>
   );
 }

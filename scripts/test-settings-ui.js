@@ -16,7 +16,8 @@
 //      a shipping save reaches the anonymous shopper's cart total; the audit
 //      log pages, filters and never shows a secret value
 //   6. the screens' markup as the admin, from the props the pages hand them:
-//      no secret value, secret fields write-only
+//      no secret value, secret fields write-only; Shipping's starter-rates
+//      notice and its Keep these rates save
 // File databases only; outside services blanked, the network blocked.
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
@@ -340,7 +341,6 @@ const STUBS = {
   "next/navigation": { useRouter: () => ({ push() {}, replace() {}, refresh() {} }), usePathname: () => globalThis.__setuiPath || "/admin/settings/checkout", useSearchParams: () => new URLSearchParams("from=onboarding") },
   "next/link": { __esModule: true, default: ({ href, children, prefetch, ...p }) => React.createElement("a", { href, ...p }, children) },
 };
-const cache = new Map();
 const resolveLocal = (id) => [`${id.slice(2)}.js`, id.slice(2)].find((c) => {
   try {
     readFileSync(join(ROOT, c));
@@ -349,24 +349,29 @@ const resolveLocal = (id) => [`${id.slice(2)}.js`, id.slice(2)].find((c) => {
     return false;
   }
 });
-async function load(relPath) {
-  const file = join(ROOT, relPath);
-  if (cache.has(file)) return cache.get(file);
-  const out = (await swc.transform(readFileSync(file, "utf8"), { filename: file, jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } }, target: "es2022" }, module: { type: "commonjs" } })).code;
-  const deps = new Map();
-  for (const [, , id] of out.matchAll(/require\((["'])([^"']+)\1\)/g)) {
-    if (deps.has(id)) continue;
-    if (STUBS[id]) deps.set(id, STUBS[id]);
-    else if (/^@\/(components\/(ui|kit|admin\/(settings|offers|integrations|billing|onboarding\/BackToOnboarding))|lib)(\/|$)/.test(id)) deps.set(id, await load(resolveLocal(id)));
-    else if (id.startsWith("./") || id.startsWith("../")) deps.set(id, await load(join(dirname(relPath), id).replace(/(\.js)?$/, ".js")));
-    else if (id.startsWith("@/")) throw new Error(`${relPath} imports ${id}`);
-    else deps.set(id, require(id));
-  }
-  const mod = { exports: {} };
-  new Function("require", "module", "exports", out)((id) => deps.get(id), mod, mod.exports);
-  cache.set(file, mod.exports);
-  return mod.exports;
+// one module world per set of stubs (the click test below swaps React's hooks)
+function loader(stubs) {
+  const cache = new Map();
+  return async function load(relPath) {
+    const file = join(ROOT, relPath);
+    if (cache.has(file)) return cache.get(file);
+    const out = (await swc.transform(readFileSync(file, "utf8"), { filename: file, jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } }, target: "es2022" }, module: { type: "commonjs" } })).code;
+    const deps = new Map();
+    for (const [, , id] of out.matchAll(/require\((["'])([^"']+)\1\)/g)) {
+      if (deps.has(id)) continue;
+      if (stubs[id]) deps.set(id, stubs[id]);
+      else if (/^@\/(components\/(ui|kit|admin\/(settings|offers|integrations|billing|onboarding\/BackToOnboarding))|lib)(\/|$)/.test(id)) deps.set(id, await load(resolveLocal(id)));
+      else if (id.startsWith("./") || id.startsWith("../")) deps.set(id, await load(join(dirname(relPath), id).replace(/(\.js)?$/, ".js")));
+      else if (id.startsWith("@/")) throw new Error(`${relPath} imports ${id}`);
+      else deps.set(id, require(id));
+    }
+    const mod = { exports: {} };
+    new Function("require", "module", "exports", out)((id) => deps.get(id), mod, mod.exports);
+    cache.set(file, mod.exports);
+    return mod.exports;
+  };
 }
+const load = loader(STUBS);
 const { TooltipProvider } = await load("components/ui/tooltip.js");
 const html = (el) => renderToStaticMarkup(React.createElement(TooltipProvider, null, el));
 const propsOf = (p, name) => adminRuns[p].props.find((x) => x.component.endsWith(`#${name}`)).props;
@@ -391,6 +396,53 @@ await t("the admin's tabs: secret fields are closed (Saved / Replace, no passwor
   ok(!s.includes('id="st-rzp-key-secret"'), "no key secret input until Replace:");
   ok(s.includes(CNY.rzpKeyId), "the key id itself is shown:");
   ok(/Test keys[\s\S]*<\/form>/.test(s) === false, "Test keys sits outside the form:");
+});
+// The Shipping tab's starter-rates notice (Phase 2 line 7; its old test went
+// with the old settings screen in line 11): shown only while the store is on
+// the starter rates, with "Keep these rates" for a role that may write; the
+// button saves the rates shown and only { shipping }.
+const KEEP = "Keep these rates";
+const STARTER_NOTICE = "You haven&#x27;t set your own shipping rates yet";
+await t("Shipping: the starter-rates notice and Keep these rates show only on starter rates, and only to a role that may write", async () => {
+  const { ShippingForm } = await load("components/admin/settings/ShippingForm.js");
+  const base = propsOf("settings/shipping", "ShippingForm");
+  const render = (initial, role = base.role) => html(React.createElement(ShippingForm, { ...base, role, initial: { ...base.initial, ...initial } }));
+  const starter = render({ shipping_is_default: true });
+  ok(starter.includes(STARTER_NOTICE), "the notice on starter rates:");
+  ok(starter.includes("Shoppers pay the starter rates below."), "it says what shoppers pay:");
+  ok(new RegExp(`<button[^>]*type="button"[^>]*>${KEEP}</button>`).test(starter), "Keep these rates is a plain button (not the form's submit):");
+  const own = render({ shipping_is_default: false });
+  ok(!own.includes(STARTER_NOTICE) && !own.includes(KEEP), "no notice and no button on the store's own rates:");
+  const ro = render({ shipping_is_default: true, readOnly: true });
+  ok(ro.includes(STARTER_NOTICE) && !ro.includes(KEEP), "read-only: the notice, never the button:");
+  const live = new RegExp(`<button(?![^>]*\\s(aria-disabled="true"|disabled=""))[^>]*>${KEEP}<`);
+  ok(live.test(starter), "the admin's button is live:");
+  ok(!live.test(render({ shipping_is_default: true }, "staff")), "a role without settings.write never gets a live Keep button:");
+});
+await t("Shipping (clicked): Keep these rates PUTs the rates shown, only { shipping }", async () => {
+  // a one-pass hook shim: state is its initial value; the tree is walked to the button
+  const hooks = { useState: (i) => [typeof i === "function" ? i() : i, () => {}], useEffect() {}, useLayoutEffect() {}, useRef: (v) => ({ current: v }), useMemo: (f) => f(), useCallback: (f) => f, useContext: () => null, useId: () => "id" };
+  const shim = { ...React, ...hooks };
+  shim.default = shim;
+  const loadShim = loader({ ...STUBS, react: shim });
+  const { ShippingForm } = await loadShim("components/admin/settings/ShippingForm.js");
+  const base = propsOf("settings/shipping", "ShippingForm");
+  const initial = { ...base.initial, shipping_is_default: true, shipping: { currency: "INR", basis: "net", flatRate: 79, freeThreshold: 999, codFee: 0, codFeeWaivedAt: null, zones: [] } };
+  // the element whose text is the button's words and that has a click (RoleGate passes it through as its child)
+  const find = (n) => (!n || typeof n !== "object" ? null : Array.isArray(n) ? n.map(find).find(Boolean) || null : !React.isValidElement(n) ? null : n.props.children === KEEP && n.props.onClick ? n : find(n.props.children));
+  const keep = find(ShippingForm({ initial, role: base.role }));
+  ok(keep, "the Keep button is in the tree:");
+  const calls = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url, init) => (calls.push({ url, method: init.method, body: JSON.parse(init.body) }), { ok: true, json: async () => ({ ok: true, settings: { shipping_is_default: false } }) });
+  try {
+    await keep.props.onClick();
+  } finally {
+    globalThis.fetch = real;
+  }
+  eq(calls.map((c) => [c.url, c.method]), [["/api/admin/settings", "PUT"]], "one save:");
+  eq(Object.keys(calls[0].body), ["shipping"], "only shipping is sent:");
+  eq([calls[0].body.shipping.flatRate, calls[0].body.shipping.freeThreshold], ["79", "999"], "the rates shown:");
 });
 await t("the integrations and billing screens hold no secret value; the no-access page is words and one marked link", async () => {
   const { IntegrationsList } = await load("components/admin/integrations/IntegrationsList.js");
