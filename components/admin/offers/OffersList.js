@@ -167,7 +167,7 @@ export function OffersList({ initialOffers, initialNames = {}, currency, timezon
             setOffset(0);
           }}
         >
-          <TabsList aria-label="Offers by state">
+          <TabsList aria-label="Offers by state" data-read-control>
             {TABS.map(([k, label]) => (
               <TabsTrigger key={k} value={k} data-read-control>
                 {label} <span className="ml-1 font-mono text-xs tabular-nums text-muted-foreground">{counts[k]}</span>

@@ -163,6 +163,9 @@ async function supportPass(drill, page, made) {
     const path = new URL(req.url()).pathname;
     if (!["GET", "HEAD"].includes(req.method()) && !READ_POSTS.some((r) => r.method === req.method() && r.path === path)) writes.push(`${req.method()} ${path}`);
   });
+  const errors = [];
+  page.on("console", (m) => m.type() === "error" && errors.push(`${new URL(page.url()).pathname}: ${m.text().slice(0, 300)}`));
+  page.on("pageerror", (e) => errors.push(`${new URL(page.url()).pathname}: ${String(e?.message || e).slice(0, 300)}`));
   const reads = [];
   page.on("request", (req) => READ_POSTS.some((r) => r.path === new URL(req.url()).pathname) && reads.push(req.method()));
   for (const path of ["/admin/offers", made.offer, "/admin/bundles", made.bundle].filter(Boolean)) {
@@ -181,9 +184,14 @@ async function supportPass(drill, page, made) {
     drill.check(reads.includes("POST"), "support: Try it is POST /api/admin/offers/simulate (a listed read)", reads);
   }
   drill.check(writes.length === 0, "support: no non-GET request but the listed reads", writes);
-  const nf = await open(page, "/admin/offers/off_missing");
-  const nb = await open(page, "/admin/bundles/bun-missing");
-  drill.check(nf?.status() === 404 && nb?.status() === 404, "an unknown offer or bundle id is a 404", { offer: nf?.status(), bundle: nb?.status() });
+  drill.check(errors.length === 0, "support: no console error or page error on the four pages", errors);
+  // the route's loading.js streams the page, so the status is already sent: the not-found page says it
+  const missing = [];
+  for (const path of ["/admin/offers/off_missing", "/admin/bundles/bun-missing"]) {
+    await open(page, path);
+    if (!/404 — not found/.test(await page.locator("body").innerText().catch(() => ""))) missing.push(path);
+  }
+  drill.check(missing.length === 0, "an unknown offer or bundle id shows the not-found page", missing);
 }
 
 async function offers(drill) {
