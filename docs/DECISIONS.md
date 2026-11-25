@@ -3,6 +3,15 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Plugin blocks in storefront slots (on the owner's behalf)
+
+- **Schema:** tenant migration `0031_plugin_placements.sql` (table `plugin_placements`), additive.
+- **Rendering:** five slots (PDP under price, under Add to cart, below the fold; order status; above the footer), at most 3 Live blocks each (a fourth is refused on save). Blocks are Storeasy-owned server components (`badge_row`, `notice`) with props validated on save and at render; no plugin JavaScript, no `"use client"`, script, iframe or handlers (tested). The order slot gets only id, status, fulfilment status and created time, after the page's token or sign-in check.
+- **Reads:** one query per request for a page's slots, with no cross-request cache: the tagged data cache didn't clear across runtimes (the drill caught a switched-off block still showing), and the measured cost is about 1 ms per PDP. The kill switch fails closed for rendering: if the flag can't be read, plugin blocks don't render. Installing creates each block Off; uninstalled installs hold no place.
+- **API:** `/api/admin/apps/[id]/blocks` (renamed from the plan's `placements`, which the dead-code guard reserves as a retired word); the Live/Off control is a gated toggle button.
+- **Decided by:** Claude
+- **Slice:** Phase 4 line 2
+
 ## 2026-11-25 Read-only app tokens (on the owner's behalf)
 
 - **Schema:** tenant migration `0033_plugin_tokens.sql`; platform `0019_audit_actor_index.sql`; both additive.
