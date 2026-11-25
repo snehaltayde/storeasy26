@@ -21,12 +21,19 @@ function watch(page, label) {
   page.on("pageerror", (e) => consoleErrors.push(`${label}: ${String(e?.message || e).slice(0, 300)}`));
 }
 
+// Each role signs in once per drill run (the login route allows 5 attempts a
+// window from one address); a later stage's context reuses that session's
+// cookies. Stages close their contexts but never sign out.
+const sessions = new Map(); // role -> storageState
 export async function signIn(drill, role) {
   const m = member(role);
-  const ctx = await drill.browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+  const ctx = await drill.browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, ...(sessions.has(role) ? { storageState: sessions.get(role) } : {}) });
   ctx.setDefaultTimeout(30_000);
-  const res = await ctx.request.post(`${ORIGIN}/api/admin/login`, { data: { email: m.email, password: m.password }, headers: { origin: ORIGIN }, maxRedirects: 0 });
-  if (res.status() !== 200) throw new Error(`sign-in as ${role} answered ${res.status()}`);
+  if (!sessions.has(role)) {
+    const res = await ctx.request.post(`${ORIGIN}/api/admin/login`, { data: { email: m.email, password: m.password }, headers: { origin: ORIGIN }, maxRedirects: 0 });
+    if (res.status() !== 200) throw new Error(`sign-in as ${role} answered ${res.status()}`);
+    sessions.set(role, await ctx.storageState());
+  }
   const page = await ctx.newPage();
   watch(page, role);
   return page;
