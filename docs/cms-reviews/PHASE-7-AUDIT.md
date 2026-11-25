@@ -58,3 +58,7 @@ Date: 2026-11-26. Audited on `main` at `b63aed9d` (Phase 7 lines 1, 2 and 3; `ba
 
 - Real Typesense `multi_search` and price stats (stubbed `fetch` only; in `MANUAL-CHECKS.md`).
 - Browser markup (covered by the Phase 7 `drill:all`).
+
+## Phase 7 browser suite
+
+`drill:all` (2026-11-26, 3,331 s) passed every drill in it, after a clean `pnpm typecheck`, `pnpm test`, migrations and build on the same state. `search` and `mobile-cart` were not yet on the `ALL` list, so the suite did not rerun them; both passed on the complete Phase 7 state in the design sweep's verify (with `sf-styles`). They, and Phase 8's `checkout`, are on `ALL` from now on.
