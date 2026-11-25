@@ -160,7 +160,8 @@ async function addSection(page) {
 
 async function ownerPreview(drill, page) {
   drill.check(await previewShown(page), "owner: the preview shows the page", await page.locator("[data-preview-pane]").getAttribute("data-preview-log"));
-  const frameWidth = () => page.locator("[data-preview-frame]").evaluate((f) => Math.round(f.getBoundingClientRect().width));
+  // the width the page is laid out at (offsetWidth ignores the fit-to-pane scale)
+  const frameWidth = () => page.locator("[data-preview-frame]").evaluate((f) => f.offsetWidth);
   const widths = {};
   for (const d of ["phone", "tablet", "desktop"]) {
     await page.locator(`[data-preview-bar] [data-device="${d}"]`).click();
@@ -168,7 +169,14 @@ async function ownerPreview(drill, page) {
     widths[d] = await frameWidth();
   }
   widths.pane = await page.locator("[data-preview-frame]").evaluate((f) => Math.round(f.parentElement.clientWidth));
-  drill.check(widths.phone === 375 && widths.tablet === 768 && Math.abs(widths.desktop - widths.pane) <= 2, "the widths: the frame is 375 and 768 wide (scrolling in a narrower pane), then the pane's own width on desktop", widths);
+  await page.locator('[data-preview-bar] [data-device="tablet"]').click();
+  await page.waitForTimeout(200);
+  widths.tabletShown = await page.locator("[data-preview-frame]").evaluate((f) => Math.round(f.getBoundingClientRect().width));
+  widths.scaleNote = (await page.locator("[data-preview-scale]").innerText().catch(() => "")).trim();
+  await page.locator('[data-preview-bar] [data-device="desktop"]').click();
+  await page.waitForTimeout(200);
+  const scaledOk = widths.pane >= 768 ? widths.tabletShown === 768 : widths.tabletShown <= widths.pane + 2 && /%$/.test(widths.scaleNote);
+  drill.check(widths.phone === 375 && widths.tablet === 768 && scaledOk && Math.abs(widths.desktop - widths.pane) <= 2, "the widths: the page is laid out 375 and 768 wide (a tablet wider than the pane is scaled to fit, with the scale shown), then the pane's own width on desktop", widths);
   await page.locator('[data-preview-bar] [data-device="phone"]').click();
   await drill.shoot(page, "owner-preview-phone-1280");
   await page.locator('[data-preview-bar] [data-device="desktop"]').click();
