@@ -470,6 +470,8 @@ export const DRILLS = {
   // Phase 3 line 5: support access across hosts (the operator console on
   // localhost, the roles store on roles.localhost); the stray pass reads the
   // roles store's Next log, as drill:shell does
+  // Phase 4: the Apps screens (line 1 stage install; lines 2-4 add stage files)
+  apps: { id: "APPS", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/apps/run.mjs", ...c.headed])) },
   "support-access": { id: "SUPPORT-ACCESS", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/support-access/run.mjs", ...c.headed])) },
   // a founder connects Shopify from onboarding step 1 (Phase 1 line 4 §5 item 14):
   // the roles store plus the Roles Annex; the drill starts the Shopify stand-in
@@ -554,7 +556,9 @@ export const DRILLS = {
 // Phase 2 line 11 (phase end): every merchant console screen's drill joins the block suite
 export const ALL = ["smoke", "p5", "p6", "agency-gone", "shell", "signup", "connect", "operator-onboarding", "operator-create-store", "dashboard", "orders", "catalog", "offers", "media", "editor", "settings", "team", "growth", "quizzes", "console-styles",
   // Phase 3 line 7 (phase end): every operator console screen's drill joins it too (line 5's support-access included)
-  "platform-shell", "platform-stores", "store-lifecycle", "platform-billing", "flags-incidents", "support-access", "platform-ops"];
+  "platform-shell", "platform-stores", "store-lifecycle", "platform-billing", "flags-incidents", "support-access", "platform-ops",
+  // Phase 4
+  "apps"];
 
 const git = (root, args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
 

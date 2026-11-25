@@ -49,6 +49,7 @@ Full columns and types are in the SQL files named below. This page lists each ta
 | `offers`, `bundles` | Discount engine rows; bundles sync a `bundle-<id>` offer | `id` | Deleted by the founder |
 | `customers`, `customer_otps`, `customer_sessions`, `customer_wishlists` | Shopper accounts (email OTP) | `id` | Privacy erasure via `privacy_requests` |
 | `events`, `notifications`, `contact_messages`, `privacy_requests`, `app_errors` | Analytics events, outgoing email, contact form, privacy requests, errors | `id` | Pruned / kept |
+| `plugin_installs` | Installed plugins (Phase 4, 0030): plugin id, version, status `enabled` / `disabled` / `uninstalled`, the scopes the admin approved, plain settings, secret settings encrypted in `secrets_enc` (never sent to a browser); one live install per plugin (a unique partial index) | `id` (`pin_`) | Never deleted: uninstall archives the row |
 
 ### Control-plane database
 

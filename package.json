@@ -196,6 +196,7 @@
     "drill:platform-ops": "node scripts/drills/run-isolated.mjs platform-ops",
     "drill:flags-incidents": "node scripts/drills/run-isolated.mjs flags-incidents",
     "drill:support-access": "node scripts/drills/run-isolated.mjs support-access",
+    "drill:apps": "node scripts/drills/run-isolated.mjs apps",
     "drill:all": "node scripts/drills/run-isolated.mjs all",
     "media:reindex": "node scripts/reindex-document-refs.js",
     "icons:gen": "node scripts/gen-icons.js",
