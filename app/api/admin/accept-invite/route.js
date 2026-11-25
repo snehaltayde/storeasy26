@@ -68,7 +68,9 @@ export const POST = tenantHandler(async (request) => {
   } catch (e) {
     const infra = infraResponse(e, { route: "admin/accept-invite" }); // DOC-04: a database failure is never a 4xx
     if (infra) return NextResponse.json(infra.body, { status: infra.status });
-    return NextResponse.json({ error: String(e?.message || e) }, { status: 400 });
+    // Phase 1 audit (P1-A): the raw error stays in the log, never in the answer
+    slog("admin_invite_rejected", { reason: "error", error: String(e?.message || e).slice(0, 200) });
+    return NextResponse.json({ error: INVALID }, { status: 400 });
   }
   if (user?.throttled) {
     slog("admin_invite_rejected", { reason: "throttled" });
@@ -81,6 +83,10 @@ export const POST = tenantHandler(async (request) => {
   if (user?.wrongPassword) {
     slog("admin_invite_rejected", { reason: "wrong_password" });
     return NextResponse.json({ error: "That isn't the password for your Storeasy account. Try again, or use \"Forgot password\" on the sign-in page.", code: "WRONG_PASSWORD" }, { status: 400 });
+  }
+  if (user?.alreadyMember) {
+    slog("admin_invite_rejected", { reason: "already_member" });
+    return NextResponse.json({ error: "You're already on this store's team. Sign in with your email and password instead.", code: "ALREADY_MEMBER" }, { status: 409 });
   }
   if (user?.passwordProblem) return NextResponse.json({ error: user.passwordProblem }, { status: 400 });
   if (!user) {
