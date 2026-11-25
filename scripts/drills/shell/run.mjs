@@ -196,7 +196,10 @@ const SELFTEST_PAGES = {
   "fake-gate": `<main><button aria-disabled="true" data-role-gate="disabled" onclick="fetch('${SELFTEST}/w',{method:'POST'})">Push</button></main>`,
   "submit-escapes": `<main><form id="f" method="post"></form><button type="button" form="f" data-read-control>A</button><button type="button" formaction="/x" data-read-control>B</button><input type="image" alt="C" data-read-control><form><button type="button" data-read-control>D</button></form></main>`,
   implicit: `<main><form id="q" onsubmit="event.preventDefault();fetch('${SELFTEST}/w',{method:'POST'})"><input name="q"></form></main>`,
-  clean: `<main><form method="get"><input name="q" data-read-control><button type="button" data-read-control>Search</button></form><form><input name="n"><button aria-disabled="true" data-role-gate="disabled" onclick="event.preventDefault()">Save</button></form></main>`,
+  clean: `<main><form method="get"><input name="q" data-read-control><button type="button" data-read-control>Search</button></form><button aria-disabled="true" data-role-gate="disabled" onclick="event.preventDefault()">Save</button></main>`,
+  // a write form whose default submit is gated: Enter can't submit it (its
+  // editable field is still a stray control for support, checked elsewhere)
+  "gated-form": `<main><form onsubmit="fetch('${SELFTEST}/w',{method:'POST'})"><input name="n"><button aria-disabled="true" data-role-gate="disabled" onclick="event.preventDefault()">Save</button></form></main>`,
 };
 async function supportSelfTest(drill, ctx) {
   const page = await ctx.newPage();
@@ -215,6 +218,9 @@ async function supportSelfTest(drill, ctx) {
   drill.check(imp.implicit.length === 1 && imp.writes.some((x) => x.startsWith("POST")), "self-test: a form that submits on Enter is caught (statically and by pressing Enter)", imp);
   const clean = await run("clean");
   drill.check(!clean.unsafe.length && !clean.implicit.length && !clean.revealed.length && !clean.writes.length && !clean.moved.length, "self-test: a GET search and a gated save pass", clean);
+  const gatedForm = await run("gated-form");
+  drill.check(!gatedForm.implicit.length && !gatedForm.writes.length, "self-test: a form whose default submit is gated does not submit on Enter", gatedForm);
+  drill.check(gatedForm.revealed.length === 0 && (await (async () => { await page.goto(`${ORIGIN}${SELFTEST}/gated-form`); return (await page.evaluate(strayControls, [CONTROLS, true])).length; })()) === 1, "self-test: its editable field is still a stray control for support", gatedForm);
   await page.close();
 }
 
