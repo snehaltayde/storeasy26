@@ -377,7 +377,7 @@ await t("data-read-control: never on a submit button or in a non-GET form; outsi
     bad('<form method={m}><input name="q" data-read-control /></form>'),
     bad('<Link href="/admin/orders" data-read-control>Orders</Link>'),
   ], [0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0], "the rule bites (submit, default submit, non-GET form, form=, formAction, type=image, dynamic type, spread, method post, dynamic method):");
-  for (const r of READ_CONTROLS) ok(r && typeof r.path === "string" && typeof r.reason === "string" && r.reason.trim().length >= 10, `read-controls row ${JSON.stringify(r)} needs a path and a reason:`);
+  for (const r of READ_CONTROLS) ok(r && typeof r.path === "string" && typeof r.reason === "string" && r.reason.trim().length >= 10 && Number.isInteger(r.marks) && r.marks > 0, `read-controls row ${JSON.stringify(r)} needs a path, a reason and its number of marks:`);
   const problems = [];
   const files = [...walk("app"), ...walk("components")];
   let marks = 0;
@@ -390,7 +390,10 @@ await t("data-read-control: never on a submit button or in a non-GET form; outsi
       if (r.submits) problems.push(`${f}: a submit control is marked a read: ${r.open}`);
       if (r.postForm) problems.push(`${f}: a marked control sits in a form that is not method="get": ${r.open}`);
     }
-    if (!f.startsWith(`${KIT}/`) && !READ_CONTROLS.some((r) => r.path === f)) problems.push(`${f}: data-read-control outside components/kit/ needs a row in scripts/support/read-controls.js`);
+    const row = READ_CONTROLS.find((r) => r.path === f);
+    if (!f.startsWith(`${KIT}/`) && !row) problems.push(`${f}: data-read-control outside components/kit/ needs a row in scripts/support/read-controls.js`);
+    // a row counts its marks: a new mark in a listed file needs the row (and its reason) updated
+    else if (row && row.marks !== found.length) problems.push(`${f}: ${found.length} data-read-control mark(s), but its read-controls row says ${row.marks}: give the new mark its reason and update the count`);
   }
   ok(marks >= 5, `found ${marks} marks (the kit's own):`);
   for (const r of READ_CONTROLS) ok(files.includes(r.path) && stripComments(read(r.path)).includes("data-read-control"), `${r.path} is listed but marks nothing: remove the row:`);

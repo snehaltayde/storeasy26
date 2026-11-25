@@ -36,6 +36,8 @@ import { ROOT } from "../../design-harness.js";
 import { runDrill, settle } from "../p3/lib.mjs";
 import { navFor, navItems } from "../../../lib/admin/nav.js";
 import { isNewUiRoute } from "../../../lib/admin/new-ui-routes.js";
+import { RANGES, rangeHref } from "../../../lib/admin/dashboard-ranges.js";
+import * as RC from "../../support/read-controls.js";
 
 const DRILL_ID = "SHELL";
 const WIDTHS = [1280, 900, 375];
@@ -76,12 +78,15 @@ const seed = () => JSON.parse(readFileSync(join(ROOT, ".design-data-roles", "rol
 // route, lib/admin/new-ui-routes.js: the rule covers the whole of main). On a
 // new-UI route a control also passes when it carries data-read-control itself
 // (never through an ancestor), is natively disabled, or is RoleGate's
-// (aria-disabled="true" with data-role-gate="disabled").
+// (aria-disabled="true" with data-role-gate="disabled"). Radix's focus
+// guards (an empty span[data-radix-focus-guard] with tabindex="0" around a
+// sheet, select or dialog) are not controls; anything else in a portal is.
 function strayControls([allowed, newUi]) {
-  const q = 'a[href], button, input, select, textarea, [role="menuitem"], [role="link"], [tabindex]:not([tabindex="-1"])';
+  const q = 'a[href], button, input, select, textarea, summary, label[for], [role="button"], [role="menuitem"], [role="link"], [onclick], [tabindex]:not([tabindex="-1"])';
   const passes = (el) => newUi && (el.hasAttribute("data-read-control") || el.disabled === true || (el.getAttribute("aria-disabled") === "true" && el.getAttribute("data-role-gate") === "disabled"));
+  const focusGuard = (el) => el.matches("span[data-radix-focus-guard]") && el.getAttribute("tabindex") === "0" && el.textContent === "" && el.children.length === 0;
   return [...document.querySelectorAll(q)]
-    .filter((el) => (newUi || !el.closest("[data-legacy]")) && !el.closest("[data-nav-item]") && !allowed.some((c) => el.closest(`[data-shell-control="${c}"]`)) && !passes(el))
+    .filter((el) => (newUi || !el.closest("[data-legacy]")) && !el.closest("[data-nav-item]") && !allowed.some((c) => el.closest(`[data-shell-control="${c}"]`)) && !passes(el) && !focusGuard(el))
     .map((el) => `${el.tagName.toLowerCase()}${el.getAttribute("aria-label") ? `[${el.getAttribute("aria-label")}]` : ""} "${(el.innerText || "").trim().slice(0, 40)}"`);
 }
 // In the page (a new-UI route): marked reads that could still write: a
@@ -114,41 +119,57 @@ function implicitSubmits() {
 }
 
 // Support on a new-UI route (and the drill's self-test pages):
-//   - each marked read: click it, then the whole document (portals, menus,
-//     popovers included) may hold no stray control, and no non-GET request
+//   - the page under test is page.url() after loading href, and must be href
+//   - each marked read: click it; when the path is unchanged (a new query
+//     string included) the whole document (portals, menus, popovers) may
+//     hold no stray control
 //   - each RoleGate-disabled control: mouse-click it and press Enter and Space
 //     on it: no non-GET request, no navigation
 //   - each enabled text field: press Enter in it: no non-GET request
+//   - every non-GET request any page of the context sends during the pass
+//     counts (workers, popups and new tabs included; no Referer is trusted),
+//     until the tab navigates to a different path: a read link's destination
+//     gets its own pass. Skipped only: an exact READ_POSTS row
+//     (scripts/support/read-controls.js, a read sent as POST: { page, method,
+//     path, reason }; none yet), and Next's dev error overlay (POST
+//     /__nextjs_*) when the server is a dev server (its page opened the HMR
+//     socket), never against a production build.
 // Returns what it found; the caller checks.
+const READ_POSTS = RC.READ_POSTS ?? [];
+const readPost = (page, method, path) => READ_POSTS.some((r) => r.page === page && r.method === method && r.path === path);
 async function supportNewUiControls(page, href) {
   const writes = [];
   const target = new URL(ORIGIN + href).pathname;
-  // Only a request sent by the page under test counts: its Referer (the
-  // document that sent it; same-origin keeps the full URL under
-  // strict-origin-when-cross-origin) or, without one, the frame's URL. A read
-  // link that leads to another page leaves that page's own requests to its
-  // own pass; a control that writes and then navigates still counts (its
-  // Referer is this page). Next's dev error overlay (POST /__nextjs_*) is
-  // skipped only against a dev server (one whose page opened the HMR socket).
+  const ctx = page.context();
+  let counting = false;
   let devServer = false;
+  const popups = [];
+  const onNavigated = (frame) => {
+    if (frame === page.mainFrame()) counting = new URL(frame.url()).pathname === target;
+  };
   const onSocket = (ws) => {
     if (/\/_next\/webpack-hmr/.test(ws.url())) devServer = true;
   };
   const onRequest = (req) => {
-    if (req.method() === "GET" || req.method() === "HEAD") return;
+    if (!counting || req.method() === "GET" || req.method() === "HEAD") return;
     const path = new URL(req.url()).pathname;
     if (devServer && path.startsWith("/__nextjs")) return;
-    const from = req.headers().referer || req.frame()?.url() || page.url();
-    if (new URL(from, ORIGIN).pathname !== target) return;
+    if (readPost(target, req.method(), path)) return;
     writes.push(`${req.method()} ${path}`);
   };
+  const onPage = (p) => {
+    if (p !== page) popups.push(p);
+  };
+  const found = { at: [], unsafe: [], implicit: [], revealed: [], moved: [], writes, reads: 0, gated: 0, fields: 0 };
   const fresh = async () => {
     await page.goto(ORIGIN + href, { waitUntil: "load" });
     await settle(page);
+    if (page.url() !== ORIGIN + href) found.at.push(page.url());
   };
-  const found = { unsafe: [], implicit: [], revealed: [], moved: [], writes, reads: 0, gated: 0, fields: 0 };
-  page.on("request", onRequest);
+  page.on("framenavigated", onNavigated);
   page.on("websocket", onSocket);
+  ctx.on("request", onRequest);
+  ctx.on("page", onPage);
   try {
     await fresh();
     found.unsafe = await page.evaluate(unsafeReads);
@@ -158,11 +179,12 @@ async function supportNewUiControls(page, href) {
       await fresh();
       const el = page.locator("main [data-read-control]").nth(i);
       if (!(await el.isVisible().catch(() => false)) || (await el.isDisabled().catch(() => true))) continue;
-      const url = page.url();
       await el.click({ timeout: 5000 }).catch(() => {});
       await page.waitForTimeout(500);
-      // a link went to another page: that page gets its own pass; a menu or popover opened here
-      if (page.url() === url) for (const x of await page.evaluate(strayControls, [CONTROLS, true])) found.revealed.push(`after read #${i}: ${x}`);
+      await settle(page);
+      // a link to another path: that page gets its own pass; the same path
+      // (a menu, a popover, or a new ?query) is checked again here
+      if (new URL(page.url()).pathname === target) for (const x of await page.evaluate(strayControls, [CONTROLS, true])) found.revealed.push(`after read #${i} (${page.url().slice(ORIGIN.length)}): ${x}`);
     }
     await fresh();
     found.gated = await page.locator('main [data-role-gate="disabled"]').count();
@@ -193,13 +215,18 @@ async function supportNewUiControls(page, href) {
       await page.keyboard.press("Enter");
       await page.waitForTimeout(500);
     }
+    await page.waitForTimeout(300); // a write sent on the way out still lands in the count
   } finally {
-    page.off("request", onRequest);
+    page.off("framenavigated", onNavigated);
     page.off("websocket", onSocket);
+    ctx.off("request", onRequest);
+    ctx.off("page", onPage);
+    for (const p of popups) await p.close().catch(() => {});
   }
   return found;
 }
 const checkNewUi = (check, href, f) => {
+  check(f.at.length === 0, `${href}: the page under test is ${href} after loading it`, f.at);
   check(f.unsafe.length === 0, `${href}: no marked read control submits a form (submit, image, form=, formaction, a non-GET form)`, f.unsafe);
   check(f.implicit.length === 0, `${href}: no form support can submit with Enter (a text field needs a gated or disabled default submit, or method="get")`, f.implicit);
   check(f.revealed.length === 0, `${href}: clicking support's ${f.reads} marked read(s) reveals no write control anywhere (menus and popovers included)`, f.revealed);
@@ -207,8 +234,14 @@ const checkNewUi = (check, href, f) => {
   check(f.moved.length === 0, `${href}: support's gated controls do not navigate`, f.moved);
 };
 
+// New-UI routes whose query changes what the page shows: support's pass runs
+// on each. Phase 2 lines append their own row.
+const NEW_UI_VARIANTS = {
+  "/admin/dashboard": RANGES.map(rangeHref), // Phase 2 line 1: ?days=7, 30 (the plain page), 90
+};
+
 // The support check's own self-test: one page per escape, served by the drill
-// (page.route), each of which must be caught.
+// (ctx.route, so popups and workers get them too), each of which must be caught.
 const SELFTEST = "/__shell-drill-selftest";
 const SELFTEST_PAGES = {
   menu: `<main><button type="button" data-read-control onclick="document.body.insertAdjacentHTML('beforeend','<div role=menu><button>Delete store</button></div>')">More</button></main>`,
@@ -224,10 +257,19 @@ const SELFTEST_PAGES = {
   "posts-on-load": `<main><p>Landed</p><script>fetch('${SELFTEST}/w',{method:'POST'})</script></main>`,
   // a "read" that POSTs and then navigates away: still this page's write
   "post-then-leave": `<main><button type="button" data-read-control onclick="fetch('${SELFTEST}/w',{method:'POST',keepalive:true});location.href='${SELFTEST}/posts-on-load'">Open</button></main>`,
+  // the same write, each hiding where it came from: none may pass
+  "referrer-origin": `<main><button type="button" data-read-control onclick="fetch('${SELFTEST}/w',{method:'POST',keepalive:true,referrerPolicy:'origin'});location.href='${SELFTEST}/posts-on-load'">Open</button></main>`,
+  "custom-referrer": `<main><button type="button" data-read-control onclick="fetch('${SELFTEST}/w',{method:'POST',keepalive:true,referrer:location.origin+'${SELFTEST}/posts-on-load'});location.href='${SELFTEST}/posts-on-load'">Open</button></main>`,
+  worker: `<main><button type="button" data-read-control onclick="new Worker(URL.createObjectURL(new Blob(['fetch(&quot;'+location.origin+'${SELFTEST}/w&quot;,{method:&quot;POST&quot;})'],{type:'text/javascript'})))">Open</button></main>`,
+  "blank-form": `<main><form id="bf" method="post" action="${SELFTEST}/w" target="_blank"></form><button type="button" data-read-control onclick="document.getElementById('bf').submit()">Open</button></main>`,
+  "window-open": `<main><button type="button" data-read-control onclick="const w=window.open('about:blank','_blank');w.fetch(location.origin+'${SELFTEST}/w',{method:'POST'})">Open</button></main>`,
+  // a Radix portal: its empty focus guards are not controls; a button in it is,
+  // and so is a "guard" with text
+  "radix-portal": `<main><button type="button" data-read-control onclick="document.body.insertAdjacentHTML('beforeend','<div data-radix-portal><span data-radix-focus-guard tabindex=0></span><div role=dialog><button>Delete store</button><span data-radix-focus-guard tabindex=0>x</span></div><span data-radix-focus-guard tabindex=0></span></div>')">More</button></main>`,
 };
 async function supportSelfTest(drill, ctx) {
   const page = await ctx.newPage();
-  await page.route(`${ORIGIN}${SELFTEST}/**`, (route) => {
+  await ctx.route(`${ORIGIN}${SELFTEST}/**`, (route) => {
     const name = new URL(route.request().url()).pathname.split("/").pop();
     return route.fulfill(SELFTEST_PAGES[name] ? { status: 200, contentType: "text/html", body: `<!doctype html><html><body>${SELFTEST_PAGES[name]}</body></html>` } : { status: 204, body: "" });
   });
@@ -248,6 +290,12 @@ async function supportSelfTest(drill, ctx) {
   drill.check(navRead.reads === 1 && navRead.writes.length === 0, "self-test: a read link to a page that POSTs on load passes (that page's request is not this page's)", navRead);
   const leave = await run("post-then-leave");
   drill.check(leave.writes.some((x) => x.startsWith("POST")), "self-test: a control that POSTs before navigating away is caught", leave);
+  for (const [name, how] of [["referrer-origin", "with referrerPolicy origin"], ["custom-referrer", "with a custom referrer"], ["worker", "from a Web Worker"], ["blank-form", "through a target=_blank form"], ["window-open", "from a window.open tab"]]) {
+    const f = await run(name);
+    drill.check(f.writes.some((x) => x.startsWith("POST")), `self-test: a POST ${how} is caught`, f);
+  }
+  const portal = await run("radix-portal");
+  drill.check(portal.revealed.length === 2 && portal.revealed.some((x) => x.includes("Delete store")) && portal.revealed.some((x) => x.includes('span "x"')), "self-test: in a Radix portal a real button (and a focus guard with text) is caught; the empty focus guards are not", portal.revealed);
   drill.check(gatedForm.revealed.length === 0 && (await (async () => { await page.goto(`${ORIGIN}${SELFTEST}/gated-form`); return (await page.evaluate(strayControls, [CONTROLS, true])).length; })()) === 1, "self-test: its editable field is still a stray control for support", gatedForm);
   await page.close();
 }
@@ -392,7 +440,8 @@ async function roleAtWidth(drill, page, role, width, out) {
       const stray = await page.evaluate(strayControls, [CONTROLS, newUi]);
       check(stray.length === 0, `${href}: ${newUi ? "anywhere" : "outside [data-legacy]"} only nav links and shell controls`, stray);
       if (newUi) {
-        checkNewUi(check, href, await supportNewUiControls(page, href));
+        // each variant of the page (a query that changes what it shows) gets its own pass
+        for (const v of NEW_UI_VARIANTS[href] ?? [href]) checkNewUi(check, v, await supportNewUiControls(page, v));
         await page.goto(ORIGIN + href, { waitUntil: "load" });
         await settle(page);
       }

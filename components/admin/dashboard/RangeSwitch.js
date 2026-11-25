@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { cn } from "@/components/ui/utils";
-import { RANGES } from "@/lib/admin/dashboard";
+import { RANGES, rangeHref } from "@/lib/admin/dashboard-ranges";
 
 // The dashboard's date range, 7 / 30 / 90 days through ?days= (30 is the
 // plain /admin/dashboard). Links, so support can use them: each is a read.
-const rangeHref = (days) => (days === 30 ? "/admin/dashboard" : `/admin/dashboard?days=${days}`);
 
 export function RangeSwitch({ days }) {
   return (

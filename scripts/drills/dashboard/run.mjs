@@ -16,7 +16,20 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT } from "../../design-harness.js";
 import { runDrill, settle } from "../p3/lib.mjs";
-import { ROLES_LOGINS } from "../../seed-roles-store.js";
+import { ROLES_LOGINS, ROLES_PROFILE } from "../../seed-roles-store.js";
+import { harnessPorts } from "../../design-harness.js";
+
+// The roles store's own database (this worktree's sqld), for the one row the
+// support pass needs: a failed import, so the sync card and its Run again show.
+async function rolesSql(statements) {
+  const { createClient } = await import("@libsql/client");
+  const c = createClient({ url: `http://127.0.0.1:${harnessPorts(process.env, ROLES_PROFILE).sqld.tenant}` });
+  try {
+    for (const s of statements) await c.execute(s);
+  } finally {
+    c.close();
+  }
+}
 
 const DRILL_ID = "DASHBOARD";
 const WIDTHS = [375, 768, 1280];
@@ -79,6 +92,10 @@ async function owner(drill, page) {
     const current = await page.locator('nav[aria-label="Date range"] a[aria-current="page"]').innerText().catch(() => "");
     const rows = await page.locator('[data-dashboard="chart"] table.sr-only tbody tr').count();
     drill.check(current.trim() === `${days} days` && rows === days, `owner: the range switch moves to ${days} days (marked, ${days} chart days)`, { current, rows, url: page.url() });
+    const labels = await page.locator('[data-dashboard="stat"]').allInnerTexts();
+    const sevens = labels.filter((l) => /Last 7 days/.test(l)).length;
+    if (days === 7) drill.check(sevens === 1 && labels.some((l) => /Refunds, last 7 days/.test(l)), "owner ?days=7: one \"Last 7 days\" card; the range card shows the refunds instead", labels);
+    else drill.check(sevens === 1 && labels.some((l) => new RegExp(`Last ${days} days`).test(l)), `owner ?days=${days}: the 7-day card and the ${days}-day card`, labels);
   }
   for (const w of WIDTHS) {
     await page.setViewportSize({ width: w, height: 900 });
@@ -95,8 +112,20 @@ async function support(drill, page, s) {
   const html = await page.content();
   const leaks = [s.shopper.email, s.shopper.name, ROLES_LOGINS.shopper?.phone].filter((x) => typeof x === "string" && x && html.includes(x));
   drill.check(leaks.length === 0, "support: no customer name, email or phone in the page (the Shopify domain: test:dashboard)", leaks);
-  const runAgain = await page.locator('main button:has-text("Run again"), main button:has-text("Try again"), main button:has-text("Bring in products")').evaluateAll((els) => els.filter((e) => !e.disabled && e.getAttribute("aria-disabled") !== "true").length);
-  drill.check(runAgain === 0, "support: no sync button it could press", runAgain);
+  // a failed import for this check only, so the sync card and its Run again show
+  await rolesSql([{ sql: "INSERT INTO sync_runs (id, status, error, started_at, finished_at) VALUES ('sync_drillfail', 'failed', 'Shopify said no', ?, ?)", args: [new Date(Date.now() - 60_000).toISOString(), new Date().toISOString()] }]);
+  try {
+    await open(page, "/admin/dashboard");
+    const card = page.locator('[data-dashboard="sync"]');
+    const shown = (await card.count()) === 1;
+    const buttons = await card.locator("button").evaluateAll((els) => els.map((e) => ({ text: e.innerText.trim(), off: e.disabled || e.getAttribute("aria-disabled") === "true" })));
+    const reason = await card.locator('[data-onboarding="reason"]').allInnerTexts();
+    drill.check(shown && buttons.length > 0 && buttons.every((b) => b.off) && reason.some((r) => r.trim().length > 10), "support, a failed import: the sync card shows, Run again is disabled with the reason why", { shown, buttons, reason });
+    await drill.shoot(page, "support-sync-failed", { fullPage: true });
+  } finally {
+    await rolesSql(["DELETE FROM sync_runs WHERE id = 'sync_drillfail'"]);
+  }
+  await open(page, "/admin/dashboard");
   const settings = await page.locator("main a[href]").evaluateAll((els) => els.map((e) => e.getAttribute("href")).filter((h) => /^\/admin\/(settings|integrations|automations|billing)/.test(h)));
   drill.check(settings.length === 0, "support: no link to a settings page", settings);
   const stray = await page.evaluate(unmarked);

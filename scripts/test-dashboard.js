@@ -310,14 +310,28 @@ await t("a table that can't be read: that row says Couldn't check, the rest stil
   }
 });
 
-await t("a suspended or maintenance store: the banner's facts", async () => {
-  const st = await a.run(async () => {
-    const { currentTenant } = await import("../lib/tenant-context.js");
-    const t0 = currentTenant();
+await t("the banner's facts: an active store has none; a store in maintenance; a suspended store", async () => {
+  const { currentTenant } = await import("../lib/tenant-context.js");
+  // the tenant object may be cached between calls: each case sets both facts, and the last puts them back
+  const as = (change) =>
+    a.run(() => {
+      change(currentTenant());
+      return D.storeStatus({ role: "support" });
+    });
+  const plain = await as(() => {});
+  eq(`${plain.status}/${plain.maintenance}`, "active/false", "active:");
+  const maint = await as((t0) => {
+    t0.status = "active";
     t0.config = { ...t0.config, maintenance: { enabled: true } };
-    return D.storeStatus({ role: "support" });
   });
-  eq(st.maintenance, true, "maintenance:");
+  eq(`${maint.status}/${maint.maintenance}`, "active/true", "maintenance:");
+  const susp = await as((t0) => {
+    t0.status = "suspended";
+    t0.config = { ...t0.config, maintenance: { enabled: false } };
+  });
+  eq(`${susp.status}/${susp.maintenance}`, "suspended/false", "suspended:");
+  const back = await as((t0) => (t0.status = "active"));
+  eq(`${back.status}/${back.maintenance}`, "active/false", "back to active:");
 });
 
 await t("the page source: every write is gated, and the dashboard is on the new-UI list", async () => {
@@ -325,6 +339,27 @@ await t("the page source: every write is gated, and the dashboard is on the new-
   ok(/gateAction\("sync\.run", role\)/.test(src), "Run again is gated on sync.run");
   const { isNewUiRoute } = await import("../lib/admin/new-ui-routes.js");
   ok(isNewUiRoute("/admin/dashboard"), "the dashboard is a new-UI route");
+});
+
+await t("over 50 dead-lettered orders: stuck pushes and missing refunds are still counted in full (real COUNTs, not a cut list)", async () => {
+  const dead = Array.from({ length: 60 }, (_, i) => order(`DASH-DEAD${i}`, { status: "sync_failed", sync_attempts: 9, sync_error: "dead", created_at: iso(i * 1000), updated_at: iso(i * 1000) }));
+  const stuck = Array.from({ length: 7 }, (_, i) => order(`DASH-STUCKX${i}`, { status: "syncing_shopify", created_at: iso(4 * 3600_000), updated_at: iso(2 * 3600_000) }));
+  await a.run(() => db.insertInto("orders").values([...dead, ...stuck]).execute());
+  const rows = Object.fromEntries((await a.run(() => D.actionQueue({ role: "support" }))).map((r) => [r.id, r]));
+  eq(rows.push_failed.count, 62, "every failed push (2 + 60 dead-lettered):");
+  eq(rows.push_stuck.count, 8, "every stuck push (1 + 7):");
+  eq(rows.push_stuck.orders.length, D.ORDERS_SHOWN, "the row links the first few:");
+  eq(rows.refund_missing.count, 1, "the missing refund still shows:");
+  eq(rows.refund_missing.orders.join(","), "DASH-REF1", "and links its order:");
+});
+
+await t("?days=7: the summary gets the 7-day range (its card shows the refunds, not a second Last 7 days: drill:dashboard)", async () => {
+  const r = await pages.run(PAGE, { cookies: cookies.support, searchParams: { days: "7" } });
+  const s = propsOf(r, "SalesSummary").sales;
+  eq(s.range.days, 7, "range:");
+  eq(s.range.net, s.week.net, "the range is the week:");
+  const src = await readFile(join(ROOT, "components/admin/dashboard/SalesSummary.js"), "utf8");
+  ok(/range\.days === 7 \?/.test(src) && /Refunds, last 7 days/.test(src), "the 7-day range swaps its card");
 });
 
 await t("no network: nothing reached fetch()", () => {

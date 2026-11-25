@@ -35,7 +35,12 @@ export function SalesSummary({ sales, newStore = null }) {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Today so far" value={money(today.net)} sub={today.orders ? orders(today.orders) : "No sales yet today"} muted={!today.orders} />
         <Stat label="Last 7 days" value={money(week.net)} sub={orders(week.orders)} />
-        <Stat label={`Last ${range.days} days`} value={money(range.net)} sub={`${orders(range.orders)} · ${range.refunds ? `${money(range.refunds)} refunded` : "no refunds"}`} />
+        {range.days === 7 ? (
+          // the 7-day card already is the range: this one shows its refunds instead of a second "Last 7 days"
+          <Stat label="Refunds, last 7 days" value={money(range.refunds)} sub={range.refunds ? "Already taken off the sales above" : "No refunds"} muted={!range.refunds} />
+        ) : (
+          <Stat label={`Last ${range.days} days`} value={money(range.net)} sub={`${orders(range.orders)} · ${range.refunds ? `${money(range.refunds)} refunded` : "no refunds"}`} />
+        )}
         <Stat label={`Average order, ${range.days} days`} value={aov == null ? "Not yet" : money(aov)} sub={aov == null ? "Shows after your first order" : `Days counted in ${sales.tz}`} muted={aov == null} />
       </div>
       {newStore && (

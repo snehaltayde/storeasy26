@@ -7,7 +7,7 @@ import { cn } from "@/components/ui/utils";
 // plain words and where to go. A row with order ids links each order; a row
 // the server couldn't check says so. Links are reads (support may follow them).
 const LINK = "rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
-const SHOWN = 5;
+const SHOWN = 5; // lib/admin/dashboard.js ORDERS_SHOWN: the server sends at most this many ids
 
 function Row({ row }) {
   const Icon = row.unknown ? CircleHelp : CircleAlert;
@@ -34,7 +34,7 @@ function Row({ row }) {
                 </Link>
               </li>
             ))}
-            {row.orders.length > SHOWN && <li className="text-muted-foreground">and {row.orders.length - SHOWN} more</li>}
+            {row.count > row.orders.length && <li className="text-muted-foreground">and {row.count - Math.min(row.orders.length, SHOWN)} more</li>}
           </ul>
         )}
       </div>
