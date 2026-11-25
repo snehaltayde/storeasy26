@@ -209,11 +209,8 @@ export function ProductsTable({ initial, currency, onOpen }) {
     <div data-catalog="products" className="space-y-3">
       <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
         <form method="get" role="search" onSubmit={(e) => e.preventDefault()} className="relative w-full md:max-w-sm xl:max-w-60">
-          <label htmlFor="catalog-search" className="sr-only">
-            Search products
-          </label>
           <Search aria-hidden className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input id="catalog-search" name="q" type="search" data-read-control placeholder="Search by name or handle" autoComplete="off" onChange={(e) => onType(e.target.value)} className="pl-8" />
+          <Input id="catalog-search" name="q" type="search" data-read-control aria-label="Search products" placeholder="Search by name or handle" autoComplete="off" onChange={(e) => onType(e.target.value)} className="pl-8" />
         </form>
         <div className="flex min-w-0 flex-wrap gap-2 xl:flex-nowrap">
           <Segmented label="Content" options={FILTERS} value={query.filter} counts={counts} onChange={(filter) => load({ ...query, filter })} />
