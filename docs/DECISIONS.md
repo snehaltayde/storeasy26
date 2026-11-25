@@ -3,6 +3,17 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-26 Phase 8 India and global checkout plan (on the owner's behalf)
+
+- **Schema:** four additive tenant migrations: 0036 `cod_otps` + `orders.payment_discount`, `cod_verified_at`; 0037 `customer_addresses` (copies each `default_address`); 0038 `bundles.starts_at`, `ends_at`; 0039 the order's market, rate and base-currency amounts. No platform migration.
+- **Permissions:** no new action. Payment and market settings are `settings.write` (admin, owner); scheduling an offer or bundle is `offers.write`, which staff already hold (status quo, so staff can make a price go live without an admin; change it if you want).
+- **Saved addresses** are shopper-only data: no console, operator or app route returns them. A shopper's own delete is a real delete; order snapshots keep their copy; privacy redaction deletes them.
+- **Pincodes** come from the India Post directory (data.gov.in, GODL-India) as a bundled offline file read by one Node route. Downloading it is an owner step; until then unknown pins just let the shopper type city and state.
+- **Delivery estimates** come only from the store's own dispatch and delivery-day settings; with none set, no estimate shows.
+- **COD:** one server quote gives both totals and the prepaid nudge; every placing action recomputes. COD OTP codes are hashed, 5 minutes, 5 attempts, rate-limited, and bound to cart, phone and amount. SMS uses a stub outside production and is refused in production until a provider is chosen; email works now.
+- **Multi-currency** uses founder-set fixed rates with rounding (not live FX, not per-country price lists); two engine runs per checkout (what the shopper pays, and the base amounts for Shopify and reports); only Razorpay-supported currencies, with the international-payments tick.
+- **Collection offers** target a collection handle via synced membership; schedule windows are UTC with an inclusive start and exclusive end.
+
 ## 2026-11-26 Phase 7 line 2: search filters (on the owner's behalf)
 
 - **Permissions:** none new. `/search` with filters is an anonymous read of this store's `products` (active only) and their published values (`display_type`, `display_vendor`, variants' `selected_options`); tags are never a facet. Support and operators see what a shopper sees.
