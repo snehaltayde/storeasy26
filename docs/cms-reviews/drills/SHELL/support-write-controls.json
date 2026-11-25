@@ -1,11 +1,7 @@
 {
   "id": "SHELL",
   "note": "Write controls support still sees inside the old screens: Phase 2's list, not a failure.",
-<<<<<<< HEAD
   "total": 45,
-=======
-  "total": 35,
->>>>>>> f16b22a (docs(drills): ORDERS and SHELL evidence for Phase 2 line 2)
   "pages": [
     {
       "page": "/admin/dashboard",
@@ -23,7 +19,6 @@
     },
     {
       "page": "/admin/orders",
-<<<<<<< HEAD
       "controls": [
         {
           "tag": "button",
@@ -76,9 +71,6 @@
           "href": null
         }
       ]
-=======
-      "controls": []
->>>>>>> f16b22a (docs(drills): ORDERS and SHELL evidence for Phase 2 line 2)
     },
     {
       "page": "/admin/catalog",

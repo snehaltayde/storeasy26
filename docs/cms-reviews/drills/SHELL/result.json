@@ -1,7 +1,7 @@
 {
   "id": "SHELL",
-  "ranAt": "2026-11-25T01:51:32.462Z",
-  "passed": 294,
+  "ranAt": "2026-11-24T05:10:29.062Z",
+  "passed": 247,
   "failed": 0,
   "byRoleAndWidth": [
     {
@@ -43,37 +43,37 @@
     {
       "role": "staff",
       "width": 1280,
+      "checks": 15,
+      "failed": 0
+    },
+    {
+      "role": "staff",
+      "width": 900,
       "checks": 16,
       "failed": 0
     },
     {
       "role": "staff",
-      "width": 900,
-      "checks": 17,
-      "failed": 0
-    },
-    {
-      "role": "staff",
       "width": 375,
-      "checks": 19,
+      "checks": 18,
       "failed": 0
     },
     {
       "role": "support",
       "width": 1280,
-      "checks": 32,
+      "checks": 26,
       "failed": 0
     },
     {
       "role": "support",
       "width": 900,
-      "checks": 17,
+      "checks": 16,
       "failed": 0
     },
     {
       "role": "support",
       "width": 375,
-      "checks": 19,
+      "checks": 18,
       "failed": 0
     }
   ],
