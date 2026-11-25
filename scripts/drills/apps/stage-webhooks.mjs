@@ -36,15 +36,27 @@ async function until(page, fn, label, tries = 20) {
   throw new Error(`timed out waiting for ${label}`);
 }
 
+// A real cash-on-delivery order through the shopper routes. The roles store
+// is closed (nothing published), so it is the founder's preview test order
+// (PUB-06): the owner mints a preview session, opens the store with it, adds
+// an in-stock variant from the synced catalog to the cart and checks out COD.
 async function placeCodOrder(page) {
-  const catalog = await api(page, "catalog");
-  const variantId = JSON.stringify(catalog.json ?? {}).match(/gid:\/\/shopify\/ProductVariant\/\d+/)?.[0];
-  if (!variantId) return { error: "no variant in the catalog" };
-  return page.evaluate(
+  const list = await api(page, "catalog?view=products&stock=in_stock");
+  const productId = (list.json?.items ?? []).find((i) => i.inShopify && i.available !== false)?.productId;
+  if (!productId) return { error: "no in-stock product in the catalog", status: list.status };
+  const sheet = await api(page, `catalog?view=product&id=${encodeURIComponent(productId)}`);
+  const variantId = (sheet.json?.variants ?? []).find((v) => v.available)?.id;
+  if (!variantId) return { error: "no available variant", status: sheet.status };
+  const mint = await page.context().request.post(`${ORIGIN}/api/admin/preview-session`, { data: { create: true }, headers: { origin: ORIGIN } });
+  const previewUrl = (await mint.json().catch(() => ({}))).previewUrl;
+  if (mint.status() !== 200 || !previewUrl) return { error: `preview session ${mint.status()}` };
+  const shop = await page.context().newPage();
+  await shop.goto(ORIGIN + previewUrl, { waitUntil: "load" });
+  const r = await shop.evaluate(
     async ([v]) => {
       const add = await fetch("/api/cart", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add", variantId: v, quantity: 1 }) });
-      if (!add.ok) return { error: `cart ${add.status}` };
-      const r = await fetch("/api/checkout", {
+      if (!add.ok) return { error: `cart ${add.status}`, body: await add.text() };
+      const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -54,10 +66,12 @@ async function placeCodOrder(page) {
           address: { line1: "1 Drill Road", city: "Bengaluru", state: "KA", pincode: "560001", country: "IN" },
         }),
       });
-      return { status: r.status, json: await r.json().catch(() => null) };
+      return { status: res.status, json: await res.json().catch(() => null) };
     },
     [variantId],
   );
+  await shop.close();
+  return r;
 }
 
 stage("webhooks", async (drill) => {
