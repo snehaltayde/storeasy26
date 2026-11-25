@@ -3,6 +3,14 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Phase 2 least-trusted audit fixes (on the owner's behalf)
+
+- **Permissions:** support gets fixed plain words for a failed Shopify push ("Shopify refused this order. An owner or admin can see why."), never the raw text, in the order API, list, page and timeline (`redactOrderForRole`). Shopper free-text return reasons count as customer details and are hidden from support; the merchant's own decision note is hidden too, for consistency. Seven pages gained a `roleAllows` gate matching their action (analytics, offers, bundles, orders and their detail pages), with a source guard that every non-`storefront.read` page has one; no role loses access today. Inviting an existing member at or above the role is 409 `ALREADY_MEMBER` (only after the `team.manage` check), with no row or mail.
+- **Tests:** support's order counts are 0 for a contact-detail search; the support-read sweep probes Phase 2's new views with fixture ids; the audit log's filters are pinned to the store (mutation-checked).
+- **Audit:** `docs/cms-reviews/PHASE-2-AUDIT.md`.
+- **Decided by:** Claude
+- **Slice:** Phase 2 audit
+
 ## 2026-11-25 Operator stores list and store page (on the owner's behalf)
 
 - **Permissions and data:** `GET /api/platform/tenants` (and `?legacy=1`, `?health=`) and `GET tenants/[id]` go through `requireOperator`. No `db_url`, database token, secret value or password hash leaves the server in any mode (canary-tested); secrets appear by name only. `scrubSecrets` now strips any `libsql://`, `file:` or Turso https address, and run, sync and overview errors are scrubbed with the store's own address.
