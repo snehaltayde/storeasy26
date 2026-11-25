@@ -292,7 +292,7 @@ await t("writes: a flag, a support grant and an incident record the operator's i
   eq((await call("operator", "incidents", "POST", { body: { action: "open", title: "platperm probe" } })).status, 200, "incident");
   eq((await call("operator", "flags", "POST", { body: { remove: { key: "ff_platperm-probe" } } })).status, 200, "flag removed");
   const rows = await auditRows(since);
-  for (const action of ["flags.set", "support.grant_created", "support.grant_revoked", "tenant.status", "flags.delete"]) {
+  for (const action of ["flags.set", "support.grant_created", "support.grant_revoked", "incident.open", "flags.delete"]) {
     const mine = rows.filter((x) => x.action === action);
     ok(mine.length, `an audit row for ${action}`);
     for (const x of mine) {
@@ -341,7 +341,7 @@ await t("writes: the bootstrap caller is audited as bootstrap (incident, flag, s
   eq((await as("billing", { action: "plan_version", plan: "platperm-boot", spec: { name: "Boot", price: 1 } })).status, 200, "plan version");
   eq((await as("queues", { action: "tick" })).status, 200, "tick");
   const rows = await auditRows(since);
-  for (const action of ["tenant.status", "flags.set", "flags.emergency_disable", "flags.delete", "support.grant_created", "support.grant_revoked", "settings.write", "billing.plan_version", "queue.tick"]) {
+  for (const action of ["incident.open", "flags.set", "flags.emergency_disable", "flags.delete", "support.grant_created", "support.grant_revoked", "settings.write", "billing.plan_version", "queue.tick"]) {
     const mine = rows.filter((x) => x.action === action);
     ok(mine.length, `an audit row for ${action}`);
     for (const x of mine) eq(`${x.actor}/${x.actor_kind}`, "bootstrap/bootstrap", action);

@@ -56,8 +56,10 @@ const { PLATFORM_PAGES, OPERATOR_ONLY_PAGES } = await import("./support/platform
 
 // --- 1. nav --------------------------------------------------------------------
 await t("nav: Stores, Signups & onboarding, New store, in that order, each a /platform path", () => {
+  // line 0's three first; later lines append theirs at the end (line 4: Flags, Incidents)
   eq(NAV.PLATFORM_NAV.slice(0, 3).map((i) => i.label).join(" | "), "Stores | Signups & onboarding | New store");
   eq(NAV.PLATFORM_NAV.slice(0, 3).map((i) => i.href).join(" "), "/platform /platform/onboarding /platform/stores/new");
+  for (const [label, href] of [["Flags", "/platform/flags"], ["Incidents", "/platform/incidents"]]) ok(NAV.PLATFORM_NAV.some((i) => i.label === label && i.href === href), `${label} in the nav`);
   eq(new Set(NAV.PLATFORM_NAV.map((i) => i.id)).size, NAV.PLATFORM_NAV.length, "unique ids");
   for (const i of NAV.PLATFORM_NAV) ok(PLATFORM_PAGES.some((p) => p.path === i.href), `${i.href} is a listed page`);
 });

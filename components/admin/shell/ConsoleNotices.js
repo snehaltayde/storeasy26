@@ -1,5 +1,6 @@
 import { Info, ShieldAlert } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { incidentBannerTitle } from "@/lib/platform/incident-words";
 
 // The support-access and incident notices (moved from the old admin root
 // layout in Phase 0 line 8; on the new UI's Alert since Phase 2 line 11): at
@@ -16,7 +17,7 @@ export function ConsoleNotices({ grant = null, incidents = [], className = "spac
       {incidents.map((i) => (
         <Alert key={i.id} variant="info" role="status">
           <Info aria-hidden />
-          <AlertTitle>{`${i.tenant_id ? "Notice for your store" : "Platform notice"}: ${i.title}`}</AlertTitle>
+          <AlertTitle>{incidentBannerTitle(i)}</AlertTitle>
           {i.public_message && <AlertDescription>{i.public_message}</AlertDescription>}
         </Alert>
       ))}

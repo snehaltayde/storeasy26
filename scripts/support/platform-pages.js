@@ -10,6 +10,8 @@ export const PLATFORM_PAGES = Object.freeze([
   { path: "/platform/onboarding", file: "app/(console)/platform/onboarding/page.js" },
   { path: "/platform/stores/new", file: "app/(console)/platform/stores/new/page.js" },
   { path: "/platform/operations", file: "app/(console)/platform/operations/page.js" },
+  { path: "/platform/flags", file: "app/(console)/platform/flags/page.js" },
+  { path: "/platform/incidents", file: "app/(console)/platform/incidents/page.js" },
 ]);
 
 // the pages a signed-out or merchant visitor must be sent away from

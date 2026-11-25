@@ -1,59 +1,60 @@
 import { NextResponse } from "next/server";
 import { requireOperator } from "@/lib/platform/require-operator";
-import { platformDb } from "@/lib/platform/control";
-import { audit } from "@/lib/platform/audit";
-import { slog } from "@/lib/log";
+import { listIncidents, openIncident, postIncidentUpdate, editInternalNote, resolveIncident, incidentTimeline, storeChoices } from "@/lib/platform/incidents";
 
-// Incidents (S43 / OP12): operator-declared, internal notes separated from
-// the PUBLIC message merchants see in their console while the incident is
-// open. tenant_id NULL = platform-wide.
-//   GET                                  → all incidents (newest first)
+// Incidents (S43 / OP12; the /platform/incidents screen, Phase 3 line 4):
+// operator-declared, the internal note kept apart from the PUBLIC message
+// merchants see in their console while the incident is open. tenant_id NULL =
+// platform-wide. The history is audit_log (incident.open | update | resolve),
+// and no audit row holds the internal note's text.
+//   GET ?scope=all|platform|<store id>&page=n → { incidents, page, pageSize, total, openCount, stores }
+//   GET ?timeline=<id>                        → { timeline }
 //   POST {action:"open", title, tenant?, publicMessage?, internalNote?}
-//   POST {action:"update", id, publicMessage?, internalNote?}
-//   POST {action:"resolve", id}
+//   POST {action:"update", id, publicMessage}  → a new public message
+//   POST {action:"note", id, internalNote}     → edit the internal note
+//   POST {action:"resolve", id, closingMessage?}
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const incId = () => "inc_" + Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, "0")).join("");
+const failed = (e) => NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: e?.status || 422 });
+
+async function listing(p) {
+  const [list, stores] = await Promise.all([listIncidents({ scope: p.get("scope") || "all", page: p.get("page") || 1 }), storeChoices()]);
+  return { ok: true, ...list, stores };
+}
 
 export async function GET(request) {
   const auth = await requireOperator(request);
   if (auth instanceof Response) return auth;
-  const r = await platformDb().execute("SELECT * FROM incidents ORDER BY created_at DESC LIMIT 50");
-  return NextResponse.json({ ok: true, incidents: r.rows.map((row) => ({ ...row })) });
+  const p = request.nextUrl.searchParams;
+  try {
+    if (p.get("timeline") != null) return NextResponse.json({ ok: true, timeline: await incidentTimeline(p.get("timeline")) });
+    return NextResponse.json(await listing(p));
+  } catch (e) {
+    return failed(e);
+  }
 }
 
 export async function POST(request) {
   const auth = await requireOperator(request, { write: true });
   if (auth instanceof Response) return auth;
   const body = await request.json().catch(() => ({}));
-  const db = platformDb();
+  const actor = auth.operator;
   try {
+    let incident;
     if (body.action === "open") {
-      const title = String(body.title || "").trim().slice(0, 200);
-      if (!title) return NextResponse.json({ error: "title required" }, { status: 400 });
-      const id = incId();
-      await db.execute({
-        sql: "INSERT INTO incidents (id, tenant_id, title, internal_note, public_message, status, created_at) VALUES (?,?,?,?,?, 'open', ?)",
-        args: [id, body.tenant || null, title, String(body.internalNote || "").slice(0, 2000) || null, String(body.publicMessage || "").slice(0, 500) || null, new Date().toISOString()],
-      });
-      slog("incident_opened", { id, tenant: body.tenant || "platform" });
-      await audit({ actor: auth.operator, action: "tenant.status", resource: `incident:${id}`, diff: { opened: title.slice(0, 80) } });
+      incident = await openIncident({ title: body.title, tenantId: body.tenant || null, publicMessage: body.publicMessage, internalNote: body.internalNote, actor });
     } else if (body.action === "update") {
-      await db.execute({
-        sql: "UPDATE incidents SET public_message = COALESCE(?, public_message), internal_note = COALESCE(?, internal_note) WHERE id = ?",
-        args: [body.publicMessage != null ? String(body.publicMessage).slice(0, 500) : null, body.internalNote != null ? String(body.internalNote).slice(0, 2000) : null, String(body.id || "")],
-      });
+      incident = await postIncidentUpdate({ id: body.id, publicMessage: body.publicMessage, actor });
+    } else if (body.action === "note") {
+      incident = await editInternalNote({ id: body.id, internalNote: body.internalNote, actor });
     } else if (body.action === "resolve") {
-      await db.execute({ sql: "UPDATE incidents SET status = 'resolved', resolved_at = ? WHERE id = ?", args: [new Date().toISOString(), String(body.id || "")] });
-      slog("incident_resolved", { id: body.id });
-      await audit({ actor: auth.operator, action: "tenant.status", resource: `incident:${body.id}`, diff: { resolved: true } });
+      incident = await resolveIncident({ id: body.id, closingMessage: body.closingMessage, actor });
     } else {
       return NextResponse.json({ error: "unknown action" }, { status: 400 });
     }
-    const r = await db.execute("SELECT * FROM incidents ORDER BY created_at DESC LIMIT 50");
-    return NextResponse.json({ ok: true, incidents: r.rows.map((row) => ({ ...row })) });
+    return NextResponse.json({ ...(await listing(new URLSearchParams())), incident });
   } catch (e) {
-    return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
+    return failed(e);
   }
 }

@@ -16,6 +16,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { StoreasyMark } from "@/components/kit/storeasy-mark";
+import { Flag, Siren } from "lucide-react"; // line 4
 import { activePlatformItem } from "@/lib/platform/nav";
 
 // The operator navigation (Phase 3 line 0). Icons by item id; later lines add theirs.
@@ -24,6 +25,8 @@ const ICONS = {
   onboarding: ListChecks,
   "new-store": Plus,
   operations: Wrench,
+  flags: Flag,
+  incidents: Siren,
 };
 
 // 240px from 1024px, icons with tooltips at 768-1023px, a sheet below 768px
