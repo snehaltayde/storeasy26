@@ -456,6 +456,25 @@ await t("the job runner: plugin_delivery never runs without a budget (shopper af
   eq(got.length, n + 4, "the rest go on a later tick:");
 });
 
+await t("the delivery time bound: a send starts only while a full 10 s timeout still fits in 30 s (fake clock)", async () => {
+  const W = await import("../lib/platform/worker.js");
+  const { enqueueJob } = await import("../lib/platform/jobs.js");
+  eq(W.PLUGIN_SEND_MAX_MS, EG.TIMEOUT_MS, "the worker's copy of the send timeout:");
+  for (let i = 0; i < 20; i++) if (!(await W.runDueJobs({ limit: 25, budgetMs: 30_000 })).length) break;
+  const start = Date.now();
+  let clock = start;
+  const now = () => clock;
+  const sent = [];
+  // each send takes the whole timeout
+  const handlers = { ...W.HANDLERS, plugin_delivery: async (p) => (sent.push(p.deliveryId), (clock += W.PLUGIN_SEND_MAX_MS), { ok: true }) };
+  for (let i = 0; i < 6; i++) await enqueueJob({ type: "plugin_delivery", tenantId: a.id, payload: { deliveryId: `dlv_slow${String(i).padStart(12, "0")}`, installId: `pin_slow${i}` }, idempotencyKey: `slow-${i}` });
+  const tick = await W.runDueJobs({ limit: 25, budgetMs: 50_000, handlers, now });
+  eq(sent.length, 3, "three sends fit (0 + 10, 10 + 10, 20 + 10 ≤ 30 s):");
+  ok(tick.filter((r) => r.deferred === "plugin_time").length >= 1, "the next is held back: 30 + 10 > 30 s");
+  ok(!tick.some((r) => r.deferred === "per_store_cap" || r.deferred === "per_app_cap"), "the time bound, not a cap, held it");
+  eq(clock - start, 30_000, "deliveries used 30 s of the 50 s run, leaving about 20 s for long jobs:");
+});
+
 await t("a lost claim keeps its job: a runner that claimed and died leaves the delivery to the job, which sends it once the claim runs out", async () => {
   const W = await import("../lib/platform/worker.js");
   const ev = await inA(() => E.emitPluginEvent("order.created", { key: "claim-gap", data: { order: { id: "cg" } } }));
