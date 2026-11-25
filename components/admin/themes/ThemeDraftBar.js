@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Palette } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -82,7 +82,8 @@ export function ThemeDraftBar({ state, names, role }) {
   }
 
   return (
-    <Alert data-themes="draft-bar">
+    <Alert variant="warning" data-themes="draft-bar">
+      <Palette aria-hidden="true" />
       <AlertTitle>
         Your draft uses {names.draft}. Your live store uses {names.live}.
       </AlertTitle>
@@ -91,7 +92,11 @@ export function ThemeDraftBar({ state, names, role }) {
           {PREVIEW_NOTE}
           {extras.length ? " Publishing lets you choose which of your other drafts go live with it." : ""}
         </p>
-        {error ? <p className="mt-2 text-destructive">{error}</p> : null}
+        {error ? (
+          <p role="alert" className="mt-2 text-destructive">
+            {error}
+          </p>
+        ) : null}
         <div className="mt-3 flex flex-wrap gap-2">
           <Button type="button" size="sm" variant="outline" disabled={!!busy} aria-busy={busy === "preview"} onClick={preview} data-themes-action="preview">
             <ExternalLink aria-hidden /> Preview
@@ -101,7 +106,7 @@ export function ThemeDraftBar({ state, names, role }) {
               Publish
             </Button>
           </RoleGate>
-          {!roleAllows(role, "storefront.publish") ? <span className="self-center text-sm text-muted-foreground">{NO_PUBLISH}</span> : null}
+          {!roleAllows(role, "storefront.publish") ? <span className="self-center text-[0.8125rem] text-muted-foreground">{NO_PUBLISH}</span> : null}
         </div>
       </AlertDescription>
       <AlertDialog open={confirming} onOpenChange={(o) => !busy && setConfirming(o)}>
@@ -111,17 +116,24 @@ export function ThemeDraftBar({ state, names, role }) {
             <AlertDialogDescription>Your design goes live. {extras.length ? "Tick the other drafts to publish with it; the rest stay drafts." : "Nothing else changes."}</AlertDialogDescription>
           </AlertDialogHeader>
           {extras.length ? (
-            <ul className="space-y-2">
-              {extras.map((d) => (
-                <li key={d.id} className="flex items-start gap-2">
-                  <Checkbox id={`pub-${d.id}`} checked={ticked[d.id] === true} onCheckedChange={(v) => setTicked((t) => ({ ...t, [d.id]: v === true }))} data-themes-publish-item={d.id} />
-                  <Label htmlFor={`pub-${d.id}`} className="font-normal">
-                    {d.label}
-                    {d.suggested ? <span className="text-muted-foreground"> (changed by the theme)</span> : <span className="text-muted-foreground"> (has other edits)</span>}
-                  </Label>
-                </li>
-              ))}
-            </ul>
+            <fieldset className="min-w-0">
+              <legend className="mb-2 text-sm font-medium">Other drafts</legend>
+              <ul className="divide-y divide-border rounded-md border border-border">
+                {extras.map((d) => (
+                  <li key={d.id} className="flex items-start gap-3 px-3 py-3">
+                    <Checkbox id={`pub-${d.id}`} className="mt-0.5" aria-describedby={`pub-${d.id}-why`} checked={ticked[d.id] === true} onCheckedChange={(v) => setTicked((t) => ({ ...t, [d.id]: v === true }))} data-themes-publish-item={d.id} />
+                    <div className="min-w-0">
+                      <Label htmlFor={`pub-${d.id}`} className="font-medium">
+                        {d.label}
+                      </Label>
+                      <p id={`pub-${d.id}-why`} className="text-[0.8125rem] text-muted-foreground">
+                        {d.suggested ? "Changed by the theme" : "Has other edits"}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </fieldset>
           ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={!!busy}>Cancel</AlertDialogCancel>

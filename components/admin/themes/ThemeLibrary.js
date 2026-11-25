@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { Palette } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CircleAlert, Palette } from "lucide-react";
+import { Alert, AlertTitle } from "@/components/ui/alert";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/kit/data-table";
 import { EmptyState } from "@/components/kit/empty-state";
+import { StatusBadge } from "@/components/kit/status-badge";
 import { Swatch } from "@/components/admin/themes/Swatch";
-import { LIVE_ARCHIVED, USE_WORDS, lookName, sameLook, shortDate } from "@/components/admin/themes/theme-words";
+import { LIVE_ARCHIVED, lookName, sameLook, shortDate } from "@/components/admin/themes/theme-words";
 import { ApplyThemeDialog } from "@/components/admin/themes/ApplyThemeDialog";
 import { ThemeDraftBar } from "@/components/admin/themes/ThemeDraftBar";
 
@@ -33,15 +34,11 @@ export function ThemeLibrary({ builtins, packages, archived, state = null, role 
         <span className="flex min-w-0 items-center gap-2">
           <Swatch colors={r.swatch} label={`${r.name} colours`} />
           <span className="truncate">{r.name}</span>
-          {r.inUse ? (
-            <Badge variant="secondary" className="shrink-0" data-theme-use={r.inUse}>
-              {USE_WORDS[r.inUse]}
-            </Badge>
-          ) : null}
+          {r.inUse ? <StatusBadge kind="theme" status={r.inUse} className="shrink-0" data-theme-use={r.inUse} /> : null}
         </span>
       ),
     },
-    { key: "version", header: "Version" },
+    { key: "version", header: "Version", cell: (r) => <span className="font-mono text-xs tabular-nums">{r.version}</span> },
     { key: "author", header: "Author", cell: (r) => r.author || "—" },
     { key: "uploadedByName", header: "Uploaded by" },
     { key: "uploadedAt", header: archived ? "Archived" : "Uploaded", cell: (r) => shortDate(archived ? r.archivedAt : r.uploadedAt) },
@@ -49,26 +46,26 @@ export function ThemeLibrary({ builtins, packages, archived, state = null, role 
   return (
     <div className="space-y-8">
       {state?.liveArchived ? (
-        <p className="text-sm text-destructive" data-themes="live-archived">
-          {LIVE_ARCHIVED}
-        </p>
+        <Alert variant="destructive" data-themes="live-archived">
+          <CircleAlert aria-hidden="true" />
+          <AlertTitle>{LIVE_ARCHIVED}</AlertTitle>
+        </Alert>
       ) : null}
       <ThemeDraftBar state={state} names={names} role={role} />
       <section className="space-y-3" aria-labelledby="builtin-looks">
-        <h2 id="builtin-looks" className="text-sm font-medium">
+        <h2 id="builtin-looks" className="text-lg font-semibold">
           Built-in looks
         </h2>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           {builtins.map((k) => (
-            <Card key={k.id} data-theme-builtin={k.id}>
+            <Card key={k.id} data-theme-builtin={k.id} className="gap-3">
+              <CardContent>
+                <Swatch band colors={k.swatch} label={`${k.label} colours`} />
+              </CardContent>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Swatch colors={k.swatch} label={`${k.label} colours`} /> {k.label}
-                  {builtinUse(k.id) ? (
-                    <Badge variant="secondary" data-theme-use={builtinUse(k.id)}>
-                      {USE_WORDS[builtinUse(k.id)]}
-                    </Badge>
-                  ) : null}
+                <CardTitle className="flex flex-wrap items-center gap-2">
+                  {k.label}
+                  {builtinUse(k.id) ? <StatusBadge kind="theme" status={builtinUse(k.id)} data-theme-use={builtinUse(k.id)} /> : null}
                 </CardTitle>
                 <CardDescription>{k.description}</CardDescription>
                 {sameLook(state?.draft, { kit: k.id, package: null }) ? null : (
@@ -83,7 +80,7 @@ export function ThemeLibrary({ builtins, packages, archived, state = null, role 
       </section>
       <section className="space-y-3" aria-labelledby="uploaded-themes">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="uploaded-themes" className="text-sm font-medium">
+          <h2 id="uploaded-themes" className="text-lg font-semibold">
             Uploaded themes
           </h2>
           <nav aria-label="Show" className="flex gap-1" data-read-control>

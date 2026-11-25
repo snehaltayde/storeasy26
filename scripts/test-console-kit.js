@@ -124,7 +124,7 @@ await t("PageHeader: title, description, breadcrumb (reads, the current page unl
 // ---------- 2. StatusBadge ----------
 await t("StatusBadge: every kind's plain words and tones; unknown reads \"Unknown\"; offerState", () => {
   const TONES = ["success", "warning", "danger", "info", "muted"];
-  eq(Object.keys(SB.STATUS_WORDS), ["order", "offer", "bundle", "media", "sync"], "the kinds:");
+  eq(Object.keys(SB.STATUS_WORDS), ["order", "offer", "bundle", "media", "sync", "theme"], "the kinds:");
   for (const [kind, table] of Object.entries(SB.STATUS_WORDS)) {
     for (const [status, [label, tone]] of Object.entries(table)) {
       ok(TONES.includes(tone), `${kind}.${status} has a known tone:`);

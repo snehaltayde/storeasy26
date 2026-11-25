@@ -300,4 +300,12 @@ Each Phase 3 line fills only its own sub-heading.
 - `/admin/themes` (nav "Themes", Store group, `storefront.read`): the built-in looks (Pulse, Glow) as cards with their swatch, then the uploaded themes as a `DataTable` (swatch, name, a "Live" / "In your draft" badge, version, author, uploaded by, when). An Installed / Archived filter is a pair of links. Empty state: "No uploaded themes yet".
 - "Upload theme" (`themes.manage`, hidden for staff, support and operator support): a dialog with a file picker; the file is read as text and posted as is; the button shows a spinner and "Uploading…". Success lists the base, the layouts, the home section count and the style rule count. A refusal is a destructive `Alert` listing every issue in plain words with its place (`templates.home.sections[1].settings.html`).
 - `/admin/themes/[id]`: the theme in words (brand tokens with colour dots, header and hero colours, layouts, home sections, style rules), "Download package" (the stored file) and "Archive" (`themes.manage`, hidden otherwise; an AlertDialog; refused while the theme is live or in the draft).
-- Needs the ui-designer pass: both pages (no `loading.js` yet).
+
+### Design sweep (Phase 5)
+
+- **Swatch:** `Swatch` draws a theme's three colours as dots beside a name (table rows) or, with `band`, as one 32px strip (accent the widest share) at the top of each built-in look's card and 40px under the title on a theme's page.
+- **Badges:** "Live" and "In your draft" are the kit's `StatusBadge` kind `theme` (success and warning tones), keeping `data-theme-use`.
+- **Draft bar:** a warning `Alert` with a palette icon (the draft differs from the live store). The publish confirm lists the other drafts as a bordered list under the legend "Other drafts": each checkbox has its draft's name as its label and "Changed by the theme" or "Has other edits" as its description (`aria-describedby`).
+- **Upload refusal:** with issues, the title says what to do ("The file wasn't uploaded. Fix these N problems and upload it again."); each issue is its sentence, then its place as a muted mono line, in a list that scrolls past 256px. Without issues, the route's sentence is the title. "Your live theme was archived" is a destructive `Alert`.
+- **Theme page:** the facts as one sentence (no middle dots), the version and colour codes in mono, the actions wrap and sit right from 640px; "Use this theme" matches the other actions' size there.
+- **Loading:** both pages have a `loading.js` shaped like the page. Section titles are 1.125rem semibold.

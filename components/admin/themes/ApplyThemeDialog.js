@@ -18,7 +18,9 @@ import { NO_WRITE, postTheme } from "@/components/admin/themes/theme-words";
 //   revision: the design's revision this page read (409 if someone else saved)
 // A package: POST /api/admin/themes/[id] { apply }. A built-in look: the
 // existing POST /api/admin/theme { action: "apply" } (it clears the package).
-export function ApplyThemeDialog({ look, role, revision = null }) {
+// size: the trigger's button size (sm in the library, default beside the
+// theme page's other actions)
+export function ApplyThemeDialog({ look, role, revision = null, size = "sm" }) {
   const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -52,7 +54,7 @@ export function ApplyThemeDialog({ look, role, revision = null }) {
       <RoleGate role={role} action="storefront.write" reason={NO_WRITE} mode="hide">
         <Button
           type="button"
-          size="sm"
+          size={size}
           data-themes-action="use"
           data-themes-look={look.id}
           onClick={() => {

@@ -2,9 +2,10 @@ import { Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusBadge } from "@/components/kit/status-badge";
 import { Swatch } from "@/components/admin/themes/Swatch";
 import { ArchiveThemeDialog } from "@/components/admin/themes/ArchiveThemeDialog";
-import { TEMPLATE_WORDS, USE_WORDS, shortDate } from "@/components/admin/themes/theme-words";
+import { TEMPLATE_WORDS, shortDate } from "@/components/admin/themes/theme-words";
 import { ApplyThemeDialog } from "@/components/admin/themes/ApplyThemeDialog";
 import { ThemeDraftBar } from "@/components/admin/themes/ThemeDraftBar";
 
@@ -22,8 +23,8 @@ function Row({ label, children }) {
 }
 const Colour = ({ hex }) => (
   <span className="inline-flex items-center gap-1.5">
-    <span className="size-3.5 rounded-full border border-border" style={{ backgroundColor: hex }} />
-    <code>{hex}</code>
+    <span aria-hidden="true" className="size-4 rounded-full border border-border" style={{ backgroundColor: hex }} />
+    <code className="font-mono text-xs">{hex}</code>
   </span>
 );
 
@@ -41,21 +42,23 @@ export function ThemeDetail({ pkg, content, role, state = null, names = null }) 
   return (
     <div className="space-y-4" data-themes="detail">
       {names ? <ThemeDraftBar state={state} names={names} role={role} /> : null}
-      <div className="flex flex-wrap items-center gap-2">
-        <Swatch colors={pkg.swatch} label={`${pkg.name} colours`} />
-        <span className="text-sm text-muted-foreground">
-          Version {pkg.version} · based on {pkg.baseLabel}
-          {pkg.author ? ` · by ${pkg.author}` : ""} · uploaded by {pkg.uploadedByName} on {shortDate(pkg.uploadedAt)}
-        </span>
-        {pkg.inUse ? <Badge variant="secondary">{USE_WORDS[pkg.inUse]}</Badge> : null}
-        {pkg.status === "archived" ? <Badge variant="outline">Archived{pkg.archivedAt ? ` ${shortDate(pkg.archivedAt)}` : ""}</Badge> : null}
-        <span className="ml-auto flex gap-2">
+      <Swatch band colors={pkg.swatch} label={`${pkg.name} colours`} className="h-10" />
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="text-sm text-muted-foreground">
+            Version <span className="font-mono text-xs tabular-nums">{pkg.version}</span>, based on {pkg.baseLabel}
+            {pkg.author ? `, by ${pkg.author}` : ""}. Uploaded by {pkg.uploadedByName} on {shortDate(pkg.uploadedAt)}.
+          </span>
+          {pkg.inUse ? <StatusBadge kind="theme" status={pkg.inUse} data-theme-use={pkg.inUse} /> : null}
+          {pkg.status === "archived" ? <Badge variant="muted">Archived{pkg.archivedAt ? ` ${shortDate(pkg.archivedAt)}` : ""}</Badge> : null}
+        </div>
+        <span className="flex flex-wrap gap-2 sm:ml-auto">
           <Button asChild variant="outline" data-read-control>
             <a href={`/api/admin/themes/${encodeURIComponent(pkg.id)}?download=1`} download data-themes-action="download">
               <Download aria-hidden /> Download package
             </a>
           </Button>
-          {pkg.status === "installed" && pkg.inUse !== "draft" && state?.draft?.package !== pkg.id ? <ApplyThemeDialog look={{ kind: "package", id: pkg.id, label: `${pkg.name} ${pkg.version}`, sections: pkg.summary?.sections ?? 0 }} role={role} revision={state?.design?.revision ?? null} /> : null}
+          {pkg.status === "installed" && pkg.inUse !== "draft" && state?.draft?.package !== pkg.id ? <ApplyThemeDialog look={{ kind: "package", id: pkg.id, label: `${pkg.name} ${pkg.version}`, sections: pkg.summary?.sections ?? 0 }} role={role} revision={state?.design?.revision ?? null} size="default" /> : null}
           <ArchiveThemeDialog pkg={pkg} role={role} />
         </span>
       </div>

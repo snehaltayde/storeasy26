@@ -175,7 +175,7 @@ function PackageLook({ id: anchor, field, packageId, notes }) {
       </p>
       <p className="text-sm">
         {packageLookWords(pkg?.name ?? "an uploaded theme", pkg?.version ?? null).replace(/ Change it on Themes$/, " ")}
-        <a href="/admin/themes" className="font-medium underline underline-offset-2">
+        <a href="/admin/themes" className="rounded-sm font-medium text-primary underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none">
           Change it on Themes
         </a>
       </p>

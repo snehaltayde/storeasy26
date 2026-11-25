@@ -1,7 +1,6 @@
 // Shared words and helpers for /admin/themes (Phase 5 line 1).
 export const NO_MANAGE = "Only an owner or admin can upload or archive themes.";
 export const TEMPLATE_WORDS = Object.freeze({ pdp: "Product page", collection: "Collection page", header: "Header", footer: "Footer" });
-export const USE_WORDS = Object.freeze({ live: "Live", draft: "In your draft" });
 
 const DATE = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" });
 export const shortDate = (iso) => {

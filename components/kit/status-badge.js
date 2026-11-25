@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 //   offer, bundle: offerState() below (enabled and the schedule window)
 //   media: live | archived (media.archived_at)
 //   sync: runState() in lib/admin/sync-view.js
+//   theme: a look's use (Phase 5): live | draft (lib/themes/packages.js inUse)
 export const STATUS_WORDS = Object.freeze({
   order: Object.freeze({
     pending_payment: ["Awaiting payment", "warning"],
@@ -41,6 +42,10 @@ export const STATUS_WORDS = Object.freeze({
     failed: ["Failed", "danger"],
     complete: ["Up to date", "success"],
   }),
+  theme: Object.freeze({
+    live: ["Live", "success"],
+    draft: ["In your draft", "warning"],
+  }),
 });
 
 // An offer's or bundle's state from its row: { enabled, starts_at, ends_at }.
@@ -58,10 +63,10 @@ export function statusWords(kind, status) {
   return { label, tone };
 }
 
-export function StatusBadge({ kind, status, className }) {
+export function StatusBadge({ kind, status, className, ...props }) {
   const { label, tone } = statusWords(kind, status);
   return (
-    <Badge variant={tone} data-kit="status-badge" data-status={status} className={className}>
+    <Badge {...props} variant={tone} data-kit="status-badge" data-status={status} className={className}>
       {label}
     </Badge>
   );
