@@ -328,3 +328,11 @@ Each Phase 3 line fills only its own sub-heading.
 - **Reset:** a ghost button, shown when the tokens differ: "Reset to the theme's" (an uploaded theme's tokens) or "Go back to your starting colours" (the store's starting brand).
 - **Roles:** support and operator support see every value with disabled inputs and "You can see your design here but not change it."; no Reset, no fix buttons. Staff draft; Publish is line 1's dialog (doc_design pre-ticked when touched).
 - Needs the design pass (`ui-designer`): the group spacing, the readability list and the theme line.
+
+### Design sweep (Phase 6)
+
+- **Handle:** the Sections rail's grip is a 24px bordered button (border turns to the accent on hover, ring with offset on focus). Insert points show a pill that turns accent on hover and carries the focus ring itself, so the ring isn't clipped by the 12px hit area. The select and exit controls use the same ring plus offset.
+- **Drag:** the drop line is the accent colour, 3px. A refused spot is muted (dimmed row, border ring, muted "Can't drop here: <reason>"), not destructive: nothing is wrong, the spot just isn't allowed.
+- **Design tab:** groups sit 24px apart with a 14px semibold title over a hairline; the theme line is a bordered muted note; each failing readability pair is a card with 14px text and its fix button.
+- **Publish dialog:** each row's checkbox is labelled by its name and described by its reason (`aria-describedby`); "Other drafts" is a 14px heading under a divider.
+- **Small screens:** the four pane tabs are an equal four-column grid (fits 375px). `loading.js` shows the same tab strip below 1024px.

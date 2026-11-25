@@ -284,17 +284,17 @@ export function DesignRailView({ status = "idle", state = null, look = null, rea
   const idFor = (key) => `studio-design-${key}`;
 
   return (
-    <div className="space-y-4" data-studio-design="" data-design-readonly={readOnly ? "" : undefined}>
+    <div className="space-y-6" data-studio-design="" data-design-readonly={readOnly ? "" : undefined}>
       <p className="text-sm text-muted-foreground">{T.DESIGN_WORDS.intro}</p>
-      <p className="text-xs text-muted-foreground" data-design-theme={isPackage ? look?.packageId || "" : "builtin"}>
+      <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs leading-relaxed text-muted-foreground" data-design-theme={isPackage ? look?.packageId || "" : "builtin"}>
         {isPackage ? T.themeWords(look?.name ?? "your uploaded theme", look?.version ?? null) : T.DESIGN_WORDS.builtIn}
       </p>
       {readOnly && <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">{T.DESIGN_WORDS.readOnly}</p>}
       {saveLine && <div data-design-save="">{saveLine}</div>}
 
       {T.TOKEN_GROUPS.map((g) => (
-        <section key={g.id} aria-labelledby={`studio-design-${g.id}`} className="space-y-3" data-design-group={g.id}>
-          <h3 id={`studio-design-${g.id}`} className="text-xs font-semibold text-foreground">
+        <section key={g.id} aria-labelledby={`studio-design-${g.id}`} className="space-y-4" data-design-group={g.id}>
+          <h3 id={`studio-design-${g.id}`} className="border-b border-border pb-1.5 text-sm font-semibold text-foreground">
             {g.words}
           </h3>
           {g.keys.map((k) => {
@@ -308,19 +308,19 @@ export function DesignRailView({ status = "idle", state = null, look = null, rea
         </section>
       ))}
 
-      <section aria-label="Readability" className="space-y-2" data-design-check={check.blocking ? "blocking" : check.items.length ? "warning" : "ok"}>
+      <section aria-label="Readability" className="space-y-2 border-t border-border pt-4" data-design-check={check.blocking ? "blocking" : check.items.length ? "warning" : "ok"}>
         {check.items.length === 0 ? (
-          <p className="text-xs text-muted-foreground">{T.DESIGN_WORDS.readable}</p>
+          <p className="text-sm text-muted-foreground">{T.DESIGN_WORDS.readable}</p>
         ) : (
           <>
             {check.blocking && (
-              <p className="text-xs font-medium text-destructive" data-design-blocks="">
+              <p className="text-sm font-medium text-destructive" data-design-blocks="">
                 {T.DESIGN_WORDS.blocks}
               </p>
             )}
             <ul className="space-y-2">
               {check.items.map((i) => (
-                <li key={`${i.severity}-${i.pair}`} className="space-y-1 rounded-md border border-border p-2 text-xs" data-design-issue={i.severity}>
+                <li key={`${i.severity}-${i.pair}`} className="space-y-2 rounded-md border border-border bg-card p-3 text-sm leading-snug" data-design-issue={i.severity}>
                   <p>{i.message}</p>
                   {i.fix && !readOnly && (
                     <Button type="button" size="sm" variant="outline" onClick={() => write(T.applyFix(brand, i.fix, startingBrand))} data-design-fix={i.fix.token}>

@@ -94,11 +94,11 @@ function InsertPoint({ index, onOpen, after = false }) {
       onClick={() => onOpen(index)}
       data-tree-insert={index}
       className={cn(
-        "absolute inset-x-2 z-[1] flex h-3 items-center justify-center rounded-md text-[11px] text-muted-foreground opacity-0 outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring hover:opacity-100 pointer-coarse:opacity-100",
+        "group/ins absolute inset-x-2 z-[1] flex h-3 items-center justify-center rounded-md text-xs text-muted-foreground opacity-0 outline-none transition-opacity hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100 motion-reduce:transition-none",
         after ? "-bottom-2" : "-top-2",
       )}
     >
-      <span className="flex items-center gap-1 rounded-full border border-border bg-background px-1.5">
+      <span className="flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 shadow-xs group-hover/ins:border-primary group-hover/ins:text-primary group-focus-visible/ins:border-primary group-focus-visible/ins:text-primary group-focus-visible/ins:ring-2 group-focus-visible/ins:ring-ring group-focus-visible/ins:ring-offset-1 group-focus-visible/ins:ring-offset-background">
         <Plus aria-hidden className="size-3" />
         Add a section here
       </span>
@@ -367,12 +367,12 @@ export default function SectionTree({ type, sections, selectedId = null, onChang
                   selected ? "bg-muted" : "hover:bg-muted/60",
                   row.hidden && "text-muted-foreground",
                   (dragging || held) && "bg-card shadow-md ring-2 ring-ring",
-                  dragging && !drag.ok && "ring-destructive",
+                  dragging && !drag.ok && "bg-muted opacity-80 ring-border",
                 )}
               >
                 {grabbing && i === 0 && insertAt !== 0 && !hold && !drag && <InsertPoint index={0} onOpen={setInsertAt} />}
-                {lineBefore && <span aria-hidden className="absolute inset-x-1 -top-0.5 h-0.5 rounded-full bg-primary" data-drop-line="" />}
-                {lineAfter && <span aria-hidden className="absolute inset-x-1 -bottom-0.5 h-0.5 rounded-full bg-primary" data-drop-line="" />}
+                {lineBefore && <span aria-hidden className="absolute inset-x-1 -top-0.5 h-[3px] rounded-full bg-primary" data-drop-line="" />}
+                {lineAfter && <span aria-hidden className="absolute inset-x-1 -bottom-0.5 h-[3px] rounded-full bg-primary" data-drop-line="" />}
                 {selected && <span aria-hidden className="absolute inset-y-1 left-0 w-0.5 rounded-full bg-primary" />}
                 <div className="flex items-center gap-1.5">
                   {grabbing && id && (
@@ -394,7 +394,7 @@ export default function SectionTree({ type, sections, selectedId = null, onChang
                       onPointerCancel={() => endPointer(true)}
                       style={{ touchAction: "none" }}
                       data-tree-handle={id}
-                      className={cn("flex size-6 shrink-0 cursor-grab items-center justify-center rounded-md text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50", (dragging || held) && "cursor-grabbing text-foreground")}
+                      className={cn("flex size-6 shrink-0 cursor-grab items-center justify-center rounded-md border border-border bg-background text-muted-foreground outline-none transition-colors hover:border-primary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none", (dragging || held) && "cursor-grabbing text-foreground")}
                     >
                       <GripVertical aria-hidden className="size-4" />
                     </button>
@@ -406,7 +406,7 @@ export default function SectionTree({ type, sections, selectedId = null, onChang
                     onClick={() => id && onSelect?.(id)}
                     data-tree-select=""
                     data-read-control=""
-                    className="flex min-w-0 flex-1 flex-col items-start rounded-md px-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex min-w-0 flex-1 flex-col items-start rounded-md px-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
                   >
                     <span className={cn("max-w-full truncate text-sm", row.hidden ? "text-muted-foreground" : "text-foreground", selected ? "font-semibold" : "font-medium")}>{row.label}</span>
                     {row.title && <span className="max-w-full truncate text-xs text-muted-foreground">{row.title}</span>}
@@ -430,7 +430,7 @@ export default function SectionTree({ type, sections, selectedId = null, onChang
                   </span>
                 </div>
                 {dragging && !drag.ok && (
-                  <p className="mt-1 px-1 text-xs text-destructive" data-drop-refused="">
+                  <p className="mt-1 px-1 text-xs text-muted-foreground" data-drop-refused="">
                     {NO_DROP}
                     {drag.reason ? `: ${drag.reason}` : ""}
                   </p>

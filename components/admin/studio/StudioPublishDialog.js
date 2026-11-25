@@ -120,11 +120,11 @@ export function fixesOf(outcome) {
 function Row({ row, checked, onChecked, busy }) {
   const box = `publish-${row.id}`;
   return (
-    <li className="flex items-start gap-2 py-1.5" data-publish-row={row.id} data-publish-ticked={checked ? "" : undefined}>
-      <Checkbox id={box} checked={checked} disabled={busy} onCheckedChange={(v) => onChecked(row.id, v === true)} />
-      <label htmlFor={box} className="min-w-0 flex-1 text-sm">
+    <li className="flex items-start gap-3 rounded-md px-1 py-2 hover:bg-muted/50" data-publish-row={row.id} data-publish-ticked={checked ? "" : undefined}>
+      <Checkbox id={box} className="mt-0.5" aria-describedby={`${box}-why`} checked={checked} disabled={busy} onCheckedChange={(v) => onChecked(row.id, v === true)} />
+      <label htmlFor={box} className="min-w-0 flex-1 cursor-pointer text-sm leading-snug">
         <span className="block truncate font-medium text-foreground">{row.label}</span>
-        <span className="block text-xs text-muted-foreground">{row.why}</span>
+        <span id={`${box}-why`} className="block text-xs text-muted-foreground">{row.why}</span>
       </label>
     </li>
   );
@@ -163,8 +163,8 @@ export default function StudioPublishDialog({ open, rows, run, onClose, onDone, 
           </ul>
         )}
         {rows?.other?.length > 0 && (
-          <section aria-label={PUBLISH_WORDS.other} data-publish-group="other">
-            <h3 className="text-xs font-semibold text-muted-foreground">{PUBLISH_WORDS.other}</h3>
+          <section aria-label={PUBLISH_WORDS.other} className="space-y-1 border-t border-border pt-3" data-publish-group="other">
+            <h3 className="text-sm font-semibold text-foreground">{PUBLISH_WORDS.other}</h3>
             <ul>
               {rows.other.map((r) => (
                 <Row key={r.id} row={r} checked={!!checked[r.id]} onChecked={set} busy={busy} />

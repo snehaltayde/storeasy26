@@ -88,12 +88,13 @@ export function StudioView({ topBar = null, note = null, readOnly = false, tab =
           {note}
         </Notice>
       )}
-      <div role="tablist" aria-label="Studio panes" className="flex gap-1 border-b border-border p-2 lg:hidden" data-studio-panes="">
+      <div role="tablist" aria-label="Studio panes" className="grid grid-cols-4 gap-1 border-b border-border p-2 lg:hidden" data-studio-panes="">
         {STUDIO_PANES.map((p) => (
           <Button
             key={p.id}
             type="button"
             size="sm"
+            className="min-w-0 px-1 text-xs sm:text-sm"
             variant={pane === p.id ? "secondary" : "ghost"}
             role="tab"
             aria-selected={pane === p.id}
@@ -110,7 +111,7 @@ export function StudioView({ topBar = null, note = null, readOnly = false, tab =
       </div>
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[18rem_minmax(0,1fr)_22rem]">
         <aside aria-label="Studio tools" className={`${railPane ? "flex" : "hidden"} min-h-0 flex-col border-r border-border lg:flex`} data-studio-rail="">
-          <div role="tablist" aria-label="Studio tools" className="hidden gap-1 border-b border-border p-2 lg:flex">
+          <div role="tablist" aria-label="Studio tools" className="hidden gap-1 border-b border-border p-3 lg:flex">
             {STUDIO_TABS.map((t) => (
               <Button key={t.id} type="button" size="sm" variant={tab === t.id ? "secondary" : "ghost"} role="tab" aria-selected={tab === t.id} onClick={() => onTab?.(t.id)} data-studio-tab={t.id} data-read-control="">
                 {t.words}
