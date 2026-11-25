@@ -12,7 +12,7 @@ import { RoleGate } from "@/components/kit/role-gate";
 import { RoleSelect } from "@/components/admin/team/RoleSelect";
 import { RemoveDialog } from "@/components/admin/team/RemoveDialog";
 import { Refusal } from "@/components/admin/team/Refusal";
-import { RowAction } from "@/components/admin/team/RowAction";
+import { RowActionBody, rowAction } from "@/components/admin/team/RowAction";
 import { actionFor, dateWords, initials, roleWords } from "@/components/admin/team/team-words";
 
 // Change one member's role (a dialog: the role select and Save). The route
@@ -120,15 +120,15 @@ export function MembersTable({ members, you, onRole, onRemove }) {
         rowActions={(m) => (
           <>
             <RoleGate role={you?.role} action={actionFor(m.role)} mode="hide" reason="Only an owner can change an owner.">
-              <RowAction icon={Pencil} onClick={() => setEditing(m)} data-team="change-role">
-                Change role
-              </RowAction>
+              <Button {...rowAction("Change role")} onClick={() => setEditing(m)} data-team="change-role">
+                <RowActionBody icon={Pencil}>Change role</RowActionBody>
+              </Button>
             </RoleGate>
             {m.id !== you?.id && (
               <RoleGate role={you?.role} action={actionFor(m.role)} mode="hide" reason="Only an owner can remove an owner.">
-                <RowAction icon={UserMinus} danger onClick={() => setRemoving(m)} data-team="remove">
-                  Remove
-                </RowAction>
+                <Button {...rowAction("Remove", { danger: true })} onClick={() => setRemoving(m)} data-team="remove">
+                  <RowActionBody icon={UserMinus}>Remove</RowActionBody>
+                </Button>
               </RoleGate>
             )}
           </>

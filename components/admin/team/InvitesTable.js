@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/kit/empty-state";
 import { RoleGate } from "@/components/kit/role-gate";
 import { actionFor, dateWords, expiryWords, roleWords } from "@/components/admin/team/team-words";
 import { Refusal } from "@/components/admin/team/Refusal";
-import { RowAction } from "@/components/admin/team/RowAction";
+import { RowActionBody, rowAction } from "@/components/admin/team/RowAction";
 import { cn } from "@/components/ui/utils";
 
 // Pending invites (Phase 2 line 8 §1.2): email, role, sent, expires. Revoke
@@ -59,14 +59,14 @@ export function InvitesTable({ invites, actorRole, onRevoke, onResend }) {
         rowActions={(i) => (
           <>
             <RoleGate role={actorRole} action={actionFor(i.role)} mode="hide" reason="Only an owner can resend an owner invite.">
-              <RowAction icon={RotateCw} onClick={() => onResend(i)} data-team="resend">
-                Send a new link
-              </RowAction>
+              <Button {...rowAction("Send a new link")} onClick={() => onResend(i)} data-team="resend">
+                <RowActionBody icon={RotateCw}>Send a new link</RowActionBody>
+              </Button>
             </RoleGate>
             <RoleGate role={actorRole} action={actionFor(i.role)} mode="hide" reason="Only an owner can revoke an owner invite.">
-              <RowAction icon={X} danger onClick={() => setRevoking(i)} data-team="revoke">
-                Revoke
-              </RowAction>
+              <Button {...rowAction("Revoke", { danger: true })} onClick={() => setRevoking(i)} data-team="revoke">
+                <RowActionBody icon={X}>Revoke</RowActionBody>
+              </Button>
             </RoleGate>
           </>
         )}
