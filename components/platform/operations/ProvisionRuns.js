@@ -7,7 +7,7 @@
 // A resumed run that finishes may hand back the store's console password: it
 // is shown once, here, with Copy, and is gone on the next load.
 import { useCallback, useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { Check, CircleAlert, Loader, Minus, RefreshCw, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,7 +18,32 @@ import { EmptyState } from "@/components/kit/empty-state";
 import { ConfirmDialog, LoadError, Notice, opsGet, opsPost, when } from "./opsShared";
 
 const RUN = { running: ["Running", "info"], done: ["Done", "success"], failed: ["Failed", "danger"], compensated: ["Abandoned", "muted"] };
-const STEP = { done: "success", running: "info", failed: "danger", pending: "muted", skipped: "muted", compensated: "muted" };
+// Each step is a node in the run's pipeline: icon and ring colour by state,
+// with the state also in words for screen readers.
+const STEP = {
+  done: [Check, "border-success bg-success text-background", "done"],
+  running: [Loader, "border-info text-info", "running"],
+  failed: [X, "border-destructive bg-destructive text-background", "failed"],
+  pending: [null, "border-border text-muted-foreground", "waiting"],
+  skipped: [Minus, "border-border text-muted-foreground", "skipped"],
+  compensated: [Minus, "border-border text-muted-foreground", "taken back"],
+};
+
+function Step({ step, last }) {
+  const [Icon, ring, word] = STEP[step.status] || [null, "border-border text-muted-foreground", step.status];
+  return (
+    <li title={step.detail || undefined} data-step-status={step.status} className="flex items-center gap-2">
+      <span className={`flex size-5 shrink-0 items-center justify-center rounded-full border-2 ${ring}`} aria-hidden>
+        {Icon && <Icon className={`size-3 ${step.status === "running" ? "motion-safe:animate-spin" : ""}`} strokeWidth={3} />}
+      </span>
+      <span className={`font-mono text-xs ${step.status === "failed" ? "font-medium text-destructive" : step.status === "done" ? "text-foreground" : "text-muted-foreground"}`}>
+        {step.name}
+        <span className="sr-only">: {word}</span>
+      </span>
+      {!last && <span aria-hidden className={`h-px w-4 sm:w-6 ${step.status === "done" ? "bg-success/60" : "bg-border"}`} />}
+    </li>
+  );
+}
 const FAILURE_KIND = { retry_exhausted: "Gave up after 5 tries", needs_operator: "Needs an operator", lapsed: "Signup lapsed" };
 
 export default function ProvisionRuns() {
@@ -104,9 +129,9 @@ export default function ProvisionRuns() {
             const [label, tone] = RUN[r.status] || [r.status, "muted"];
             return (
               <li key={r.id} data-ops-run={r.id}>
-                <Card size="sm">
-                  <CardContent className="space-y-2">
-                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                <Card size="sm" className={r.status === "failed" ? "border-destructive/40 shadow-[inset_3px_0_0_var(--c-danger)]" : undefined}>
+                  <CardContent className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                       <span className="font-semibold">{r.tenant_id}</span>
                       <span className="font-mono text-xs text-muted-foreground">{r.id}</span>
                       <Badge variant={tone}>{label}</Badge>
@@ -120,26 +145,33 @@ export default function ProvisionRuns() {
                           {FAILURE_KIND[r.signup.failureKind] || r.signup.failureKind}
                         </Badge>
                       )}
-                      <span className="ml-auto text-xs text-muted-foreground">{when(r.created_at)}</span>
+                      <span className="ml-auto text-xs text-muted-foreground tabular-nums">{when(r.created_at)}</span>
                     </div>
-                    <ol className="flex flex-wrap gap-1.5" aria-label="Steps">
-                      {r.steps.map((s) => (
-                        <li key={s.name} title={s.detail || undefined}>
-                          <Badge variant={STEP[s.status] || "muted"}>
-                            {s.name} · {s.status}
-                          </Badge>
-                        </li>
+                    <ol className="flex flex-wrap items-center gap-x-2 gap-y-2" aria-label="Steps">
+                      {r.steps.map((s, i) => (
+                        <Step key={s.name} step={s} last={i === r.steps.length - 1} />
                       ))}
                     </ol>
-                    {r.error && <p className="text-xs break-words text-destructive">{r.error}</p>}
-                    {r.status === "failed" && (
-                      <div className="flex flex-wrap gap-2">
-                        <Button size="sm" disabled={busy != null} onClick={() => resume(r)}>
-                          {busy === r.id ? "Resuming…" : "Resume"}
-                        </Button>
-                        <Button size="sm" variant="destructive" disabled={busy != null} onClick={() => setAbandoning(r)}>
-                          Abandon
-                        </Button>
+                    {(r.error || r.status === "failed") && (
+                      <div className="flex flex-col gap-3 border-t border-border pt-3 sm:flex-row sm:items-center sm:justify-between">
+                        {r.error ? (
+                          <p className="flex min-w-0 items-start gap-1.5 text-[0.8125rem] break-words text-destructive">
+                            <CircleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+                            <span className="min-w-0">{r.error}</span>
+                          </p>
+                        ) : (
+                          <span />
+                        )}
+                        {r.status === "failed" && (
+                          <div className="flex shrink-0 flex-wrap gap-2">
+                            <Button size="sm" disabled={busy != null} onClick={() => resume(r)}>
+                              {busy === r.id ? "Resuming…" : "Resume"}
+                            </Button>
+                            <Button size="sm" variant="destructive" disabled={busy != null} onClick={() => setAbandoning(r)}>
+                              Abandon
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </CardContent>

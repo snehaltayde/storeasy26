@@ -5,7 +5,7 @@
 // published study off the site until it is published again); Publish runs the
 // server's gate (documented consent and a measurement record); Archive takes a
 // published study off /customers and keeps it as a draft; Delete removes it.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,22 +13,26 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DataTable } from "@/components/kit/data-table";
 import { EmptyState } from "@/components/kit/empty-state";
 import { ConfirmDialog, LoadError, Notice, opsGet, opsPost, when } from "./opsShared";
 
+// The form in three groups: what the study is, the record the publish gate
+// reads (consent and how it was measured), and the merchant's quote.
 const FIELDS = [
-  ["title", "Title"],
-  ["tenant_id", "Store (its id)"],
-  ["consent_ref", "Consent (who approved, when, how)"],
-  ["period", "Measurement period"],
-  ["baseline", "Baseline"],
-  ["method", "Method"],
-  ["limitations", "Limitations"],
-  ["confounders", "Other changes in the period (or 'none known')"],
-  ["quote", "Quote (with usage rights)"],
-  ["quote_by", "Quote by"],
+  ["title", "Title", "story"],
+  ["tenant_id", "Store (its id)", "story"],
+  ["consent_ref", "Consent (who approved, when, how)", "evidence"],
+  ["period", "Measurement period", "evidence"],
+  ["baseline", "Baseline", "evidence"],
+  ["method", "Method", "evidence"],
+  ["limitations", "Limitations", "evidence"],
+  ["confounders", "Other changes in the period (or 'none known')", "evidence"],
+  ["quote", "Quote (with usage rights)", "quote"],
+  ["quote_by", "Quote by", "quote"],
 ];
+const GROUP_CLASS = "grid content-start gap-3 sm:grid-cols-2";
 const EMPTY_RESULT = { metric: "", before: "", after: "" };
 const EMPTY = { slug: "", title: "", tenant_id: "", consent_ref: "", period: "", baseline: "", method: "", limitations: "", confounders: "", results: [EMPTY_RESULT], quote: "", quote_by: "", body: "" };
 
@@ -38,6 +42,22 @@ function Editor({ initial, isNew, onSaved, onCancel }) {
   const [error, setError] = useState(null);
   const set = (k, v) => setCs((c) => ({ ...c, [k]: v }));
   const setResult = (i, k, v) => setCs((c) => ({ ...c, results: c.results.map((x, j) => (j === i ? { ...x, [k]: v } : x)) }));
+  const card = useRef(null);
+  const first = useRef(null);
+  const label = Object.fromEntries(FIELDS.map(([k, l]) => [k, l]));
+  const field = (k) => (
+    <div key={k} className="space-y-1.5">
+      <Label htmlFor={`cs-${k}`}>{label[k]}</Label>
+      <Input id={`cs-${k}`} value={cs[k] || ""} onChange={(e) => set(k, e.target.value)} required={k === "title"} />
+    </div>
+  );
+
+  // The form opens above the list: bring it into view below the 56px top bar and start on its first
+  // field the operator can change (the address is fixed once saved).
+  useEffect(() => {
+    card.current?.scrollIntoView({ block: "start" });
+    (isNew ? first.current : document.getElementById("cs-title"))?.focus({ preventScroll: true });
+  }, [isNew]);
 
   async function save(e) {
     e.preventDefault();
@@ -55,46 +75,65 @@ function Editor({ initial, isNew, onSaved, onCancel }) {
   }
 
   return (
-    <Card data-ops-case-editor>
+    <Card ref={card} className="scroll-mt-16" data-ops-case-editor>
       <CardHeader>
         <CardTitle>{isNew ? "New case study" : `Edit “${initial.title}”`}</CardTitle>
         <CardDescription>Saving keeps it as a draft.{initial.published ? " It comes off /customers until you publish it again." : ""}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={save} className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="cs-slug">Address (/customers/…)</Label>
-            <Input id="cs-slug" value={cs.slug} disabled={!isNew} onChange={(e) => set("slug", e.target.value)} placeholder="lowercase-with-hyphens" required />
-          </div>
-          {FIELDS.map(([k, label]) => (
-            <div key={k} className="space-y-1.5">
-              <Label htmlFor={`cs-${k}`}>{label}</Label>
-              <Input id={`cs-${k}`} value={cs[k] || ""} onChange={(e) => set(k, e.target.value)} required={k === "title"} />
+        <form onSubmit={save} className="space-y-6">
+          <fieldset className={GROUP_CLASS}>
+            <legend className="mb-3 text-sm font-semibold">The study</legend>
+            <div className="space-y-1.5">
+              <Label htmlFor="cs-slug">Address (/customers/…)</Label>
+              <Input ref={first} id="cs-slug" className="font-mono" value={cs.slug} disabled={!isNew} onChange={(e) => set("slug", e.target.value)} placeholder="lowercase-with-hyphens" required />
+              {!isNew && <p className="text-xs text-muted-foreground">The address can&apos;t change after the first save.</p>}
             </div>
-          ))}
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="cs-body">Story</Label>
-            <Textarea id="cs-body" rows={5} value={cs.body || ""} onChange={(e) => set("body", e.target.value)} />
-          </div>
-          <fieldset className="space-y-1.5 sm:col-span-2">
-            <legend className="text-sm font-medium">Measured results (before and after)</legend>
+            {field("title")}
+            {field("tenant_id")}
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="cs-body">Story</Label>
+              <Textarea id="cs-body" rows={5} value={cs.body || ""} onChange={(e) => set("body", e.target.value)} />
+            </div>
+          </fieldset>
+          <fieldset className={`${GROUP_CLASS} border-t border-border pt-6`}>
+            <legend className="sr-only">Consent and measurement</legend>
+            <div className="space-y-0.5 sm:col-span-2" aria-hidden>
+              <p className="text-sm font-semibold">Consent and measurement</p>
+              <p className="text-xs text-muted-foreground">Publishing checks these. A draft saves without them.</p>
+            </div>
+            {FIELDS.filter((f) => f[2] === "evidence").map(([k]) => field(k))}
+          </fieldset>
+          <fieldset className="space-y-2 border-t border-border pt-6">
+            <legend className="sr-only">Measured results (before and after)</legend>
+            <p className="text-sm font-semibold" aria-hidden>
+              Measured results (before and after)
+            </p>
             {cs.results.map((r, i) => (
               <div key={i} className="flex flex-wrap gap-2">
                 <Input aria-label={`Result ${i + 1}: what was measured`} placeholder="What was measured" className="min-w-40 flex-1" value={r.metric} onChange={(e) => setResult(i, "metric", e.target.value)} />
-                <Input aria-label={`Result ${i + 1}: before`} placeholder="Before" className="w-28" value={r.before} onChange={(e) => setResult(i, "before", e.target.value)} />
-                <Input aria-label={`Result ${i + 1}: after`} placeholder="After" className="w-28" value={r.after} onChange={(e) => setResult(i, "after", e.target.value)} />
+                <Input aria-label={`Result ${i + 1}: before`} placeholder="Before" className="w-28 font-mono tabular-nums" value={r.before} onChange={(e) => setResult(i, "before", e.target.value)} />
+                <Input aria-label={`Result ${i + 1}: after`} placeholder="After" className="w-28 font-mono tabular-nums" value={r.after} onChange={(e) => setResult(i, "after", e.target.value)} />
               </div>
             ))}
             <Button type="button" size="sm" variant="outline" disabled={cs.results.length >= 10} onClick={() => setCs((c) => ({ ...c, results: [...c.results, EMPTY_RESULT] }))}>
               <Plus aria-hidden /> Add a result
             </Button>
           </fieldset>
-          {error && (
-            <p role="alert" className="text-sm text-destructive sm:col-span-2">
-              {error}
+          <fieldset className={`${GROUP_CLASS} border-t border-border pt-6`}>
+            <legend className="sr-only">Quote</legend>
+            <p className="text-sm font-semibold sm:col-span-2" aria-hidden>
+              Quote
             </p>
+            {field("quote")}
+            {field("quote_by")}
+          </fieldset>
+          {error && (
+            <Alert variant="destructive" role="alert">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
-          <div className="flex gap-2 sm:col-span-2">
+          <div className="flex flex-wrap gap-2 border-t border-border pt-4">
             <Button type="submit" disabled={busy}>
               {busy ? "Saving…" : "Save draft"}
             </Button>
@@ -152,9 +191,16 @@ export default function CaseStudies() {
         c.published ? (
           <Badge variant="success">Published</Badge>
         ) : c.publishBlocks?.length ? (
-          <Badge variant="warning" title={c.publishBlocks.join("; ")}>
-            Draft, not ready
-          </Badge>
+          // The reasons sit in the hover title and, for a screen reader, in the
+          // badge itself; the count is the visible cue.
+          <span className="inline-flex items-center gap-1.5" title={c.publishBlocks.join("; ")}>
+            <Badge variant="warning">
+              Draft, not ready<span className="sr-only">: {c.publishBlocks.join("; ")}</span>
+            </Badge>
+            <span className="text-xs text-muted-foreground tabular-nums" aria-hidden>
+              {c.publishBlocks.length} to fill in
+            </span>
+          </span>
         ) : (
           <Badge variant="muted">Draft</Badge>
         ),

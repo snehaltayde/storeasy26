@@ -7,11 +7,12 @@
 // can't be taken back (typed: the text the operator must type first). It stays
 // open while the write runs and shows a failure inside it.
 import { useState } from "react";
+import { TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogMedia, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 const OFFLINE = "The console couldn't reach the server. Check your connection and try again.";
 
@@ -74,6 +75,7 @@ export function ConfirmDialog({ open, onOpenChange, title, description, confirmL
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const ready = !typed || text.trim() === typed;
+  const idLike = typed && /^[a-z0-9_-]+$/.test(typed); // a run id reads in mono; a store's name doesn't
 
   function change(next) {
     if (busy) return;
@@ -101,23 +103,45 @@ export function ConfirmDialog({ open, onOpenChange, title, description, confirmL
 
   return (
     <AlertDialog open={open} onOpenChange={change}>
-      <AlertDialogContent>
+      <AlertDialogContent
+        data-ops-confirm-dialog
+        onOpenAutoFocus={(e) => {
+          // A typed confirmation opens on its field; otherwise Radix focuses Cancel.
+          if (!typed) return;
+          e.preventDefault();
+          document.getElementById("ops-confirm-text")?.focus();
+        }}
+      >
         <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogMedia className="bg-destructive/10 text-destructive">
+            <TriangleAlert aria-hidden />
+          </AlertDialogMedia>
+          <AlertDialogTitle className="break-words">{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         {typed && (
-          <div className="space-y-1.5">
-            <Label htmlFor="ops-confirm-text" className="text-[0.8125rem]">
-              {typedLabel || "Type"} <span className="font-mono font-semibold text-foreground">{typed}</span> to confirm
+          <div className="space-y-2 rounded-md border border-destructive/30 bg-destructive/5 p-3">
+            <Label htmlFor="ops-confirm-text" className="block text-[0.8125rem] leading-snug font-normal">
+              {typedLabel || "Type"} <span className={`font-semibold break-words text-foreground select-all ${idLike ? "font-mono" : ""}`}>{typed}</span> to confirm
             </Label>
-            <Input id="ops-confirm-text" autoComplete="off" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && confirm()} />
+            <Input
+              id="ops-confirm-text"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              className={`bg-background ${idLike ? "font-mono" : ""}`}
+              aria-invalid={typed && text.trim().length >= typed.length && !ready ? true : undefined}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && confirm()}
+            />
           </div>
         )}
         {error && (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
+          <Alert variant="destructive" role="alert">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
