@@ -315,13 +315,15 @@ async function waitUp(url, child, ms = 240_000) {
 // failure; the fonts are self-hosted now, see app/fonts/fonts.js.)
 const WARM_PATHS = ["/", "/admin/login"];
 
-// start() → { probe(), output() → string, stop() }; gone() → { ok, why }.
-// Its own harness is stopped even when probe() throws; one that does not go
-// is reported, never killed.
-export async function warmUp({ start, gone }) {
+// start() → { probe() → [{ path, status, body }], output() → string, stop() };
+// gone() → { ok, why }. A page answering 500 or more, or not at all (status
+// 0), is said (the drill still runs and sees it). Its own harness is stopped
+// even when probe() throws; one that does not go is reported, never killed.
+export async function warmUp({ start, gone, say = () => {} }) {
   const h = await start();
   try {
-    await h.probe();
+    const bad = (await h.probe()).filter((p) => p.status === 0 || p.status >= 500);
+    if (bad.length) say(`! warm-up: ${bad.map((p) => `${p.path} ${p.status || "no answer"}`).join(", ")}`);
   } finally {
     await h.stop();
   }
@@ -358,13 +360,12 @@ function warmHarness(c) {
   };
 }
 
-const realWarm = (c) => warmUp({ start: warmHarness(c), gone: () => waitHarnessGone({ worktree: c.worktree, ports: c.ports }) });
+const realWarm = (c, say) => warmUp({ start: warmHarness(c), gone: () => waitHarnessGone({ worktree: c.worktree, ports: c.ports }), say });
 
 const node = process.execPath;
 
 // Seeds this worktree's roles store fresh (dev-roles.js seed --reset: only the
-// worktree's own .design-data-roles, so a drill run a second time after a
-// broken build starts clean too), starts it, runs fn() while it answers, then
+// worktree's own .design-data-roles), starts it, runs fn() while it answers, then
 // stops it (its own handle only). → fn's exit code.
 export async function withRolesStore(c, fn, { start = startChild, up = waitUp, built = bootBuilt } = {}) {
   const seeded = await c.node(["scripts/dev-roles.js", "seed", "--reset"]);
@@ -546,7 +547,7 @@ export async function runIsolated({ root = ROOT, names, stages = [], keep = fals
       let exit;
       try {
         if (spec.id) clearResults(worktree, root, spec.id);
-        if (spec.warm) await warm(ctx);
+        if (spec.warm) await warm(ctx, (m) => (log.push(`${m}\n`), say(m)));
         exit = await spec.run(ctx);
       } catch (e) {
         log.push(`✗ ${e instanceof RunnerError ? e.message : e.stack || e}\n`);

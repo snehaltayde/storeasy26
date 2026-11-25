@@ -383,16 +383,22 @@ await t("smoke seeds the --p3 documents store (a live release) before it starts 
 });
 
 // A stand-in warm-up harness that counts its calls.
-function standInHarness() {
+function standInHarness(pages = [{ path: "/", status: 200, body: "ok" }, { path: "/admin/login", status: 200, body: "ok" }]) {
   const calls = { starts: 0, probes: 0, stops: 0, gones: 0 };
-  const start = async () => (calls.starts++, { probe: async () => void calls.probes++, output: () => "", stop: async () => void calls.stops++ });
+  const start = async () => (calls.starts++, { probe: async () => (calls.probes++, pages), output: () => "", stop: async () => void calls.stops++ });
   return { calls, start, gone: async () => (calls.gones++, { ok: true }) };
 }
 
-await t("warm-up: one boot, its pages loaded, its own harness stopped; a harness that won't go is reported, not killed", async () => {
+await t("warm-up: one boot, its pages loaded, 5xx or no answer said, its own harness stopped; a harness that won't go is reported, not killed", async () => {
   const h = standInHarness();
   await R.warmUp(h);
   eq(JSON.stringify(h.calls), JSON.stringify({ starts: 1, probes: 1, stops: 1, gones: 1 }), "calls:");
+  const quiet = [];
+  await R.warmUp({ ...standInHarness(), say: (m) => quiet.push(m) });
+  eq(quiet.length, 0, "200s are not said:");
+  const said = [];
+  await R.warmUp({ ...standInHarness([{ path: "/", status: 500, body: "" }, { path: "/admin/login", status: 0, body: "ECONNRESET" }, { path: "/x", status: 404, body: "" }]), say: (m) => said.push(m) });
+  eq(said.join("|"), "! warm-up: / 500, /admin/login no answer", "a 5xx and no answer are said, a 404 is not:");
   let stuck;
   await R.warmUp({ ...standInHarness(), gone: async () => ({ ok: false, why: "ports 6100 still answer" }) }).catch((e) => (stuck = e));
   ok(stuck instanceof R.RunnerError && /6100 still answer/.test(stuck.message), `stuck: ${stuck?.message}`);

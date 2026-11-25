@@ -19,8 +19,8 @@ const cspImgSources = ["'self'", "data:", "blob:", "https://cdn.shopify.com", "h
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://www.googletagmanager.com https://connect.facebook.net",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' data: https://fonts.gstatic.com",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data:",
   `img-src ${cspImgSources}`,
   "connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com https://www.google-analytics.com https://region1.google-analytics.com https://graph.facebook.com https://*.a1.typesense.net",
   "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com",

@@ -1,19 +1,27 @@
 // The fonts are self-hosted (app/fonts/), never fetched from Google at build.
 //   pnpm test:fonts
 // No browser, no network. This suite proves:
-//   1. no file in app/, components/ or lib/ imports next/font/google (its
-//      Turbopack build sometimes failed and left every page answering 500)
+//   1. no code file in app/, components/, lib/ or the repo root names
+//      next/font/google (its Turbopack build sometimes failed and left every
+//      page answering 500), and no .css there loads fonts.googleapis.com; the
+//      walk itself is tested on a planted folder
 //   2. every url() in app/fonts/fonts.css and every src path in
-//      app/fonts/fonts.js is a woff2 file that exists
+//      app/fonts/fonts.js is a woff2 file that exists, and every file under
+//      app/fonts/ is one of them (or fonts.js / fonts.css)
 //   3. each family fonts.css declares is a font binding exported by fonts.js
 //      (Turbopack names a next/font/local family after its binding), and
 //      every family fonts.js exports has its latin face there and its other
 //      subsets in fonts.css
 //   4. each fallback fonts.js names has its metric-matched face in fonts.css
 //   5. both root layouts take their fonts from app/fonts/fonts.js
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+//   6. scripts/check-built-fonts.js (run after next build) fails a --font-*
+//      value whose family fonts.css does not declare (a hashed name) or that
+//      has no ₹ face, and passes the real shape
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkBuiltFonts } from "./check-built-fonts.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FONTS = join(ROOT, "app/fonts");
@@ -32,16 +40,29 @@ function t(name, fn) {
 const ok = (v, m) => {
   if (!v) throw new Error(m);
 };
+const eq = (a, b) => ok(a === b, `expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`);
 
-const SOURCE = /\.(m?[jt]sx?|cjs)$/;
+const CODE = /\.(m?[jt]sx?|cjs)$/;
+const GOOGLE_IMPORT = /["'`]@?next\/font\/google[/"'`]/;
+const GOOGLE_CSS = /fonts\.googleapis\.com/;
 function walk(dir, out = []) {
+  if (!existsSync(dir)) return out;
   for (const name of readdirSync(dir)) {
     if (name === "node_modules" || name.startsWith(".")) continue;
     const p = join(dir, name);
     if (statSync(p).isDirectory()) walk(p, out);
-    else if (SOURCE.test(name)) out.push(p);
+    else out.push(p);
   }
   return out;
+}
+// → the files under root (app/, components/, lib/ and the root's own files)
+// that name next/font/google (code) or load fonts.googleapis.com (.css)
+export function googleFontUses(root) {
+  const rootFiles = readdirSync(root).map((n) => join(root, n)).filter((p) => statSync(p).isFile());
+  const files = [...rootFiles, ...["app", "components", "lib"].flatMap((d) => walk(join(root, d)))];
+  return files
+    .filter((f) => (CODE.test(f) && GOOGLE_IMPORT.test(readFileSync(f, "utf8"))) || (f.endsWith(".css") && GOOGLE_CSS.test(readFileSync(f, "utf8"))))
+    .map((f) => relative(root, f));
 }
 
 const js = readFileSync(join(FONTS, "fonts.js"), "utf8");
@@ -53,25 +74,35 @@ const faces = [...css.matchAll(/@font-face\s*\{([^}]*)\}/g)].map((m) => ({
 }));
 const bindings = [...js.matchAll(/export const (\w+) = localFont\(\{([\s\S]*?)\n\}\);/g)].map((m) => ({ name: m[1], body: m[2] }));
 
-t("no file in app/, components/ or lib/ imports next/font/google", () => {
-  const bad = [];
-  for (const dir of ["app", "components", "lib"]) {
-    for (const f of walk(join(ROOT, dir))) {
-      if (/["']next\/font\/google["']/.test(readFileSync(f, "utf8"))) bad.push(relative(ROOT, f));
-    }
+t("no file in app/, components/, lib/ or the repo root names next/font/google or loads fonts.googleapis.com", () => {
+  const bad = googleFontUses(ROOT);
+  ok(!bad.length, `Google Fonts in: ${bad.join(", ")}`);
+});
+
+t("the guard bites: a planted folder's imports, a subpath, a template literal and a .css @import are all found", () => {
+  const dir = mkdtempSync(join(tmpdir(), "fonts-guard-"));
+  try {
+    const plant = (f, text) => (mkdirSync(dirname(join(dir, f)), { recursive: true }), writeFileSync(join(dir, f), text));
+    plant("instrumentation.js", 'import { Geist } from "next/font/google";\n');
+    plant("app/(x)/layout.js", "import { Inter } from 'next/font/google/target.css';\n");
+    plant("components/a/b.tsx", "const m = await import(`@next/font/google`);\n");
+    plant("lib/c.css", '@import url("https://fonts.googleapis.com/css2?family=Inter");\n');
+    plant("lib/ok.js", 'import localFont from "next/font/local";\n');
+    plant("lib/note.md", 'import "next/font/google"\n');
+    eq(googleFontUses(dir).sort().join(","), ["app/(x)/layout.js", "components/a/b.tsx", "instrumentation.js", "lib/c.css"].sort().join(","));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
-  ok(!bad.length, `next/font/google in: ${bad.join(", ")}`);
 });
 
-t("the guard bites: a next/font/google import is caught by the pattern", () => {
-  ok(/["']next\/font\/google["']/.test('import { Geist } from "next/font/google";'), "the pattern missed an import");
-});
-
-t("every font file fonts.css and fonts.js name is a woff2 that exists", () => {
+t("every font file fonts.css and fonts.js name is a woff2 that exists; every file under app/fonts/ is named", () => {
   const paths = [...faces.filter((f) => f.url).map((f) => f.url), ...[...js.matchAll(/["'](\.\/[^"']+\.woff2)["']/g)].map((m) => m[1])];
   ok(paths.length >= 14, `only ${paths.length} font paths found`);
   const missing = paths.filter((p) => !p.endsWith(".woff2") || !existsSync(resolve(FONTS, p)));
   ok(!missing.length, `missing: ${missing.join(", ")}`);
+  const named = new Set([...paths.map((p) => resolve(FONTS, p)), join(FONTS, "fonts.js"), join(FONTS, "fonts.css")]);
+  const stray = walk(FONTS).filter((f) => !named.has(f)).map((f) => relative(ROOT, f));
+  ok(!stray.length, `under app/fonts/ but named by neither fonts.js nor fonts.css: ${stray.join(", ")}`);
 });
 
 t("fonts.css families are fonts.js bindings; each binding has its latin face in fonts.js and other subsets in fonts.css", () => {
@@ -101,6 +132,17 @@ t("both root layouts take their fonts from app/fonts/fonts.js", () => {
   for (const f of ["app/(storefront)/layout.js", "app/(console)/layout.js"]) {
     ok(/from "@\/app\/fonts\/fonts"/.test(readFileSync(join(ROOT, f), "utf8")), `${f} does not import @/app/fonts/fonts`);
   }
+});
+
+t("check-built-fonts: a hashed family, an unset variable or a missing ₹ face fails; the real shape passes", () => {
+  const good =
+    ":root{--font-geist-sans:\"Geist\", \"Geist Fallback\";--font-geist-mono:\"GeistMono\", \"Geist Mono Fallback\";--font-fraunces:\"Fraunces\", \"Fraunces Fallback\"}" +
+    ["Geist", "GeistMono", "Fraunces"].map((f) => `@font-face{font-family:${f};src:url(x.woff2);unicode-range:U+100-2BA,U+20AD-20C4}`).join("");
+  eq(checkBuiltFonts(good, css).join(" | "), "");
+  const hashed = good.replace('--font-geist-sans:"Geist"', '--font-geist-sans:"__Geist_1a2b3c"');
+  ok(/--font-geist-sans: .*__Geist_1a2b3c.*does not declare/.test(checkBuiltFonts(hashed, css).join(" | ")), "a hashed family name passed");
+  ok(/--font-fraunces is not set/.test(checkBuiltFonts(good.replace(/--font-fraunces:[^}]*/, ""), css).join(" | ")), "an unset variable passed");
+  ok(/no "GeistMono" face covering ₹/.test(checkBuiltFonts(good.replace("font-family:GeistMono;src:url(x.woff2);unicode-range:U+100-2BA,U+20AD-20C4", "font-family:GeistMono;src:url(x.woff2);unicode-range:U+0000-00FF"), css).join(" | ")), "a family without a ₹ face passed");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);
