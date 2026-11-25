@@ -61,7 +61,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - [ ] An operator can list, search and open stores, with each store's status, plan and health
 - [ ] An operator can suspend or resume a store and rotate its secrets, with an audit row for each
 - [ ] An operator can manage plans, subscriptions and billing events
-- [ ] An operator can manage feature flags and incidents
+- [x] An operator can manage feature flags and incidents
 - [ ] An operator can open time-boxed support access to a store, and the store's team sees that it is open
 - [x] An operator can run job queues, provisioning runs, privacy requests, themes and case studies on the new UI
 - [ ] The old operator console and `components/console/` are removed once every operator screen is on the new UI

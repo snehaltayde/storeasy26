@@ -3,6 +3,16 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Operator flags and incidents on the new UI (on the owner's behalf)
+
+- **Schema:** none; the existing `incidents` and `feature_flags` tables.
+- **Permissions and data:** every route uses `requireOperator`, and every write is audited with `operatorActor`. An incident's internal note never reaches an audit row, a merchant notice, the merchant Audit log or an error (canary-tested); a note edit is recorded as `incident.update` with `{note_edited: true}`. Merchants (support included) see only the public title and message, for their own store or platform-wide. Incident rows use `incident.open|update|resolve` with the store as `tenant_id`; flag rows use `flags.*`.
+- **Integrity:** a flag edit keeps the stored per-store overrides; each override is one `json_set`/`json_remove` UPDATE. Resolve and update only change an open incident (409 otherwise, one audit row for the winner). Create on an existing key is 409. A flag body without `create` still upserts (operator-only, audited; the old panel and CLIs rely on it).
+- **Kill switches:** a key in `FLAG_FALLBACKS` (`ff_checkout`, `ff_self-signup`) can't be given an expiry (422 in plain words), so checkout can never switch itself off. Deleting a flag falls back to the code's default, which the delete dialog names.
+- **Known gap (until Phase 3 line 7):** in the old console's flags panel, editing an existing flag's cohort field no longer changes its overrides though it reports ok; use `/platform/flags`.
+- **Decided by:** Claude
+- **Slice:** Phase 3 line 4
+
 ## 2026-11-25 Operator operations on the new UI (on the owner's behalf)
 
 - **Schema:** none. A discarded dead job gets a new `discarded` status (a dead webhook goes to the existing `ignored`). Only an explicit retry revives it (`makeJobDue(id, { revive: true })` from the founder's or operator's Try again / Resume, or `runNow`); polls, status reads and the tick never do. Discarded jobs are pruned on the dead-letter schedule.
