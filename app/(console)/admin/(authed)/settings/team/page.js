@@ -27,9 +27,9 @@ export default async function AdminTeamPage() {
     const tenant = currentTenant();
     if (!tenant || tenant.id === "_default" || !platformConfigured()) return { supported: false, initial: null, storeName: null };
     try {
-      return { supported: true, initial: await teamView(tenant.id, actor), storeName: tenant.name };
+      return { supported: true, initial: await teamView(tenant.id, actor), storeName: tenant.name || tenant.id };
     } catch {
-      return { supported: true, initial: null, storeName: tenant.name };
+      return { supported: true, initial: null, storeName: tenant.name || tenant.id };
     }
   });
   return <TeamPage initial={initial} supported={supported} role={actor.role} storeName={storeName} />;
