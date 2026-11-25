@@ -6,10 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DataTable } from "@/components/kit/data-table";
 import { EmptyState } from "@/components/kit/empty-state";
-import { formatPaise } from "@/lib/platform/billing-money";
 import { EVENT_WORDS, shortDate } from "./billingWords";
 import { useBillingData } from "./useBillingData";
 import { selectClass } from "./Subscriptions";
+import { SignedMoney } from "./Overview";
 
 // Billing events: the provider ledger, newest first, 50 a page, filtered by
 // store (or "no store" for orphans), type and month. Amounts are signed
@@ -21,7 +21,7 @@ export default function Events({ params, setParams }) {
   const stores = useStores();
 
   const columns = [
-    { key: "occurred_at", header: "When", cell: (e) => shortDate(e.occurred_at) },
+    { key: "occurred_at", header: "When", cell: (e) => <span className="whitespace-nowrap">{shortDate(e.occurred_at)}</span> },
     {
       key: "store",
       header: "Store",
@@ -31,7 +31,7 @@ export default function Events({ params, setParams }) {
             No store
           </Badge>
         ) : (
-          <a href={`/platform/billing?tab=subscriptions&store=${encodeURIComponent(e.tenant_id)}`} data-read-control className="font-medium underline-offset-4 hover:underline">
+          <a href={`/platform/billing?tab=subscriptions&store=${encodeURIComponent(e.tenant_id)}`} data-read-control title={e.store_name || e.tenant_id} className="block max-w-[10rem] truncate rounded-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring lg:max-w-[16rem]">
             {e.store_name || e.tenant_id}
           </a>
         ),
@@ -41,9 +41,7 @@ export default function Events({ params, setParams }) {
       key: "amount",
       header: "Amount",
       align: "right",
-      cell: (e) => (
-        <span className={`block text-right font-mono tabular-nums ${e.amount < 0 ? "text-destructive" : ""}`}>{e.amount === 0 ? "—" : `${e.amount < 0 ? "−" : "+"}${formatPaise(Math.abs(e.amount))}`}</span>
-      ),
+      cell: (e) => <SignedMoney paise={e.amount} />,
     },
     { key: "ref", header: "Provider reference", truncate: true, cell: (e) => e.payment_id || e.provider_event_id || e.id },
   ];
@@ -55,7 +53,7 @@ export default function Events({ params, setParams }) {
           <Label htmlFor="ev-store" className="mb-1 text-xs text-muted-foreground">
             Store
           </Label>
-          <select id="ev-store" className={selectClass} value={params.store || ""} onChange={(e) => setParams({ store: e.target.value, offset: null })} data-read-control>
+          <select id="ev-store" className={`${selectClass} max-w-64`} value={params.store || ""} onChange={(e) => setParams({ store: e.target.value, offset: null })} data-read-control>
             <option value="">Every store</option>
             <option value="orphan">No store (unmatched)</option>
             {stores.map((s) => (

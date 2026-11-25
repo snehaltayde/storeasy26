@@ -55,7 +55,7 @@ export default function BillingConsole() {
               ))}
             </TabsList>
           </div>
-          <TabsContent value={tab} className="mt-4">
+          <TabsContent value={tab} className="mt-4 rounded-card outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background">
             <Panel params={params} setParams={setParams} />
           </TabsContent>
         </Tabs>

@@ -46,14 +46,19 @@ export default function Overrides() {
   }
 
   const columns = [
-    { key: "tenant", header: "Store", cell: (o) => <span className="font-medium">{nameOf(o.tenant)}</span> },
+    { key: "tenant", header: "Store", cell: (o) => (
+        <span className="block max-w-[10rem] truncate font-medium lg:max-w-[14rem]" title={nameOf(o.tenant)}>
+          {nameOf(o.tenant)}
+        </span>
+      ),
+    },
     {
       key: "features",
       header: "Overrides",
       cell: (o) => (
         <ul className="flex flex-wrap gap-1">
           {Object.entries(o.features || {}).map(([k, v]) => (
-            <li key={k} className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+            <li key={k} className="rounded-full bg-muted px-2 py-0.5 font-mono text-xs whitespace-nowrap">
               {k}: {String(v)}
             </li>
           ))}
@@ -64,7 +69,17 @@ export default function Overrides() {
     {
       key: "expires_at",
       header: "Expires",
-      cell: (o) => (o.expires_at && Date.parse(o.expires_at) <= now ? <Badge variant="muted">Expired {shortDate(o.expires_at)}</Badge> : o.expires_at ? shortDate(o.expires_at) : "Never"),
+      cell: (o) =>
+        o.expires_at && Date.parse(o.expires_at) <= now ? (
+          <span className="flex flex-col items-start gap-0.5 leading-tight">
+            <Badge variant="muted">Expired</Badge>
+            <span className="text-xs whitespace-nowrap text-muted-foreground">{shortDate(o.expires_at)}</span>
+          </span>
+        ) : o.expires_at ? (
+          <span className="whitespace-nowrap">{shortDate(o.expires_at)}</span>
+        ) : (
+          "Never"
+        ),
     },
   ];
 
@@ -95,7 +110,7 @@ export default function Overrides() {
         loading={loading && !data}
         empty={<EmptyState title="No overrides." description="Every store gets exactly what its plan gives." />}
         rowActions={(o) => (
-          <span className="flex justify-end gap-1">
+          <span className="flex flex-col items-end gap-1 lg:flex-row lg:justify-end">
             <Button size="sm" variant="ghost" onClick={() => setDialog({ kind: "set", row: o })}>
               Edit
             </Button>

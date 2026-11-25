@@ -9,7 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/kit/empty-state";
 import { formatPaise } from "@/lib/platform/billing-money";
-import { EXCEPTION_WORDS, UNCONFIGURED_WORDS, monthWords } from "./billingWords";
+import { MoneyCell } from "@/components/kit/money-cell";
+import { EXCEPTION_WORDS, UNCONFIGURED_WORDS, detailWords, monthWords } from "./billingWords";
 import { useBillingData } from "./useBillingData";
 
 // Overview: MRR, gross / refunds / net by month, whether Razorpay is set up,
@@ -41,9 +42,9 @@ export default function Overview() {
       )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Figure label="Monthly recurring revenue" loading={!data} value={data && formatPaise(data.mrr)} />
-        <Figure label="Paying or active subscriptions" loading={!data} value={data && String(live)} />
-        <Figure label="Needs attention" loading={!data} value={data && String(data.exceptions.length)} tone={data?.exceptions.length ? "warning" : null} />
+        <Figure label="Monthly recurring revenue" loading={!data} value={data && formatPaise(data.mrr)} mono />
+        <Figure label="Paying or active subscriptions" loading={!data} value={data && String(live)} mono />
+        <Figure label="Needs attention" loading={!data} value={data && String(data.exceptions.length)} tone={data?.exceptions.length ? "warning" : null} mono />
         <Figure
           label="Payment provider"
           loading={!data}
@@ -51,10 +52,12 @@ export default function Overview() {
             data &&
             (data.provider_configured ? (
               <span className="inline-flex items-center gap-1.5 text-success">
-                <CheckCircle2 className="size-4" aria-hidden /> Razorpay set up
+                <CheckCircle2 className="size-5" aria-hidden /> Razorpay set up
               </span>
             ) : (
-              <span className="text-warning-text">Not set up</span>
+              <span className="inline-flex items-center gap-1.5 text-warning-text">
+                <AlertTriangle className="size-5" aria-hidden /> Not set up
+              </span>
             ))
           }
         />
@@ -71,22 +74,24 @@ export default function Overview() {
           {!data ? (
             <Skeleton className="h-16" />
           ) : data.exceptions.length === 0 ? (
-            <EmptyState title="Nothing needs attention." description="Payment trouble, stores past their grace period and events no store matched show up here." />
+            <EmptyState icon={CheckCircle2} className="border-0 py-6" title="Nothing needs attention." description="Payment trouble, stores past their grace period and events no store matched show up here." />
           ) : (
             <ul className="divide-y divide-border" aria-label="Exceptions">
               {data.exceptions.map((x, i) => (
-                <li key={`${x.kind}-${x.tenant || ""}-${i}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5">
-                  <Badge variant={x.kind === "past_grace" ? "danger" : "warning"}>{EXCEPTION_WORDS[x.kind] || x.kind}</Badge>
+                <li key={`${x.kind}-${x.tenant || ""}-${i}`} className="grid gap-x-3 gap-y-1 py-2.5 sm:grid-cols-[11rem_12rem_1fr] sm:items-center">
+                  <span>
+                    <Badge variant={x.kind === "past_grace" ? "danger" : "warning"}>{EXCEPTION_WORDS[x.kind] || x.kind}</Badge>
+                  </span>
                   {x.tenant ? (
-                    <a href={`/platform/billing?tab=subscriptions&store=${encodeURIComponent(x.tenant)}`} data-read-control className="font-medium underline-offset-4 hover:underline">
+                    <a href={`/platform/billing?tab=subscriptions&store=${encodeURIComponent(x.tenant)}`} data-read-control className="w-fit truncate rounded-sm font-mono text-[0.8125rem] font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
                       {x.tenant}
                     </a>
                   ) : (
-                    <a href="/platform/billing?tab=events&store=orphan" data-read-control className="font-medium underline-offset-4 hover:underline">
+                    <a href="/platform/billing?tab=events&store=orphan" data-read-control className="w-fit rounded-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
                       Open in the ledger
                     </a>
                   )}
-                  <span className="text-sm text-muted-foreground">{x.detail}</span>
+                  <span className="text-sm text-muted-foreground">{detailWords(x.detail)}</span>
                 </li>
               ))}
             </ul>
@@ -102,7 +107,7 @@ export default function Overview() {
           {!data ? (
             <Skeleton className="h-24" />
           ) : data.revenue.length === 0 ? (
-            <EmptyState title="No payments yet." description="Charges and refunds from Razorpay appear here month by month." />
+            <EmptyState className="border-0 py-6" title="No payments yet." description="Charges and refunds from Razorpay appear here month by month." />
           ) : (
             <Table aria-label="Revenue by month">
               <TableHeader>
@@ -117,9 +122,13 @@ export default function Overview() {
                 {data.revenue.map((m) => (
                   <TableRow key={m.month}>
                     <TableCell>{monthWords(m.month)}</TableCell>
-                    <TableCell className="text-right font-mono tabular-nums">{formatPaise(m.gross)}</TableCell>
-                    <TableCell className="text-right font-mono tabular-nums">{m.refunds ? `−${formatPaise(m.refunds)}` : formatPaise(0)}</TableCell>
-                    <TableCell className="text-right font-mono font-medium tabular-nums">{formatPaise(m.net)}</TableCell>
+                    <TableCell>
+                      <MoneyCell amount={m.gross / 100} currency="INR" />
+                    </TableCell>
+                    <TableCell>{m.refunds ? <SignedMoney paise={-m.refunds} /> : <MoneyCell amount={0} currency="INR" className="text-muted-foreground" />}</TableCell>
+                    <TableCell>
+                      <MoneyCell amount={m.net / 100} currency="INR" className="font-medium" />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -131,11 +140,31 @@ export default function Overview() {
   );
 }
 
-function Figure({ label, value, loading, tone = null }) {
+// A headline figure. Numbers are mono and tabular; words stay in the body face.
+// A figure that needs attention gets a warning rule on its left edge.
+export function Figure({ label, value, loading = false, tone = null, mono = false, note = null }) {
   return (
-    <div className="rounded-card border border-border bg-card p-4 shadow-card">
+    <div className={`rounded-card border border-border bg-card p-4 shadow-card ${tone === "warning" ? "border-l-4 border-l-warning" : ""}`}>
       <p className="text-[0.8125rem] text-muted-foreground">{label}</p>
-      {loading ? <Skeleton className="mt-2 h-7 w-24" /> : <p className={`mt-1 font-mono text-xl font-semibold tabular-nums ${tone === "warning" ? "text-warning-text" : ""}`}>{value}</p>}
+      {loading ? (
+        <Skeleton className="mt-2 h-7 w-24" />
+      ) : (
+        <p className={`mt-1 leading-tight font-semibold ${mono ? "font-mono text-[1.375rem] tabular-nums" : "pt-1 text-base"} ${tone === "warning" ? "text-warning-text" : ""}`}>{value}</p>
+      )}
+      {note && <p className="mt-1 text-xs text-muted-foreground">{note}</p>}
     </div>
+  );
+}
+
+// A signed ledger amount in paise: "+₹999" or "−₹499.95" (refunds in the
+// destructive colour), through MoneyCell so it lines up with the column.
+export function SignedMoney({ paise }) {
+  if (!paise) return <MoneyCell amount={null} currency="INR" />;
+  const neg = paise < 0;
+  return (
+    <span className={`flex justify-end font-mono tabular-nums ${neg ? "text-destructive" : ""}`}>
+      <span>{neg ? "−" : "+"}</span>
+      <MoneyCell amount={Math.abs(paise) / 100} currency="INR" className="inline" />
+    </span>
   );
 }

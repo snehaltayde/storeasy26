@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DataTable } from "@/components/kit/data-table";
 import { EmptyState } from "@/components/kit/empty-state";
+import { MoneyCell } from "@/components/kit/money-cell";
 import { formatPaise, rupeesToPaise } from "@/lib/platform/billing-money";
 import { platformApi, shortDate } from "./billingWords";
 import { useBillingData } from "./useBillingData";
@@ -42,21 +43,37 @@ export default function Plans() {
       header: "Plan",
       cell: (p) => (
         <span className="flex flex-col leading-tight">
-          <span className="font-medium">
-            {p.name} <span className="text-muted-foreground">v{p.version}</span>
+          <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+            <span className="font-medium">
+              {p.name} <span className="text-muted-foreground">v{p.version}</span>
+            </span>
+            <Badge variant={p.status === "active" ? "success" : "muted"}>{p.status === "active" ? "On sale" : "Retired"}</Badge>
           </span>
           <span className="font-mono text-xs text-muted-foreground">{p.id}</span>
         </span>
       ),
     },
-    { key: "price", header: "Price", align: "right", cell: (p) => <span className="font-mono tabular-nums">{p.price ? `${formatPaise(p.price)} / ${p.interval}` : "Free"}</span> },
+    {
+      key: "price",
+      header: "Price",
+      align: "right",
+      cell: (p) =>
+        p.price ? (
+          <span className="flex flex-col items-end leading-tight">
+            <MoneyCell amount={p.price / 100} currency="INR" />
+            <span className="text-xs text-muted-foreground">a {p.interval}</span>
+          </span>
+        ) : (
+          <span className="block text-right">Free</span>
+        ),
+    },
     {
       key: "features",
       header: "Features",
       cell: (p) => (
-        <ul className="flex flex-wrap gap-1">
+        <ul className="flex max-w-md flex-wrap gap-1 py-1.5">
           {Object.entries(p.features || {}).map(([k, v]) => (
-            <li key={k} className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+            <li key={k} className="rounded-full bg-muted px-2 py-0.5 font-mono text-xs whitespace-nowrap">
               {k}: {featureText(v)}
             </li>
           ))}
@@ -64,8 +81,7 @@ export default function Plans() {
       ),
     },
     { key: "subscribers", header: "Subscribers", align: "right", cell: (p) => <span className="font-mono tabular-nums">{p.subscribers}</span> },
-    { key: "status", header: "Status", cell: (p) => <Badge variant={p.status === "active" ? "success" : "muted"}>{p.status === "active" ? "On sale" : "Retired"}</Badge> },
-    { key: "created_at", header: "Created", cell: (p) => shortDate(p.created_at) },
+    { key: "created_at", header: "Created", className: "hidden xl:table-cell", cell: (p) => <span className="whitespace-nowrap">{shortDate(p.created_at)}</span> },
   ];
 
   return (
@@ -95,7 +111,7 @@ export default function Plans() {
         loading={loading && !data}
         empty={<EmptyState title="No plans yet." description="Create the first plan version." />}
         rowActions={(p) => (
-          <span className="flex justify-end gap-1">
+          <span className="flex flex-col items-end gap-1 lg:flex-row lg:justify-end">
             <Button size="sm" variant="ghost" onClick={() => setDialog({ kind: "new", plan: p })}>
               New version
             </Button>
@@ -304,7 +320,7 @@ function RetireDialog({ plan, onClose, onDone }) {
             Retire {plan.name} v{plan.version}?
           </AlertDialogTitle>
           <AlertDialogDescription>
-            No store can start this version any more. The {plan.subscribers} {plan.subscribers === 1 ? "store" : "stores"} on it keep it.
+            No store can start {plan.name} v{plan.version} after this. The {plan.subscribers} {plan.subscribers === 1 ? "store" : "stores"} on it keep it at the same price. Retiring can&apos;t be undone: to sell this plan again, put a new version on sale.
           </AlertDialogDescription>
         </AlertDialogHeader>
         {err && (

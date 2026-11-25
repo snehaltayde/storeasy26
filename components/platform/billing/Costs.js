@@ -16,6 +16,7 @@ import { MoneyCell } from "@/components/kit/money-cell";
 import { formatMoney } from "@/lib/format";
 import { monthWords, platformApi } from "./billingWords";
 import { useBillingData } from "./useBillingData";
+import { Figure } from "./Overview";
 
 // Costs (moved here from the old console's GrowthOps panel): the month's real
 // provider bills (whole rupees, not paise), each allocated to stores by a
@@ -70,9 +71,9 @@ export default function Costs({ params, setParams }) {
           </Label>
           <Input id="cost-month" type="month" value={month} max={thisMonth()} onChange={(e) => setParams({ month: e.target.value || null })} className="h-8 w-40" data-read-control />
         </div>
-        {report?.configured && (
-          <Button size="sm" onClick={() => setDialog({ kind: "inputs" })}>
-            {report.inputs ? "Edit the month's bills" : "Enter the month's bills"}
+        {report?.configured && report.inputs && (
+          <Button size="sm" variant="outline" onClick={() => setDialog({ kind: "inputs" })}>
+            Edit the month&apos;s bills
           </Button>
         )}
       </div>
@@ -103,9 +104,9 @@ export default function Costs({ params, setParams }) {
       {report?.configured && report.inputs && (
         <>
           <div className="grid gap-3 sm:grid-cols-3">
-            <Figure label={`Bills for ${monthWords(month)}`} value={inr(report.total)} />
-            <Figure label="Allocated to stores" value={inr(report.allocated)} />
-            <Figure label="Unallocated" value={inr(report.unallocated)} note={report.total ? `${Math.round((report.unallocated / report.total) * 100)}% of the bills: never spread over stores without a measure` : null} />
+            <Figure label={`Bills for ${monthWords(month)}`} value={inr(report.total)} mono />
+            <Figure label="Allocated to stores" value={inr(report.allocated)} mono />
+            <Figure label="Unallocated" value={inr(report.unallocated)} mono note={report.total ? `${Math.round((report.unallocated / report.total) * 100)}% of the bills. It is never spread over stores without a measure.` : null} />
           </div>
           {report.alerts.length > 0 && (
             <Alert variant="destructive">
@@ -134,11 +135,11 @@ export default function Costs({ params, setParams }) {
               <CardDescription>{report.inputs.note || "Each bill is split by a measured driver."}</CardDescription>
             </CardHeader>
             <CardContent>
-              <dl className="grid gap-x-4 gap-y-1.5 text-sm sm:grid-cols-[8rem_1fr]">
+              <dl className="grid gap-x-4 gap-y-1.5 text-sm sm:grid-cols-[11rem_1fr]">
                 {BUCKETS.map(([k, label]) => (
                   <div key={k} className="contents">
                     <dt className="font-medium">
-                      {label} <span className="font-mono text-muted-foreground">{inr(report.inputs.totals[k] || 0)}</span>
+                      {label} <span className="ml-1 font-mono font-normal tabular-nums text-muted-foreground">{inr(report.inputs.totals[k] || 0)}</span>
                     </dt>
                     <dd className="text-muted-foreground">{report.method[k]}</dd>
                   </div>
@@ -155,16 +156,6 @@ export default function Costs({ params, setParams }) {
       )}
       {dialog?.kind === "inputs" && <InputsDialog month={month} current={report?.inputs} onClose={() => setDialog(null)} onDone={done} />}
       {dialog?.kind === "budget" && <BudgetDialog row={dialog.row} onClose={() => setDialog(null)} onDone={done} />}
-    </div>
-  );
-}
-
-function Figure({ label, value, note = null }) {
-  return (
-    <div className="rounded-card border border-border bg-card p-4 shadow-card">
-      <p className="text-[0.8125rem] text-muted-foreground">{label}</p>
-      <p className="mt-1 font-mono text-xl font-semibold tabular-nums">{value}</p>
-      {note && <p className="mt-1 text-xs text-muted-foreground">{note}</p>}
     </div>
   );
 }

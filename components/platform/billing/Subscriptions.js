@@ -69,36 +69,49 @@ export default function Subscriptions({ params, setParams }) {
       key: "store",
       header: "Store",
       cell: (r) => (
-        <span className="flex flex-col leading-tight">
-          <span className="font-medium">{r.store_name || r.tenant_id}</span>
-          <span className="font-mono text-xs text-muted-foreground">{r.tenant_id}</span>
+        <span className="flex max-w-[10rem] flex-col leading-tight lg:max-w-[12rem] 2xl:max-w-[18rem]">
+          <span className="truncate font-medium" title={r.store_name || r.tenant_id}>
+            {r.store_name || r.tenant_id}
+          </span>
+          <span className="truncate font-mono text-xs text-muted-foreground">{r.tenant_id}</span>
         </span>
       ),
     },
-    { key: "plan", header: "Plan", cell: (r) => `${r.plan_id} v${r.plan_version}` },
+    {
+      key: "plan",
+      header: "Plan",
+      cell: (r) => (
+        <span className="flex flex-col leading-tight">
+          <span>
+            {r.plan_id} v{r.plan_version}
+          </span>
+          <span className="text-xs text-muted-foreground">{r.provider ? "Billed by Razorpay" : "Local, no charge"}</span>
+          {r.current_end && <span className="text-xs text-muted-foreground lg:hidden">Cycle ends {shortDate(r.current_end)}</span>}
+        </span>
+      ),
+    },
     {
       key: "status",
       header: "Status",
       cell: (r) => {
         const [label, tone] = subStatus(r.status);
+        const note = r.cancel_requested && !ENDED.includes(r.status) ? (r.cancel_requested.ended === "now" ? "Cancel sent" : "Cancels at cycle end") : null;
         return (
-          <span className="flex flex-wrap items-center gap-1.5">
+          <span className="flex flex-col items-start gap-0.5 leading-tight">
             <Badge variant={tone}>{label}</Badge>
-            {r.cancel_requested && !ENDED.includes(r.status) && <span className="text-xs text-muted-foreground">{r.cancel_requested.ended === "now" ? "Cancel sent" : "Cancels at cycle end"}</span>}
+            {(note || r.grace_until) && <span className="text-xs text-muted-foreground">{note || `Grace until ${shortDate(r.grace_until)}`}</span>}
           </span>
         );
       },
     },
-    { key: "source", header: "Billed by", cell: (r) => (r.provider ? "Razorpay" : "Local (free)") },
-    { key: "current_end", header: "Period ends", cell: (r) => shortDate(r.current_end) },
-    { key: "grace_until", header: "Grace until", cell: (r) => (r.grace_until ? shortDate(r.grace_until) : "—") },
+    { key: "current_end", header: "Cycle ends", className: "hidden lg:table-cell", cell: (r) => <span className="whitespace-nowrap">{shortDate(r.current_end)}</span> },
   ];
 
   const rowActions = (r) => {
     const ended = ENDED.includes(r.status);
     const cancelBlocked = ended ? "This subscription has already ended." : r.provider && !configured ? "Razorpay isn't set up, so this can't be cancelled from here." : null;
     return (
-      <span className="flex justify-end gap-1">
+      <span className="flex flex-col items-end gap-1 lg:flex-row lg:justify-end">
         {!ended && (
           <Button size="sm" variant="ghost" onClick={() => setDialog({ kind: "start", tenant: r.tenant_id, row: r })}>
             Change plan
@@ -288,7 +301,7 @@ function StartDialog({ stores, plans, configured, initial, onClose, onDone }) {
           <DialogTitle>{change ? "Change plan" : "Start a plan"}</DialogTitle>
           <DialogDescription>
             A free plan starts now. A paid plan gives you a payment link for the founder; it starts when they pay.
-            {change && " The current subscription ends: a free one now, a paid one at the end of the period already paid for."}
+            {change && " The current subscription ends: a free one now, a paid one at the end of the billing cycle."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -333,7 +346,7 @@ function StartDialog({ stores, plans, configured, initial, onClose, onDone }) {
             disabled={busy || !tenant || !plan || Boolean(blocked)}
             onClick={() =>
               submit({ action: "start", tenant, plan }, (r) => ({
-                text: `${chosen?.name || plan} ${r.local ? "is active" : "is waiting for the founder's payment"} for ${tenant}.${r.previous?.ended === "cycle_end" ? " The old subscription ends at the end of its period." : r.previous?.ended === "now" ? " The old subscription has ended." : r.previous?.error ? ` The old subscription could not be cancelled: ${r.previous.error}` : ""}`,
+                text: `${chosen?.name || plan} ${r.local ? "is active" : "is waiting for the founder's payment"} for ${tenant}.${r.previous?.ended === "cycle_end" ? " The old subscription ends at the end of its billing cycle." : r.previous?.ended === "now" ? " The old subscription has ended." : r.previous?.error ? ` The old subscription could not be cancelled: ${r.previous.error}` : ""}`,
                 link: r.shortUrl || null,
               }))
             }
@@ -346,28 +359,38 @@ function StartDialog({ stores, plans, configured, initial, onClose, onDone }) {
   );
 }
 
+// The date grace would end on: the server adds the days to the later of now
+// and the current grace end (lib/platform/billing.js extendGrace).
+const graceAfter = (graceUntil, days) => new Date(Math.max(Date.now(), graceUntil ? Date.parse(graceUntil) : 0) + days * 86400000).toISOString();
+
 function GraceDialog({ row, onClose, onDone }) {
   const [days, setDays] = useState("7");
   const [reason, setReason] = useState("");
   const { busy, err, submit } = useSubmit(onDone);
   const n = Number(days);
-  const valid = Number.isInteger(n) && n >= 1 && n <= 30 && reason.trim();
+  const daysOk = Number.isInteger(n) && n >= 1 && n <= 30;
+  const valid = daysOk && reason.trim();
+  const name = row.store_name || row.tenant_id;
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Extend grace for {row.store_name || row.tenant_id}</DialogTitle>
-          <DialogDescription>
-            Checkout keeps working until the grace period ends. {row.grace_until ? `It ends ${shortDate(row.grace_until)} now.` : "There is no grace period now."} Add up to 30 days.
-          </DialogDescription>
+          <DialogTitle>Extend grace for {name}</DialogTitle>
+          <DialogDescription>Checkout keeps working until grace ends. The store is not charged for the extra days, and the reason goes in the audit log.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div>
             <Label htmlFor="grace-days" className="mb-1">
               Days to add
             </Label>
-            <Input id="grace-days" type="number" min="1" max="30" step="1" value={days} onChange={(e) => setDays(e.target.value)} className="w-28" />
+            <Input id="grace-days" type="number" min="1" max="30" step="1" value={days} onChange={(e) => setDays(e.target.value)} className="w-28 font-mono" aria-describedby="grace-readback" aria-invalid={!daysOk || undefined} />
           </div>
+          <dl id="grace-readback" aria-live="polite" className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-md bg-muted px-3 py-2 text-sm">
+            <dt className="text-muted-foreground">Grace ends now</dt>
+            <dd>{row.grace_until ? shortDate(row.grace_until) : "No grace period"}</dd>
+            <dt className="text-muted-foreground">After this</dt>
+            <dd className="font-medium">{daysOk ? shortDate(graceAfter(row.grace_until, n)) : "Pick 1 to 30 days"}</dd>
+          </dl>
           <div>
             <Label htmlFor="grace-reason" className="mb-1">
               Reason
@@ -393,36 +416,49 @@ function GraceDialog({ row, onClose, onDone }) {
   );
 }
 
+// Cancel: a Razorpay subscription ends at the end of the billing cycle unless
+// the operator picks "now"; a local (free) one has no cycle and ends now.
 function CancelDialog({ row, onClose, onDone }) {
   const [when, setWhen] = useState("cycle_end");
   const [reason, setReason] = useState("");
   const { busy, err, submit } = useSubmit(onDone);
   const name = row.store_name || row.tenant_id;
+  const cycleEnd = row.current_end ? shortDate(row.current_end) : null;
+  const outcome = !row.provider
+    ? "The subscription ends now and the usual grace period starts. Checkout pauses when grace ends."
+    : when === "cycle_end"
+      ? `${name} keeps its plan until the end of the billing cycle${cycleEnd ? ` on ${cycleEnd}` : ""}. After that the subscription ends and Razorpay charges nothing more.`
+      : `Razorpay stops the subscription now. ${name} loses the rest of the billing cycle it paid for${cycleEnd ? ` (to ${cycleEnd})` : ""}.`;
   return (
     <AlertDialog open onOpenChange={(o) => !o && onClose()}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Cancel {name}&apos;s subscription?</AlertDialogTitle>
           <AlertDialogDescription>
-            {row.provider
-              ? "This cancels the subscription at Razorpay. It can't be undone: to bill this store again, start a new plan."
-              : "The free subscription ends now and the usual grace period starts; checkout pauses when it ends. This can't be undone: to bill this store again, start a new plan."}
+            {row.provider ? "" : "This is a free plan with no billing cycle, so it ends now. "}This can&apos;t be undone: to bill this store again, start a new plan.
           </AlertDialogDescription>
         </AlertDialogHeader>
         {row.provider && (
-          <RadioGroup value={when} onValueChange={setWhen} aria-label="When it ends" className="gap-2">
-            <label htmlFor="cancel-cycle-end" className="flex items-start gap-2 text-sm">
+          <RadioGroup value={when} onValueChange={setWhen} aria-label="When the subscription ends" className="gap-2">
+            <label htmlFor="cancel-cycle-end" className="flex cursor-pointer items-start gap-2 rounded-md border border-border px-3 py-2 text-sm has-[[data-state=checked]]:border-primary">
               <RadioGroupItem id="cancel-cycle-end" value="cycle_end" className="mt-0.5" />
               <span>
-                At the end of the period already paid for{row.current_end ? ` (${shortDate(row.current_end)})` : ""}. <span className="text-muted-foreground">Recommended.</span>
+                <span className="font-medium">At the end of the billing cycle{cycleEnd ? ` (${cycleEnd})` : ""}</span>
+                <span className="block text-muted-foreground">Recommended. The founder keeps what they paid for.</span>
               </span>
             </label>
-            <label htmlFor="cancel-now" className="flex items-start gap-2 text-sm">
+            <label htmlFor="cancel-now" className="flex cursor-pointer items-start gap-2 rounded-md border border-border px-3 py-2 text-sm has-[[data-state=checked]]:border-destructive">
               <RadioGroupItem id="cancel-now" value="now" className="mt-0.5" />
-              <span>Now. The founder loses the rest of the period they paid for.</span>
+              <span>
+                <span className="font-medium">Now</span>
+                <span className="block text-muted-foreground">The founder loses the rest of the cycle.</span>
+              </span>
             </label>
           </RadioGroup>
         )}
+        <p className="rounded-md bg-muted px-3 py-2 text-sm" aria-live="polite">
+          {outcome}
+        </p>
         <div>
           <Label htmlFor="cancel-reason" className="mb-1">
             Reason (kept in the audit log)
@@ -442,7 +478,7 @@ function CancelDialog({ row, onClose, onDone }) {
             onClick={(e) => {
               e.preventDefault();
               submit({ action: "cancel", subscription: row.id, atCycleEnd: when === "cycle_end", reason: reason.trim() }, (r) => ({
-                text: r.local ? `${name}'s free subscription has ended.` : r.ended === "cycle_end" ? `${name}'s subscription will end at the end of its period. Razorpay confirms it by webhook.` : `${name}'s subscription was cancelled at Razorpay. Razorpay confirms it by webhook.`,
+                text: r.local ? `${name}'s free subscription has ended.` : r.ended === "cycle_end" ? `${name}'s subscription will end at the end of the billing cycle. Razorpay confirms it by webhook.` : `${name}'s subscription was cancelled at Razorpay. Razorpay confirms it by webhook.`,
               }));
             }}
           >

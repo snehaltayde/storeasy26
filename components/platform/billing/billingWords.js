@@ -64,3 +64,14 @@ export async function platformApi(path, body = undefined) {
   if (!res.ok || !json?.ok) throw new Error(json?.error || `That didn't work (${res.status}). Try again.`);
   return json;
 }
+
+// An exception's detail line from the server ("status halted, grace until
+// 2026-11-27T09:46:39.275Z") in plain words: dates as dates, statuses as the
+// table's words. Display only; the server's text is unchanged.
+export const detailWords = (detail) =>
+  String(detail || "")
+    .replace(/\b\d{4}-\d{2}-\d{2}T[\d:.]+Z\b/g, (iso) => shortDate(iso))
+    .replace(/\bstatus (\w+)/g, (_, s) => subStatus(s)[0])
+    .replace(/\b(?:subscription|refund)\.\w+\b/g, (t) => EVENT_WORDS[t] || t)
+    .replace(/ — /g, ": ")
+    .replace(/^./, (c) => c.toUpperCase());
