@@ -824,12 +824,11 @@ const flowStubs = {
 };
 // Phase 8 step 0: CheckoutFlow's own parts, loaded with the same stubs.
 // Phase 8 line 2: and the nudge, the code dialog, the quote hook and placeOrder.
-for (const part of ["checkoutModel", "AddressStep", "PrepaidNudge", "PaymentStep", "OrderSummary", "CodOtpDialog", "useQuote", "placeOrder"]) {
 // Phase 8 line 3: AddressStep's SavedAddressPicker keeps its own hooks and
 // fetches, which this stand-in can't run; it renders nothing here (its copy is
 // still in the source scan, and scripts/test-addresses.js scans it too).
 flowStubs["./SavedAddressPicker"] = nothing;
-for (const part of ["checkoutModel", "AddressStep", "PaymentStep", "OrderSummary"]) {
+for (const part of ["checkoutModel", "AddressStep", "PrepaidNudge", "PaymentStep", "OrderSummary", "CodOtpDialog", "useQuote", "placeOrder"]) {
   flowStubs[`./${part}`] = await loadComponent(sources.get(`components/checkout/${part}.js`), flowStubs);
 }
 const realFlow = () => loadComponent(sources.get("components/checkout/CheckoutFlow.js"), flowStubs);
