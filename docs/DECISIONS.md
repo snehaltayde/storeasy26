@@ -12,6 +12,14 @@ without asking the owner are marked so they are easy to review.
 - **Decided by:** Claude
 - **Slice:** Phase 2
 
+## 2026-11-25 Phase 1 audit: invites only add or raise; owner invites go to the signup email (on the owner's behalf)
+
+- **Decision (permission):** accepting an invite can only add a member or raise their role, in one SQL statement (`addInviteMembership`); an invite to someone already at that role or higher answers 409 `ALREADY_MEMBER` and spends the token. Changing or removing a member in the team route expires their pending invites to that store. An operator's owner invite goes only to the signup's email; the `support_email` fallback is gone (an admin could set it and become owner), so a store with no signup gets "no email on file".
+- **Accepted, not gaps:** the address check says when a store address is taken (addresses are public); Shopify connect tells an admin another store holds a shop without naming it; the invite page tells the link holder whether that email has an account.
+- **Why:** Phase 1 least-trusted audit (`docs/cms-reviews/PHASE-1-AUDIT.md`, gaps P1-A and P1-B).
+- **Decided by:** Claude
+- **Slice:** Phase 1 end audit
+
 ## 2026-11-25 Drill harness: reboot a broken Turbopack font build, serialize installs (on the owner's behalf)
 
 - **Decision:** every harness boot a drill starts first loads `/` and `/admin/login`; only Turbopack's `next/font/google` "Can't resolve ... internal/font/google/font" build error stops and reboots it (up to 3 times, then a plain failure); any other 500 still reaches the drill. Fonts are not mocked, since that would change how pages render. `pnpm install` in drill worktrees runs one at a time under a machine-wide lock folder (dead owner taken over, live owner waited for, never killed) rather than a shared `node_modules`. Each drill keeps its Next and sqld logs in `.drill-results/<stamp>/<drill>/server.log`.
