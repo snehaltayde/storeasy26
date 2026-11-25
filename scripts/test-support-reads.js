@@ -410,9 +410,10 @@ CTX.ownerSid = ownerPreview.body?.sid;
 TOKENS.ownerPreviewToken = ownerPreview.body?.token ?? "";
 await t("owner: makes its own preview session", () => eq(ownerPreview.status, 200, `owner preview: ${ownerPreview.text?.slice(0, 200)}`));
 // Phase 4 line 2: Trust badges installed, so the placements probe reads a real install
+// (line 1's fixture may have installed it already: then its install is used)
 const installed = await call("owner", "apps", "POST", { body: { install: { pluginId: "trust-badges", scopes: [] } } });
-CTX.installId = installed.body?.install?.id;
-await t("owner: installs Trust badges (the placements probe's install)", () => eq(installed.status, 200, `install: ${installed.text?.slice(0, 200)}`));
+CTX.installId = installed.body?.install?.id ?? (await call("owner", "apps", "GET")).body?.installs?.find((i) => i.pluginId === "trust-badges")?.id;
+await t("owner: Trust badges is installed (the placements probe's install)", () => ok(/^pin_[0-9a-f]{16}$/.test(String(CTX.installId)), `install: ${installed.text?.slice(0, 200)}`));
 
 // --- every probe as every least-trusted caller -----------------------------------------
 const results = {}; // caller -> probe name -> response
