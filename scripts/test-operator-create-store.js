@@ -501,6 +501,25 @@ await t("an existing account accepts with its current password: a wrong one is r
   ok(/already has an owner/.test(after.body.error), "words");
 });
 
+await t("Phase 1 audit gap P1-A: an invite never lowers an existing member's role: the sole owner or an admin invited as support is refused before the token is spent, keeps the role, and the answer carries no internal words; an invite that raises a role still works", async () => {
+  const A = store.a.tenant.domains[0];
+  const roleOf = async (userId) => (await one("SELECT role FROM memberships WHERE tenant_id = ? AND user_id = ?", [store.a.id, userId]))?.role;
+  for (const [who, pass] of [["owner", "owner-pass-opcreate"], ["admin", "admin-pass-opcreate"]]) {
+    const inv = await I.createInvite({ email: store.users[who].email, tenantId: store.a.id, role: "support", invitedBy: store.users.admin.id });
+    const r = await acceptCall(A, "POST", { body: { token: inv.token, password: pass } });
+    eq(r.status, 409, `${who}: ${r.text}`);
+    eq(r.body.code, "ALREADY_MEMBER", `${who} code`);
+    ok(!/demote|grant owner|Error|at \w+ \(/.test(r.text), `${who}: no internal words: ${r.text}`);
+    eq(await roleOf(store.users[who].id), who, `${who} keeps the role`);
+    eq((await one("SELECT accepted_at FROM invitations WHERE id = ?", [inv.id])).accepted_at, null, `${who}: the invite is not spent`);
+  }
+  const up = await I.createInvite({ email: store.users.support.email, tenantId: store.a.id, role: "staff" });
+  const r = await acceptCall(A, "POST", { body: { token: up.token, password: "support-pass-opcreate" } });
+  eq(r.status, 200, r.text);
+  eq(await roleOf(store.users.support.id), "staff", "raised to staff");
+  await I.addMembership(store.users.support.id, store.a.id, "support");
+});
+
 await t("an expired invite is refused", async () => {
   const inv = await I.createInvite({ email: "late@x.test", tenantId: "prep-store", role: "owner", ttlMs: -1 });
   eq((await acceptCall("prep-store.stores.test", "POST", { body: { token: inv.token, name: "L", password: "late-pass-123" } })).status, 400, "expired");
