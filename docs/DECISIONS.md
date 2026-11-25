@@ -3,6 +3,18 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Operator billing on the new UI (on the owner's behalf)
+
+- **Schema:** platform migration `0016_subscription_changes.sql` adds `replaced_by`, `cancel_state` and `cancel_error` and a unique partial index allowing one current subscription per store. Its backfill keeps a paid-up row over an unpaid one (then the newest) and marks other live duplicates replaced and ended; nothing is deleted. Line 5 takes 0017.
+- **Plan changes:** ending every live row and inserting the new one is one batch; a losing concurrent change gets 409 and its new Razorpay subscription is cancelled at once, or kept as a replaced row with `cancel_state='failed'` so the exception queue shows it and the next change retries. A paid provider subscription is cancelled at cycle end by default (`cancel_at_cycle_end`); one the founder never paid for is cancelled now. `subscriptionFor` prefers the current (not replaced) row.
+- **Features and MRR** come from the subscription that is paid up or within a charged period (plus grace), never from an `authenticated` or `created` row: an unpaid upgrade unlocks nothing, a paid-to-free downgrade keeps the paid plan until the cycle ends.
+- **Permissions and data:** every route uses `requireOperator` and audits with `operatorActor`; failed starts and cancels are audited too (`billing.start_failed`, `billing.cancel_failed`), on the merchant path as well. Operator reasons and Razorpay error text are operator-only: kept under `operator_only` in audit rows (the merchant Audit log drops it), never in the merchant billing API's answers (`/api/admin/billing` answers carry only plan, status, link and `previousEnded`), and the override reason is no longer shown to merchants. The founder's payment link is shown once and never listed.
+- **Grace:** 1–30 days with a reason, only on the store's newest subscription in a halted, cancelled or expired state.
+- **Money:** paise and rupees convert in one place (`lib/platform/billing-money.js`), integer arithmetic. Costs moved into Billing.
+- **Not verified:** the Razorpay cancel API against a real account (MANUAL-CHECKS).
+- **Decided by:** Claude
+- **Slice:** Phase 3 line 3
+
 ## 2026-11-25 Phase 2 least-trusted audit fixes (on the owner's behalf)
 
 - **Permissions:** support gets fixed plain words for a failed Shopify push ("Shopify refused this order. An owner or admin can see why."), never the raw text, in the order API, list, page and timeline (`redactOrderForRole`). Shopper free-text return reasons count as customer details and are hidden from support; the merchant's own decision note is hidden too, for consistency. Seven pages gained a `roleAllows` gate matching their action (analytics, offers, bundles, orders and their detail pages), with a source guard that every non-`storefront.read` page has one; no role loses access today. Inviting an existing member at or above the role is 409 `ALREADY_MEMBER` (only after the `team.manage` check), with no row or mail.
