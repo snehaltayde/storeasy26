@@ -81,8 +81,8 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 
 ## Phase 6: studio editor (roadmap Phase 3)
 
-- [ ] A founder edits in a full-screen studio with drag-and-drop sections and an instant preview
-- [ ] A founder can customise the theme's colours, type and spacing in the studio within the design tokens
+- [x] A founder edits in a full-screen studio with drag-and-drop sections and an instant preview
+- [x] A founder can customise the theme's colours, type and spacing in the studio within the design tokens
 
 ## Phase 7: flagship themes and storefront UX (roadmap Phase 4)
 
