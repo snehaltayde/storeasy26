@@ -254,7 +254,8 @@ await t("change plan: free -> starter returns the founder's payment link once an
   ok(!list.text.includes("rzp.io"), "the link is not listed again");
 });
 
-await t("change plan: starter (Razorpay) -> growth cancels the old one at Razorpay at its cycle end", async () => {
+await t("change plan: starter (Razorpay, paid) -> growth cancels the old one at Razorpay at its cycle end", async () => {
+  await db().execute({ sql: "UPDATE subscriptions SET status = 'active' WHERE id = ?", args: [paidSub.id] }); // as its activated webhook would
   const calls = razorpay.length;
   await tick();
   const r = await op({ action: "start", tenant: A, plan: "growth" });
@@ -264,7 +265,7 @@ await t("change plan: starter (Razorpay) -> growth cancels the old one at Razorp
   ok(cancel, "a cancel call");
   eq(cancel.path, `/v1/subscriptions/${paidSub.razorpay_subscription_id}/cancel`, "the old provider id");
   eq(cancel.body.cancel_at_cycle_end, true, "cycle end");
-  eq((await subsOf(A)).find((s) => s.id === paidSub.id).status, "created", "status waits for the webhook");
+  eq((await subsOf(A)).find((s) => s.id === paidSub.id).status, "active", "status waits for the webhook");
 });
 
 await t("cancel: a Razorpay subscription is cancelled at cycle end by default; 'now' only when asked", async () => {
