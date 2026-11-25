@@ -30,7 +30,7 @@
 // top reaches the skip link first; Sign out lands on /admin/login and the
 // dashboard then redirects to sign-in.
 // Results: docs/cms-reviews/drills/SHELL/result.json (and results-main.json).
-import { readFileSync, writeFileSync } from "node:fs";
+import { closeSync, openSync, readFileSync, readSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT } from "../../design-harness.js";
 import { runDrill, settle } from "../p3/lib.mjs";
@@ -134,8 +134,36 @@ function implicitSubmits() {
 //     path, reason }; none yet), and Next's dev error overlay (POST
 //     /__nextjs_*) when the server is a dev server (its page opened the HMR
 //     socket), never against a production build.
+//   - and, as a second witness, the server's own request log (the roles
+//     store's Next log in DRILL_LOG_DIR, when the server logs requests, as
+//     next dev does): every non-GET line written while the tab is on the page
+//     under test counts too. It sees what the browser events can miss: a
+//     request from a dedicated worker, or from a popup before Playwright
+//     attaches to it.
 // Returns what it found; the caller checks.
 const READ_POSTS = RC.READ_POSTS ?? [];
+const NEXT_LOG = process.env.DRILL_LOG_DIR ? join(process.env.DRILL_LOG_DIR, "design-data-roles-next.log") : null;
+const logSize = () => {
+  try {
+    return NEXT_LOG ? statSync(NEXT_LOG).size : 0;
+  } catch {
+    return 0;
+  }
+};
+// the server log's non-GET request lines between two offsets: [{ method, path }]
+function loggedWrites(from, to) {
+  if (!NEXT_LOG || to <= from) return [];
+  const buf = Buffer.alloc(to - from);
+  const fd = openSync(NEXT_LOG, "r");
+  try {
+    readSync(fd, buf, 0, buf.length, from);
+  } finally {
+    closeSync(fd);
+  }
+  // strip colour codes; next dev logs " POST /api/x 403 in 12ms"
+  const text = buf.toString("utf8").replace(/\u001b\[[0-9;]*m/g, "");
+  return [...text.matchAll(/^\s*(POST|PUT|PATCH|DELETE) (\/\S*) \d{3}\b/gm)].map((m) => ({ method: m[1], path: m[2].split("?")[0] }));
+}
 const readPost = (page, method, path) => READ_POSTS.some((r) => r.page === page && r.method === method && r.path === path);
 async function supportNewUiControls(page, href) {
   const writes = [];
@@ -144,8 +172,18 @@ async function supportNewUiControls(page, href) {
   let counting = false;
   let devServer = false;
   const popups = [];
+  let logFrom = null; // the server log's offset when the tab came onto the page under test
+  const skip = (method, path) => (devServer && path.startsWith("/__nextjs")) || readPost(target, method, path);
+  const closeLogWindow = () => {
+    if (logFrom == null) return;
+    for (const w of loggedWrites(logFrom, logSize())) if (!skip(w.method, w.path)) writes.push(`${w.method} ${w.path} (server log)`);
+    logFrom = null;
+  };
   const onNavigated = (frame) => {
-    if (frame === page.mainFrame()) counting = new URL(frame.url()).pathname === target;
+    if (frame !== page.mainFrame()) return;
+    counting = new URL(frame.url()).pathname === target;
+    if (counting && logFrom == null) logFrom = logSize();
+    if (!counting) closeLogWindow();
   };
   const onSocket = (ws) => {
     if (/\/_next\/webpack-hmr/.test(ws.url())) devServer = true;
@@ -153,8 +191,7 @@ async function supportNewUiControls(page, href) {
   const onRequest = (req) => {
     if (!counting || req.method() === "GET" || req.method() === "HEAD") return;
     const path = new URL(req.url()).pathname;
-    if (devServer && path.startsWith("/__nextjs")) return;
-    if (readPost(target, req.method(), path)) return;
+    if (skip(req.method(), path)) return;
     writes.push(`${req.method()} ${path}`);
   };
   const onPage = (p) => {
@@ -216,6 +253,7 @@ async function supportNewUiControls(page, href) {
       await page.waitForTimeout(500);
     }
     await page.waitForTimeout(300); // a write sent on the way out still lands in the count
+    closeLogWindow();
   } finally {
     page.off("framenavigated", onNavigated);
     page.off("websocket", onSocket);
