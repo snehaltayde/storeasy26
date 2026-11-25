@@ -3,6 +3,13 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Faster build: fewer repeated checks (owner decision)
+
+- Builders run only their own unit suite (and lint), no browser drills; the session's one `steelthread-verify` before merge is the proof.
+- Each merge runs the full unit suite, the fresh-database migrations, the build and only that slice's own browser drill. `drill:shell` and the other shared drills move to the once-per-phase full browser suite, unless the slice changes the shell or a shared drill helper.
+- Kept on every slice: the design pass, the reviewer, the unit suite and the build. One branch per merge check.
+- **Decided by:** owner
+
 ## 2026-11-25 Phase 3 shape: operator console on shadcn (on the owner's behalf)
 
 - **Schema:** one migration, platform `0016_support_sessions.sql` (line 5): adds `sessions.grant_id` and its index, additive. Tenant migrations stay at 0029.
