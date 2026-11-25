@@ -22,4 +22,5 @@ export const ALLOWLIST = [
   { path: "components/ui/switch.js", reason: "added in Phase 2 line 0 for lines 1-5; remove this row when the first page imports it" },
   { path: "components/ui/checkbox.js", reason: "added in Phase 2 line 0 for lines 1-5; remove this row when the first page imports it" },
   { path: "components/ui/popover.js", reason: "added in Phase 2 line 0 for lines 1-5; remove this row when the first page imports it" },
+  { path: "app/fonts/", reason: "the self-hosted woff2 files: loaded by url() in app/fonts/fonts.css and by next/font/local src paths in app/fonts/fonts.js, which the walk does not read; test:fonts checks every one exists" },
 ];
