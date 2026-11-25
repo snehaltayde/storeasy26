@@ -88,7 +88,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 
 - [ ] A founder can choose one of five flagship themes at onboarding or later
 - [x] A shopper can filter search results by several facets
-- [ ] A shopper on a phone sees a sticky add-to-cart bar and a cart drawer with tiered offers
+- [x] A shopper on a phone sees a sticky add-to-cart bar and a cart drawer with tiered offers
 
 ## Phase 8: India and global checkout (roadmap Phase 5)
 
@@ -108,6 +108,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 
 ## Later (not planned yet)
 
+- Spend-percent tier offers ("Add ₹300 more for 10% off") as a new offer type; and a free-shipping nudge on the net basis for stores with product discounts, which today is left out because no single amount is honest (Phase 7 line 3)
 - Search filters: store values with tabs, backslashes, odd spaces or over 80 characters show in the filter rail but match nothing (links clean values, the index doesn't); clean both sides the same way (Phase 7 line 2 review)
 - `lib/platform/operator-error.js` `isRefusal` decides by shape: mark `refuse()` errors explicitly so a `TursoApiError` with a 4xx status never shows its text to operators (Phase 3 audit re-read, low, operator-only).
 - `customers.read` for external apps (customer contact details to a third party): left out of Phase 4 by the owner; revisit only when a real app needs it.
