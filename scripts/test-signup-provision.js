@@ -557,6 +557,40 @@ await t("operator (Phase 3 line 6): a discarded dead signup job runs again on Re
   eq((await J.getJobByKey(`provision_store:${row.id}`)).status, "done", "job done");
 });
 
+await t("operator (Phase 3 line 6): a founder's status poll and the operator's store-status read leave a discarded job discarded; only Resume brings it back", async () => {
+  const s = await start("Polled Discard Co");
+  await fault({ route: "create", status: 402 });
+  await verify(s);
+  await H.drainAfter();
+  const row = await rowFor(s.f.email);
+  const jobStatus = async () => (await J.getJobByKey(`provision_store:${row.id}`)).status;
+  await one("UPDATE jobs SET status = 'dead' WHERE id = ?", [row.job_id]);
+  ok(await J.discardJob(row.job_id, { actor: { kind: "operator", id: "u_sgp_op" } }), "discarded");
+  // the signup still reads as provisioning (as a run stopped mid-way would)
+  await one("UPDATE signups SET status = 'provisioning', next_attempt_at = NULL WHERE id = ?", [row.id]);
+  const creates0 = creates("polled-discard-co").length;
+  const p = await poll(s);
+  eq(p.status, 200, p.text);
+  await H.drainAfter();
+  eq(await jobStatus(), "discarded", "after the founder's poll:");
+  eq((await rowFor(s.f.email)).status, "provisioning", "the poll ran nothing:");
+  const OS = await import("../lib/platform/operator-stores.js");
+  await one("UPDATE signups SET source = 'operator' WHERE id = ?", [row.id]);
+  try {
+    await OS.operatorStoreStatus(row.id);
+  } finally {
+    await one("UPDATE signups SET source = 'signup' WHERE id = ?", [row.id]);
+  }
+  eq(await jobStatus(), "discarded", "after the operator's status read:");
+  eq(creates("polled-discard-co").length, creates0, "no database create was asked for");
+  const op = { _platform: store.cookies["operator-support"]._platform };
+  const r = await api("platform/provisions", "POST", { body: { action: "resume", run: row.provision_run_id }, cookies: op });
+  eq(r.status, 200, r.text);
+  eq(await jobStatus(), "pending", "Resume revives it:");
+  await H.drainAfter();
+  eq((await rowFor(s.f.email)).status, "done", "and it runs to done");
+});
+
 // --- least-trusted (§4) ---------------------------------------------------------------------
 
 await t("least-trusted: status with no cookie or another browser's cookie: the same generic 400", async () => {

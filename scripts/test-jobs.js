@@ -362,11 +362,13 @@ await t("discard: only a dead job; the tick never runs a discarded job", async (
   eq((await J.listJobs({})).find((j) => j.id === id).status, "discarded", "still discarded:");
 });
 
-await t("an explicit retry (makeJobDue) takes a discarded job back to pending with a fresh budget, and the tick runs it", async () => {
+await t("makeJobDue leaves a discarded job alone (an automatic poll); with revive (an explicit retry) it is pending with a fresh budget, and the tick runs it", async () => {
   const { id } = await J.enqueueJob({ type: "noop_retry", idempotencyKey: "k-discard-retry" });
   await C.platformDb().execute({ sql: "UPDATE jobs SET status = 'dead', attempts = 5 WHERE id = ?", args: [id] });
   await J.discardJob(id, { actor });
   await J.makeJobDue(id);
+  eq((await J.listJobs({})).find((j) => j.id === id).status, "discarded", "no revive, still discarded:");
+  await J.makeJobDue(id, { revive: true });
   const r = (await J.listJobs({})).find((j) => j.id === id);
   same([r.status, Number(r.attempts), r.run_after], ["pending", 0, null], "due again:");
   let ran = 0;

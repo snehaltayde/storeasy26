@@ -53,7 +53,7 @@ for (const k of ["TYPESENSE_HOST", "SHOPIFY_STORE_DOMAIN", "SHOPIFY_ADMIN_TOKEN"
   delete process.env[k];
 }
 
-const TENANTS = ["connect", "kill", "fail", "prune", "write", "gen", "callers", "cli", "nocreds", "deny", "members", "notick", "gaps", "dbfail", "dbro"];
+const TENANTS = ["connect", "kill", "fail", "prune", "write", "gen", "callers", "cli", "nocreds", "deny", "members", "notick", "gaps", "dbfail", "dbro", "discard"];
 const dbs = [".test-fsync-default.db", ".test-fsync-platform.db", ...TENANTS.map((t) => `.test-fsync-${t}.db`)];
 for (const f of dbs) await rm(join(root, f), { force: true });
 
@@ -1373,6 +1373,44 @@ console.log("— no tick: the console alone gets a killed sync going again");
     eq((await json(out.value)).body.action, "resumed", "action:");
     eq((await latest("notick")).status, "complete", "run:");
     eq(tickCount(), ticksBefore, "no tick ran:");
+  });
+}
+
+// =====================================================================================
+console.log("— Phase 3 line 6: a sync job an operator discarded stays discarded until Try again");
+{
+  const catalog = Array.from({ length: 150 }, (_, i) => mkProduct(i));
+  const fetched = async () => Number((await latest("discard")).products_fetched);
+  const jobOf = async () => (await J.listJobs({ tenant: "fs-discard" })).filter((j) => j.type === "catalog_sync")[0];
+  const killOnPage = (n) => {
+    let pages = 0;
+    return (c) => (c.op === "AdminProducts" && ++pages === n ? "hang" : null);
+  };
+
+  await t("a sync killed mid-run whose job an operator discards: an owner's poll leaves it discarded and never runs it", async () => {
+    Object.assign(shop, { products: catalog, collections: [], pageMs: 1000, fault: killOnPage(2) });
+    const out = await quiet(() => invoke("manual sync", () => postSync("discard")));
+    shop.fault = null;
+    ok(out.killed, "killed");
+    await letLeasesLapse("discard");
+    const job = await jobOf();
+    await C.platformDb().execute({ sql: "UPDATE jobs SET status = 'dead' WHERE id = ?", args: [job.id] });
+    eq(await J.discardJob(job.id, { actor: { kind: "operator", id: "u_fsync_op" } }), true, "discarded:");
+    const before = await fetched();
+    const calls = shop.calls.length;
+    await quiet(() => invoke("poll", () => adminSync.GET(req(consoleUrl("discard"), { cookies: { _admin: ownerTok } }))));
+    eq((await jobOf()).status, "discarded", "still discarded after the poll:");
+    eq(await fetched(), before, "no slice ran:");
+    eq(callsSince(calls).length, 0, "no Shopify call:");
+  });
+
+  await t("…the founder's Try again brings it back and finishes the sync", async () => {
+    await inT("discard", () => libsql.execute({ sql: "UPDATE sync_runs SET updated_at = ?", args: [new Date(Date.now() - 3_600_000).toISOString()] }));
+    const out = await quiet(() => invoke("try again", () => postSync("discard", { retry: true })));
+    eq((await json(out.value)).status, 202, "answer:");
+    eq((await latest("discard")).status, "complete", "run:");
+    eq(await count("discard", "products"), 150, "products:");
+    ok((await jobOf()).status !== "discarded", "the job is no longer discarded");
   });
 }
 
