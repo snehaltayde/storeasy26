@@ -26,6 +26,9 @@ export const SUPPORT_PROBES = Object.freeze([
   { name: "apps/[id]/webhooks", path: "apps/[id]/webhooks", method: "GET", req: (ctx) => ({ params: { id: ctx.webhookAppId } }), keys: ["ok", "endpoint", "topics", "canSeePayloads", "deliveries"] },
   { name: "apps/[id]/webhooks ?status=delivered", path: "apps/[id]/webhooks", method: "GET", req: (ctx) => ({ params: { id: ctx.webhookAppId }, query: "status=delivered&topic=order.created" }), keys: ["ok", "endpoint", "topics", "canSeePayloads", "deliveries"] },
   { name: "apps/[id]/webhooks (store B's app)", path: "apps/[id]/webhooks", method: "GET", req: (ctx) => ({ params: { id: ctx.bWebhookAppId } }), status: 404, keys: ["error", "code"], note: "another store's app is not on this store" },
+  // Phase 4 line 4: an app's API access (never a token's secret or hash; calls are audit.read only)
+  { name: "apps/[id]/tokens", path: "apps/[id]/tokens", method: "GET", req: (ctx) => ({ params: { id: ctx.webhookAppId } }), keys: ["ok", "scopes", "offered", "tokens", "maxActive", "expiryDays", "defaultExpiryDays"] },
+  { name: "apps/[id]/tokens (store B's app)", path: "apps/[id]/tokens", method: "GET", req: (ctx) => ({ params: { id: ctx.bWebhookAppId } }), status: 404, keys: ["error", "code"], note: "another store's app is not on this store" },
   { name: "brand-step", path: "brand-step", method: "GET", keys: ["ok", "brandStep", "palettes", "current", "design", "storeOpen", "canEditDescription", "descriptionMax"] },
   { name: "bundles", path: "bundles", method: "GET", keys: ["ok", "bundles", "currency"] },
   { name: "catalog", path: "catalog", method: "GET", keys: ["ok", "products", "overrides", "collections", "shopify_admin"] },

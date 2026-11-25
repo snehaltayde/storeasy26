@@ -61,6 +61,7 @@
     "test:support-access": "node scripts/test-support-access.js",
     "test:apps": "node scripts/test-apps.js",
     "test:plugin-webhooks": "node scripts/test-plugin-webhooks.js",
+    "test:app-tokens": "node scripts/test-app-tokens.js",
     "test:settings-ui": "node scripts/test-settings-ui.js",
     "test:shopper-reads": "node scripts/test-shopper-reads.js",
     "test:platform-core": "node scripts/test-platform-core.js",

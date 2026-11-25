@@ -80,7 +80,7 @@ const SECRET_KEYS = [
 ];
 // member emails (…@sup-a.test … @sup-d.test) and the operator's (operator@sup.test)
 const MEMBER_EMAIL = /[\w.+-]+@sup(-[a-d])?\.test/i;
-const SECRET_KEY_NAMES = /"(secrets|dbToken|db_token|password_hash|token_hash)"\s*:/;
+const SECRET_KEY_NAMES = /"(secrets|dbToken|db_token|password_hash|token_hash|secret_hash)"\s*:/;
 
 const H = await import("./support/route-harness.js");
 H.blankOutsideServices();
@@ -277,6 +277,11 @@ const hookB = await call("owner-b", "apps", "POST", { body: hookBody(CNY.bWebhoo
 // the secret's longest letters-and-digits run, lower-cased (the search is case-blind)
 CNY.webhookSecret = ((hookA.body?.secret ?? "").slice(6).match(/[A-Za-z0-9]+/g) ?? [""]).sort((x, y) => y.length - x.length)[0].toLowerCase();
 SECRET_KEYS.push("webhookSecret");
+// Phase 4 line 4: an API token on that app; its secret part and stored hash are canaries
+const minted = await call("owner", "apps/[id]/tokens", "POST", { params: { id: hookA.body?.install?.id }, body: { create: { name: "Support probe token", scopes: ["orders.read"] } } });
+CNY.appTokenSecret = String(minted.body?.secret ?? "").split(".")[1] ?? "";
+CNY.appTokenHash = minted.body?.token?.id ? String((await a.run(async () => (await import("../lib/db.js")).db.selectFrom("plugin_tokens").select("secret_hash").where("id", "=", minted.body.token.id).executeTakeFirst()))?.secret_hash ?? "") : "";
+SECRET_KEYS.push("appTokenSecret", "appTokenHash");
 await a.run(async () => {
   const { emitOrderEvent, fanOut } = await import("../lib/plugins/events.js");
   const ev = await emitOrderEvent("order.created", ORDER_ID);
@@ -355,7 +360,7 @@ await t("setup: outside services blank, only file: databases, the fixture plante
   eq(secretSaved.status, 200, `the app secret saved: ${secretSaved.text?.slice(0, 200)}`);
   eq(appB.status, 200, `store B's app: ${appB.text?.slice(0, 200)}`);
   ok(CNY.webhookSecret.length >= 6 && hookB.status === 200, `the custom apps (line 3): ${hookA.text?.slice(0, 160)} | ${hookB.text?.slice(0, 160)}`);
-  for (const [k, v] of Object.entries({ appId: CTX.appId, secretAppId: CTX.secretAppId, bundleId: CTX.bundleId, experimentSlug: CTX.experimentSlug, quizSlug: CTX.quizSlug, collectionGid: CTX.collectionGid })) ok(v, `fixture ${k} (${bundleA.text?.slice(0, 120)} | ${experimentA.text?.slice(0, 120)} | ${quizA.text?.slice(0, 120)})`);
+  for (const [k, v] of Object.entries({ appId: CTX.appId, secretAppId: CTX.secretAppId, bundleId: CTX.bundleId, experimentSlug: CTX.experimentSlug, quizSlug: CTX.quizSlug, collectionGid: CTX.collectionGid, appTokenSecret: /^[0-9a-f]{64}$/.test(CNY.appTokenSecret), appTokenHash: /^[0-9a-f]{64}$/.test(CNY.appTokenHash) })) ok(v, `fixture ${k} (${bundleA.text?.slice(0, 120)} | ${experimentA.text?.slice(0, 120)} | ${quizA.text?.slice(0, 120)})`);
   for (const k of H.OUTSIDE_SERVICE_ENV) eq(process.env[k], "", k);
   for (const tn of [a, b, c, d]) F.assertLocalDbUrl(tn.tenant.dbUrl);
   eq(CALLERS.join(","), "staff,support,operator-support,operator-support-entry", "least-trusted callers, derived from roleAllows:");
