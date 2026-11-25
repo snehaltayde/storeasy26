@@ -372,7 +372,7 @@ None. The timeline reads `audit_log` with `tenant_id IS ? AND resource = ?` (`id
    - owners and admins are emailed when access opens (best effort; the operator UI says if mail is off);
    - a "Support access" card on `/admin/settings/team` shows the open grant with "End support access now" (AlertDialog) and the last 20 grants.
 
-### Data: `migrations/platform/0016_support_sessions.sql` (nothing destructive)
+### Data: `migrations/platform/0017_support_sessions.sql` (nothing destructive)
 ```sql
 ALTER TABLE sessions ADD COLUMN grant_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_sessions_grant ON sessions(grant_id);
@@ -394,7 +394,7 @@ New session kinds `support_entry` and `support` go in `sessions.kind` (TEXT), wi
 - **Every admin read:** `route-harness` gains the caller `operator-support-entry` (`_support`). `test:permissions` and `test:support-reads` run it with the same expectations as support.
 
 ### File plan
-1. Migration 0016.
+1. Migration 0017 (0016 went to line 3).
 2. `lib/platform/sessions.js`, `lib/platform/support.js` (enter, revoke sessions, history, owner mail), `lib/admin-auth.js` (`supportActor`).
 3. `app/api/platform/support/route.js`, `app/api/admin/support-entry/route.js`, `app/api/admin/support-access/route.js`, `app/api/admin/logout/route.js`.
 4. `lib/admin/notices.js`.
@@ -485,7 +485,7 @@ No change. The anonymous and merchant passes run on every `platform-pages.js` ro
 
 ## Decisions for `docs/DECISIONS.md` (schema and permissions first)
 
-1. **One migration in Phase 3:** platform `0016_support_sessions.sql` (line 5) adds `sessions.grant_id` and its index. It is additive. Tenant migrations stay at 0029, and the next free platform number is 0017.
+1. **Two migrations in Phase 3:** platform `0016_subscription_changes.sql` (line 3: one live subscription per store, additive columns and a unique partial index) and `0017_support_sessions.sql` (line 5: `sessions.grant_id` and its index). Both additive. Tenant migrations stay at 0029; the next free platform number is 0018.
 2. **No operator roles in Phase 3.** Every operator, and bootstrap while no operator exists, may take every operator action. A read-only operator role goes under Later. The least-trusted callers of the operator console are the signed-out visitor and a merchant session.
 3. **One guard, `requireOperator`, on every operator route,** with the origin check on every write. This fixes `billing`, `costs` and `flags`. Audit rows name the real operator.
 4. **Support entry across hosts** uses a single-use, 60-second entry token and a host-only `_support` session tied to the grant. Bootstrap cannot enter. `_platform` on the same host keeps working.
