@@ -111,6 +111,11 @@ async function ownerFlows(drill) {
   await page.locator(`[data-archive="${id}"]`).click();
   await page.locator(`[data-page-row="${id}"]`).getByRole("button", { name: "Archive", exact: true }).click();
   drill.check(await page.waitForURL(/doc=doc_home/, { timeout: 30_000 }).then(() => true, () => false), "Archive takes the open page off the list and opens the home page", page.url());
+  // 6c, on the same sign-in (the login allows five a window)
+  await openEditor(page);
+  await ownerPreview(drill, page);
+  await ownerPublish(drill, page);
+  await ownerPublishing(drill, page);
   await page.context().close();
 
   // the widths
@@ -162,7 +167,8 @@ async function ownerPreview(drill, page) {
     await page.waitForTimeout(200);
     widths[d] = await frameWidth();
   }
-  drill.check(widths.phone === 375 && widths.tablet === 768 && widths.desktop > 375, "the widths: the frame is 375 and 768 wide, then the pane's width on desktop", widths);
+  widths.pane = await page.locator("[data-preview-frame]").evaluate((f) => Math.round(f.parentElement.clientWidth));
+  drill.check(widths.phone === 375 && widths.tablet === 768 && Math.abs(widths.desktop - widths.pane) <= 2, "the widths: the frame is 375 and 768 wide (scrolling in a narrower pane), then the pane's own width on desktop", widths);
   await page.locator('[data-preview-bar] [data-device="phone"]').click();
   await drill.shoot(page, "owner-preview-phone-1280");
   await page.locator('[data-preview-bar] [data-device="desktop"]').click();
@@ -232,8 +238,8 @@ async function ownerPublish(drill, page) {
   await page.locator("[data-publish] button", { hasText: /^Close$/ }).first().click().catch(() => {});
 }
 
-async function ownerPublishing(drill) {
-  const page = await signIn(drill, "owner");
+// the owner's page from the publish flow (the login allows five sign-ins a window)
+async function ownerPublishing(drill, page) {
   await page.goto(`${ORIGIN}/admin/releases`, { waitUntil: "load" });
   await settle(page);
   await page.locator("[data-recently-published], [data-history-loading]").first().waitFor({ timeout: 30_000 }).catch(() => {});
@@ -314,14 +320,6 @@ async function supportView(drill) {
 async function editor(drill) {
   if (!port) throw new Error("drill:editor needs ROLES_PORT (run it as pnpm drill:editor).");
   await ownerFlows(drill);
-  {
-    const page = await signIn(drill, "owner");
-    await openEditor(page);
-    await ownerPreview(drill, page);
-    await ownerPublish(drill, page);
-    await page.context().close();
-  }
-  await ownerPublishing(drill);
   await staffFlows(drill);
   await supportView(drill);
   drill.check(consoleErrors.length === 0, "no error in the browser console (owner, staff and support)", consoleErrors);
