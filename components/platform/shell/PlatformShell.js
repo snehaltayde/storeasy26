@@ -21,8 +21,7 @@ import { PlatformNav } from "./PlatformNav";
 // the merchant shell: the sidebar (cookie sidebar_state on /platform, read on
 // the server for defaultOpen), a 56px sticky top bar with the operator's
 // account menu, a skip link, and the content capped at 1200px. Only signed-in
-// operators get it (app/(console)/platform/layout.js). Old screens keep their
-// own [data-legacy] region inside it (app/(console)/platform/page.js).
+// operators get it (app/(console)/platform/layout.js).
 
 const initials = (text) =>
   String(text || "")

@@ -7,8 +7,8 @@ import CreateStoreForm from "@/components/platform/stores/CreateStoreForm";
 
 // Phase 1 line 9: an operator creates a store for a founder in one form; the
 // founder gets an invite into the same onboarding. Operators only; anyone else
-// goes to /platform (which shows the sign-in). Built on components/ui, outside
-// any [data-legacy] region. ?signup=sgn_… shows that setup's progress.
+// goes to /platform (which shows the sign-in). Built on components/ui.
+// ?signup=sgn_… shows that setup's progress.
 export const dynamic = "force-dynamic";
 export const metadata = { title: "New store · Storeasy platform", robots: { index: false } };
 

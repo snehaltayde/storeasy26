@@ -828,8 +828,9 @@ await t("unit: the operator screens read theme_pin (overview, themes, tenant det
   eq([row.kit, row.version, row.pinned], ["glow", 1, true], "themes:");
   const det = await platformGet("tenants/[id]", { id: "dd" });
   eq([det.status, det.body.tenant.config.theme_pin?.kit, Object.hasOwn(det.body.tenant.config, "theme")], [200, "glow", false], `tenant detail: ${JSON.stringify(det.body.tenant?.config).slice(0, 200)}`);
-  const src = await readFile(join(ROOT, "components/platform/TenantDetail.js"), "utf8");
-  ok(/t\.config\.theme_pin/.test(src) && !/t\.config\.theme\b(?!_)/.test(src), "TenantDetail shows theme_pin:");
+  // Phase 3 line 7: the old TenantDetail went; the store page shows the pin through themePinLabel
+  const { themePinLabel } = await import("../lib/platform/stores-list.js");
+  eq(themePinLabel({ theme_pin: { kit: "glow", version: 1 } }), "glow-1", "the store page shows theme_pin:");
   // a published default look pins null: no kit on the detail, the default on the overview
   await C.patchTenant("dd", { config: { theme_pin: null } });
   eq((await platformGet("overview")).body.fleet.find((f) => f.tenant === "dd")?.kit, "pulse-1", "overview, default look:");
@@ -1269,7 +1270,7 @@ await t("unit: the guard finds no config.brand or config.theme read outside the 
     await readFile(join(ROOT, f), "utf8");
   }
   // the readers this item moved really read nothing themselves
-  for (const f of ["lib/onboarding/service.js", "lib/onboarding/steps.js", "app/api/admin/help/route.js", "lib/admin/brand-readability.js", "app/api/platform/overview/route.js", "app/api/platform/themes/route.js", "app/api/platform/tenants/[id]/route.js", "components/platform/TenantDetail.js"]) {
+  for (const f of ["lib/onboarding/service.js", "lib/onboarding/steps.js", "app/api/admin/help/route.js", "lib/admin/brand-readability.js", "app/api/platform/overview/route.js", "app/api/platform/themes/route.js", "app/api/platform/tenants/[id]/route.js", "components/platform/stores/StoreDetail.js"]) {
     eq(configReads(await readFile(join(ROOT, f), "utf8")), [], `${f}:`);
   }
   ok(allowedHits.has("lib/themes/kits.js"), `the allowlist is used: ${[...allowedHits]}`);

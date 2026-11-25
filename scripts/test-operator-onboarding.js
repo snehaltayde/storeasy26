@@ -260,9 +260,10 @@ await t("feature 9: the old operator hand-off route is gone (404: no route file)
   ok(!SHOPPER_ROUTES.some((r) => r.path.includes("tenants/[id]/handoff")), "no guard row");
   ok(SHOPPER_ROUTES.some((r) => r.path === "platform/onboarding" && r.class === "operator"), "the new route is guarded as operator");
   const { readFile } = await import("node:fs/promises");
-  const src = await readFile(join(ROOT, "components/platform/PlatformAdmin.js"), "utf8");
-  ok(!/\/handoff|HandoffDialog|rotate_password/.test(src), "no hand-off UI");
-  ok(src.includes('href="/platform/onboarding"'), "nav link");
+  // Phase 3 line 7: the old console (PlatformAdmin) is gone; the operator nav links here
+  ok(!existsSync(join(ROOT, "components/platform/PlatformAdmin.js")), "the old console, and its hand-off UI, are gone");
+  const { PLATFORM_NAV } = await import("../lib/platform/nav.js");
+  ok(PLATFORM_NAV.some((i) => i.href === "/platform/onboarding"), "nav link");
 });
 
 // ---- list, views, search, paging ----------------------------------------------------------

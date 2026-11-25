@@ -11,7 +11,8 @@
 //      session and revoked or expired sessions get the page alone, and nothing
 //      they get holds a store id or name or the operator's email
 //   4. the pages: /platform is the sign-in (or the "not set up" card) for
-//      anyone not signed in and the old console in [data-legacy] for operators;
+//      anyone not signed in and the Stores list for operators (the old console
+//      at /platform/legacy went in Phase 3 line 7);
 //      every other page (scripts/support/platform-pages.js) sends them to /platform
 //   5. static: the new files import no components/console; the sign-in keeps
 //      #pl-email, #pl-password and #pl-totp; the sidebar cookie is on /platform
@@ -55,12 +56,19 @@ const W = await import("../components/platform/loginWords.js");
 const { PLATFORM_PAGES, OPERATOR_ONLY_PAGES } = await import("./support/platform-pages.js");
 
 // --- 1. nav --------------------------------------------------------------------
-await t("nav: Stores, Signups & onboarding, New store first, in that order, each a /platform path; line 1's Old console", () => {
-  // line 0's three first; later lines append theirs at the end (line 4: Flags, Incidents; line 3: Billing)
-  eq(NAV.PLATFORM_NAV.slice(0, 3).map((i) => i.label).join(" | "), "Stores | Signups & onboarding | New store");
-  eq(NAV.PLATFORM_NAV.slice(0, 3).map((i) => i.href).join(" "), "/platform /platform/onboarding /platform/stores/new");
-  for (const [label, href] of [["Billing", "/platform/billing"], ["Flags", "/platform/flags"], ["Incidents", "/platform/incidents"]]) ok(NAV.PLATFORM_NAV.some((i) => i.label === label && i.href === href), `${label} in the nav`);
-  eq(NAV.PLATFORM_NAV.find((i) => i.id === "old-console")?.href, "/platform/legacy", "Old console (removed by line 7)");
+await t("nav: the full operator nav, in this exact order, each a /platform path; no Old console (Phase 3 line 7)", () => {
+  eq(
+    JSON.stringify(NAV.PLATFORM_NAV.map((i) => [i.id, i.label, i.href])),
+    JSON.stringify([
+      ["stores", "Stores", "/platform"],
+      ["onboarding", "Signups & onboarding", "/platform/onboarding"],
+      ["new-store", "New store", "/platform/stores/new"],
+      ["flags", "Flags", "/platform/flags"],
+      ["incidents", "Incidents", "/platform/incidents"],
+      ["billing", "Billing", "/platform/billing"],
+      ["operations", "Operations", "/platform/operations"],
+    ])
+  );
   eq(new Set(NAV.PLATFORM_NAV.map((i) => i.id)).size, NAV.PLATFORM_NAV.length, "unique ids");
   for (const i of NAV.PLATFORM_NAV) ok(PLATFORM_PAGES.some((p) => p.path === i.href), `${i.href} is a listed page`);
 });
@@ -71,7 +79,7 @@ await t("nav: the active item is the longest matching href", () => {
   eq(at("/platform/onboarding"), "onboarding");
   eq(at("/platform/stores/new"), "new-store");
   eq(at("/platform/stores/some-store"), "stores", "a store's page is under Stores");
-  eq(at("/platform/legacy"), "old-console");
+  eq(at("/platform/legacy"), "stores", "the old console's address is just under Stores now (the page is gone)");
   eq(at("/platform/stores/new?signup=x"), "stores", "a query is not a path (usePathname has none)");
   eq(at("/platformx"), null);
   eq(at("/admin"), null);
@@ -201,21 +209,20 @@ await t("pages: every app/(console)/platform page has its row in platform-pages.
   eq(PLATFORM_PAGES.filter((p) => p.signIn).length, 1, "one sign-in page");
 });
 
-await t("pages: /platform is the sign-in for every denied caller, the Stores list for operators; the old console in [data-legacy] at /platform/legacy", async () => {
+await t("pages: /platform is the sign-in for every denied caller, the Stores list for operators; /platform/legacy is gone", async () => {
   for (const caller of DENIED) {
     const r = await runAs(caller, "app/(console)/platform/page.js");
     ok(r.props.some((p) => p.component === "@/components/platform/PlatformLogin#default"), `${caller}: the sign-in`);
-    ok(!r.props.some((p) => p.component === "@/components/platform/PlatformAdmin#default"), `${caller}: never the console`);
-    ok(!r.props.some((p) => p.props?.["data-legacy"] !== undefined), `${caller}: the sign-in is not in a data-legacy region`);
     for (const c of CANARIES) ok(!r.text.includes(c), `${caller}: holds ${c}`);
   }
   for (const caller of ALLOWED) {
     const r = await runAs(caller, "app/(console)/platform/page.js");
     ok(r.props.some((p) => p.component === "@/components/platform/stores/StoresTable#default"), `${caller}: the Stores list`);
-    ok(!r.props.some((p) => p.props?.["data-legacy"] !== undefined), `${caller}: the Stores list is not in a data-legacy region`);
-    const old = await runAs(caller, "app/(console)/platform/legacy/page.js");
-    const legacy = old.props.find((p) => p.props?.["data-legacy"] !== undefined);
-    ok(legacy && old.props.some((p) => p.component === "@/components/platform/PlatformAdmin#default"), `${caller}: the old console in data-legacy at /platform/legacy`);
+  }
+  for (const f of ["app/(console)/platform/legacy", "components/platform/PlatformAdmin.js", "components/console"]) {
+    let gone = false;
+    await stat(join(ROOT, f)).catch(() => (gone = true));
+    ok(gone, `${f} is gone (Phase 3 line 7)`);
   }
 });
 

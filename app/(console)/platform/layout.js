@@ -7,9 +7,8 @@ import { PlatformShell } from "@/components/platform/shell/PlatformShell";
 // The operator console (Phase 3 line 0). A signed-in operator (a TOTP session,
 // or the bootstrap token before the first operator user) gets the shell built
 // on components/ui; anyone else gets the page alone, which is the sign-in (or a
-// redirect to it): no shell, no nav, no operator name. Old screens put
-// themselves in a [data-legacy] region (page.js, loading.js, error.js) so they
-// keep the old tokens under the console's .console body (app/console.css).
+// redirect to it): no shell, no nav, no operator name. Every screen in it is
+// built on components/ui (the old console went in Phase 3 line 7).
 export const dynamic = "force-dynamic";
 
 export default async function PlatformLayout({ children }) {

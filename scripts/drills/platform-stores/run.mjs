@@ -118,8 +118,8 @@ async function platformStores(drill) {
   await drill.screenshot(page, "01-list-1280");
 
   // the list and health APIs hold no database url
-  const apis = await page.evaluate(async (id) => Promise.all([`/api/platform/tenants`, `/api/platform/tenants?health=${id}`, `/api/platform/tenants/${id}`, `/api/platform/tenants?legacy=1`].map((u) => fetch(u).then((r) => r.text()))), first.id);
-  drill.check(apis.every((body) => !/"db_url"|"dbUrl"|"db_token|"password_hash"/.test(body) && !dbUrls.some((u) => body.includes(u))), "the list, health, detail and legacy answers hold no database url, token or password hash", null);
+  const apis = await page.evaluate(async (id) => Promise.all([`/api/platform/tenants`, `/api/platform/tenants?health=${id}`, `/api/platform/tenants/${id}`].map((u) => fetch(u).then((r) => r.text()))), first.id);
+  drill.check(apis.every((body) => !/"db_url"|"dbUrl"|"db_token|"password_hash"/.test(body) && !dbUrls.some((u) => body.includes(u))), "the list, health and detail answers hold no database url, token or password hash", null);
 
   // 2. search
   await page.locator("#stores-q").fill(String(first.name));

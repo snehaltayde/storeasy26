@@ -548,7 +548,10 @@ export const DRILLS = {
   quizzes: { id: "QUIZZES", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/quizzes/run.mjs", ...c.headed])) },
 };
 // Phase 2 line 11 (phase end): every merchant console screen's drill joins the block suite
-export const ALL = ["smoke", "p5", "p6", "agency-gone", "shell", "signup", "connect", "operator-onboarding", "operator-create-store", "dashboard", "orders", "catalog", "offers", "media", "editor", "settings", "team", "growth", "quizzes", "console-styles"];
+export const ALL = ["smoke", "p5", "p6", "agency-gone", "shell", "signup", "connect", "operator-onboarding", "operator-create-store", "dashboard", "orders", "catalog", "offers", "media", "editor", "settings", "team", "growth", "quizzes", "console-styles",
+  // Phase 3 line 7 (phase end): every operator console screen's drill joins it too. support-access
+  // is line 5's drill; it joins as soon as line 5's branch (which adds it to DRILLS) is merged.
+  "platform-shell", "platform-stores", "store-lifecycle", "platform-billing", "flags-incidents", ...(Object.hasOwn(DRILLS, "support-access") ? ["support-access"] : []), "platform-ops"];
 
 const git = (root, args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
 

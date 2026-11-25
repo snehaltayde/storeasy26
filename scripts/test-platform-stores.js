@@ -3,7 +3,7 @@
 //   pnpm test:platform-stores
 // lib/platform/stores-list.js (search, filters, sort, paging, counts, live
 // health with its 5-second limit, the store page's read model), GET
-// /api/platform/tenants (list, ?health=, ?legacy=1) and GET tenants/[id] as
+// /api/platform/tenants (list and ?health=; the old ?legacy=1 answer went with the old console in Phase 3 line 7) and GET tenants/[id] as
 // every caller, the /platform and /platform/stores/[id] pages, and the
 // canaries: no answer an operator gets holds db_url, a database token, a
 // secret value or a password hash, and no signed-out or merchant answer holds
@@ -285,14 +285,10 @@ await t("health: a store slower than the limit is unreachable, never healthy; at
   eq(L.HEALTH_TIMEOUT_MS, 5000, "five seconds");
 });
 
-await t("legacy: ?legacy=1 keeps the old console's shape (every store with health), minus the database url", async () => {
+await t("legacy: ?legacy=1 is gone with the old console (Phase 3 line 7): it answers the ordinary Stores list", async () => {
   const r = await list("legacy=1");
   eq(r.status, 200);
-  eq(r.body.tenants.length, 57, "every store");
-  eq(r.body.tenants.slice(0, 50).filter((x) => x.health.state !== "unchecked").length, 50, "the first 50 are checked");
-  eq(r.body.tenants.slice(50).map((x) => [x.health.state, x.health.reachable]), Array.from({ length: 7 }, () => ["unchecked", false]), "the rest are not, and not reachable");
-  const ta = r.body.tenants.find((x) => x.id === a.id);
-  ok(ta.health && Array.isArray(ta.domains), "health and domains");
+  ok(!("tenants" in r.body) && Array.isArray(r.body.stores), "the list's shape, not the old console's");
   noCanary(r.text, "legacy");
 });
 
@@ -491,11 +487,10 @@ await t("render: StoreDetail renders a store with a theme pin and one with a leg
 });
 
 // --- 6. every caller ------------------------------------------------------------------
-await t("permissions: operator and bootstrap-before get 200 on the list, health, legacy and detail; every other caller 401 with no store in it", async () => {
+await t("permissions: operator and bootstrap-before get 200 on the list, health and detail; every other caller 401 with no store in it", async () => {
   const calls = [
     ["tenants", {}],
     ["tenants", { query: `health=${a.id}` }],
-    ["tenants", { query: "legacy=1" }],
     ["tenants", { query: `q=${a.id}` }],
     ["tenants/[id]", { params: { id: a.id } }],
   ];

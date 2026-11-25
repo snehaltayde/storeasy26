@@ -10,6 +10,7 @@
 // naming the real operator. Razorpay is a fetch stand-in that records each
 // call; any other host fails the suite. Every database is a throwaway file.
 import { readFile, readdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -825,11 +826,10 @@ await t("page: /platform/billing is an operator page in the nav, and its parts u
   ok(/platformOperator\(/.test(page) && /redirect\("\/platform"\)/.test(page), "the page sends non-operators to the sign-in");
 });
 
-await t("old console: billing and costs moved out; BillingPanel is allowlisted for line 7", async () => {
-  const src = await readFile(join(ROOT, "components/platform/PlatformAdmin.js"), "utf8");
-  ok(!/BillingPanel|CostsPanel/.test(src), "PlatformAdmin no longer renders them");
+await t("old console: billing and costs are only on /platform/billing (Phase 3 line 7 removed the old panels and their allowlist row)", async () => {
+  for (const f of ["components/platform/BillingPanel.js", "components/platform/GrowthOpsPanels.js", "components/platform/PlatformAdmin.js"]) ok(!existsSync(join(ROOT, f)), `${f} is gone`);
   const { ALLOWLIST } = await import("./support/dead-code-allowlist.js");
-  ok(ALLOWLIST.some((r) => r.path === "components/platform/BillingPanel.js" && r.reason === "removed by Phase 3 line 7"), "allowlist row");
+  ok(!ALLOWLIST.some((r) => r.path.startsWith("components/platform/")), "no allowlist row for an old panel");
 });
 
 await t("no network: every outside call went to the Razorpay stand-in", () => {

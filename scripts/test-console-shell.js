@@ -436,7 +436,7 @@ await t("support's shell on every console page: main holds the page directly (no
       ["operator support", { kind: "operator-support", role: "support", id: "usr_op1" }],
     ]) {
       const html = render("support", actor, path);
-      ok(!html.includes("data-legacy"), `${label} on ${path}: no old region:`);
+      // no old region: test:no-legacy-ui keeps its attribute out of every source (Phase 3 line 7)
       ok(/<main [^>]*id="console-content"[^>]*>\s*<p id="page-marker">/.test(html), `${label} on ${path}: main > the page:`);
       eq(interactive(mainOf(html)).filter((e) => !ALLOWED_CONTROLS.some((c) => e.includes(`data-shell-control="${c}"`)) && !mainPasses(e)), [], `${label} on ${path}: interactive elements in main:`);
       const bad = interactive(html).filter((e) => !/data-nav-item="/.test(e) && !ALLOWED_CONTROLS.some((c) => e.includes(`data-shell-control="${c}"`)));
@@ -499,21 +499,11 @@ await t("ConsoleNotices is the new UI's Alert: a grant is a warning, an incident
 
 // ---------- 6. the old regions are gone; the editor preview ----------
 console.log("— old regions");
-await t("no merchant console frame carries data-legacy (Phase 2 line 11); the operator console keeps its own until Phase 3; the editor sits under the 56px top bar", () => {
-  for (const f of ["components/admin/shell/AdminShell.js", "components/admin/shell/ConsoleNotices.js", "app/(console)/admin/(auth)/layout.js", "app/(console)/admin/(invite)/layout.js", "app/(console)/admin/(handoff)/layout.js", "app/(console)/error.js", "app/(console)/not-found.js", "app/(console)/layout.js", "components/kit/toast.js"]) ok(!read(f).includes("data-legacy"), `${f} has no old region:`);
-  const WRAPPED = {
-    // Phase 1 line 8: the old operator screens carry their own region (the
-    // layout is a pass-through, so /platform/onboarding is new UI outside it)
-    // Phase 3 line 0: only the signed-in old console; the sign-in is new UI
-    // Phase 3 line 1: the old console moved to /platform/legacy; /platform is the Stores list
-    "app/(console)/platform/legacy/page.js": /<div data-legacy className="contents">\s*<PlatformAdmin \/>/,
-  };
-  for (const [f, re] of Object.entries(WRAPPED)) ok(re.test(read(f)), `${f} has the wrapper:`);
+await t("the old regions are gone from both consoles (test:no-legacy-ui scans every source since Phase 3 line 7); the operator layout is the shell or the page alone; the editor sits under the 56px top bar", () => {
   const platformLayout = read("app/(console)/platform/layout.js").replace(/^\s*\/\/.*$/gm, "");
   // Phase 3 line 0: operators get the shell (components/ui), anyone else the page alone
-  ok(/if \(!operator\) return children;/.test(platformLayout) && /<PlatformShell /.test(platformLayout) && !platformLayout.includes("data-legacy"), "the platform layout: the shell for operators, the page alone otherwise, no data-legacy:");
-  ok((read("app/(console)/platform/legacy/page.js").replace(/^\s*\/\/.*$/gm, "").match(/data-legacy/g) || []).length === 1, "the old console page: one data-legacy region:");
-  for (const f of ["app/(console)/platform/onboarding/page.js", "app/(console)/platform/onboarding/loading.js", "components/platform/onboarding/OnboardingOps.js", "components/platform/onboarding/OnboardingTable.js", "components/platform/onboarding/SubjectSheet.js", "components/platform/PlatformLogin.js", "components/platform/shell/PlatformShell.js", "components/platform/shell/PlatformNav.js", "app/(console)/platform/page.js", "app/(console)/platform/loading.js", "app/(console)/platform/error.js", "app/(console)/platform/stores/[id]/page.js", "components/platform/stores/StoresTable.js", "components/platform/stores/StoreDetail.js", "components/platform/stores/FleetStrip.js", "components/platform/stores/HealthCard.js"]) ok(!read(f).replace(/^\s*\/\/.*$/gm, "").includes("data-legacy"), `${f} is new UI, never in a data-legacy region:`);
+  ok(/if \(!operator\) return children;/.test(platformLayout) && /<PlatformShell /.test(platformLayout), "the platform layout: the shell for operators, the page alone otherwise:");
+  for (const f of ["app/(console)/platform/legacy", "components/console", "components/platform/PlatformAdmin.js", "components/platform/TenantDetail.js"]) ok(!require("node:fs").existsSync(join(ROOT, f)), `${f} is gone (Phase 3 line 7):`);
   const de = read("components/admin/editor/DocumentEditor.js");
   // Phase 2 line 6: the editor's panes fill the height under the 56px top bar (no sticky preview)
   ok(de.includes("lg:h-[calc(100svh-3.5rem)]") && !de.includes("lg:sticky"), "the editor frame sits under the 56px top bar:");

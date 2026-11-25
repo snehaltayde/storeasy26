@@ -306,7 +306,7 @@ async function sfStyles(drill) {
   };
   writeFileSync(join(drill.dir, "compare.json"), `${JSON.stringify(report, null, 2)}\n`);
   const t = diff.totals;
-  drill.note(`compare: ${t.style} computed-style, ${t.box} box, ${t.added} added and ${t.removed} removed element differences; ${t.customChanged} changed and ${t.customAdded} added custom properties (${diff.customAdded.join(", ") || "none"}); ${t.shots} screenshot(s) differ; ${t.missing} missing; ${t.ignored} ignored layout values, ${t.boxReported} box differences and ${t.frame} frame (outside [data-legacy]) differences reported; CSS ${report.cssDeltaBytes >= 0 ? "+" : ""}${report.cssDeltaBytes} bytes`);
+  drill.note(`compare: ${t.style} computed-style, ${t.box} box, ${t.added} added and ${t.removed} removed element differences; ${t.customChanged} changed and ${t.customAdded} added custom properties (${diff.customAdded.join(", ") || "none"}); ${t.shots} screenshot(s) differ; ${t.missing} missing; ${t.ignored} ignored layout values, ${t.boxReported} box differences and ${t.frame} frame differences reported; CSS ${report.cssDeltaBytes >= 0 ? "+" : ""}${report.cssDeltaBytes} bytes`);
   if (bite) {
     const caught = diff.pages.some((p) => p.samples.some((s) => s.prop === "letter-spacing"));
     drill.check(!isClean(t) && caught, "bite: the 0.01em letter-spacing is caught as computed-style differences", t);

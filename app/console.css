@@ -13,12 +13,10 @@
      · success = emerald (lime is retired as a status color);
      · the platform lime survives only as `caccent` — wordmark, CUSTOMIZED
        chips, small brand touches.
-   Phase 0 line 8: the same values hold inside every [data-legacy] region
-   under .console (the old screens inside the new shell), so those screens
-   keep their old look; Phase 2 removes the wrapper with the old screens.
+   Phase 3 line 7 removed the old screens' region under .console with the
+   old operator console; these names stay for the utilities still built on them.
 --------------------------------------------------------------------------- */
-[data-console],
-.console [data-legacy] {
+[data-console] {
   /* surfaces */
   --c-surface: #ffffff;
   --c-surface-muted: #fafafa;   /* app background */
@@ -112,17 +110,6 @@
   }
 }
 
-/* The rest of the old frame an old screen sat in: globals.css's :root
-   --background/--foreground (scripts/test-console-ui.js keeps them equal),
-   and the body's line height and text colour (globals.css body: var(--foreground)),
-   which the shell's own root (text-sm text-foreground) would otherwise pass down. */
-.console [data-legacy] {
-  --background: #ffffff;
-  --foreground: #0a0a0b;
-  line-height: 1.5;
-  color: var(--foreground);
-}
-
 /* ---------------------------------------------------------------------------
    Phase 0 line 7: the shadcn/ui console tokens (docs/UI.md "Color"). Scoped to
    .console, which goes on the console root <body> (Radix portals mount into
@@ -131,8 +118,7 @@
    :root, html, body or * rule, and every new utility name is one no
    storefront file uses (scripts/test-console-ui.js).
    Note: --c-surface, --c-border, --c-accent and the status names are also
-   legacy [data-console] tokens; line 8's .console [data-legacy] rule above
-   gives the old screens their old values back.
+   [data-console] tokens; .console (on <body>) wins inside the console.
 --------------------------------------------------------------------------- */
 .console {
   --c-bg: oklch(98.6% 0.003 95);
@@ -228,17 +214,11 @@
 @custom-variant dark (&:where(.console.dark, .console.dark *));
 
 @layer base {
-  /* descendants only; inside an old region, the old default (currentcolor) */
+  /* descendants only */
   .console *,
   .console ::before,
   .console ::after {
     border-color: var(--border);
-  }
-  .console [data-legacy],
-  .console [data-legacy] *,
-  .console [data-legacy] ::before,
-  .console [data-legacy] ::after {
-    border-color: currentcolor;
   }
   .console {
     background: var(--background);

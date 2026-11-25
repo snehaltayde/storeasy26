@@ -142,7 +142,7 @@ async function platformOps(drill) {
   await page.locator('[data-ops-tab="queues"]').waitFor();
   await settle(page);
   drill.check((await page.locator('[data-nav-item="operations"][aria-current="page"]').count()) === 1, "the nav opens Operations, marked current", null);
-  drill.check(!ERROR_TEXT.test(await text(page)) && (await page.locator('[data-legacy]').count()) === 0, "Operations renders on the new UI without an error", null);
+  drill.check(!ERROR_TEXT.test(await text(page)), "Operations renders on the new UI without an error", null);
   await drill.screenshot(page, "01-queues");
 
   // 3. Queues: retry one dead job, discard another

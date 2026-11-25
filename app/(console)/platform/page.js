@@ -9,8 +9,7 @@ import StoresTable from "@/components/platform/stores/StoresTable";
 // The operator console's home (Phase 3 line 1): the Stores list for a
 // signed-in operator, the sign-in (or "not set up") for anyone else. The list
 // loads client-side through the operator-gated GET /api/platform/tenants, so
-// this page renders no store data itself. The old console is at
-// /platform/legacy until Phase 3 line 7.
+// this page renders no store data itself.
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Stores · Storeasy platform", robots: { index: false } };
 

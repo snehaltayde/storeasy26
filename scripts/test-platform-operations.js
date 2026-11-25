@@ -399,7 +399,6 @@ await t("static: the page and its components import components/ui and kit, never
   for (const f of files) {
     const src = await readFile(join(ROOT, f), "utf8");
     ok(!/components\/console/.test(src), `${f} imports components/console`);
-    ok(!/data-legacy/.test(src), `${f} uses data-legacy`);
   }
   ok(files.length >= 8, "page, loading and the five tabs");
 });

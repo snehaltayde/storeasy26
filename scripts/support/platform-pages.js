@@ -12,8 +12,7 @@ export const PLATFORM_PAGES = Object.freeze([
   { path: "/platform/operations", file: "app/(console)/platform/operations/page.js" },
   { path: "/platform/flags", file: "app/(console)/platform/flags/page.js" },
   { path: "/platform/incidents", file: "app/(console)/platform/incidents/page.js" },
-  // line 1: the old console moved here; a store's page (a made-up id: operators get not-found)
-  { path: "/platform/legacy", file: "app/(console)/platform/legacy/page.js" },
+  // line 1: a store's page (a made-up id: operators get not-found)
   { path: "/platform/stores/missing-store", file: "app/(console)/platform/stores/[id]/page.js" },
   { path: "/platform/billing", file: "app/(console)/platform/billing/page.js" },
 ]);

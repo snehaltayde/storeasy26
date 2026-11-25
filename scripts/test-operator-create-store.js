@@ -214,7 +214,10 @@ await t("§3: POST /api/platform/tenants is retired (405, no handler); GET stays
 
 await t("§3: the console no longer offers the old New tenant form", async () => {
   const { readFile } = await import("node:fs/promises");
-  const src = await readFile(join(ROOT, "components/platform/PlatformAdmin.js"), "utf8");
+  // Phase 3 line 7: the old console is gone; the Stores list and the nav link to New store
+  const { existsSync } = await import("node:fs");
+  ok(!existsSync(join(ROOT, "components/platform/PlatformAdmin.js")), "the old console, and its New tenant form, are gone");
+  const src = await readFile(join(ROOT, "components/platform/stores/StoresTable.js"), "utf8");
   ok(!/NewTenantForm|New tenant/.test(src), "no New tenant form or button");
   ok(/\/platform\/stores\/new/.test(src), "a New store link");
 });

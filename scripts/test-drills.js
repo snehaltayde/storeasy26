@@ -626,6 +626,9 @@ await t("shell: drill:shell runs the roles store, adds the annex, then the drill
   ok(R.ALL.includes("shell"), "in ALL:");
   // Phase 2 line 11: the phase-end block suite runs every merchant screen's drill, and every name in ALL is a drill
   for (const n of ["dashboard", "orders", "catalog", "offers", "media", "editor", "settings", "team", "growth", "quizzes", "console-styles"]) ok(R.ALL.includes(n), `${n} in ALL:`);
+  // Phase 3 line 7: every operator screen's drill too (support-access once line 5 adds it to DRILLS)
+  for (const n of ["platform-shell", "platform-stores", "store-lifecycle", "platform-billing", "flags-incidents", "platform-ops"]) ok(R.ALL.includes(n), `${n} in ALL:`);
+  ok(R.ALL.includes("support-access") === Object.hasOwn(R.DRILLS, "support-access"), "support-access is in ALL exactly when it is a drill:");
   ok(R.ALL.every((n) => Object.hasOwn(R.DRILLS, n)), `every ALL name is a drill: ${R.ALL.filter((n) => !Object.hasOwn(R.DRILLS, n))}`);
   const calls = [];
   const src = readFileSync(join(ROOT, "scripts/drills/run-isolated.mjs"), "utf8");

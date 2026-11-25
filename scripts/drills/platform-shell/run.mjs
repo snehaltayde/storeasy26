@@ -70,7 +70,6 @@ async function checkSignIn(drill, page, who) {
   drill.check((await page.locator("#pl-email").count()) === 1 && (await page.locator("#pl-totp").count()) === 1, `${who}: the sign-in has the email, password and code fields`, null);
   drill.check((await page.locator(SHELL).count()) === 0 && (await page.locator('[data-nav-item]').count()) === 0, `${who}: no shell and no nav`, null);
   drill.check(!/Signups & onboarding|Tenant registry|Sign out/.test(body), `${who}: no console words`, body.slice(0, 200));
-  drill.check((await page.locator('[data-platform="sign-in"] [data-legacy]').count()) === 0 && (await page.locator("[data-legacy] #pl-email").count()) === 0, `${who}: the sign-in is new UI, outside any [data-legacy] region`, null);
 }
 
 async function platformShell(drill) {
@@ -155,9 +154,10 @@ async function platformShell(drill) {
   drill.check(Boolean(session), "an operator session row exists", null);
   await settle(page);
   const navIds = await page.locator("[data-nav-item]").evaluateAll((els) => els.map((e) => e.getAttribute("data-nav-item")));
-  drill.check(navIds.slice(0, 3).join(",") === "stores,onboarding,new-store", "the nav: Stores, Signups & onboarding, New store", navIds);
+  // Phase 3 line 7: the full list, in order (no Old console)
+  drill.check(navIds.join(",") === "stores,onboarding,new-store,flags,incidents,billing,operations", "the nav: Stores, Signups & onboarding, New store, Flags, Incidents, Billing, Operations", navIds);
   drill.check((await page.locator('[data-nav-item="stores"][aria-current="page"]').count()) === 1, "on /platform, Stores is the current item", null);
-  // Phase 3 line 1: /platform is the Stores list; the old console moved to /platform/legacy
+  // Phase 3 line 1: /platform is the Stores list (line 7 removed the old console at /platform/legacy)
   drill.check((await page.locator(`${SHELL} [data-screen="platform-stores"]`).count()) === 1 && !ERROR_TEXT.test(await text(page)), "/platform is the Stores list inside the shell", null);
   await page.locator('[data-shell-control="account"]').click();
   const menu = await page.locator('[data-account="name"]').innerText().catch(() => "");
@@ -175,6 +175,13 @@ async function platformShell(drill) {
     drill.check((await page.locator(`[data-nav-item="${item}"][aria-current="page"]`).count()) === 1 && (await page.locator(SHELL).count()) === 1, `the nav opens ${path} inside the shell, marked current`, null);
     drill.check(!ERROR_TEXT.test(await text(page)), `${path} renders without an error`, null);
     await drill.screenshot(page, `06-${item}`);
+  }
+  // Phase 3 line 7: the old console is gone; its address answers 404
+  {
+    const res = await page.goto(at("/platform/legacy"), { waitUntil: "load" });
+    drill.check(res?.status() === 404 && !/Tenant registry|Old console/.test(await text(page)), "/platform/legacy is gone (404, no old console words)", res?.status());
+    await page.goto(at("/platform"), { waitUntil: "load" });
+    await settle(page);
   }
 
   // 5. phones: the nav is a sheet
