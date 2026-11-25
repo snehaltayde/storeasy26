@@ -88,7 +88,7 @@ t("fonts.css families are fonts.js bindings; each binding has its latin face in 
 });
 
 t("each fallback fonts.js names has its metric-matched face in fonts.css", () => {
-  const fallbacks = bindings.map((b) => /fallback: \['"([^"]+)"'\]/.exec(b.body)?.[1]);
+  const fallbacks = bindings.map((b) => /fallback: \["'([^']+)'"\]/.exec(b.body)?.[1]);
   ok(fallbacks.every(Boolean), `a binding has no fallback: ${fallbacks}`);
   for (const fb of fallbacks) {
     const face = faces.find((f) => f.family === fb);
