@@ -78,7 +78,7 @@ const WHEY = { tags: ["secret-whey-tag"] };
   check("no chosen rates → no free-shipping promise", noRates.nudges.length === 0, noRates);
 }
 {
-  const p = offerProgress([line("a", 400, 1, WHEY)], { offers: [TIER, GIFT, SAVE10], coupon: "SAVE10", shippingConfig: RATES });
+  const p = offerProgress([line("a", 400, 1, WHEY)], { offers: [TIER, GIFT, SAVE10], coupon: "SAVE10", shippingConfig: { ...RATES, basis: "gross" } });
   check("at most two nudges: spend first, then the tier", p.nudges.length === 2 && p.nudges[0].kind === "spend" && p.nudges[1].kind === "tier", p.nudges.map((n) => n.kind));
   const spend = p.nudges[0];
   check("spend: the nearest goal's words, a bar and a milestone for each goal", spend.milestones.length === 2 && spend.percent > 0 && spend.percent < 100 && spend.milestones.every((m) => m.position > spend.percent && m.position <= 100), spend);
@@ -86,14 +86,20 @@ const WHEY = { tags: ["secret-whey-tag"] };
   check("currency: the cart's own ('Add $11 more…')", usd.nudges[0]?.text === "Add $11 more for a free Shaker", usd);
 }
 {
-  // the drill's own shape on the net basis: the shipping nudge must survive adding the discounted product itself
-  const items = [line("a", 500, 1, WHEY)];
-  const p = offerProgress(items, { offers: [TIER], shippingConfig: RATES });
-  const s = p.nudges.find((n) => n.kind === "spend");
-  const asTee = evaluateOffers([...items, { ...items[0], variantId: "v-a2", price: s?.remaining ?? 0 }], { offers: [TIER] });
-  check("net shipping: adding the tier's own product for the nudged amount really makes shipping free", s?.id === "shipping" && computeShipping({ subtotal: asTee.subtotal, discountTotal: asTee.discountTotal, config: RATES }).free, p);
-  const tiered = evaluateOffers([line("a", 500, 2, WHEY), line("x", s?.remaining ?? 0)], { offers: [TIER] });
-  check("net shipping: and after doing the tier nudge too", computeShipping({ subtotal: tiered.subtotal, discountTotal: tiered.discountTotal, config: RATES }).free, tiered);
+  // net basis: whole units of a tiered or B2G1 product can be discounted past any fixed step
+  // (the reviewer's cases), so with any line offer there is no shipping promise
+  const TIERS2 = { ...TIER, tiers: [{ minQty: 2, percent: 10 }, { minQty: 5, percent: 30 }] };
+  const a = offerProgress([line("a", 100, 1, WHEY)], { offers: [TIERS2], shippingConfig: RATES });
+  check("net shipping with a 2+/5+ tier: no shipping promise (adding 11 × ₹100 leaves ₹840 net)", !a.nudges.some((n) => n.id === "shipping") && a.nudges.some((n) => n.kind === "tier"), a);
+  const b = offerProgress([line("a", 100, 2, WHEY)], { offers: [BXGY], shippingConfig: RATES });
+  check("net shipping with B2G1: no shipping promise (adding 9 × ₹100 leaves ₹800 net)", b.nudges.length === 0, b);
+  const gross = offerProgress([line("a", 100, 1, WHEY)], { offers: [TIERS2], shippingConfig: { ...RATES, basis: "gross" } });
+  const gs = gross.nudges.find((n) => n.id === "shipping");
+  const units = Math.ceil((gs?.remaining ?? 0) / 100);
+  const ga = evaluateOffers([line("a", 100, 1 + units, WHEY)], { offers: [TIERS2] });
+  check("gross basis: the promise stands, and whole units of the tiered product reach it", gs?.text === "Add ₹899 more for free shipping" && computeShipping({ subtotal: ga.subtotal, discountTotal: ga.discountTotal, config: { ...RATES, basis: "gross" } }).free, gross);
+  const plainNet = offerProgress([line("a", 500)], { offers: [GIFT], shippingConfig: RATES });
+  check("net basis with no line offer: 'Add ₹499 more for free shipping'", plainNet.nudges[0]?.text === "Add ₹499 more for free shipping", plainNet);
   const zoned = offerProgress([line("a", 500)], { offers: [], shippingConfig: { ...RATES, zones: [{ prefixes: ["19"], label: "Remote", freeThreshold: 1999 }] } });
   check("pincode zones with their own free-shipping amount: no shipping promise", zoned.nudges.length === 0 && zoned.unlocked.length === 0, zoned);
   const flatZone = offerProgress([line("a", 500)], { offers: [], shippingConfig: { ...RATES, zones: [{ prefixes: ["19"], label: "Remote", flatRate: 149 }] } });
@@ -106,6 +112,9 @@ const WHEY = { tags: ["secret-whey-tag"] };
   const T30 = { ...TIER, tiers: [{ minQty: 2, percent: 30 }] };
   const p = offerProgress([line("a", 600, 2, WHEY)], { offers: [G, SOLO10, T30], coupon: "SOLO" });
   check("coupon: no 'Add ₹300 more to use SOLO' when the code would raise the total", !p.nudges.some((n) => n.kind === "coupon"), p);
+  // the gift trap: ₹1,200 with a gift now; SOLO saves ₹20 but takes the ₹315 gift away
+  const trap = offerProgress([line("a", 1200)], { offers: [{ ...GIFT, threshold: 500, gift: { ...GIFT.gift, value: 315 } }, { ...SOLO, discount: { kind: "fixed", value: 20 }, minSubtotal: 1500 }], coupon: "SOLO" });
+  check("coupon: no nudge for a code that would take away the gift the shopper has now", !trap.nudges.some((n) => n.kind === "coupon") && trap.unlocked.some((u) => u.id === "gift-shaker"), trap);
   const worth = offerProgress([line("a", 1000)], { offers: [{ ...SOLO, minSubtotal: 1500 }], coupon: "SOLO" });
   check("coupon: an exclusive code that does lower the total is still nudged", worth.nudges[0]?.text === "Add ₹500 more to use SOLO", worth);
   const cents = offerProgress([{ ...line("a", 49.99), currency: "USD" }], { offers: [{ ...GIFT, threshold: 50 }], shippingConfig: { ...RATES, freeThreshold: 75.5 } });
@@ -160,11 +169,15 @@ for (let n = 0; n < 500; n++) {
   // a tag some offer targets; and, when a tier nudge shows, on top of doing it
   const tierNd = p.nudges.find((x) => x.kind === "tier");
   const bases = [items, ...(tierNd ? [items.map((i) => (i.variantId === tierNd.variantId ? { ...i, quantity: i.quantity + tierNd.add } : i))] : [])];
+  // whole units: enough units of a line already in the cart (and one more), or
+  // of a new product some offer targets, at their real prices
+  const unitsOf = (base, i, amount, extra = 0) => base.map((x) => (x.variantId === i.variantId ? { ...x, quantity: x.quantity + Math.ceil(amount / x.price) + extra } : x));
+  const tagUnit = usd ? int(100, 4000) / 100 : int(1, 40) * 10;
   const addsFor = (amount) =>
     bases.flatMap((base) => [
       [...base, line("added", amount, 1, { currency: base[0].currency })],
-      [...base, { ...pick(base), variantId: "v-added-copy", price: amount, quantity: 1 }],
-      [...base, line("added-tag", amount, 1, { currency: base[0].currency, tags: [pick(TAGS)] })],
+      ...base.flatMap((i) => [unitsOf(base, i, amount), unitsOf(base, i, amount, 1)]),
+      [...base, line("added-tag", tagUnit, Math.ceil(amount / tagUnit), { currency: base[0].currency, tags: [pick(TAGS)] })],
     ]);
   for (const nd of p.nudges) {
     shown++;
@@ -177,7 +190,11 @@ for (let n = 0; n < 500; n++) {
     for (const after of addsFor(nd.remaining)) {
       const r = evaluateOffers(after, { offers, coupon: code });
       if (nd.kind === "coupon" && !(r.couponStatus?.valid && r.couponStatus.applied > 0)) broken.push({ n, nd, why: "coupon not valid" });
-      if (nd.kind === "coupon" && !(r.total < evaluateOffers(after, { offers }).total)) broken.push({ n, nd, why: "the coupon doesn't lower the total" });
+      if (nd.kind === "coupon") {
+        const without = evaluateOffers(after, { offers });
+        if (!(r.total < without.total)) broken.push({ n, nd, why: "the coupon doesn't lower the total" });
+        if (!without.gifts.every((g) => r.gifts.some((x) => x.offerId === g.offerId))) broken.push({ n, nd, why: "the coupon takes a gift away" });
+      }
       if (nd.kind === "spend" && nd.id === "shipping" && !computeShipping({ subtotal: r.subtotal, discountTotal: r.discountTotal, config: rates }).free) broken.push({ n, nd, after: after.at(-1), why: "shipping not free" });
       if (nd.kind === "spend" && nd.id !== "shipping" && !r.gifts.some((g) => g.offerId === nd.id)) broken.push({ n, nd, why: "gift not given" });
     }
@@ -185,6 +202,21 @@ for (let n = 0; n < 500; n++) {
   }
 }
 check(`property: over 500 random carts (bundles, BXGY, tiers, gifts, coupons; a third in USD with cents) every shown nudge (${shown}) really applies when done, whatever is added, no target value in the output`, broken.length === 0 && shown > 300, broken.slice(0, 3));
+
+// ---- cost: it runs on every cart read --------------------------------------------------------
+{
+  const offers = Array.from({ length: 40 }, (_, k) => ({ id: "t" + k, type: "TIERED_QTY", scope: "line", priority: k, title: "T" + k, target: { kind: "tag", value: "w" }, tiers: [{ minQty: 50 + k, percent: 10 }] }));
+  for (let k = 0; k < 20; k++) offers.push({ id: "g" + k, type: "FREE_GIFT", scope: "gift", priority: k, title: "G", threshold: 100000 + k, gift: { variantId: "vg" + k, title: "x" } });
+  const items = Array.from({ length: 50 }, (_, i) => line("i" + i, 100, 1, { tags: ["w"] }));
+  const times = [];
+  for (let k = 0; k < 7; k++) {
+    const t0 = performance.now();
+    offerProgress(items, { offers, coupon: "NONE", shippingConfig: { ...RATES, basis: "gross", freeThreshold: 100000 } });
+    times.push(performance.now() - t0);
+  }
+  const median = times.sort((a, b) => a - b)[3];
+  check(`cost: 60 offers × 50 lines in under 15 ms (median ${median.toFixed(1)} ms of 7)`, median < 15, times);
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
