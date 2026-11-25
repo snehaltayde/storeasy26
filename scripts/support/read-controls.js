@@ -23,6 +23,15 @@ export const READ_CONTROLS = [
   { path: "components/admin/media/MediaGrid.js", reason: "a file's card (and its name in the list) opens the details sheet; nothing is sent", marks: 2 },
   { path: "components/admin/media/MediaLibrary.js", reason: "Clear search, Try again and Load more ask GET /api/admin/media?view=library again", marks: 3 },
   { path: "components/admin/media/MediaSheet.js", reason: "Close, Copy URL (the clipboard) and Open full size send nothing; Where it's used is PUT /api/admin/media, a read gated on storefront.read (scripts/support/admin-routes.js) that writes nothing", marks: 4 },
+  // Phase 2 line 2: the orders screens
+  { path: "components/admin/orders/OrderFilters.js", reason: "view, status and payment links and the GET search form (with its hidden filter fields) only change the list's address", marks: 7 },
+  { path: "components/admin/orders/OrdersList.js", reason: "Clear filters links to the unfiltered list; Try again re-runs the GET that loads more orders", marks: 2 },
+  { path: "components/admin/orders/ReturnsList.js", reason: "each return's order id links to that order's page", marks: 1 },
+  { path: "components/admin/orders/OrderHeader.js", reason: "Copy writes the order id to the clipboard; nothing is sent", marks: 1 },
+  { path: "components/admin/orders/OrderTimeline.js", reason: "a shipment's tracking number opens the carrier's tracking page", marks: 1 },
+  { path: "app/(console)/admin/(authed)/orders/[id]/page.js", reason: "View in Shopify opens the order in the store's Shopify admin", marks: 1 },
+  { path: "app/(console)/admin/(authed)/orders/[id]/not-found.js", reason: "Back to orders links to the orders list", marks: 1 },
+  { path: "app/(console)/admin/(authed)/orders/error.js", reason: "Try again re-renders the page, which only reads", marks: 1 },
 ];
 
 // Reads sent as a non-GET request: { page, method, path, reason }, an exact

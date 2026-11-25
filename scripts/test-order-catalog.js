@@ -235,11 +235,26 @@ async function loadComponent(src, stubs) {
 const h = React.createElement;
 const nothing = { __esModule: true, default: () => null };
 const PAGE = "app/(console)/admin/(authed)/orders/[id]/page.js";
+// Phase 2 line 2: the lines (and the OVL-06 line under them) moved from the
+// page into components/admin/orders/OrderLines.js, rendered here for real;
+// the page's other parts are stand-ins.
+const LINES = "components/admin/orders/OrderLines.js";
 const pageSrc = await readFile(join(ROOT, PAGE), "utf8");
+const linesSrc = await readFile(join(ROOT, LINES), "utf8");
 const authz = await import("../lib/platform/authz.js");
 const projection = await import("../lib/order-projection.js");
-async function renderOrderPage(orderId, { role = "owner", src = pageSrc } = {}) {
-  const page = await loadComponent(src, {
+const push = await import("../lib/shopify-push.js");
+const adminUrl = await import("../lib/admin/shopify-admin-url.js");
+const reporting = await import("../lib/reporting.js");
+const format = await import("../lib/format.js");
+const box = (tag) => ({ children }) => h(tag, null, children);
+const UI_STUBS = {
+  "@/components/ui/card": { Card: box("section"), CardHeader: box("header"), CardTitle: box("h2"), CardContent: box("div"), CardDescription: box("p") },
+  "@/components/ui/badge": { Badge: box("span") },
+};
+async function renderOrderPage(orderId, { role = "owner", src = linesSrc } = {}) {
+  const lines = await loadComponent(src, { ...UI_STUBS, "@/lib/format": format, "@/lib/admin/order-view": view });
+  const page = await loadComponent(pageSrc, {
     "next/headers": { cookies: async () => ({ get: () => ({ value: "session" }) }) },
     "next/navigation": {
       notFound: () => {
@@ -252,34 +267,34 @@ async function renderOrderPage(orderId, { role = "owner", src = pageSrc } = {}) 
     "@/lib/admin-auth": { adminActor: async () => ({ role }), ADMIN_COOKIE: "admin", PLATFORM_COOKIE: "platform" },
     // Everything that reads the order is real, on the real tenant database.
     "@/lib/orders": O,
+    "@/lib/shopify-push": push,
     "@/lib/platform/authz": authz,
     "@/lib/order-projection": projection,
     "@/lib/admin/order-view": view,
+    "@/lib/admin/shopify-admin-url": adminUrl,
+    "@/lib/reporting": reporting,
     // console pages read the store through lib/console-request.js (P1-FIX-C)
     "@/lib/console-request": { tfetch: inT },
-    "@/components/console/Badge": { StatusBadge: ({ status }) => h("span", null, status), Badge: ({ children }) => h("span", null, children) },
-    "@/components/console/PageHeader": { PageHeader: ({ title, description }) => h("header", null, title, description) },
-    "@/components/console/Card": { Card: ({ children }) => h("section", null, children), CardHeader: ({ title }) => h("h2", null, title) },
-    "@/components/console/bits": { KeyValue: ({ items }) => h("dl", null, items.map((i) => h("div", { key: i.key }, `${i.key}: ${i.value}`))) },
-    "@/components/console/Banner": { Banner: ({ children }) => h("div", null, children) },
-    "@/components/admin/RetryPushButton": nothing,
-    "@/components/admin/ReconcileButton": nothing,
-    "@/components/admin/CancelOrderButton": nothing,
+    ...UI_STUBS,
+    "@/components/admin/orders/OrderHeader": { OrderHeader: ({ order }) => h("header", null, order.id) },
+    "@/components/admin/orders/OrderActions": { OrderActions: () => null },
+    "@/components/admin/orders/OrderLines": lines,
+    "@/components/admin/orders/OrderTimeline": { OrderTimeline: () => null },
   });
   return renderToStaticMarkup(await page.default({ params: Promise.resolve({ id: orderId }) }));
 }
 const text = (html) => html.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/\s+/g, " ").trim();
 // Each line's row, as plain text.
-const rows = (html) => [...html.matchAll(/<li class="flex items-center[^"]*">([\s\S]*?)<\/li>/g)].map((m) => text(m[1]));
+const rows = (html) => [...html.matchAll(/<li data-order-line="true"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => text(m[1]));
 
-// The page as it was before OVL-06: the new line taken out. P4-SEARCH: the
+// The lines as they were before OVL-06: the new line taken out. P4-SEARCH: the
 // line's class is lib/admin/order-view.js SHOPIFY_LINE_CLASS (the muted text
 // colour, 4.5:1 or better), no longer the subtle one.
 const NEW_LINE = /\n\s*\{shopifyLines\[i\] && <p className=\{SHOPIFY_LINE_CLASS\}>\{shopifyLines\[i\]\}<\/p>\}/g;
 const pageWithoutNewLine = () => {
-  const n = (pageSrc.match(NEW_LINE) || []).length;
-  eq(n, 1, "the new line, found in the page source:");
-  return pageSrc.replace(NEW_LINE, "");
+  const n = (linesSrc.match(NEW_LINE) || []).length;
+  eq(n, 1, "the new line, found in OrderLines' source:");
+  return linesSrc.replace(NEW_LINE, "");
 };
 
 await t("an order for a retitled product shows both titles: the shopper's, then Shopify title and SKU", async () => {

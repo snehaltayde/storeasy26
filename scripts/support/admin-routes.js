@@ -84,7 +84,7 @@ export const ADMIN_ROUTES = Object.freeze([
   { path: "orders", method: "GET", action: "orders.read" },
   { path: "orders/[id]", method: "GET", action: "orders.read", probe: MISSING_ORDER },
   { path: "orders/[id]", method: "POST", variant: "cancel", action: "orders.cancel", probe: { ...MISSING_ORDER, body: { action: "cancel" } } },
-  { path: "orders/[id]", method: "POST", variant: "push", action: "orders.push", probe: { ...MISSING_ORDER, body: { action: "push" } }, allowStatus: [500, "push answers an unknown order with 500 'not found' (the route's own error path, past the gate)"] },
+  { path: "orders/[id]", method: "POST", variant: "push", action: "orders.push", probe: { ...MISSING_ORDER, body: { action: "push" } } },
   { path: "orders/[id]", method: "POST", variant: "reconcile", action: "orders.push", probe: { ...MISSING_ORDER, body: { action: "reconcile" } } },
   { path: "policy-start", method: "POST", action: "storefront.write", probe: { body: {} } },
   { path: "preview-session", method: "POST", variant: "create", action: "storefront.read", via: PREVIEW, crossOrigin: "read", probe: { body: { create: true } } },

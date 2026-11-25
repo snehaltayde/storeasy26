@@ -105,7 +105,7 @@ CREATE INDEX IF NOT EXISTS idx_cart_items_cart ON cart_items(cart_id);
 --              shipping, address, payment refs) so the Session-12 Shopify push
 --              can reproduce the exact discount representation.
 CREATE TABLE IF NOT EXISTS orders (
-  id                  TEXT PRIMARY KEY,       -- e.g. BL-1A2B3C4D
+  id                  TEXT PRIMARY KEY,       -- e.g. BL-1A2B3C4D5E6F7A8B (older: BL-1A2B3C4D)
   idempotency_key     TEXT,                   -- one per checkout intent (UNIQUE below)
   cart_id             TEXT,                   -- source cart, so the webhook can clear it
   email               TEXT,

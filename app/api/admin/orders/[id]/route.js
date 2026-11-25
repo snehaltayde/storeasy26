@@ -6,6 +6,8 @@ import { pushOrderToShopify } from "@/lib/shopify-push";
 import { getOrderProjection, reconcileOrderProjection } from "@/lib/order-projection";
 import { cancelOrder } from "@/lib/order-cancel";
 import { redactOrderForRole } from "@/lib/admin/order-view";
+import { orderExists } from "@/lib/admin/orders";
+import { infraResponse } from "@/lib/infra-response";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
 
@@ -40,6 +42,9 @@ export const POST = tenantHandler(async (request, { params }) => {
   if (!auth.ok) return deny(auth);
   const { id } = await params;
   try {
+    // Phase 2 line 2: an unknown order is a 404 before anything runs (no
+    // audit row: nothing happened); push used to answer it with a 500.
+    if (!(await orderExists(id))) return NextResponse.json({ error: "We couldn't find that order." }, { status: 404 });
     if (action === "cancel") {
       const result = await cancelOrder(id, {
         reason: String(body.reason || "cancelled from admin console").slice(0, 200),
@@ -61,6 +66,11 @@ export const POST = tenantHandler(async (request, { params }) => {
     await audit({ actor: auth.actor, action: "orders.push", resource: `order:${id}`, diff: { ok: result?.ok !== false } });
     return NextResponse.json(result);
   } catch (e) {
-    return NextResponse.json({ ok: false, error: String(e?.message || e).slice(0, 300) }, { status: 500 });
+    // a database failure answers through infraResponse; anything else (most
+    // often Shopify not answering) is a plain 5xx, the raw text in the log
+    const infra = infraResponse(e, { route: "admin/orders/[id]", doing: "save" });
+    if (infra) return NextResponse.json({ ok: false, ...infra.body }, { status: infra.status });
+    slog("admin_order_action_failed", { order_id: id, action, error: String(e?.message || e).slice(0, 300) });
+    return NextResponse.json({ ok: false, error: "That didn't go through: we couldn't finish it with Shopify. Nothing changed on the order. Try again in a minute." }, { status: 502 });
   }
 });

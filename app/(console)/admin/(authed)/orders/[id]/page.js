@@ -2,24 +2,39 @@ import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { getOrder, canTransition, ORDER_STATUS } from "@/lib/orders";
+import { canPush } from "@/lib/shopify-push";
 import { roleAllows } from "@/lib/platform/authz";
 import { getOrderProjection } from "@/lib/order-projection";
-import { redactOrderForRole, shopifyMatchLine, SHOPIFY_LINE_CLASS } from "@/lib/admin/order-view";
-import { StatusBadge, Badge } from "@/components/console/Badge";
-import { PageHeader } from "@/components/console/PageHeader";
-import { Card, CardHeader } from "@/components/console/Card";
-import { KeyValue } from "@/components/console/bits";
-import { Banner } from "@/components/console/Banner";
-import RetryPushButton from "@/components/admin/RetryPushButton";
-import ReconcileButton from "@/components/admin/ReconcileButton";
-import CancelOrderButton from "@/components/admin/CancelOrderButton";
+import { redactOrderForRole, shopifyMatchLine, orderTime } from "@/lib/admin/order-view";
+import { shopifyAdminUrl } from "@/lib/admin/shopify-admin-url";
+import { merchantTz } from "@/lib/reporting";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { OrderHeader } from "@/components/admin/orders/OrderHeader";
+import { OrderActions } from "@/components/admin/orders/OrderActions";
+import { OrderLines } from "@/components/admin/orders/OrderLines";
+import { OrderTimeline } from "@/components/admin/orders/OrderTimeline";
 import { tfetch } from "@/lib/console-request";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Order · Admin", robots: { index: false } };
 
-const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
-const when = (s) => (s ? new Date(s).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
+// One order on the new UI (docs/plans/phase-2.md "Line 2" §1.3-1.7). S31:
+// the support role sees the order's state and money, never the customer.
+// The writes offered are the role's permission AND what the order's state
+// allows (canPush, canTransition), and OrderActions gates them again.
+function Fields({ items }) {
+  return (
+    <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-[8rem_1fr]">
+      {items.map(([k, v, mono]) => (
+        <div key={k} className="contents">
+          <dt className="text-muted-foreground">{k}</dt>
+          <dd className={mono ? "font-mono break-all" : "break-words"}>{v}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
 export default async function AdminOrderDetail({ params }) {
   const jar = await cookies();
@@ -29,181 +44,95 @@ export default async function AdminOrderDetail({ params }) {
   if (!actor) redirect("/admin/login");
 
   const { id } = await params;
-  // S31: the SUPPORT role sees order state and money, never customer PII
   const role = actor.role;
-  const [rawOrder, projection] = await tfetch(async () => [await getOrder(id), await getOrderProjection(id)]);
+  const [rawOrder, projection, timeZone, shopifyUrl] = await tfetch(async () => {
+    const o = await getOrder(id);
+    return [o, o ? await getOrderProjection(id) : null, merchantTz(), o?.shopify_order_id ? shopifyAdminUrl({ order: o.shopify_order_id }) : null];
+  });
   if (!rawOrder) notFound();
   const order = redactOrderForRole(rawOrder, role);
   // OVL-06: "Shopify title: X, SKU: Y" under a line the shopper saw under another
   // title. The snapshot's items hold titles and SKUs only, no customer details,
   // so the support role gets this line too.
   const shopifyLines = order.items.map((it) => shopifyMatchLine(it, rawOrder.snapshot?.items));
+  const can = {
+    push: roleAllows(role, "orders.push") && canPush(order),
+    reconcile: roleAllows(role, "orders.push") && Boolean(order.shopify_order_id),
+    cancel: roleAllows(role, "orders.cancel") && canTransition(order.status, ORDER_STATUS.CANCELLED),
+  };
+  const address = [order.address_line1, order.address_line2, order.city, order.state, order.pincode].filter(Boolean).join(", ");
 
   return (
     <>
-      <PageHeader
-        breadcrumb={[{ label: "Orders", href: "/admin/orders" }, { label: order.id }]}
-        title={
-          <span className="flex flex-wrap items-center gap-2.5">
-            <span className="font-mono text-xl">{order.id}</span>
-            <StatusBadge status={order.status} />
-            {order.financial_status && <Badge tone={order.refunded_total > 0 ? "warning" : "neutral"}>{order.financial_status}</Badge>}
-            {order.fulfillment_status && <Badge tone="neutral">{order.fulfillment_status}</Badge>}
-          </span>
-        }
-        description={`${order.payment_method === "cod" ? "Cash on delivery" : "Paid online"} · placed ${when(order.created_at)}`}
-        actions={
-          <>
-            {order.status === "sync_failed" && <RetryPushButton orderId={order.id} />}
-            {order.shopify_order_id && role !== "support" && <ReconcileButton orderId={order.id} />}
-            {roleAllows(role, "orders.cancel") && canTransition(order.status, ORDER_STATUS.CANCELLED) && (
-              <CancelOrderButton orderId={order.id} paymentCaptured={rawOrder.payment_status === "paid"} />
-            )}
-          </>
-        }
+      <OrderHeader
+        order={{ id: order.id, status: order.status, financial_status: order.financial_status ?? null, fulfillment_status: order.fulfillment_status ?? null, refunded_total: order.refunded_total ?? 0, payment_method: order.payment_method, created_at: order.created_at }}
+        timeZone={timeZone}
+        actions={<OrderActions orderId={order.id} role={role} can={can} paymentCaptured={rawOrder.payment_status === "paid"} />}
       />
 
-      {order.sync_error && (
-        <Banner tone="danger" title="Shopify push failing" className="mb-4">
-          {order.sync_error} ({order.sync_attempts} attempt{order.sync_attempts === 1 ? "" : "s"})
-        </Banner>
+      {order.sync_error && order.status === ORDER_STATUS.SYNC_FAILED && (
+        <div role="status" className="mb-4 rounded-card border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
+          <p className="font-medium text-destructive">This order didn&apos;t reach Shopify</p>
+          <p className="mt-1 break-words text-foreground">{order.sync_error}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {order.sync_attempts} attempt{order.sync_attempts === 1 ? "" : "s"} so far.{can.push ? " Fix the cause in Shopify, then use Push to Shopify." : " An owner or admin can push it again once the cause is fixed."}
+          </p>
+        </div>
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Customer" badge={order.pii_redacted ? <Badge tone="warning">PII hidden for support</Badge> : null} />
-          <KeyValue
-            items={[
-              { key: "Name", value: order.name || "—" },
-              { key: "Email", value: order.email || "—" },
-              { key: "Phone", value: order.phone || "—" },
-              { key: "Address", value: [order.address_line1, order.address_line2, order.city, order.state, order.pincode].filter(Boolean).join(", ") || "No address" },
-            ]}
-          />
+          <CardHeader>
+            <CardTitle className="text-[1.125rem]">Customer</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {order.pii_redacted ? (
+              <p className="text-sm text-muted-foreground">
+                <Badge variant="muted" className="mr-2">
+                  Hidden for support
+                </Badge>
+                Customer details are not shown with support access.
+              </p>
+            ) : (
+              <Fields items={[["Name", order.name || "—"], ["Email", order.email || "—"], ["Phone", order.phone || "—"], ["Address", address || "No address"]]} />
+            )}
+          </CardContent>
         </Card>
         <Card>
-          <CardHeader title="Payment & sync" />
-          <KeyValue
-            items={[
-              { key: "Created", value: when(order.created_at) },
-              { key: "Paid", value: when(order.paid_at) },
-              { key: "Razorpay", value: order.razorpay_payment_id || order.razorpay_order_id || "—", mono: true },
-              { key: "Shopify order", value: order.shopify_order_id ? order.shopify_order_id.split("/").pop() : "not pushed", mono: true },
-              { key: "Sync attempts", value: String(order.sync_attempts) },
-            ]}
-          />
+          <CardHeader>
+            <CardTitle className="text-[1.125rem]">Payment and sync</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Fields
+              items={[
+                ["Placed", orderTime(order.created_at, timeZone)],
+                ["Paid", orderTime(order.paid_at, timeZone)],
+                ["Razorpay", order.razorpay_payment_id || order.razorpay_order_id || "—", true],
+                ["Shopify order", order.shopify_order_id ? String(order.shopify_order_id).split("/").pop() : "Not sent yet", true],
+                ["Push attempts", String(order.sync_attempts ?? 0)],
+              ]}
+            />
+            {shopifyUrl && (
+              <a href={shopifyUrl} target="_blank" rel="noopener noreferrer" data-read-control className="inline-flex rounded-md text-sm font-medium text-primary underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
+                View in Shopify
+              </a>
+            )}
+          </CardContent>
         </Card>
       </div>
 
-      <Card className="mt-4" padded={false}>
-        <ul className="divide-y divide-edge">
-          {order.items.map((it, i) => (
-            <li key={i} className="flex items-center gap-3 px-5 py-3 text-sm">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              {it.image && <img src={it.image} alt="" className="size-10 rounded-ctl object-cover" />}
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-fg">
-                  {it.title}
-                  {it.is_gift && (
-                    <Badge tone="accent" className="ml-2">
-                      Gift
-                    </Badge>
-                  )}
-                </p>
-                <p className="text-xs text-fg-muted">
-                  {it.variant_title ? `${it.variant_title} · ` : ""}× {it.quantity}
-                </p>
-                {shopifyLines[i] && <p className={SHOPIFY_LINE_CLASS}>{shopifyLines[i]}</p>}
-              </div>
-              <span className="font-medium tabular-nums">{inr(it.line_total)}</span>
-            </li>
-          ))}
-        </ul>
-        <dl className="space-y-1 border-t border-edge px-5 py-4 text-sm">
-          <div className="flex justify-between text-fg-muted">
-            <dt>Subtotal</dt>
-            <dd className="tabular-nums">{inr(order.subtotal)}</dd>
-          </div>
-          {order.discount_total > 0 && (
-            <div className="flex justify-between text-fg-muted">
-              <dt>Discounts{order.coupon_code ? ` (${order.coupon_code})` : ""}</dt>
-              <dd className="tabular-nums">−{inr(order.discount_total)}</dd>
-            </div>
-          )}
-          <div className="flex justify-between text-fg-muted">
-            <dt>Shipping</dt>
-            <dd className="tabular-nums">{order.shipping_total ? inr(order.shipping_total) : "Free"}</dd>
-          </div>
-          <div className="flex justify-between text-base font-semibold text-fg">
-            <dt>Total</dt>
-            <dd className="tabular-nums">{inr(order.total)}</dd>
-          </div>
-          {order.refunded_total > 0 && (
-            <div className="flex justify-between text-danger">
-              <dt>Refunded</dt>
-              <dd className="tabular-nums">−{inr(order.refunded_total)}</dd>
-            </div>
-          )}
-        </dl>
-      </Card>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader title={`Shipments (${projection.fulfillments.length})`} />
-          <ul className="space-y-2 text-sm">
-            {projection.fulfillments.map((f, i) => (
-              <li key={f.id}>
-                <span className="text-xs font-medium text-fg-subtle">#{i + 1}</span>{" "}
-                {f.tracking_company ? `${f.tracking_company} · ` : ""}
-                {f.tracking_url ? (
-                  <a href={f.tracking_url} target="_blank" rel="noopener noreferrer" className="rounded font-medium text-info underline-offset-2 focus-ring hover:underline">
-                    {f.tracking_number}
-                  </a>
-                ) : (
-                  <span className="font-medium">{f.tracking_number || "no tracking yet"}</span>
-                )}
-                <span className="ml-2 text-xs text-fg-subtle">
-                  {f.status || ""} {f.updated_at ? `· ${when(f.updated_at)}` : ""}
-                </span>
-              </li>
-            ))}
-            {projection.fulfillments.length === 0 && <li className="text-fg-muted">No shipments yet.</li>}
-          </ul>
-        </Card>
-        <Card>
-          <CardHeader title="Refunds" description="Shopify is authoritative — Reconcile refreshes this." />
-          <ul className="space-y-2 text-sm">
-            {projection.refunds.map((r) => (
-              <li key={r.id} className="flex justify-between gap-3">
-                <span className="text-fg-muted">
-                  {when(r.created_at)}
-                  {r.note ? <span className="ml-2 text-xs text-fg-subtle">{r.note}</span> : null}
-                </span>
-                <span className="font-medium tabular-nums text-danger">−{inr(r.amount)}</span>
-              </li>
-            ))}
-            {projection.refunds.length === 0 && <li className="text-fg-muted">No refunds recorded.</li>}
-          </ul>
-        </Card>
+      <div className="mt-4">
+        <OrderLines
+          items={order.items}
+          shopifyLines={shopifyLines}
+          totals={{ subtotal: order.subtotal, discount_total: order.discount_total, coupon_code: order.coupon_code, shipping_total: order.shipping_total, total: order.total, refunded_total: order.refunded_total }}
+          currency={order.currency}
+        />
       </div>
 
-      <Card className="mt-4">
-        <CardHeader title="Timeline" />
-        <ol className="space-y-2 text-sm">
-          {order.events.map((e) => {
-            const meta = typeof e.meta === "string" ? (() => { try { return JSON.parse(e.meta); } catch { return null; } })() : e.meta;
-            const detail = meta && (meta.note || meta.reason || meta.source || meta.error);
-            return (
-              <li key={e.id} className="flex gap-3">
-                <span className="w-36 shrink-0 text-xs text-fg-subtle">{when(e.created_at)}</span>
-                <span className="font-medium text-fg">{e.from_status ? `${e.from_status} → ${e.to_status}` : e.to_status}</span>
-                {detail && <span className="min-w-0 truncate text-xs text-fg-muted">{String(detail)}</span>}
-              </li>
-            );
-          })}
-          {order.events.length === 0 && <li className="text-fg-muted">No events recorded.</li>}
-        </ol>
-      </Card>
+      <div className="mt-4">
+        <OrderTimeline fulfillments={projection.fulfillments} refunds={projection.refunds} events={order.events} currency={order.currency} timeZone={timeZone} />
+      </div>
     </>
   );
 }

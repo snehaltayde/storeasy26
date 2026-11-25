@@ -83,6 +83,14 @@ Each Phase 2 line fills only its own sub-heading. Every screen here is on the ne
 
 ### Orders
 
+`/admin/orders` and `/admin/orders/[id]` (Phase 2 line 2), in `components/admin/orders/`.
+
+- **List:** the address holds the state: `?status=` (tabs All, Pending payment, COD pending, Paid, Pushing, Pushed, Push failed, Cancelled, each with its count), `?payment=cod|online`, `?q=`, and `?view=returns` for the Returns tab. Every filter is a link and the search is a `method="get"` form, so each is a marked read and support can use them all. Counts follow the payment and search filters, so a tab's count is what it shows. Columns: order id (mono, the row link), placed (the store's timezone), customer ("Hidden for support" for support), payment in words, status (`StatusBadge`), total (`MoneyCell`, the order's currency), Shopify (the Shopify number, or the push error truncated with a tooltip). 50 rows, then "Load more" fetches the next page with the opaque cursor; a failed load keeps the rows and offers Try again. Empty: "No orders yet", or "No orders match" with Clear filters. Support's search box says "Order id": it searches ids only.
+- **Returns tab:** open requests (status, order link, the shopper's reason in quotes, requested date, amount), then resolved ones. Approve, Mark received and Reject open an AlertDialog with an optional note; a refusal stays in the dialog with the note. Support sees the status only (the decisions are hidden). The banner line says approving moves no money.
+- **Order page:** the title row has the id with Copy, the status, and Shopify's financial and fulfilment states; the actions are Push to Shopify (only while the order can be pushed), Refresh from Shopify (only once pushed) and Cancel order (only when the order can be cancelled), each for owner and admin only and hidden otherwise. A failed push shows its error above the cards. Cards: Customer (support: "Hidden for support", no fields), Payment and sync (with View in Shopify once pushed), Items (each line, the Shopify title and SKU line where the shopper saw another title, totals with the coupon, shipping and refunds), Shipments with tracking links, Refunds, Timeline (state changes in words). Every answer is a toast in plain words, then the page refreshes.
+- **Cancel dialog:** a reason (up to 200 characters, with a counter); for a captured payment, the Razorpay refund id with the words to refund in Razorpay first, and the confirm stays disabled until it is filled. Each refusal is shown in the dialog in words; nothing typed is lost.
+- **States:** `loading.js` skeletons for the list and the order; `error.js` with Try again; an unknown id is the order's own not-found page with Back to orders.
+
 ### Catalog
 
 ### Offers and bundles

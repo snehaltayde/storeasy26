@@ -19,4 +19,10 @@ export const ALLOWLIST = [
   { path: "components/admin/OfferForm.js", reason: "removed by Phase 2 line 10" },
   // Phase 2 line 5: the media page stopped importing these
   { path: "components/admin/MediaAdmin.js", reason: "removed by Phase 2 line 10" },
+  // Phase 2 line 2: the old orders screens' parts, no longer imported by the new orders pages
+  { path: "components/admin/OrdersAdmin.js", reason: "removed by Phase 2 line 10" },
+  { path: "components/admin/CancelOrderButton.js", reason: "removed by Phase 2 line 10" },
+  { path: "components/admin/ReconcileButton.js", reason: "removed by Phase 2 line 10" },
+  { path: "components/admin/RetryPushButton.js", reason: "removed by Phase 2 line 10" },
+  { path: "components/console/Tabs.js", reason: "removed by Phase 2 line 10" },
 ];

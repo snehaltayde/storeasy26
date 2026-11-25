@@ -61,6 +61,8 @@
     "test:first-sync": "node scripts/test-first-sync.js",
     "test:import-step": "node scripts/test-import-step.js",
     "test:order-projection": "node scripts/test-order-projection.js",
+    "test:orders-console": "node scripts/test-orders-console.js",
+    "drill:orders": "node scripts/drills/run-isolated.mjs orders",
     "alert:test": "node --env-file=.env.local scripts/alert-test.js",
     "rotate:secrets": "node --env-file=.env.local scripts/rotate-secrets.js",
     "tenant:migrate": "node --env-file=.env.local scripts/tenant-migrate.js",
