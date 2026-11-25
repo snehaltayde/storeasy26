@@ -3,6 +3,14 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Operator operations on the new UI (on the owner's behalf)
+
+- **Schema:** none. A discarded dead job gets a new `discarded` status (a dead webhook goes to the existing `ignored`). Only an explicit retry revives it (`makeJobDue(id, { revive: true })` from the founder's or operator's Try again / Resume, or `runNow`); polls, status reads and the tick never do. Discarded jobs are pruned on the dead-letter schedule.
+- **Permissions and data:** every route uses `requireOperator`, and every write is audited with `operatorActor`. Privacy and provisioning answers use allowlisted fields: no shopper email, phone, customer id or shop domain, no run settings or database address. Run errors are scrubbed of the store's database address. A resumed run's console password is shown once. Erasure refuses a request with no store (so it never runs against the default database), and the operator types the store's name to confirm; it is audited as `privacy.redact` with counts only.
+- **Case studies:** Archive takes a study off `/customers` and keeps it as a draft. Delete stays (control-plane rows, not CMS documents), behind a confirmation, and is audited with what was removed.
+- **Decided by:** Claude
+- **Slice:** Phase 3 line 6
+
 ## 2026-11-25 Old merchant console screens removed (on the owner's behalf)
 
 - **Scope:** the 18 old `components/admin/*` screens, `lib/admin/new-ui-routes.js` and `AdminShell`'s legacy branch, and the merchant-only console parts (`PageHeader`, `Tabs`, `charts`) are deleted. `components/console/*` and the `data-legacy` CSS stay for the operator console until Phase 3 line 7. `Toast` moved to `components/kit/toast.js`. `test:no-legacy-ui` follows every merchant route's imports and fails on an old part or a `data-legacy` wrapper; its four operator rows say "removed by Phase 3 line 7".
