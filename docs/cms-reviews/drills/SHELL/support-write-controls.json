@@ -1,7 +1,7 @@
 {
   "id": "SHELL",
   "note": "Write controls support still sees inside the old screens: Phase 2's list, not a failure.",
-  "total": 46,
+  "total": 45,
   "pages": [
     {
       "page": "/admin/dashboard",
@@ -67,7 +67,7 @@
         },
         {
           "tag": "button",
-          "text": "Open order ROL-9B440D13",
+          "text": "Open order ROL-24555AF0",
           "href": null
         }
       ]
@@ -229,16 +229,6 @@
           "tag": "button",
           "text": "Add a section",
           "href": null
-        }
-      ]
-    },
-    {
-      "page": "/admin/start",
-      "controls": [
-        {
-          "tag": "a",
-          "text": "Edit the home page",
-          "href": "/admin/editor?doc=doc_home"
         }
       ]
     },

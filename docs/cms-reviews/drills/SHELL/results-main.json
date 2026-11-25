@@ -2,17 +2,41 @@
   "id": "SHELL",
   "part": "main",
   "title": "SHELL — the new console shell, every role and width",
-  "ranAt": "2026-11-24T05:10:29.064Z",
-  "harness": "http://localhost:6100",
+  "ranAt": "2026-11-25T00:24:45.727Z",
+  "harness": "http://localhost:6300",
   "chrome": "158.0.8127.37",
-  "passed": 247,
+  "passed": 297,
   "failed": 0,
   "knownFailures": 0,
   "checks": [
     {
       "ok": true,
-      "label": "owner 1280px: /admin lands on /admin/dashboard",
-      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+      "label": "owner 1280px: /admin lands on /admin/onboarding (the store is closed)",
+      "detail": "200 http://roles.localhost:6301/admin/onboarding"
+    },
+    {
+      "ok": true,
+      "label": "owner 1280px: onboarding: no sidebar, the 56px top bar, a step panel",
+      "detail": {
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [
+          "Ink",
+          "Slate",
+          "Navy",
+          "Stone",
+          "Forest",
+          "Clay",
+          "Upload a logo",
+          "Choose from your library",
+          "Save",
+          "Skip for now"
+        ],
+        "reasons": []
+      }
     },
     {
       "ok": true,
@@ -36,11 +60,10 @@
         "links": [
           "/admin/dashboard",
           "/admin/analytics",
-          "/admin/setup",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -54,11 +77,10 @@
         "want": [
           "/admin/dashboard",
           "/admin/analytics",
-          "/admin/setup",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -97,14 +119,28 @@
     },
     {
       "ok": true,
-      "label": "owner 1280px: /admin/setup opens (200, no error, content in [data-legacy], aria-current)",
+      "label": "owner 1280px: /admin/onboarding opens in the onboarding shell (200, no error, the step panel, no sidebar)",
       "detail": {
         "status": 200,
         "error": false,
-        "legacy": true,
-        "current": [
-          "/admin/setup"
-        ]
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [
+          "Ink",
+          "Slate",
+          "Navy",
+          "Stone",
+          "Forest",
+          "Clay",
+          "Upload a logo",
+          "Choose from your library",
+          "Save",
+          "Skip for now"
+        ],
+        "reasons": []
       }
     },
     {
@@ -140,18 +176,6 @@
         "legacy": true,
         "current": [
           "/admin/editor"
-        ]
-      }
-    },
-    {
-      "ok": true,
-      "label": "owner 1280px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
-      "detail": {
-        "status": 200,
-        "error": false,
-        "legacy": true,
-        "current": [
-          "/admin/start"
         ]
       }
     },
@@ -265,8 +289,32 @@
     },
     {
       "ok": true,
-      "label": "owner 900px: /admin lands on /admin/dashboard",
-      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+      "label": "owner 900px: /admin lands on /admin/onboarding (the store is closed)",
+      "detail": "200 http://roles.localhost:6301/admin/onboarding"
+    },
+    {
+      "ok": true,
+      "label": "owner 900px: onboarding: no sidebar, the 56px top bar, a step panel",
+      "detail": {
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [
+          "Ink",
+          "Slate",
+          "Navy",
+          "Stone",
+          "Forest",
+          "Clay",
+          "Upload a logo",
+          "Choose from your library",
+          "Save",
+          "Skip for now"
+        ],
+        "reasons": []
+      }
     },
     {
       "ok": true,
@@ -290,11 +338,10 @@
         "links": [
           "/admin/dashboard",
           "/admin/analytics",
-          "/admin/setup",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -308,11 +355,10 @@
         "want": [
           "/admin/dashboard",
           "/admin/analytics",
-          "/admin/setup",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -356,14 +402,28 @@
     },
     {
       "ok": true,
-      "label": "owner 900px: /admin/setup opens (200, no error, content in [data-legacy], aria-current)",
+      "label": "owner 900px: /admin/onboarding opens in the onboarding shell (200, no error, the step panel, no sidebar)",
       "detail": {
         "status": 200,
         "error": false,
-        "legacy": true,
-        "current": [
-          "/admin/setup"
-        ]
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [
+          "Ink",
+          "Slate",
+          "Navy",
+          "Stone",
+          "Forest",
+          "Clay",
+          "Upload a logo",
+          "Choose from your library",
+          "Save",
+          "Skip for now"
+        ],
+        "reasons": []
       }
     },
     {
@@ -399,18 +459,6 @@
         "legacy": true,
         "current": [
           "/admin/editor"
-        ]
-      }
-    },
-    {
-      "ok": true,
-      "label": "owner 900px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
-      "detail": {
-        "status": 200,
-        "error": false,
-        "legacy": true,
-        "current": [
-          "/admin/start"
         ]
       }
     },
@@ -524,8 +572,32 @@
     },
     {
       "ok": true,
-      "label": "owner 375px: /admin lands on /admin/dashboard",
-      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+      "label": "owner 375px: /admin lands on /admin/onboarding (the store is closed)",
+      "detail": "200 http://roles.localhost:6301/admin/onboarding"
+    },
+    {
+      "ok": true,
+      "label": "owner 375px: onboarding: no sidebar, the 56px top bar, a step panel",
+      "detail": {
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [
+          "Ink",
+          "Slate",
+          "Navy",
+          "Stone",
+          "Forest",
+          "Clay",
+          "Upload a logo",
+          "Choose from your library",
+          "Save",
+          "Skip for now"
+        ],
+        "reasons": []
+      }
     },
     {
       "ok": true,
@@ -559,11 +631,10 @@
         "links": [
           "/admin/dashboard",
           "/admin/analytics",
-          "/admin/setup",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -577,11 +648,10 @@
         "want": [
           "/admin/dashboard",
           "/admin/analytics",
-          "/admin/setup",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -597,7 +667,7 @@
     {
       "ok": true,
       "label": "owner 375px: a link tap opens the page and closes the sheet",
-      "detail": "http://roles.localhost:6101/admin/orders"
+      "detail": "http://roles.localhost:6301/admin/orders"
     },
     {
       "ok": true,
@@ -625,14 +695,28 @@
     },
     {
       "ok": true,
-      "label": "owner 375px: /admin/setup opens (200, no error, content in [data-legacy], aria-current)",
+      "label": "owner 375px: /admin/onboarding opens in the onboarding shell (200, no error, the step panel, no sidebar)",
       "detail": {
         "status": 200,
         "error": false,
-        "legacy": true,
-        "current": [
-          "/admin/setup"
-        ]
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [
+          "Ink",
+          "Slate",
+          "Navy",
+          "Stone",
+          "Forest",
+          "Clay",
+          "Upload a logo",
+          "Choose from your library",
+          "Save",
+          "Skip for now"
+        ],
+        "reasons": []
       }
     },
     {
@@ -668,18 +752,6 @@
         "legacy": true,
         "current": [
           "/admin/editor"
-        ]
-      }
-    },
-    {
-      "ok": true,
-      "label": "owner 375px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
-      "detail": {
-        "status": 200,
-        "error": false,
-        "legacy": true,
-        "current": [
-          "/admin/start"
         ]
       }
     },
@@ -793,8 +865,32 @@
     },
     {
       "ok": true,
-      "label": "admin 1280px: /admin lands on /admin/dashboard",
-      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+      "label": "admin 1280px: /admin lands on /admin/onboarding (the store is closed)",
+      "detail": "200 http://roles.localhost:6301/admin/onboarding"
+    },
+    {
+      "ok": true,
+      "label": "admin 1280px: onboarding: no sidebar, the 56px top bar, a step panel",
+      "detail": {
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [
+          "Ink",
+          "Slate",
+          "Navy",
+          "Stone",
+          "Forest",
+          "Clay",
+          "Upload a logo",
+          "Choose from your library",
+          "Save",
+          "Skip for now"
+        ],
+        "reasons": []
+      }
     },
     {
       "ok": true,
@@ -818,11 +914,10 @@
         "links": [
           "/admin/dashboard",
           "/admin/analytics",
-          "/admin/setup",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -836,11 +931,10 @@
         "want": [
           "/admin/dashboard",
           "/admin/analytics",
-          "/admin/setup",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -879,14 +973,28 @@
     },
     {
       "ok": true,
-      "label": "admin 1280px: /admin/setup opens (200, no error, content in [data-legacy], aria-current)",
+      "label": "admin 1280px: /admin/onboarding opens in the onboarding shell (200, no error, the step panel, no sidebar)",
       "detail": {
         "status": 200,
         "error": false,
-        "legacy": true,
-        "current": [
-          "/admin/setup"
-        ]
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [
+          "Ink",
+          "Slate",
+          "Navy",
+          "Stone",
+          "Forest",
+          "Clay",
+          "Upload a logo",
+          "Choose from your library",
+          "Save",
+          "Skip for now"
+        ],
+        "reasons": []
       }
     },
     {
@@ -922,18 +1030,6 @@
         "legacy": true,
         "current": [
           "/admin/editor"
-        ]
-      }
-    },
-    {
-      "ok": true,
-      "label": "admin 1280px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
-      "detail": {
-        "status": 200,
-        "error": false,
-        "legacy": true,
-        "current": [
-          "/admin/start"
         ]
       }
     },
@@ -1047,8 +1143,32 @@
     },
     {
       "ok": true,
-      "label": "admin 900px: /admin lands on /admin/dashboard",
-      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+      "label": "admin 900px: /admin lands on /admin/onboarding (the store is closed)",
+      "detail": "200 http://roles.localhost:6301/admin/onboarding"
+    },
+    {
+      "ok": true,
+      "label": "admin 900px: onboarding: no sidebar, the 56px top bar, a step panel",
+      "detail": {
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [
+          "Ink",
+          "Slate",
+          "Navy",
+          "Stone",
+          "Forest",
+          "Clay",
+          "Upload a logo",
+          "Choose from your library",
+          "Save",
+          "Skip for now"
+        ],
+        "reasons": []
+      }
     },
     {
       "ok": true,
@@ -1072,11 +1192,10 @@
         "links": [
           "/admin/dashboard",
           "/admin/analytics",
-          "/admin/setup",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -1090,11 +1209,10 @@
         "want": [
           "/admin/dashboard",
           "/admin/analytics",
-          "/admin/setup",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -1138,14 +1256,28 @@
     },
     {
       "ok": true,
-      "label": "admin 900px: /admin/setup opens (200, no error, content in [data-legacy], aria-current)",
+      "label": "admin 900px: /admin/onboarding opens in the onboarding shell (200, no error, the step panel, no sidebar)",
       "detail": {
         "status": 200,
         "error": false,
-        "legacy": true,
-        "current": [
-          "/admin/setup"
-        ]
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [
+          "Ink",
+          "Slate",
+          "Navy",
+          "Stone",
+          "Forest",
+          "Clay",
+          "Upload a logo",
+          "Choose from your library",
+          "Save",
+          "Skip for now"
+        ],
+        "reasons": []
       }
     },
     {
@@ -1181,18 +1313,6 @@
         "legacy": true,
         "current": [
           "/admin/editor"
-        ]
-      }
-    },
-    {
-      "ok": true,
-      "label": "admin 900px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
-      "detail": {
-        "status": 200,
-        "error": false,
-        "legacy": true,
-        "current": [
-          "/admin/start"
         ]
       }
     },
@@ -1306,8 +1426,32 @@
     },
     {
       "ok": true,
-      "label": "admin 375px: /admin lands on /admin/dashboard",
-      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+      "label": "admin 375px: /admin lands on /admin/onboarding (the store is closed)",
+      "detail": "200 http://roles.localhost:6301/admin/onboarding"
+    },
+    {
+      "ok": true,
+      "label": "admin 375px: onboarding: no sidebar, the 56px top bar, a step panel",
+      "detail": {
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [
+          "Ink",
+          "Slate",
+          "Navy",
+          "Stone",
+          "Forest",
+          "Clay",
+          "Upload a logo",
+          "Choose from your library",
+          "Save",
+          "Skip for now"
+        ],
+        "reasons": []
+      }
     },
     {
       "ok": true,
@@ -1341,11 +1485,10 @@
         "links": [
           "/admin/dashboard",
           "/admin/analytics",
-          "/admin/setup",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -1359,11 +1502,10 @@
         "want": [
           "/admin/dashboard",
           "/admin/analytics",
-          "/admin/setup",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -1379,7 +1521,7 @@
     {
       "ok": true,
       "label": "admin 375px: a link tap opens the page and closes the sheet",
-      "detail": "http://roles.localhost:6101/admin/orders"
+      "detail": "http://roles.localhost:6301/admin/orders"
     },
     {
       "ok": true,
@@ -1407,14 +1549,28 @@
     },
     {
       "ok": true,
-      "label": "admin 375px: /admin/setup opens (200, no error, content in [data-legacy], aria-current)",
+      "label": "admin 375px: /admin/onboarding opens in the onboarding shell (200, no error, the step panel, no sidebar)",
       "detail": {
         "status": 200,
         "error": false,
-        "legacy": true,
-        "current": [
-          "/admin/setup"
-        ]
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [
+          "Ink",
+          "Slate",
+          "Navy",
+          "Stone",
+          "Forest",
+          "Clay",
+          "Upload a logo",
+          "Choose from your library",
+          "Save",
+          "Skip for now"
+        ],
+        "reasons": []
       }
     },
     {
@@ -1450,18 +1606,6 @@
         "legacy": true,
         "current": [
           "/admin/editor"
-        ]
-      }
-    },
-    {
-      "ok": true,
-      "label": "admin 375px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
-      "detail": {
-        "status": 200,
-        "error": false,
-        "legacy": true,
-        "current": [
-          "/admin/start"
         ]
       }
     },
@@ -1575,8 +1719,32 @@
     },
     {
       "ok": true,
-      "label": "staff 1280px: /admin lands on /admin/dashboard",
-      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+      "label": "staff 1280px: /admin lands on /admin/onboarding (the store is closed)",
+      "detail": "200 http://roles.localhost:6301/admin/onboarding"
+    },
+    {
+      "ok": true,
+      "label": "staff 1280px: onboarding: no sidebar, the 56px top bar, a step panel",
+      "detail": {
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [
+          "Ink",
+          "Slate",
+          "Navy",
+          "Stone",
+          "Forest",
+          "Clay",
+          "Upload a logo",
+          "Choose from your library",
+          "Save",
+          "Skip for now"
+        ],
+        "reasons": []
+      }
     },
     {
       "ok": true,
@@ -1600,10 +1768,10 @@
         "links": [
           "/admin/dashboard",
           "/admin/analytics",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -1613,10 +1781,10 @@
         "want": [
           "/admin/dashboard",
           "/admin/analytics",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -1647,6 +1815,32 @@
         "current": [
           "/admin/analytics"
         ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 1280px: /admin/onboarding opens in the onboarding shell (200, no error, the step panel, no sidebar)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [
+          "Ink",
+          "Slate",
+          "Navy",
+          "Stone",
+          "Forest",
+          "Clay",
+          "Upload a logo",
+          "Choose from your library",
+          "Save",
+          "Skip for now"
+        ],
+        "reasons": []
       }
     },
     {
@@ -1682,18 +1876,6 @@
         "legacy": true,
         "current": [
           "/admin/editor"
-        ]
-      }
-    },
-    {
-      "ok": true,
-      "label": "staff 1280px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
-      "detail": {
-        "status": 200,
-        "error": false,
-        "legacy": true,
-        "current": [
-          "/admin/start"
         ]
       }
     },
@@ -1759,8 +1941,32 @@
     },
     {
       "ok": true,
-      "label": "staff 900px: /admin lands on /admin/dashboard",
-      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+      "label": "staff 900px: /admin lands on /admin/onboarding (the store is closed)",
+      "detail": "200 http://roles.localhost:6301/admin/onboarding"
+    },
+    {
+      "ok": true,
+      "label": "staff 900px: onboarding: no sidebar, the 56px top bar, a step panel",
+      "detail": {
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [
+          "Ink",
+          "Slate",
+          "Navy",
+          "Stone",
+          "Forest",
+          "Clay",
+          "Upload a logo",
+          "Choose from your library",
+          "Save",
+          "Skip for now"
+        ],
+        "reasons": []
+      }
     },
     {
       "ok": true,
@@ -1784,10 +1990,10 @@
         "links": [
           "/admin/dashboard",
           "/admin/analytics",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -1797,10 +2003,10 @@
         "want": [
           "/admin/dashboard",
           "/admin/analytics",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -1840,6 +2046,32 @@
     },
     {
       "ok": true,
+      "label": "staff 900px: /admin/onboarding opens in the onboarding shell (200, no error, the step panel, no sidebar)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [
+          "Ink",
+          "Slate",
+          "Navy",
+          "Stone",
+          "Forest",
+          "Clay",
+          "Upload a logo",
+          "Choose from your library",
+          "Save",
+          "Skip for now"
+        ],
+        "reasons": []
+      }
+    },
+    {
+      "ok": true,
       "label": "staff 900px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
       "detail": {
         "status": 200,
@@ -1871,18 +2103,6 @@
         "legacy": true,
         "current": [
           "/admin/editor"
-        ]
-      }
-    },
-    {
-      "ok": true,
-      "label": "staff 900px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
-      "detail": {
-        "status": 200,
-        "error": false,
-        "legacy": true,
-        "current": [
-          "/admin/start"
         ]
       }
     },
@@ -1948,8 +2168,32 @@
     },
     {
       "ok": true,
-      "label": "staff 375px: /admin lands on /admin/dashboard",
-      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+      "label": "staff 375px: /admin lands on /admin/onboarding (the store is closed)",
+      "detail": "200 http://roles.localhost:6301/admin/onboarding"
+    },
+    {
+      "ok": true,
+      "label": "staff 375px: onboarding: no sidebar, the 56px top bar, a step panel",
+      "detail": {
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [
+          "Ink",
+          "Slate",
+          "Navy",
+          "Stone",
+          "Forest",
+          "Clay",
+          "Upload a logo",
+          "Choose from your library",
+          "Save",
+          "Skip for now"
+        ],
+        "reasons": []
+      }
     },
     {
       "ok": true,
@@ -1983,10 +2227,10 @@
         "links": [
           "/admin/dashboard",
           "/admin/analytics",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -1996,10 +2240,10 @@
         "want": [
           "/admin/dashboard",
           "/admin/analytics",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -2011,7 +2255,7 @@
     {
       "ok": true,
       "label": "staff 375px: a link tap opens the page and closes the sheet",
-      "detail": "http://roles.localhost:6101/admin/orders"
+      "detail": "http://roles.localhost:6301/admin/orders"
     },
     {
       "ok": true,
@@ -2035,6 +2279,32 @@
         "current": [
           "/admin/analytics"
         ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff 375px: /admin/onboarding opens in the onboarding shell (200, no error, the step panel, no sidebar)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [
+          "Ink",
+          "Slate",
+          "Navy",
+          "Stone",
+          "Forest",
+          "Clay",
+          "Upload a logo",
+          "Choose from your library",
+          "Save",
+          "Skip for now"
+        ],
+        "reasons": []
       }
     },
     {
@@ -2070,18 +2340,6 @@
         "legacy": true,
         "current": [
           "/admin/editor"
-        ]
-      }
-    },
-    {
-      "ok": true,
-      "label": "staff 375px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
-      "detail": {
-        "status": 200,
-        "error": false,
-        "legacy": true,
-        "current": [
-          "/admin/start"
         ]
       }
     },
@@ -2147,8 +2405,23 @@
     },
     {
       "ok": true,
-      "label": "support 1280px: /admin lands on /admin/dashboard",
-      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+      "label": "support 1280px: /admin lands on /admin/onboarding (the store is closed)",
+      "detail": "200 http://roles.localhost:6301/admin/onboarding"
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: onboarding: no sidebar, the 56px top bar, a step panel",
+      "detail": {
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [],
+        "reasons": [
+          "Your role can look at this but not change it."
+        ]
+      }
     },
     {
       "ok": true,
@@ -2172,10 +2445,10 @@
         "links": [
           "/admin/dashboard",
           "/admin/analytics",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -2185,10 +2458,10 @@
         "want": [
           "/admin/dashboard",
           "/admin/analytics",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -2229,6 +2502,28 @@
     {
       "ok": true,
       "label": "support 1280px: /admin/analytics: outside [data-legacy] only nav links and shell controls",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/onboarding opens in the onboarding shell (200, no error, the step panel, no sidebar)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [],
+        "reasons": [
+          "Your role can look at this but not change it."
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 1280px: /admin/onboarding: support sees no enabled control in the step panel",
       "detail": []
     },
     {
@@ -2280,23 +2575,6 @@
     {
       "ok": true,
       "label": "support 1280px: /admin/editor: outside [data-legacy] only nav links and shell controls",
-      "detail": []
-    },
-    {
-      "ok": true,
-      "label": "support 1280px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
-      "detail": {
-        "status": 200,
-        "error": false,
-        "legacy": true,
-        "current": [
-          "/admin/start"
-        ]
-      }
-    },
-    {
-      "ok": true,
-      "label": "support 1280px: /admin/start: outside [data-legacy] only nav links and shell controls",
       "detail": []
     },
     {
@@ -2386,8 +2664,23 @@
     },
     {
       "ok": true,
-      "label": "support 900px: /admin lands on /admin/dashboard",
-      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+      "label": "support 900px: /admin lands on /admin/onboarding (the store is closed)",
+      "detail": "200 http://roles.localhost:6301/admin/onboarding"
+    },
+    {
+      "ok": true,
+      "label": "support 900px: onboarding: no sidebar, the 56px top bar, a step panel",
+      "detail": {
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [],
+        "reasons": [
+          "Your role can look at this but not change it."
+        ]
+      }
     },
     {
       "ok": true,
@@ -2411,10 +2704,10 @@
         "links": [
           "/admin/dashboard",
           "/admin/analytics",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -2424,10 +2717,10 @@
         "want": [
           "/admin/dashboard",
           "/admin/analytics",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -2467,6 +2760,23 @@
     },
     {
       "ok": true,
+      "label": "support 900px: /admin/onboarding opens in the onboarding shell (200, no error, the step panel, no sidebar)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [],
+        "reasons": [
+          "Your role can look at this but not change it."
+        ]
+      }
+    },
+    {
+      "ok": true,
       "label": "support 900px: /admin/orders opens (200, no error, content in [data-legacy], aria-current)",
       "detail": {
         "status": 200,
@@ -2498,18 +2808,6 @@
         "legacy": true,
         "current": [
           "/admin/editor"
-        ]
-      }
-    },
-    {
-      "ok": true,
-      "label": "support 900px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
-      "detail": {
-        "status": 200,
-        "error": false,
-        "legacy": true,
-        "current": [
-          "/admin/start"
         ]
       }
     },
@@ -2575,8 +2873,23 @@
     },
     {
       "ok": true,
-      "label": "support 375px: /admin lands on /admin/dashboard",
-      "detail": "200 http://roles.localhost:6101/admin/dashboard"
+      "label": "support 375px: /admin lands on /admin/onboarding (the store is closed)",
+      "detail": "200 http://roles.localhost:6301/admin/onboarding"
+    },
+    {
+      "ok": true,
+      "label": "support 375px: onboarding: no sidebar, the 56px top bar, a step panel",
+      "detail": {
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [],
+        "reasons": [
+          "Your role can look at this but not change it."
+        ]
+      }
     },
     {
       "ok": true,
@@ -2610,10 +2923,10 @@
         "links": [
           "/admin/dashboard",
           "/admin/analytics",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -2623,10 +2936,10 @@
         "want": [
           "/admin/dashboard",
           "/admin/analytics",
+          "/admin/onboarding",
           "/admin/orders",
           "/admin/catalog",
           "/admin/editor",
-          "/admin/start",
           "/admin/media",
           "/admin/releases",
           "/admin/offers",
@@ -2638,7 +2951,7 @@
     {
       "ok": true,
       "label": "support 375px: a link tap opens the page and closes the sheet",
-      "detail": "http://roles.localhost:6101/admin/orders"
+      "detail": "http://roles.localhost:6301/admin/orders"
     },
     {
       "ok": true,
@@ -2661,6 +2974,23 @@
         "legacy": true,
         "current": [
           "/admin/analytics"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support 375px: /admin/onboarding opens in the onboarding shell (200, no error, the step panel, no sidebar)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [],
+        "reasons": [
+          "Your role can look at this but not change it."
         ]
       }
     },
@@ -2697,18 +3027,6 @@
         "legacy": true,
         "current": [
           "/admin/editor"
-        ]
-      }
-    },
-    {
-      "ok": true,
-      "label": "support 375px: /admin/start opens (200, no error, content in [data-legacy], aria-current)",
-      "detail": {
-        "status": 200,
-        "error": false,
-        "legacy": true,
-        "current": [
-          "/admin/start"
         ]
       }
     },
@@ -2780,7 +3098,7 @@
     {
       "ok": true,
       "label": "support: the account menu shows name, email, Support and the read-only note",
-      "detail": "Sam Support\nsupport@roles.test\nSupport\n\nYour role can look at everything here but not change it.\n\nSign out"
+      "detail": "Sam Support\nsupport@roles.test\nRole: Support\n\nYour role can look at everything here but not change it.\n\nSign out"
     },
     {
       "ok": true,
@@ -2797,7 +3115,443 @@
           "Roles Annex\nSupport",
           "Roles Demo Co\nSupport"
         ],
-        "sw": "Your stores\nRoles Annex\nSupport\nRoles Demo Co\nSupport\nOpen storefront"
+        "sw": "Your stores\nRoles Annex\nSupport\nRoles Demo Co\nSupport\nOpen storefront\n(opens another tab)"
+      }
+    },
+    {
+      "ok": true,
+      "label": "support deep link /admin/settings: the permission note, no error",
+      "detail": {
+        "status": 200,
+        "url": "http://roles.localhost:6301/admin/settings",
+        "body": "Settings\nYour role (support) can’t view the store's settings — ask an owner or admin."
+      }
+    },
+    {
+      "ok": true,
+      "label": "support deep link /admin/integrations: the permission note, no error",
+      "detail": {
+        "status": 200,
+        "url": "http://roles.localhost:6301/admin/integrations",
+        "body": "Integrations\nYour role (support) can’t view integrations — ask an owner or admin."
+      }
+    },
+    {
+      "ok": true,
+      "label": "support deep link /admin/billing: the permission note, no error",
+      "detail": {
+        "status": 200,
+        "url": "http://roles.localhost:6301/admin/billing",
+        "body": "Billing\nYour role (support) can’t view billing — ask an owner or admin."
+      }
+    },
+    {
+      "ok": true,
+      "label": "support deep link /admin/automations: the permission note, no error",
+      "detail": {
+        "status": 200,
+        "url": "http://roles.localhost:6301/admin/automations",
+        "body": "Automations\nYour role (support) can’t view automations — ask an owner or admin."
+      }
+    },
+    {
+      "ok": true,
+      "label": "support deep link /admin/onboarding?step=open: opens on that step read-only (controls disabled with their reason), no error",
+      "detail": {
+        "status": 200,
+        "url": "http://roles.localhost:6301/admin/onboarding?step=open",
+        "main": true,
+        "panel": true,
+        "step": "open",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [],
+        "reasons": [
+          "Your role can look at this but not change it.",
+          "Your role can look at this but not change it.",
+          "Your role can look at this but not change it.",
+          "Your role can look at this but not change it.",
+          "Your role can look at this but not change it.",
+          "Your role can look at this but not change it."
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support: publish, the onboarding test-order mark, settings, team, audit, help and integrations APIs answer 403",
+      "detail": {
+        "PUT documents publish": 403,
+        "PUT documents publishSet": 403,
+        "POST releases publish": 403,
+        "POST onboarding": 403,
+        "PUT settings": 403,
+        "GET settings": 403,
+        "GET team": 403,
+        "GET audit": 403,
+        "GET help": 403,
+        "GET integrations": 403
+      }
+    },
+    {
+      "ok": true,
+      "label": "support at /platform: the operator sign-in (or not configured), never the console",
+      "detail": {
+        "status": 200,
+        "body": "Platform console\nNot configured — set PLATFORM_ADMIN_PASSWORD in the environment."
+      }
+    },
+    {
+      "ok": true,
+      "label": "support signs in on the Roles Annex",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "support on the empty Roles Annex: /admin/dashboard renders (200, no error, content)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "content": true,
+        "url": "http://annex.localhost:6301/admin/dashboard"
+      }
+    },
+    {
+      "ok": true,
+      "label": "support on the empty Roles Annex: /admin/analytics renders (200, no error, content)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "content": true,
+        "url": "http://annex.localhost:6301/admin/analytics"
+      }
+    },
+    {
+      "ok": true,
+      "label": "support on the empty Roles Annex: /admin/onboarding renders (200, no error, content)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": false,
+        "content": true,
+        "url": "http://annex.localhost:6301/admin/onboarding"
+      }
+    },
+    {
+      "ok": true,
+      "label": "support on the empty Roles Annex: /admin/orders renders (200, no error, content)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "content": true,
+        "url": "http://annex.localhost:6301/admin/orders"
+      }
+    },
+    {
+      "ok": true,
+      "label": "support on the empty Roles Annex: /admin/catalog renders (200, no error, content)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "content": true,
+        "url": "http://annex.localhost:6301/admin/catalog"
+      }
+    },
+    {
+      "ok": true,
+      "label": "support on the empty Roles Annex: /admin/editor renders (200, no error, content)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "content": true,
+        "url": "http://annex.localhost:6301/admin/editor"
+      }
+    },
+    {
+      "ok": true,
+      "label": "support on the empty Roles Annex: /admin/media renders (200, no error, content)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "content": true,
+        "url": "http://annex.localhost:6301/admin/media"
+      }
+    },
+    {
+      "ok": true,
+      "label": "support on the empty Roles Annex: /admin/releases renders (200, no error, content)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "content": true,
+        "url": "http://annex.localhost:6301/admin/releases"
+      }
+    },
+    {
+      "ok": true,
+      "label": "support on the empty Roles Annex: /admin/offers renders (200, no error, content)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "content": true,
+        "url": "http://annex.localhost:6301/admin/offers"
+      }
+    },
+    {
+      "ok": true,
+      "label": "support on the empty Roles Annex: /admin/experiments renders (200, no error, content)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "content": true,
+        "url": "http://annex.localhost:6301/admin/experiments"
+      }
+    },
+    {
+      "ok": true,
+      "label": "support on the empty Roles Annex: /admin/insights renders (200, no error, content)",
+      "detail": {
+        "status": 200,
+        "error": false,
+        "legacy": true,
+        "content": true,
+        "url": "http://annex.localhost:6301/admin/insights"
+      }
+    },
+    {
+      "ok": true,
+      "label": "anonymous: all 18 console pages redirect to /admin/login",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "anonymous at /platform: the operator sign-in (or not configured), never the console",
+      "detail": "Platform console\nNot configured — set PLATFORM_ADMIN_PASSWORD in the environment."
+    },
+    {
+      "ok": true,
+      "label": "anonymous on the closed Roles Annex: / shows only \"Opening soon\"",
+      "detail": {
+        "status": 200,
+        "body": "Roles Annex\n\nOpening soon\n\nWe're getting the shop ready. Check back soon."
+      }
+    },
+    {
+      "ok": true,
+      "label": "anonymous on the closed Roles Annex: /collections shows only \"Opening soon\"",
+      "detail": {
+        "status": 200,
+        "body": "Roles Annex\n\nOpening soon\n\nWe're getting the shop ready. Check back soon."
+      }
+    },
+    {
+      "ok": true,
+      "label": "anonymous on the closed Roles Annex: /products/fixture-product-1 shows only \"Opening soon\"",
+      "detail": {
+        "status": 200,
+        "body": "Roles Annex\n\nOpening soon\n\nWe're getting the shop ready. Check back soon."
+      }
+    },
+    {
+      "ok": true,
+      "label": "anonymous on the closed Roles Annex: /journal shows only \"Opening soon\"",
+      "detail": {
+        "status": 200,
+        "body": "Roles Annex\n\nOpening soon\n\nWe're getting the shop ready. Check back soon."
+      }
+    },
+    {
+      "ok": true,
+      "label": "anonymous on the closed Roles Annex: /search?q=a shows only \"Opening soon\"",
+      "detail": {
+        "status": 200,
+        "body": "Roles Annex\n\nOpening soon\n\nWe're getting the shop ready. Check back soon."
+      }
+    },
+    {
+      "ok": true,
+      "label": "anonymous on the closed Roles Annex: /policies/privacy-policy shows only \"Opening soon\"",
+      "detail": {
+        "status": 200,
+        "body": "Roles Annex\n\nOpening soon\n\nWe're getting the shop ready. Check back soon."
+      }
+    },
+    {
+      "ok": true,
+      "label": "anonymous on the closed Roles Annex: /bundles/any shows only \"Opening soon\"",
+      "detail": {
+        "status": 200,
+        "body": "Roles Annex\n\nOpening soon\n\nWe're getting the shop ready. Check back soon."
+      }
+    },
+    {
+      "ok": true,
+      "label": "anonymous: the closed Roles Annex sitemap lists only its front door",
+      "detail": {
+        "status": 200,
+        "locs": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "support at onboarding step connect: read-only, no enabled write, no Shopify address",
+      "detail": {
+        "status": 200,
+        "main": true,
+        "panel": true,
+        "step": "connect",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [],
+        "reasons": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "support at onboarding step import: read-only, no enabled write, no Shopify address",
+      "detail": {
+        "status": 200,
+        "main": true,
+        "panel": true,
+        "step": "import",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [],
+        "reasons": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "support at onboarding step brand: read-only, no enabled write, no Shopify address",
+      "detail": {
+        "status": 200,
+        "main": true,
+        "panel": true,
+        "step": "brand",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [],
+        "reasons": [
+          "Your role can look at this but not change it."
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support at onboarding step open: read-only, no enabled write, no Shopify address",
+      "detail": {
+        "status": 200,
+        "main": true,
+        "panel": true,
+        "step": "open",
+        "sidebar": false,
+        "bar": 56,
+        "enabledWrites": [],
+        "reasons": [
+          "Your role can look at this but not change it.",
+          "Your role can look at this but not change it.",
+          "Your role can look at this but not change it.",
+          "Your role can look at this but not change it.",
+          "Your role can look at this but not change it.",
+          "Your role can look at this but not change it."
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "support: Connect, the Shopify callback, brand, policy start, starter store, import, the contact form and media delete answer 403",
+      "detail": {
+        "POST shopify/connect": 403,
+        "GET shopify/callback": 403,
+        "POST brand-step": 403,
+        "POST policy-start": 403,
+        "POST first-run": 403,
+        "POST sync": 403,
+        "PUT settings identity": 403,
+        "DELETE media": 403
+      }
+    },
+    {
+      "ok": true,
+      "label": "support at /platform/onboarding: sent to the operator sign-in, never the screen",
+      "detail": {
+        "url": "http://roles.localhost:6301/platform",
+        "body": "Platform console\nNot configured — set PLATFORM_ADMIN_PASSWORD in the environment."
+      }
+    },
+    {
+      "ok": true,
+      "label": "support at /platform/stores/new: sent to the operator sign-in, never the screen",
+      "detail": {
+        "url": "http://roles.localhost:6301/platform",
+        "body": "Platform console\nNot configured — set PLATFORM_ADMIN_PASSWORD in the environment."
+      }
+    },
+    {
+      "ok": true,
+      "label": "anonymous: a made-up handoff token is 400 with the generic words and no session",
+      "detail": {
+        "status": 400,
+        "body": {
+          "error": "This sign-in link has expired or was already used. Sign in with your email and password."
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "anonymous: a made-up invite token's peek is 400",
+      "detail": 400
+    },
+    {
+      "ok": true,
+      "label": "anonymous: the accept page with a made-up token says the invitation is invalid, no error",
+      "detail": "Roles Demo Co\n\nThis invitation can't be used\n\nThis invitation is invalid, expired, or already used. Ask whoever invited you for a new one.\n\nGo to the sign-in page"
+    },
+    {
+      "ok": true,
+      "label": "anonymous: the founder's Shopify callback is 401",
+      "detail": 401
+    },
+    {
+      "ok": true,
+      "label": "anonymous: the operator onboarding and New store APIs are 401",
+      "detail": {
+        "onboarding": 401,
+        "stores": 401,
+        "onboarding POST": 401
+      }
+    },
+    {
+      "ok": true,
+      "label": "anonymous: signup's page and APIs on a store host are 404",
+      "detail": {
+        "page": 404,
+        "api": 404,
+        "status": 404
+      }
+    },
+    {
+      "ok": true,
+      "label": "anonymous at /platform/onboarding: sent to the operator sign-in, never the screen",
+      "detail": {
+        "url": "http://roles.localhost:6301/platform",
+        "body": "Platform console\nNot configured — set PLATFORM_ADMIN_PASSWORD in the environment."
+      }
+    },
+    {
+      "ok": true,
+      "label": "anonymous at /platform/stores/new: sent to the operator sign-in, never the screen",
+      "detail": {
+        "url": "http://roles.localhost:6301/platform",
+        "body": "Platform console\nNot configured — set PLATFORM_ADMIN_PASSWORD in the environment."
       }
     },
     {
@@ -2816,8 +3570,8 @@
     },
     {
       "ok": true,
-      "label": "owner: choosing Roles Annex requests http://annex.localhost:6101/admin",
-      "detail": "http://annex.localhost:6101/admin"
+      "label": "owner: choosing Roles Annex requests http://annex.localhost:6301/admin",
+      "detail": "http://annex.localhost:6301/admin"
     },
     {
       "ok": true,
@@ -2842,12 +3596,12 @@
       "label": "owner: Sign out lands on /admin/login and the dashboard then redirects to sign-in",
       "detail": {
         "landed": "/admin/login",
-        "after": "http://roles.localhost:6101/admin/login"
+        "after": "http://roles.localhost:6301/admin/login"
       }
     }
   ],
   "notes": [
-    "support still sees 46 write control(s) inside the old screens (support-write-controls.json)"
+    "support still sees 45 write control(s) inside the old screens (support-write-controls.json)"
   ],
   "screenshots": []
 }
