@@ -45,7 +45,7 @@ export async function scheduleStage(drill, staff) {
   for (const name of ["Fixture product 1", "Fixture product 2"]) await pick(staff, staff.getByRole("button", { name: /Add a product/ }), name);
   await staff.locator("#bundle-price").fill("250");
   const hint = await staff.locator("[data-bundle-window]").innerText();
-  const tz = /\(([^)]+)\)/.exec(hint)?.[1] || "Asia/Kolkata";
+  const tz = /store.s \(([^)]+)\)/.exec(hint)?.[1] || "Asia/Kolkata"; // "Times are your store’s (Asia/Kolkata)."
   const startMs = Math.ceil((Date.now() + 120_000) / 60_000) * 60_000; // the next whole minute two minutes out
   await staff.locator("#offer-starts").fill(zoned(startMs, tz));
   await staff.getByText("Turn on after saving", { exact: true }).click();

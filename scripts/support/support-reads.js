@@ -68,7 +68,7 @@ export const SUPPORT_PROBES = Object.freeze([
   { name: "offers", path: "offers", method: "GET", keys: ["ok", "offers", "names", "currency"] },
   { name: "offers/[id]", path: "offers/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.offerId } }), keys: ["ok", "offer"] },
   { name: "offers/simulate", path: "offers/simulate", method: "POST", req: (ctx) => ({ body: { offer: ctx.offer } }), keys: ["ok", "currency", "sentence", "example", "nearMiss", "steps", "missing", "warnings", "facts", "cart", "alone", "combined", "applied", "activeOfferCount", "notes"] },
-  { name: "offers/targets", path: "offers/targets", method: "GET", keys: ["ok", "tags", "types", "currency"] },
+  { name: "offers/targets", path: "offers/targets", method: "GET", keys: ["ok", "tags", "types", "collections", "currency"] }, // collections: Phase 8 line 5
   { name: "orders", path: "orders", method: "GET", keys: ["ok", "orders", "nextBefore", "counts"] },
   { name: "orders ?q=<email>", path: "orders", method: "GET", req: (ctx) => ({ query: `q=${encodeURIComponent(ctx.orderEmail)}` }), keys: ["ok", "orders", "nextBefore", "counts"] },
   { name: "orders ?q=<phone>", path: "orders", method: "GET", req: (ctx) => ({ query: `q=${encodeURIComponent(ctx.orderPhone)}` }), keys: ["ok", "orders", "nextBefore", "counts"] },
