@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { AppSettingsForm } from "@/components/admin/apps/AppSettingsForm";
 import { AppDangerZone } from "@/components/admin/apps/AppDangerZone";
 import { AppActivity } from "@/components/admin/apps/AppActivity";
+import { WebhooksCard } from "@/components/admin/apps/WebhooksCard";
 import { PluginIcon } from "@/components/admin/apps/plugin-icon";
 import { KILLED, KILLED_BODY, SEES_NOTHING, installState, shortDate } from "@/components/admin/apps/app-words";
 
@@ -82,6 +83,7 @@ export function AppDetail({ install: initial, plugin, activity, role }) {
       )}
       {/* line 2: placements */}
       {/* line 3: webhooks */}
+      <WebhooksCard install={install} role={role} />
       {/* line 4: api access */}
       {activity && <AppActivity rows={activity} />}
       <AppDangerZone install={install} role={role} onChanged={setInstall} />

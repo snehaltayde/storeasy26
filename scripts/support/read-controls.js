@@ -16,6 +16,9 @@ export function routeMatches(pattern, path) {
 // fails until its row says why and the count is raised). Phase 2 lines
 // append rows; when appends conflict, keep both sides.
 export const READ_CONTROLS = [
+  // Phase 4 line 3: webhooks
+  { path: "components/admin/apps/DeliveriesTable.js", reason: "the Status and Event filters re-ask GET /api/admin/apps/[id]/webhooks with a query, and View opens the delivery's payload (already read) in a dialog; no write", marks: 3 },
+  { path: "components/admin/apps/WebhooksCard.js", reason: "Try again re-asks GET /api/admin/apps/[id]/webhooks after a failed read", marks: 1 },
   // Phase 4 line 1: Apps
   { path: "components/admin/apps/AppsList.js", reason: "the Installed / Browse tabs (and their list, which Radix makes focusable) only switch the shown tab, and Browse apps switches to the Browse tab; no write", marks: 4 },
   { path: "components/admin/apps/AppCatalog.js", reason: "Open is a link to an installed app's page (a GET)", marks: 1 },
