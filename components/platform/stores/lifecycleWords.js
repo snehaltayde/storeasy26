@@ -20,10 +20,23 @@ export const SUSPEND_EFFECTS = [
   "Other servers can take up to 30 seconds to apply it.",
 ];
 
+// Who notices each rotation, said before the confirm. The order-link key signs
+// more than order links (lib/orders.js, lib/customers.js, lib/releases.js,
+// lib/maintenance.js); scripts/test-store-lifecycle.js keeps these words true.
+export const ROTATE_EFFECTS = {
+  order_link_secret: [
+    "Shoppers are signed out of their accounts, and sign-in codes already sent stop working.",
+    "Order links in earlier emails stop working.",
+    "The team's preview links and maintenance passes stop working.",
+    "Other servers may still accept old links for up to 30 seconds.",
+  ],
+  admin_password: ["Team: the old console password stops working; give them the new one."],
+};
+
 // lib/platform/export.js offboardTenant, in order.
 export const OFFBOARD_STAGES = [
   "Suspend the store (storefront and console close).",
-  "Rotate the order-link key and the console password: links in customers' emails stop working.",
+  "Rotate the order-link key and the console password: shoppers are signed out, and order, sign-in and preview links stop working.",
   "Cancel the store's subscription record here (the payment provider is not touched).",
   "Delete its queued jobs, webhook receipts and usage events on the platform.",
 ];

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireOperator } from "@/lib/platform/require-operator";
 import { offboardTenant } from "@/lib/platform/export";
+import { getTenant } from "@/lib/platform/control";
 
 // Offboard a tenant (S43 / BE29): suspend → revoke keys → cancel local
 // billing → purge platform-side derived rows. The tenant DATABASE and
@@ -14,6 +15,7 @@ export async function POST(request, { params }) {
   const auth = await requireOperator(request, { write: true });
   if (auth instanceof Response) return auth;
   const { id } = await params;
+  if (!(await getTenant(id))) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const body = await request.json().catch(() => ({}));
   if (body.confirm !== id) {
     return NextResponse.json({ error: `type the tenant id ("${id}") as confirm to offboard` }, { status: 400 });

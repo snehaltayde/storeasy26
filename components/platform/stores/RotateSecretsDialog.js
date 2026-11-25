@@ -14,16 +14,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { CopyButton } from "@/components/kit/copy-button";
-import { storeApi } from "./lifecycleWords";
+import { ROTATE_EFFECTS, storeApi } from "./lifecycleWords";
 
 const HINTS = {
-  order_link_secret: "Order-status links already in customers' emails stop working. New emails get working links.",
+  order_link_secret: "Signs shopper sign-ins and sessions, order links, preview links and maintenance passes.",
   admin_password: "The shared password that opens the console before the store has team members.",
-};
-// Who notices each rotation, said before the confirm.
-const WHO = {
-  order_link_secret: "Shoppers: order links in earlier emails stop working. They can still sign in to see their orders.",
-  admin_password: "Team: the old console password stops working; give them the new one.",
 };
 
 export default function RotateSecretsDialog({ store, lifecycle, open, onOpenChange, onDone }) {
@@ -131,8 +126,8 @@ export default function RotateSecretsDialog({ store, lifecycle, open, onOpenChan
                 <AlertTitle>What changes when you rotate</AlertTitle>
                 <AlertDescription>
                   <ul className="space-y-1">
-                    {picked.map((k) => (
-                      <li key={k}>{WHO[k] || label(k)}</li>
+                    {picked.flatMap((k) => ROTATE_EFFECTS[k] || [label(k)]).map((w) => (
+                      <li key={w}>{w}</li>
                     ))}
                   </ul>
                   <p className="mt-1.5 font-medium">This can&apos;t be undone.</p>

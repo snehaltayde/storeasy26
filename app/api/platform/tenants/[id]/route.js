@@ -139,7 +139,9 @@ export async function PATCH(request, { params }) {
     return NextResponse.json({ ok: true, tenant: { id: t.id, status: t.status }, mail });
   } catch (e) {
     if (e instanceof LifecycleError) return NextResponse.json({ ok: false, error: e.message }, { status: e.status });
-    return NextResponse.json({ ok: false, error: String(e?.message || e).slice(0, 300) }, { status: 404 });
+    // anything else is ours: logged (no request body), plain words back
+    slog("tenant_patch_failed", { tenant: id, error: String(e?.message || e).slice(0, 200) });
+    return NextResponse.json({ ok: false, error: "That didn't save because of a problem on our side. Try again." }, { status: 500 });
   }
 }
 

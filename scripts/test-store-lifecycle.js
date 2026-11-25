@@ -75,6 +75,8 @@ const AA = await import("../lib/platform/admin-auth.js");
 const J = await import("../lib/platform/jobs.js");
 const WK = await import("../lib/platform/worker.js");
 const O = await import("../lib/orders.js");
+const K = await import("../lib/customers.js");
+const { db: tdb } = await import("../lib/db.js");
 const { withTenant } = await import("../lib/tenant-context.js");
 const { NextRequest } = await import("./support/next-server-stub.js");
 const db = () => C.platformDb();
@@ -205,6 +207,10 @@ await t("suspend: the storefront host fails closed on this server at once (patch
   eq(r.body.tenant.status, "suspended");
   eq(r.body.mail, "not_configured", "mail");
   eq((await C.resolveHost(host)).outcome, "suspended", "host after suspend");
+  // a shopper's checkout gets the closed answer, not an order
+  const checkout = await import(pathToFileURL(join(ROOT, "app/api/checkout/route.js")).href);
+  const co = await checkout.POST(new NextRequest(`http://${host}/api/checkout`, { method: "POST", headers: { host, origin: `http://${host}`, "content-type": "application/json" }, body: JSON.stringify({ cartId: "cart_x", method: "cod" }) }), {});
+  eq([co.status, (await co.json()).code], [503, "TENANT_SUSPENDED"], "checkout on a suspended store");
   const au = await lastAudit(a.id, "tenant.status");
   eq([au.actor, au.actor_kind], [operatorId, "operator"], "actor");
   eq(JSON.parse(au.diff), { status: "suspended", reason: "Chargebacks under review" }, "diff");
@@ -218,30 +224,53 @@ await t("suspend twice: 409 and no second audit row", async () => {
   eq((await auditRows(a.id, "tenant.status")).length, n, "rows");
 });
 
-await t("suspended: the store's jobs wait (pending, later) instead of failing; after resume they run", async () => {
+const jobRow = async (id) => (await db().execute({ sql: "SELECT status, attempts, created_at, run_after, last_error FROM jobs WHERE id = ?", args: [id] })).rows[0];
+const OLD_CREATED = "2026-01-01T00:00:00.000Z";
+
+await t("suspended: a job waits (pending, later, a plain reason) instead of failing; each pass keeps its attempts and created_at", async () => {
   const ran = [];
   const handlers = { lifecycle_probe: async () => ran.push(1) };
   const { id } = await J.enqueueJob({ type: "lifecycle_probe", tenantId: a.id });
-  const r = await WK.runJobById(id, { handlers });
-  const job = (await db().execute({ sql: "SELECT status, attempts, run_after, last_error FROM jobs WHERE id = ?", args: [id] })).rows[0];
+  await db().execute({ sql: "UPDATE jobs SET created_at = ? WHERE id = ?", args: [OLD_CREATED, id] });
+  await WK.runJobById(id, { handlers });
+  const first = await jobRow(id);
   eq(ran.length, 0, "handler not run");
-  eq(String(job.status), "pending", `status (${JSON.stringify(r)})`);
-  ok(job.run_after && Date.parse(job.run_after) > Date.now() + 10 * 60_000, "run later");
-  eq(job.last_error, null, "no error recorded");
-  ok(r?.skipped === "suspended" || r?.results?.[0]?.skipped === "suspended" || JSON.stringify(r).includes("suspended"), `skipped: ${JSON.stringify(r)}`);
+  eq([String(first.status), Number(first.attempts), first.created_at], ["pending", 0, OLD_CREATED], "after the first pass");
+  ok(first.run_after && Date.parse(first.run_after) > Date.now() + 10 * 60_000, "due later");
+  ok(String(first.last_error).startsWith(J.SUSPENDED_WAIT_PREFIX), `says why: ${first.last_error}`);
+  // fifteen minutes on, the queue leases it again: still waiting, nothing reset, the same "since"
+  await db().execute({ sql: "UPDATE jobs SET run_after = ? WHERE id = ?", args: [new Date(Date.now() - 1000).toISOString(), id] });
+  await WK.runJobById(id, { handlers });
+  const second = await jobRow(id);
+  eq([String(second.status), Number(second.attempts), second.created_at, second.last_error], ["pending", 0, OLD_CREATED, first.last_error], "after the second pass");
+  eq(ran.length, 0, "still not run");
   globalThis.__lifecycleJob = id;
 });
 
-await t("resume: the same reason rule; the host resolves again at once; the waiting job runs; audit row", async () => {
+await t("suspended for 7 days: a waiting job dead-letters with a plain reason", async () => {
+  const { id } = await J.enqueueJob({ type: "lifecycle_probe", tenantId: a.id });
+  const since = new Date(Date.now() - J.SUSPENDED_MAX_MS - 60_000).toISOString();
+  await db().execute({ sql: "UPDATE jobs SET last_error = ? WHERE id = ?", args: [`${J.SUSPENDED_WAIT_PREFIX}${since})`, id] });
+  const ran = [];
+  await WK.runJobById(id, { handlers: { lifecycle_probe: async () => ran.push(1) } });
+  const row = await jobRow(id);
+  eq([String(row.status), row.last_error], ["dead", J.SUSPENDED_DEAD_REASON]);
+  eq(ran.length, 0, "not run");
+});
+
+await t("resume: the same reason rule; the host resolves again at once; waiting jobs are due at once and run; audit row", async () => {
   eq((await call("operator", "tenants/[id]", { params: { id: a.id }, body: { status: "active", reason: "ok" } })).status, 400, "short reason");
   const r = await call("operator", "tenants/[id]", { params: { id: a.id }, body: { status: "active", reason: "Review cleared" } });
   eq(r.status, 200, r.text.slice(0, 200));
   eq((await C.resolveHost(a.tenant.domains[0])).outcome, "resolved");
   eq(JSON.parse((await lastAudit(a.id, "tenant.status")).diff), { status: "active", reason: "Review cleared" });
+  // resume made the waiting job due at once: no run_after, no waiting reason, attempts and place kept
+  const waiting = await jobRow(globalThis.__lifecycleJob);
+  eq([waiting.run_after, waiting.last_error, Number(waiting.attempts), waiting.created_at], [null, null, 0, OLD_CREATED], "due now");
   const ran = [];
-  await db().execute({ sql: "UPDATE jobs SET run_after = NULL WHERE id = ?", args: [globalThis.__lifecycleJob] });
   await WK.runJobById(globalThis.__lifecycleJob, { handlers: { lifecycle_probe: async () => ran.push(1) } });
   eq(ran.length, 1, "ran after resume");
+  eq(String((await jobRow(globalThis.__lifecycleJob)).status), "done");
 });
 
 await t("mail: with mail set up the owner is emailed on suspend and resume (no reason, no secret in it); a failed send says failed and the action still happens", async () => {
@@ -286,6 +315,14 @@ await t("rotate: an old order link fails and a new one works; the merchant's key
   const tenantBefore = await C.getTenant(a.id, { fresh: true });
   const oldToken = await withTenant(tenantBefore, () => O.orderStatusToken("ord_lifecycle"));
   ok(await withTenant(tenantBefore, () => O.verifyOrderStatusToken("ord_lifecycle", oldToken)), "old link works before");
+  // a signed-in shopper, and a sign-in code sent but not yet used (lib/customers.js signs both with this key)
+  const inBefore = (fn) => withTenant(tenantBefore, fn);
+  const latestCode = async () => /(\d{6})/.exec((await inBefore(() => tdb.selectFrom("notifications").select(["subject"]).where("type", "=", "customer_otp").orderBy("created_at", "desc").executeTakeFirst())).subject)[1];
+  await inBefore(() => K.requestOtp("shopper@lifecycle.test"));
+  const session = (await inBefore(async () => K.verifyOtp("shopper@lifecycle.test", await latestCode()))).token;
+  ok(await inBefore(() => K.customerFromToken(session)), "the shopper session works before");
+  await inBefore(() => K.requestOtp("pending@lifecycle.test"));
+  const pendingCode = await latestCode();
   const r = await call("operator", "tenants/[id]", { params: { id: a.id }, body: { rotate: { keys: ["order_link_secret"] } } });
   eq(r.status, 200, r.text.slice(0, 200));
   eq(r.body.rotated, ["order_link_secret"]);
@@ -297,6 +334,13 @@ await t("rotate: an old order link fails and a new one works; the merchant's key
   eq(sec.razorpay_key_secret, SECRET_CANARY, "merchant key kept");
   const after = await C.getTenant(a.id, { fresh: true });
   eq(await withTenant(after, () => O.verifyOrderStatusToken("ord_lifecycle", oldToken)), false, "old link fails");
+  eq(await withTenant(after, () => K.customerFromToken(session)), null, "the shopper session signed before is refused (signed out)");
+  let codeRefused = false;
+  await withTenant(after, () => K.verifyOtp("pending@lifecycle.test", pendingCode)).catch(() => (codeRefused = true));
+  ok(codeRefused, "a sign-in code sent before is refused");
+  // the dialog says so (components/platform/stores/lifecycleWords.js)
+  const said = W.ROTATE_EFFECTS.order_link_secret.join(" ");
+  for (const w of ["signed out", "sign-in codes", "Order links", "preview links", "30 seconds"]) ok(said.includes(w), `the dialog says: ${w}`);
   const newToken = await withTenant(after, () => O.orderStatusToken("ord_lifecycle"));
   ok(await withTenant(after, () => O.verifyOrderStatusToken("ord_lifecycle", newToken)), "new link works");
   const au = await lastAudit(a.id, "tenant.secrets_rotate");
@@ -363,6 +407,22 @@ await t("sync: a suspended store refuses (409); export mints an expiring link an
   eq((await lastAudit(a.id, "tenant.export")).actor, operatorId, "actor");
 });
 
+await t("an unknown store: export and offboard answer 404 exactly (offboard before the typed-id check)", async () => {
+  eq((await call("operator", "tenants/[id]/export", { method: "POST", params: { id: "missing-store" } })).status, 404, "export");
+  for (const confirm of ["missing-store", "wrong"]) eq((await call("operator", "tenants/[id]/offboard", { method: "POST", params: { id: "missing-store" }, body: { confirm } })).status, 404, `offboard (${confirm})`);
+});
+
+await t("sync now: 202 with progress and a tenant.sync audit row with the operator", async () => {
+  // credentials to start with (the first slice, which would call Shopify, runs in after() and is dropped)
+  await C.patchTenant(a.id, { config: { shopify_store_domain: "lifecycle-a.myshopify.com" }, secrets: { shopify_admin_token: "shpat_lifecycle_fake_token" } });
+  const r = await call("operator", "tenants/[id]", { method: "POST", params: { id: a.id } });
+  eq(r.status, 202, r.text.slice(0, 300));
+  ok(r.body.runId && typeof r.body.products === "number", "progress");
+  const au = await lastAudit(a.id, "tenant.sync");
+  eq([au.actor, au.actor_kind, JSON.parse(au.diff).run], [operatorId, "operator", r.body.runId]);
+  (globalThis.__afterQueue || []).length = 0; // the first slice is not run here (it needs Shopify)
+});
+
 await t("offboard: the store id typed back is required; it suspends, rotates both keys and audits tenant.offboard with the operator; b untouched", async () => {
   const bBefore = JSON.stringify(await row(b.id));
   eq((await call("operator", "tenants/[id]/offboard", { method: "POST", params: { id: lone.id }, body: { confirm: "wrong" } })).status, 400);
@@ -380,8 +440,7 @@ await t("offboard: the store id typed back is required; it suspends, rotates bot
 await t("every action's audit row carries the real operator id, and no row holds a secret value", async () => {
   const rows = (await db().execute({ sql: "SELECT action, actor, diff FROM audit_log WHERE tenant_id IN (?, ?) AND action LIKE 'tenant.%'", args: [a.id, lone.id] })).rows;
   const actions = new Set(rows.map((r) => r.action));
-  // (tenant.sync is the existing POST's row; a real sync needs Shopify, so it isn't run here)
-  for (const x of ["tenant.status", "tenant.maintenance", "tenant.secrets_rotate", "tenant.update", "tenant.export", "tenant.offboard"]) ok(actions.has(x), x);
+  for (const x of ["tenant.status", "tenant.maintenance", "tenant.secrets_rotate", "tenant.update", "tenant.sync", "tenant.export", "tenant.offboard"]) ok(actions.has(x), x);
   for (const r of rows) eq(r.actor, operatorId, r.action);
   const values = Object.values({ ...(await secretsOf(a.id)), ...(await secretsOf(lone.id)) }).filter((v) => typeof v === "string" && v.length >= 8);
   for (const r of rows) for (const v of values) ok(!String(r.diff).includes(v), `${r.action} holds a value`);
