@@ -3,6 +3,12 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 External app tokens: read-only, no customer data (owner decision)
+
+- Per-store custom apps with read-only tokens (server to server, `/api/apps/v1/*`) are fine.
+- `customers.read` is not offered in Phase 4: `APP_SCOPES` is `storefront.read`, `offers.read`, `orders.read`. Order webhook payloads and `/api/apps/v1/orders` never carry customer names, emails, phones or addresses; orders are always redacted as for the support role.
+- **Decided by:** owner
+
 ## 2026-11-25 Phase 4 shape: plugin system (on the owner's behalf)
 
 - **Schema:** plugin state lives in each store's own database: tenant migrations 0030 (installs), 0031 (placements), 0032 (endpoints, events, deliveries), 0033 (tokens), all additive; platform 0018 adds an `audit_log(tenant_id, actor, at)` index. One install table for first-party plugins and custom apps; uninstall archives the row; one live install per plugin.

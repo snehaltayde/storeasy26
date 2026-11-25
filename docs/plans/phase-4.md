@@ -1,5 +1,7 @@
 # Phase 4 plan: plugin system (roadmap Phase 2A)
 
+> **Owner decision (2026-11-25):** read-only tokens are fine; `customers.read` is **not offered** in Phase 4. Wherever this plan mentions `customers.read` or a customer block, drop it: order payloads and v1 order reads are always redacted as for support.
+
 ## Findings that change the brief
 
 **1. A plugin contract already exists, and parts of it break the rules.** `lib/types/ecosystem.ts` declares `PluginManifest`, `ExtensionSlotId`, `WebhookTopic` and `PluginScope`. Three parts conflict with this phase:
