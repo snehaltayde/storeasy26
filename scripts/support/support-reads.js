@@ -30,6 +30,8 @@ export const SUPPORT_PROBES = Object.freeze([
   { name: "apps/[id]/tokens", path: "apps/[id]/tokens", method: "GET", req: (ctx) => ({ params: { id: ctx.webhookAppId } }), keys: ["ok", "scopes", "offered", "tokens", "maxActive", "expiryDays", "defaultExpiryDays"] },
   { name: "apps/[id]/tokens (store B's app)", path: "apps/[id]/tokens", method: "GET", req: (ctx) => ({ params: { id: ctx.bWebhookAppId } }), status: 404, keys: ["error", "code"], note: "another store's app is not on this store" },
   { name: "brand-step", path: "brand-step", method: "GET", keys: ["ok", "brandStep", "palettes", "current", "design", "storeOpen", "canEditDescription", "descriptionMax"] },
+  // Phase 4 line 2: an app's placements (ctx.installId: Trust badges, which test-support-reads installs)
+  { name: "apps/[id]/placements", path: "apps/[id]/placements", method: "GET", req: (ctx) => ({ params: { id: ctx.installId } }), keys: ["ok", "installStatus", "placements", "previewPaths"] },
   { name: "bundles", path: "bundles", method: "GET", keys: ["ok", "bundles", "currency"] },
   { name: "catalog", path: "catalog", method: "GET", keys: ["ok", "products", "overrides", "collections", "shopify_admin"] },
   // P2-D: Phase 2's catalog views (lines 5 and 6)

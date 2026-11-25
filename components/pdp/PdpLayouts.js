@@ -4,6 +4,7 @@ import ProductPurchase from "@/components/ProductPurchase";
 import WishlistButton from "@/components/WishlistButton";
 import ProductCard from "@/components/ProductCard";
 import { sanitizeHtml } from "@/lib/sanitize";
+import PluginSlot from "@/components/plugins/PluginSlot";
 
 // PDP template variants (S56 / audit slices 3-4): materially different
 // LAYOUTS over the SAME functional components — ProductPurchase (variants,
@@ -82,6 +83,16 @@ export function PairsSection({ pairs }) {
   );
 }
 
+// Phase 4 line 2: the three product-page plugin slots, the same in both layouts.
+const Purchase = ({ product }) => (
+  <ProductPurchase
+    product={product}
+    underPrice={<PluginSlot name="storefront.pdp.under_price" ctx={product} className="mt-4" />}
+    underAtc={<PluginSlot name="storefront.pdp.under_atc" ctx={product} className="mt-5" />}
+  />
+);
+const BelowFold = ({ product }) => <PluginSlot name="storefront.pdp.below_fold" ctx={product} className="mt-8" />;
+
 // ---- classic: the original layout, moved verbatim ---------------------------
 export function PdpClassic({ product, override, extras, pairs }) {
   return (
@@ -93,13 +104,14 @@ export function PdpClassic({ product, override, extras, pairs }) {
           <VendorBadge product={product} override={override} />
           <h1 className="mt-1 text-3xl font-extrabold tracking-tight">{product.title}</h1>
 
-          <ProductPurchase product={product} />
+          <Purchase product={product} />
           <div className="mt-3">
             <WishlistButton handle={product.handle} />
           </div>
 
           <DetailsBlock product={product} />
           <Accordions override={override} extras={extras} />
+          <BelowFold product={product} />
         </div>
       </div>
 
@@ -131,6 +143,7 @@ export function PdpEditorial({ product, override, extras, pairs }) {
         <div className="lg:col-span-2">
           <DetailsBlock product={product} />
           <Accordions override={override} extras={extras} />
+          <BelowFold product={product} />
           {product.images?.length > 1 ? (
             <div className="mt-10 grid grid-cols-2 gap-4">
               {product.images.slice(1, 5).map((img, i) => (
@@ -142,7 +155,7 @@ export function PdpEditorial({ product, override, extras, pairs }) {
         </div>
         <aside className="lg:sticky lg:top-24 lg:self-start">
           <div className="rounded-brand border border-sf-border p-5 shadow-sm">
-            <ProductPurchase product={product} />
+            <Purchase product={product} />
             <div className="mt-3">
               <WishlistButton handle={product.handle} />
             </div>

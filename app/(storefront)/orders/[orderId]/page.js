@@ -7,6 +7,7 @@ import { getOrderProjection, reconcileOrderProjection } from "@/lib/order-projec
 import { formatMoney } from "@/lib/format";
 import { siteSupport } from "@/lib/site";
 import { tfetch } from "@/lib/storefront-request";
+import PluginSlot from "@/components/plugins/PluginSlot";
 
 // Guest order-status page (Session 18; S31 projection-backed). Reachable ONLY
 // via the tokenized link. Renders our durable state machine PLUS the local
@@ -151,6 +152,9 @@ export default async function OrderStatusPage({ params, searchParams }) {
             </p>
           </div>
         )}
+
+        {/* Phase 4 line 2: after the signed-link check above; ids and states only */}
+        <PluginSlot name="storefront.order.status" ctx={order} className="mt-5" />
 
         <ul className="mt-6 divide-y divide-sf-border-soft border-y border-sf-border-soft">
           {order.items.map((it, i) => (

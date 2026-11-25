@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "@/components/cart/CartContext";
 import { formatMoney, discountPercent } from "@/lib/format";
 
-export default function ProductPurchase({ product }) {
+// Phase 4 line 2: underPrice and underAtc are server-rendered plugin slots
+// (components/plugins/PluginSlot.js) passed in by the PDP layouts.
+export default function ProductPurchase({ product, underPrice = null, underAtc = null }) {
   const {
     options = [],
     variants = [],
@@ -104,6 +106,8 @@ export default function ProductPurchase({ product }) {
         {available ? "● In stock" : "● Sold out"}
       </p>
 
+      {underPrice}
+
       {showOptions && (
         <div className="mt-6 space-y-5">
           {options.map((opt) => (
@@ -182,6 +186,8 @@ export default function ProductPurchase({ product }) {
           {available ? (currentVariant ? "Add to cart" : "Select options") : "Sold out"}
         </button>
       </div>
+
+      {underAtc}
 
       {added && available && (
         <button

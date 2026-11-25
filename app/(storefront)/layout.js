@@ -2,6 +2,7 @@ import { Geist, GeistMono, Fraunces } from "@/app/fonts/fonts";
 import "../globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import PluginSlot from "@/components/plugins/PluginSlot";
 import { CartProvider } from "@/components/cart/CartContext";
 import CartDrawer from "@/components/cart/CartDrawer";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
@@ -386,6 +387,7 @@ export default async function RootLayout({ children }) {
         <CartProvider initialCart={cart}>
           <Header collections={collections} logo={chrome.logo} nav={chrome.navHeader} announcement={chrome.announcement} variant={chrome.headerVariant} editing={editing} />
           {editing ? <PreviewMain routes={frame.routes}>{children}</PreviewMain> : <main className="flex-1">{children}</main>}
+          <PluginSlot name="storefront.footer.above" className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6" />
           <Footer
             collections={collections}
             logo={chrome.logo}

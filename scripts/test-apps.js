@@ -114,7 +114,7 @@ await t("manifest checks: a bad id, version, icon, scope, setting kind, secret d
   bad({ settings: [{ key: "s", kind: "secret", default: "x" }] }, "default");
   bad({ settings: [{ key: "l", kind: "list", max: 3, fields: [{ key: "s", kind: "secret" }] }] }, "list field");
   bad({ settings: [{ key: "a", kind: "text" }, { key: "a", kind: "text" }] }, "twice");
-  bad({ blocks: [] }, "unknown field");
+  bad({ widgets: [] }, "unknown field");
   let threw = false;
   try {
     CAT.registerPlugin({ ...FIXTURE });

@@ -54,6 +54,7 @@ export interface PluginManifest {
   scopes: PluginScope[];
   settings: PluginSetting[];
   // line 2: blocks (declarative only: no iframe or script slot kinds)
+  blocks?: PluginBlock[];
   // line 3: events and egress
   events?: Exclude<WebhookTopic, "ping">[]; // handlers: lib/plugins/handlers.js
   egress?: string[]; // the hosts its handlers may call (lowercase DNS names, never Shopify)
@@ -72,6 +73,28 @@ export interface WebhookBody {
   store: string | null; // the store's host
   data: Record<string, unknown>;
 }
+
+// Phase 4 line 2: storefront slots and block primitives (lib/plugins/slots.js, lib/plugins/blocks.js).
+export type SlotId =
+  | "storefront.pdp.under_price"
+  | "storefront.pdp.under_atc"
+  | "storefront.pdp.below_fold"
+  | "storefront.order.status"
+  | "storefront.footer.above";
+
+export type BlockPrimitive = "badge_row" | "notice";
+
+export interface PluginBlock {
+  id: string;
+  label: string;
+  primitive: BlockPrimitive;
+  slots: SlotId[];
+  settings?: PluginField[];
+  // in-repo, Edge-safe; its output joins the placement's settings as props
+  data?: (ctx: Record<string, string | number | boolean | null>, extra: { installSettings: Record<string, unknown> }) => Record<string, unknown> | Promise<Record<string, unknown>>;
+}
+
+export type PlacementState = "off" | "live";
 
 export type PluginInstallStatus = "enabled" | "disabled" | "uninstalled";
 

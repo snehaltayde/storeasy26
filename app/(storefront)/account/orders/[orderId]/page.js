@@ -8,6 +8,7 @@ import ReturnRequest from "@/components/account/ReturnRequest";
 import { returnForOrder, returnEligibility, returnsWindowDays } from "@/lib/returns";
 import { db } from "@/lib/db";
 import { tfetch } from "@/lib/storefront-request";
+import PluginSlot from "@/components/plugins/PluginSlot";
 
 // Account order detail (S45 / SF11 + SF12): ownership-checked server-side
 // (someone else's order id is a plain 404), fulfilment + refunds from the
@@ -114,6 +115,9 @@ export default async function AccountOrderPage({ params }) {
           ))}
         </section>
       )}
+
+      {/* Phase 4 line 2: after the signed-in customer's own order is found; ids and states only */}
+      <PluginSlot name="storefront.order.status" ctx={o} className="mt-4" />
 
       <section className="mt-6">
         <ReorderPanel orderId={o.id} />

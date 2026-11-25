@@ -52,6 +52,9 @@ export const ADMIN_ROUTES = Object.freeze([
     ["scopes", { scopes: [] }],
   ].map(([v, arg]) => ({ path: "apps/[id]/tokens", method: "POST", variant: v, action: "apps.manage", probe: { params: { id: "pin_0000000000000000" }, body: { [v]: arg } } })),
   { path: "apps/[id]/calls", method: "GET", action: "audit.read", probe: { params: { id: "pin_0000000000000000" } } },
+  // Phase 4 line 2: where an app's blocks show (a missing install: the gate, then 404)
+  { path: "apps/[id]/placements", method: "GET", action: "apps.read", probe: { params: { id: "pin_0000000000000000" } } },
+  { path: "apps/[id]/placements", method: "POST", action: "apps.manage", probe: { params: { id: "pin_0000000000000000" }, body: { block: "badges", state: "live" } } },
   { path: "audit", method: "GET", action: "audit.read" },
   { path: "automations", method: "GET", action: "settings.read" },
   { path: "automations", method: "POST", action: "settings.write", probe: { body: {} } },

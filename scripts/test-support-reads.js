@@ -409,6 +409,10 @@ const ownerPreview = await call("owner", "preview-session", "POST", { body: { cr
 CTX.ownerSid = ownerPreview.body?.sid;
 TOKENS.ownerPreviewToken = ownerPreview.body?.token ?? "";
 await t("owner: makes its own preview session", () => eq(ownerPreview.status, 200, `owner preview: ${ownerPreview.text?.slice(0, 200)}`));
+// Phase 4 line 2: Trust badges installed, so the placements probe reads a real install
+const installed = await call("owner", "apps", "POST", { body: { install: { pluginId: "trust-badges", scopes: [] } } });
+CTX.installId = installed.body?.install?.id;
+await t("owner: installs Trust badges (the placements probe's install)", () => eq(installed.status, 200, `install: ${installed.text?.slice(0, 200)}`));
 
 // --- every probe as every least-trusted caller -----------------------------------------
 const results = {}; // caller -> probe name -> response
