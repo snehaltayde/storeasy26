@@ -3,6 +3,14 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Catalog on the new UI (on the owner's behalf)
+
+- **Permissions:** browse, sheets and collections are `storefront.read`; "Sync from Shopify" is `RoleGate`d on `sync.run` (and disabled for everyone on a store not linked to Shopify); support gets "View content" (the editor's read-only path) and no editor-list link; another store's gid answers 404 with nothing about it. The quiz tray stays an old-screen tray for writers only, allowed by the shell drill only on `/admin/catalog`, only for `storefront.write`, exactly one.
+- **Reads:** `listProductContent` gained `available`, `withTotal`, an `edited` filter (still refused by the editor's API) and `pageFacts` (one query for a page's price, stock, type and content state); the editor's answer and the old `GET /api/admin/catalog` are unchanged. A new `?view=product&id=` serves the sheet.
+- **Bundles:** they left the catalog; `BUNDLES_HREF` is `/admin/bundles` and the editor's bundle words point there; `drill:p5` works on the bundles pages.
+- **Decided by:** Claude
+- **Slice:** Phase 2 line 3
+
 ## 2026-11-25 Orders on the new UI (on the owner's behalf)
 
 - **Schema:** tenant 0029 adds two orders indexes only. The list cursor is `(created_at, id)` (base64url); a plain ISO `before` still works and an unreadable one returns the first page. New order ids carry 64 random bits (`PREFIX-` + 16 hex, 20 characters, inside Shopify's tag limit); old ids stay valid.
