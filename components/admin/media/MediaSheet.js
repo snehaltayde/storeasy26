@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { RoleGate } from "@/components/kit/role-gate";
 import { StatusBadge } from "@/components/kit/status-badge";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 import { roleAllows } from "@/lib/platform/authz";
 import { DeleteMediaDialog } from "@/components/admin/media/DeleteMediaDialog";
 import { fmtDate, fmtDims, fmtSize, MEDIA_WORDS, TYPE_WORDS, usageLines } from "@/components/admin/media/media-words";

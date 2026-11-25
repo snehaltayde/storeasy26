@@ -2,12 +2,24 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
-import { Banner } from "@/components/console/Banner";
-import { Button, IconButton } from "@/components/console/Button";
-import { Field, Input, Textarea } from "@/components/console/fields";
+import { Banner, Button, IconButton, Input, Textarea } from "@/components/admin/editor/fields/parts";
 import { VariantPicker } from "@/components/admin/shared/RefPicker";
 import { formatMoney } from "@/lib/format";
 import { reasonSentence } from "@/lib/commerce/bundle-words";
+
+// A labelled field: the label above, a hint below (Phase 2 line 11: was the
+// old console Field).
+function Field({ label, hint = null, htmlFor, className = "", children }) {
+  return (
+    <div className={`min-w-0 ${className}`.trim()}>
+      <label htmlFor={htmlFor} className="mb-1 block text-xs font-medium text-muted-foreground">
+        {label}
+      </label>
+      {children}
+      {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
 
 // P5-PANEL (COM-02): THE bundle form. The console's Catalog > Bundles panel
 // uses it in full mode; the editor's inline "new bundle" Dialog (P5-EDITOR)

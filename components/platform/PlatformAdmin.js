@@ -10,7 +10,7 @@ import { StatusBadge } from "@/components/console/Badge";
 import { Dialog, ConfirmDialog, DangerDialog } from "@/components/console/Dialog";
 import { Field, Input, Select, Textarea } from "@/components/console/fields";
 import { SkeletonText, EmptyState, ErrorState } from "@/components/console/bits";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 import QueuesPanel from "./QueuesPanel";
 import { FlagsPanel, CostsPanel } from "./GrowthOpsPanels";
 import CaseStudiesPanel from "./CaseStudiesPanel";

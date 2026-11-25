@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/kit/page-header";
 import { RoleGate } from "@/components/kit/role-gate";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 import { sendJson, useLeaveGuard } from "@/components/admin/offers/ConfirmAction";
 import { validateQuiz } from "@/lib/quiz-rules";
 import { QuestionList, blankQuestion } from "./QuestionList";

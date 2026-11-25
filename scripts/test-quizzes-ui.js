@@ -327,7 +327,7 @@ await swc.loadBindings();
 const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
 const stubs = {
-  "@/components/console/Toast": { useToast: () => ({ success() {}, error() {}, info() {} }) },
+  "@/components/kit/toast": { useToast: () => ({ success() {}, error() {}, info() {} }) },
   "next/navigation": { useRouter: () => ({ refresh() {}, replace() {}, push() {} }), usePathname: () => "/admin/quizzes" },
 };
 const cache = new Map();
@@ -430,12 +430,10 @@ await t("validateQuiz problems name the field by position, in plain words; the a
   ok(v.problems.every((p) => /^[A-Z].*\.$/.test(p.words)), "sentences:");
   eq([slugFrom("Find your fit!"), slugFrom("  Été & Co  "), slugFrom("")], ["find-your-fit", "ete-co", ""]);
 });
-await t("the catalog page has no quiz tray; the nav lists Quizzes under Catalog; /admin/quizzes is a new-UI route", async () => {
+await t("the catalog page has no quiz tray; the nav lists Quizzes under Catalog; every page is new UI since Phase 2 line 11 (test:no-legacy-ui)", async () => {
   ok(!/QuizPanel|QuizTray|listQuizzes/.test(read("app/(console)/admin/(authed)/catalog/page.js")), "catalog:");
   const { NAV } = await import("../lib/admin/nav.js");
   eq(NAV.find((g) => g.label === "Catalog").items.map((i) => i.id), ["catalog", "quizzes"]);
-  const { isNewUiRoute } = await import("../lib/admin/new-ui-routes.js");
-  eq([isNewUiRoute("/admin/quizzes"), isNewUiRoute("/admin/quizzes/fit")], [true, true]);
 });
 
 console.log(`\n${pass} passed, ${fail} failed (${((Date.now() - started) / 1000).toFixed(1)} s)`);

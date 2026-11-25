@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/console/Badge";
 import { Field, Input, Textarea } from "@/components/console/fields";
 import { ConfirmDialog } from "@/components/console/Dialog";
 import { SkeletonText, ErrorState, EmptyState } from "@/components/console/bits";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 
 // Case-study authoring for the marketing site's /customers (MK06). Publishing
 // is gated on the server: documented consent + a measurement record.

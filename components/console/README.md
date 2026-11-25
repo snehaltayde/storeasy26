@@ -6,14 +6,14 @@ Tokens live in `app/console.css`, scoped to `[data-console]` — the console
 route group's `<html>` carries the attribute, so tenant brand variables never
 re-skin the console and console tokens never touch the storefront.
 
-**Since line 8** these primitives render only inside a `data-legacy` region
-(`<div data-legacy className="contents">`): the new shell's `main`, the
-sign-in layout, the platform layout, the console error and 404 pages and the
-Toast viewport. `.console [data-legacy]` in `app/console.css` gives them
-their old tokens back under the new `.console` body. A primitive used
-outside such a region picks up the new tokens. The old shell
-(`nav/ConsoleShell.js`, `nav/SidebarNav.js`) is gone; the shell is
-`components/admin/shell/`.
+**Operator console only (Phase 2 line 11).** The merchant console no longer
+imports anything here (`pnpm test:no-legacy-ui`). The files left are the ones
+the operator console's old screens (`app/(console)/platform/`,
+`components/platform/`) still use; they render inside a `data-legacy` region,
+where `.console [data-legacy]` in `app/console.css` gives them their old
+tokens. Phase 3 rebuilds those screens on `components/ui` and removes this
+folder. Toasts moved to `components/kit/toast.js`. Do not add new imports of
+these parts.
 
 ## House rules
 

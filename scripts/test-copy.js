@@ -1161,72 +1161,12 @@ await t("checkout (clicked, P1-RATES): a refused total redraws the page, and the
 
 // ---- the founder's Settings form
 
-const settingsStubs = {
-  "lucide-react": { Plus: nothing.default, X: nothing.default },
-  "@/components/console/Card": { Card: ({ children }) => React.createElement("section", null, children), CardHeader: ({ title }) => React.createElement("h2", null, title) },
-  "@/components/console/Banner": { Banner: ({ title, actions, children }) => React.createElement("div", { role: "note" }, title, " ", children, actions) },
-  "@/components/console/Button": { Button: ({ children }) => React.createElement("button", null, children), IconButton: nothing.default },
-  "@/components/console/fields": { Field: ({ children }) => React.createElement("label", null, children), Input: () => null, Select: () => null },
-  "@/components/console/Toast": { useToast: () => ({ success() {}, error() {} }) },
-  "@/lib/admin/settings": settingsLib,
-  // GEN-02's sync card; scripts/test-first-sync.js renders it
-  "@/components/admin/SyncProgress": nothing,
-};
-const settingsSrc = await readFile(join(ROOT, "components/admin/SettingsAdmin.js"), "utf8");
-const NOTICE = "You haven't set your own shipping rates yet";
-const shopView = async () => settingsLib.settingsView(await C.getTenant("shop"));
-const byId = (id) => (e) => e.props.id === id;
-
-await t("settings (rendered): the notice shows only when the rates aren't chosen", async () => {
-  const { default: SettingsAdmin } = await loadComponent(settingsSrc, settingsStubs);
-  const render = (initial) => renderToStaticMarkup(React.createElement(SettingsAdmin, { initial }));
-  const starter = render(await shopView());
-  ok(shopperText(starter).includes(`${NOTICE} Shoppers are charged the starter rates below.`), "the notice is missing on starter rates");
-  ok(starter.includes("Keep these rates"), "the Keep button is missing");
-  const own = render(settingsLib.settingsView(await C.getTenant("own-rates")));
-  ok(!shopperText(own).includes(NOTICE), "the notice shows on a store with its own rates");
-  ok(!render(settingsLib.settingsView(await C.getTenant("beastlife"))).includes("Keep these rates"), "BeastLife's cart treats the rates as chosen, so the console must too");
-});
-
-await t("settings (clicked): Keep these rates saves them, and the notice goes", async () => {
-  const view = await shopView();
-  const app = await mount(settingsSrc, settingsStubs, { initial: view });
-  ok(app.text().includes(NOTICE), "notice before");
-  const saved = settingsLib.settingsView({ id: "shop", config: { shipping_config: OWN_RATES }, secrets: {} });
-  await withBrowser([{ ok: true, settings: saved }], {}, async (calls) => {
-    await app.click("Keep these rates");
-    eq(calls.length, 1, "one save:");
-    eq(Object.keys(calls[0].body).join(), "shipping", "only shipping is sent:");
-    eq(calls[0].body.shipping.flatRate, 79, "the rates shown:");
-    eq(calls[0].body.shipping.freeThreshold, 999, "the rates shown:");
-  });
-  ok(!app.text().includes(NOTICE), "notice after");
-});
-
-await t("settings (clicked): an unrelated save can't adopt starter rates", async () => {
+// Phase 2 line 11: the old SettingsAdmin form is gone; the Shipping tab is
+// components/admin/settings/ShippingForm.js (test:settings-ui). The save rule
+// stays proven on the library it uses.
+await t("settings: an unrelated save can't adopt starter rates", () => {
   const patch = settingsLib.buildSettingsPatch({ identity: { name: "Acme" } }, {}).patch;
   ok(!("shipping_config" in patch.config), "a save without shipping must not write shipping_config");
-  const save = async (app) =>
-    withBrowser([{ ok: true, settings: await shopView() }], {}, async (calls) => {
-      await app.find((e) => e.type === "form", "the form").props.onSubmit({ preventDefault() {} });
-      return calls[0].body;
-    });
-  const app = await mount(settingsSrc, settingsStubs, { initial: await shopView() });
-  app.type(byId("sa-support-email"), "help@acme.test", "support email");
-  const unrelated = await save(app);
-  eq(unrelated.identity.support_email, "help@acme.test", "the change is sent:");
-  ok(!("shipping" in unrelated), "starter rates sent with an unrelated change");
-
-  const retyped = await mount(settingsSrc, settingsStubs, { initial: await shopView() });
-  retyped.type(byId("sa-flat-rate"), "79", "flat rate");
-  ok(!("shipping" in (await save(retyped))), "retyping the same number counts as choosing the rates");
-
-  const changed = await mount(settingsSrc, settingsStubs, { initial: await shopView() });
-  changed.type(byId("sa-flat-rate"), "60", "flat rate");
-  eq((await save(changed)).shipping?.flatRate, "60", "a real change is sent:");
-
-  const own = await mount(settingsSrc, settingsStubs, { initial: settingsLib.settingsView(await C.getTenant("own-rates")) });
-  ok("shipping" in (await save(own)), "a store with its own rates keeps sending them");
 });
 
 await t("settings: only a real change counts, and a bad value still reaches validation", () => {

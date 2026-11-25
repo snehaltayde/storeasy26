@@ -3,7 +3,7 @@
 import { Copy, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 import { ReadState, useRead } from "@/components/admin/settings/SaveBar";
 
 // Settings → Help (Phase 2 line 7): the diagnostics a founder can copy into a

@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/console/Badge";
 import { Field, Input } from "@/components/console/fields";
 import { ConfirmDialog } from "@/components/console/Dialog";
 import { SkeletonText, ErrorState, EmptyState } from "@/components/console/bits";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 
 // Incidents panel (S43 / OP12, redesigned S50): open/update/resolve with
 // INTERNAL notes kept apart from the PUBLIC message merchants see in their

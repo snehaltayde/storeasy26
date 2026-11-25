@@ -22,7 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/kit/empty-state";
 import { MoneyCell } from "@/components/kit/money-cell";
 import { RoleGate } from "@/components/kit/role-gate";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 import { orderTime } from "@/lib/admin/order-view";
 
 // The Returns tab (?view=returns; docs/plans/phase-2.md "Line 2" §1.2): open

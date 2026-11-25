@@ -9,8 +9,7 @@ import { MediaLibrary } from "@/components/admin/media/MediaLibrary";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Media · Admin", robots: { index: false } };
 
-// The media screen on the new UI (Phase 2 line 5; lib/admin/new-ui-routes.js
-// lists /admin/media). The first page of the library comes from the server;
+// The media screen on the new UI (Phase 2 line 5). The first page of the library comes from the server;
 // a failed read hands the screen null, and it shows the error with Try again.
 // The screen gets the caller's role and the upload limits, nothing a write
 // needs: support's view has no write control at all.

@@ -14,7 +14,7 @@ import { CatalogTabs } from "@/components/admin/catalog/CatalogTabs";
 import { SyncHeader } from "@/components/admin/catalog/SyncHeader";
 
 // The Catalog page on the new UI (Phase 2 line 3, docs/plans/phase-2.md
-// "Line 3"; lib/admin/new-ui-routes.js lists /admin/catalog). Browse products
+// "Line 3"). Browse products
 // and collections, read-only (Shopify owns the values; the editor owns the
 // content). ?product= and ?collection= still open that one in the editor.
 export const dynamic = "force-dynamic";

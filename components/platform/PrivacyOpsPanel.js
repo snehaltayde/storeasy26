@@ -7,7 +7,7 @@ import { Button } from "@/components/console/Button";
 import { StatusBadge } from "@/components/console/Badge";
 import { DangerDialog } from "@/components/console/Dialog";
 import { SkeletonText, ErrorState, EmptyState } from "@/components/console/bits";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 
 // Privacy ops (S43 / OP11, redesigned S50): the fleet's privacy-request queue
 // + manual execution of pending/manual redactions (audited). Unreachable

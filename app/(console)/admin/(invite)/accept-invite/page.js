@@ -1,4 +1,4 @@
-import AcceptInviteForm from "@/components/admin/AcceptInviteForm";
+import AcceptInviteForm from "@/components/admin/auth/AcceptInviteForm";
 import { siteName } from "@/lib/site";
 import { tfetch } from "@/lib/console-request";
 

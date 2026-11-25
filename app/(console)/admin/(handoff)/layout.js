@@ -1,8 +1,8 @@
 import { siteName } from "@/lib/site";
 import { tfetch } from "@/lib/console-request";
 
-// The signup handoff's own frame (Phase 1 line 1). It is new UI, so it sits
-// outside the old sign-in pages' data-legacy region (admin/(auth)/layout.js):
+// The signup handoff's own frame (Phase 1 line 1). Like the sign-in pages
+// (admin/(auth)/layout.js), it is
 // the same centred 640px column and words as /signup and the Welcome page, so
 // the founder's first three screens read as one flow. The store's name heads
 // it; the notices wait for the Welcome page a moment later.

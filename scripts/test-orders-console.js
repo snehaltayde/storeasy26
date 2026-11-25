@@ -415,7 +415,7 @@ const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
 const h = React.createElement;
 const STUBS = {
-  "@/components/console/Toast": { useToast: () => ({ success() {}, info() {}, error() {} }) },
+  "@/components/kit/toast": { useToast: () => ({ success() {}, info() {}, error() {} }) },
   "next/navigation": { useRouter: () => ({ refresh() {}, push() {}, replace() {} }) },
 };
 const cache = new Map();

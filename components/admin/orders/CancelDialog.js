@@ -14,7 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 import { cancelAnswer, REFUND_ID_RE, REFUND_ID_WORDS } from "@/lib/admin/order-view";
 
 // Cancel an order (orders.cancel; docs/plans/phase-2.md "Line 2" §1.6). The

@@ -89,8 +89,7 @@ const linkClass = "font-medium text-primary underline-offset-4 outline-none hove
 // ---- the starter store ------------------------------------------------------------
 
 // SyncProgress's own body, polled with its own readSync, so this page knows
-// when the products are in (and then reads the first run again). Old screen:
-// data-legacy until SyncProgress is restyled (Phase 2).
+// when the products are in (and then reads the first run again).
 function SyncPanel({ initial, canRun, showStart = false, onSettled, pollMs }) {
   const [view, setView] = useState(initial);
   const [busy, setBusy] = useState(false);
@@ -123,9 +122,7 @@ function SyncPanel({ initial, canRun, showStart = false, onSettled, pollMs }) {
 
   if (!view) return null;
   return (
-    <div data-legacy className="contents">
-      <SyncProgressBody view={view} busy={busy} error={error} canRun={canRun} showStart={showStart} onRetry={() => act({ retry: true })} onStart={() => act({})} />
-    </div>
+    <SyncProgressBody view={view} busy={busy} error={error} canRun={canRun} showStart={showStart} onRetry={() => act({ retry: true })} onStart={() => act({})} />
   );
 }
 
@@ -698,9 +695,7 @@ export default function BrandStepPanel({ canEdit = false, canSync = false, reaso
         )}
       </div>
       {canEdit && (
-        <div data-legacy className="contents">
-          <MediaPicker open={picking} onClose={() => setPicking(false)} onSelect={picked} />
-        </div>
+        <MediaPicker open={picking} onClose={() => setPicking(false)} onSelect={picked} />
       )}
     </div>
   );

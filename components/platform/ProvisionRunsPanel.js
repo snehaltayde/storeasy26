@@ -7,7 +7,7 @@ import { Badge, StatusBadge } from "@/components/console/Badge";
 import { DangerDialog } from "@/components/console/Dialog";
 import { SecretReveal } from "@/components/console/Copy";
 import { SkeletonText, ErrorState, EmptyState } from "@/components/console/bits";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 
 // Provisioning runs panel (S41 / OP04, redesigned S50): per-step state, safe
 // resume of failed runs (steps are idempotent — no duplicate resources),

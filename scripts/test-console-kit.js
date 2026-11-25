@@ -62,7 +62,7 @@ const ok = (v, m = "") => {
 };
 
 const KIT = "components/kit";
-const PARTS = ["page-header", "status-badge", "empty-state", "money-cell", "role-gate", "data-table", "copy-button", "storeasy-mark"];
+const PARTS = ["page-header", "status-badge", "empty-state", "money-cell", "role-gate", "data-table", "toast", "copy-button", "storeasy-mark"];
 
 // Next's SWC compiles components/kit, components/ui and lib/ (CommonJS out);
 // packages come from node_modules

@@ -334,11 +334,9 @@ await t("the banner's facts: an active store has none; a store in maintenance; a
   eq(`${back.status}/${back.maintenance}`, "active/false", "back to active:");
 });
 
-await t("the page source: every write is gated, and the dashboard is on the new-UI list", async () => {
+await t("the page source: every write is gated", async () => {
   const src = await readFile(join(ROOT, PAGE), "utf8");
   ok(/gateAction\("sync\.run", role\)/.test(src), "Run again is gated on sync.run");
-  const { isNewUiRoute } = await import("../lib/admin/new-ui-routes.js");
-  ok(isNewUiRoute("/admin/dashboard"), "the dashboard is a new-UI route");
 });
 
 await t("over 50 dead-lettered orders: stuck pushes and missing refunds are still counted in full (real COUNTs, not a cut list)", async () => {

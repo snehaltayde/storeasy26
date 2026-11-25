@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { RoleGate } from "@/components/kit/role-gate";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 import { useLeaveGuard } from "@/components/admin/offers/ConfirmAction";
 
 // Every settings tab's save (Phase 2 line 7). A tab sends only its own

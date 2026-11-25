@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { EmptyState } from "@/components/kit/empty-state";
 import { RoleGate } from "@/components/kit/role-gate";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 import { ConfirmAction, sendJson } from "@/components/admin/offers/ConfirmAction";
 
 // Billing (Phase 2 line 7): the plan and its state (grace and paused said

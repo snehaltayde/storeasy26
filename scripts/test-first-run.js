@@ -714,8 +714,6 @@ const pageStubs = {
   "@/lib/platform/authz": Authz,
   "@/lib/bundles": { bundleCurrency: async () => "INR" },
   "@/lib/log": Log,
-  "@/components/console/PageHeader": { PageHeader: marker("PageHeader") },
-  "@/components/console/Banner": { Banner: marker("Banner") },
   "@/components/admin/editor/DocumentEditor": { __esModule: true, default: marker("DocumentEditor") },
 };
 // the page's dynamic import of the generator: counted, so a render that

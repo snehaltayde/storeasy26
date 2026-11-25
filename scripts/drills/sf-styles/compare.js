@@ -24,7 +24,7 @@
 //   ignoreBoxes  box differences are counted in `boxReported`, not `box`:
 //                reported and expected (a wider content column moves boxes),
 //                never a failure
-//   frameOutside an element the next capture marks outside every old-screen
+//   frameOutside an element the next capture marks outside the captured
 //                region (l falsy: the new shell's frame, e.g. <body> and Next's
 //                hidden elements on a whole-document page) has its style and
 //                custom-property differences counted in `frame`, reported, not
@@ -133,7 +133,7 @@ export const isClean = (t) => t.style === 0 && t.box === 0 && t.added === 0 && t
 // The one `top` CONSOLE_IGNORE is known to hide (reviewer, line 8): the
 // editor's sticky preview sits below the new 56px top bar (lg:top-18, 72px;
 // 16px before). base, next: one page's captures. Lists every element inside
-// the region ([data-legacy]) whose computed `top` differs; passes only when
+// the captured region (main) whose computed `top` differs; passes only when
 // exactly one positioned element (sticky, fixed or absolute) moved, it is
 // sticky and went from `from` to `to`. A static or relative element's `top`
 // does not place it, so it is listed, not failed.

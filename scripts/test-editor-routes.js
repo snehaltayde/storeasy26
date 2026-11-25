@@ -422,8 +422,8 @@ await t("rendered: the shell's nav links the storefront to /admin/editor; Media 
   eq((html.match(/aria-current="page"/g) || []).length, 1, "exactly one current item:");
   ok(html.includes(">Editor<") && /data-badge="publish"/.test(html), "label or Publishing badge missing");
   eq(links.filter((h) => h === "/admin/editor").length, 1, "one sidebar (the phone sheet renders nothing on the server):");
-  // Phase 2 line 6: the editor (and its templates) is a new-UI route: the page sits in main, no [data-legacy] around it
-  ok(html.includes("<p>page</p>") && !/data-legacy[^>]*>(<div[^>]*>)?<p>page<\/p>/.test(html), "the page renders straight in main:");
+  // the page sits straight in main (every page is new UI since Phase 2 line 11)
+  ok(/<main[^>]*>(<div[^>]*>)?<p>page<\/p>/.test(html), "the page renders straight in main:");
 });
 
 await t("rendered: /admin/editor keeps the shell's sidebar and top bar (no route steps the shell aside since the Designer went)", () => {

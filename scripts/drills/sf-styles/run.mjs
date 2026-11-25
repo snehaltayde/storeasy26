@@ -1,6 +1,6 @@
 // SF-STYLES: `pnpm drill:sf-styles`, the storefront render comparison
 // (Phase 0 line 7, docs/plans/phase-0.md §5). Proves a console-only CSS
-// change leaves every storefront page, and the legacy /admin/login, rendered
+// change leaves every storefront page, and /admin/login, rendered
 // exactly as before. A reusable tool, not a permanent golden.
 //
 //   pnpm drill:sf-styles                                    capture only
@@ -35,9 +35,9 @@
 // shell. Signs in through POST /api/admin/login as owner and support (the
 // roles seed's logins); pages dashboard, orders, orders/<the seeded order>,
 // offers, catalog, media, releases, editor, settings (owner only), at 375,
-// 768 and 1280. Region: the descendants of `main > [data-legacy]` (or `main`
-// before line 8), keyed relative to it ("root>div:1"), so a new frame around
-// it moves no key; /admin/login and /platform as whole documents. The
+// 768 and 1280. Region: the descendants of `main`, keyed relative to it
+// ("root>div:1"), so a new frame around it moves no key (Phase 2 line 11
+// removed the old screens' region wrapper, so every page is new UI now); /admin/login and /platform as whole documents. The
 // compare ignores layout-derived properties (CONSOLE_IGNORE) and reports box
 // differences without failing on them (the content column is wider). Results
 // in docs/cms-reviews/drills/CONSOLE-STYLES/.
@@ -59,7 +59,7 @@ export const DRILL_ID = SET === "console" ? "CONSOLE-STYLES" : "SF-STYLES";
 // grid-template-columns/rows (fr and auto tracks resolve to px) and the
 // horizontal margins (mx-auto resolves to px).
 export const CONSOLE_IGNORE = Object.freeze(["width", "height", "inline-size", "block-size", "top", "right", "bottom", "left", "transform-origin", "perspective-origin", "inset-block-start", "inset-block-end", "inset-inline-start", "inset-inline-end", "grid-template-columns", "grid-template-rows", "margin-left", "margin-right", "margin-inline-start", "margin-inline-end"]);
-export const CONSOLE_REGION = Object.freeze(["main > [data-legacy]", "main"]);
+export const CONSOLE_REGION = Object.freeze(["main"]);
 export const WIDTHS = [375, 768, 1280];
 const HEIGHTS = { 375: 812, 768: 1024, 1280: 900 };
 const PRODUCT = "/products/glow-serum";
@@ -79,14 +79,11 @@ export function captureDom(roots = null) {
     for (let i = 0; i < cs.length; i++) s[cs[i]] = cs.getPropertyValue(cs[i]);
     return s;
   };
-  // An old-screen region wrapper (line 8's [data-legacy], display: contents,
-  // no box) is see-through: its children take its place, so a wrapper added
-  // around an old screen moves no key. None exist before line 8.
-  const kids = (el) => [...el.children].flatMap((c) => (c.tagName === "SCRIPT" ? [] : c.hasAttribute("data-legacy") ? kids(c) : [c]));
+  const kids = (el) => [...el.children].filter((c) => c.tagName !== "SCRIPT");
   const walk = (el, path) => {
     const r = el.getBoundingClientRect();
-    // l: inside an old-screen region (line 8's [data-legacy])
-    const l = el.closest("[data-legacy]") || inRegion ? 1 : 0;
+    // l: inside the captured region (main), not the frame around it
+    const l = inRegion ? 1 : 0;
     out.push({ k: path, s: styleOf(getComputedStyle(el)), b: [r2(r.x + scrollX), r2(r.y + scrollY), r2(r.width), r2(r.height)], l });
     for (const pseudo of ["::before", "::after"]) {
       const cs = getComputedStyle(el, pseudo);
@@ -323,7 +320,7 @@ async function sfStyles(drill) {
       const top = b && n ? topShiftCheck(b, { elements: n.elements }) : null;
       report.editorTop = top;
       writeFileSync(join(drill.dir, "compare.json"), `${JSON.stringify(report, null, 2)}\n`);
-      drill.check(Boolean(top?.ok), "owner-editor 1280px: inside [data-legacy] only the sticky preview's top moved (16px to 72px, below the top bar); no other sticky, fixed or absolute element's top differs", top && { moved: top.moved, placed: top.placed, others: top.others });
+      drill.check(Boolean(top?.ok), "owner-editor 1280px: inside main only the sticky preview's top moved (16px to 72px, below the top bar); no other sticky, fixed or absolute element's top differs", top && { moved: top.moved, placed: top.placed, others: top.others });
     }
     if (t.shots) drill.note(`screenshot differences: ${diff.pages.filter((p) => p.shot !== "same").map((p) => `${p.page}@${p.width}`).join(", ")} (they fail only if the baseline-vs-baseline screenshots were identical; see compare.json)`);
   }

@@ -3,26 +3,23 @@ import { tfetch } from "@/lib/console-request";
 import { consoleNotices } from "@/lib/admin/notices";
 import { ConsoleNotices } from "@/components/admin/shell/ConsoleNotices";
 
-// Auth shell (S50): login and reset render as a centered
-// card — store context above, no sidebar, no storefront chrome. Phase 0
-// line 8: an old screen, so it sits in a [data-legacy] region (the old
-// tokens, app/console.css); the support-access and incident notices show
-// above it, as they did before the shell moved them.
+// Signing in and resetting a password (S50; new UI since Phase 2 line 11):
+// the same flat 640px column as accepting an invite and /signup, headed by
+// the store's name; no sidebar, no storefront chrome. The incident notices
+// show above it.
 export default async function AdminAuthLayout({ children }) {
   // no member on this page, so incidents only: never the support-access banner (Phase 2 line 7)
-  const [name, notices] = await Promise.all([tfetch(() => siteName()).catch(() => "Store"), consoleNotices()]);
+  const [name, notices] = await Promise.all([tfetch(() => siteName()).catch(() => null), consoleNotices()]);
   return (
-    <div data-legacy className="contents">
-      <ConsoleNotices {...notices} className="space-y-2 px-4 pt-4 sm:px-6" />
-      <div className="flex min-h-screen flex-col items-center justify-center px-4 py-12">
-        <div className="mb-6 text-center">
-          <p className="text-lg font-semibold tracking-tight text-fg">{name}</p>
-          <p className="text-xs text-fg-subtle">
-            Store console · powered by Store<span className="font-semibold text-caccent">asy</span>
-          </p>
-        </div>
-        <div className="w-full max-w-sm rounded-card border border-edge bg-surface p-6 shadow-card">{children}</div>
+    <main className="mx-auto flex min-h-screen w-full max-w-[640px] flex-col px-4 pt-8 pb-16 text-sm text-foreground md:px-6 md:pt-16">
+      <ConsoleNotices {...notices} className="mb-8 space-y-2" />
+      <div className="mb-12 min-w-0">
+        <p className="truncate text-base font-semibold tracking-[-0.01em]" title={name || undefined}>
+          {name || "Your store"}
+        </p>
+        <p className="text-[0.8125rem] text-muted-foreground">Store console · powered by Storeasy</p>
       </div>
-    </div>
+      {children}
+    </main>
   );
 }

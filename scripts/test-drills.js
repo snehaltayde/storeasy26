@@ -538,13 +538,13 @@ await t("sf-styles compare: identical captures have no differences; a synthetic 
   eq(JSON.stringify(C.roundBox({ x: 1.2, y: 2.74, width: 3, height: 4.1 })), "[1,2.5,3,4]", "roundBox:");
 });
 
-await t("console-styles: the runner entry seeds and starts the roles store, then runs the console set; drill:console-styles exists, outside drill:all", async () => {
+await t("console-styles: the runner entry seeds and starts the roles store, then runs the console set; drill:console-styles exists, and is in drill:all since Phase 2 line 11", async () => {
   const { scripts } = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
   eq(scripts["drill:console-styles"], "node scripts/drills/run-isolated.mjs console-styles", "drill:console-styles:");
   const spec = R.DRILLS["console-styles"];
   eq(spec?.id, "CONSOLE-STYLES", "id:");
   eq(spec?.warm, true, "warm:");
-  ok(!R.ALL.includes("console-styles"), "not in ALL:");
+  ok(R.ALL.includes("console-styles"), "in ALL (Phase 2 line 11):");
   const calls = [];
   const stopped = [];
   const c = { worktree: "/w", env: { A: "1" }, ports: { rolesNext: 6101 }, log: [], headed: [], node: async (args, opts = {}) => (calls.push(`${args.join(" ")}${opts.env?.SF_STYLES_SET ? ` [${opts.env.SF_STYLES_SET}]` : ""}`), 0) };
@@ -615,7 +615,7 @@ await t("console-styles: topShiftCheck passes only on the sticky preview moving 
   const outside = structuredClone(good);
   outside.elements[2].s.top = "64px";
   outside.elements[2].l = 0;
-  eq(C.topShiftCheck(base, outside).ok, true, "outside [data-legacy] (the frame) is not counted:");
+  eq(C.topShiftCheck(base, outside).ok, true, "outside the captured region (the frame) is not counted:");
 });
 
 await t("shell: drill:shell runs the roles store, adds the annex, then the drill; it is in drill:all", async () => {
@@ -624,6 +624,9 @@ await t("shell: drill:shell runs the roles store, adds the annex, then the drill
   const spec = R.DRILLS.shell;
   eq(`${spec?.id} ${spec?.warm}`, "SHELL true", "id and warm:");
   ok(R.ALL.includes("shell"), "in ALL:");
+  // Phase 2 line 11: the phase-end block suite runs every merchant screen's drill, and every name in ALL is a drill
+  for (const n of ["dashboard", "orders", "catalog", "offers", "media", "editor", "settings", "team", "growth", "quizzes", "console-styles"]) ok(R.ALL.includes(n), `${n} in ALL:`);
+  ok(R.ALL.every((n) => Object.hasOwn(R.DRILLS, n)), `every ALL name is a drill: ${R.ALL.filter((n) => !Object.hasOwn(R.DRILLS, n))}`);
   const calls = [];
   const src = readFileSync(join(ROOT, "scripts/drills/run-isolated.mjs"), "utf8");
   ok(/shell: \{[\s\S]*?withRolesStore\(c, async \(\) => \{[\s\S]*?"scripts\/dev-roles\.js", "annex"[\s\S]*?"scripts\/drills\/shell\/run\.mjs"/.test(src), "inside withRolesStore: annex, then the drill:");

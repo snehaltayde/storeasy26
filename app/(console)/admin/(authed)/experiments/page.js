@@ -8,8 +8,7 @@ import { ExperimentsList } from "@/components/admin/experiments/ExperimentsList"
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Experiments · Admin", robots: { index: false } };
 
-// Experiments on the new UI (Phase 2 line 9; lib/admin/new-ui-routes.js lists
-// /admin/experiments). Every role reads the list (storefront.read); the
+// Experiments on the new UI (Phase 2 line 9). Every role reads the list (storefront.read); the
 // screen gets the caller's role and hides "New experiment" from a role
 // without storefront.write. A failed read hands the screen null (Try again).
 export default async function AdminExperimentsPage() {

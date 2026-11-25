@@ -80,6 +80,8 @@ export const READ_CONTROLS = [
   { path: "components/admin/editor/publish/RecentlyPublished.js", reason: "Open in the editor is a link to that page in the editor (a GET)", marks: 1 },
   { path: "components/admin/releases/WaitingList.js", reason: "Open in the editor is a link to that page in the editor (a GET)", marks: 1 },
   { path: "components/admin/releases/PublishingPage.js", reason: "Try again reads the pages waiting to publish again (listDocuments, a document read)", marks: 1 },
+  // Phase 2 line 11: the console's own error page
+  { path: "app/(console)/admin/(authed)/error.js", reason: "Try again re-renders the failed page's segment (reset(), a re-read, no write)", marks: 1 },
 ];
 
 // Reads sent as a non-GET request: { page, method, path, reason, body? }. page

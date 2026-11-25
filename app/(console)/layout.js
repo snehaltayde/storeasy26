@@ -1,5 +1,5 @@
 import { Geist, GeistMono } from "@/app/fonts/fonts";
-import { ToastProvider } from "@/components/console/Toast";
+import { ToastProvider } from "@/components/kit/toast";
 import "../globals.css";
 
 // Console root layout (S50). The second root layout: /admin and /platform

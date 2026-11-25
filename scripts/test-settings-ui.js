@@ -336,7 +336,7 @@ await swc.loadBindings();
 const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
 const STUBS = {
-  "@/components/console/Toast": { useToast: () => ({ success() {}, error() {}, info() {} }) },
+  "@/components/kit/toast": { useToast: () => ({ success() {}, error() {}, info() {} }) },
   "next/navigation": { useRouter: () => ({ push() {}, replace() {}, refresh() {} }), usePathname: () => globalThis.__setuiPath || "/admin/settings/checkout", useSearchParams: () => new URLSearchParams("from=onboarding") },
   "next/link": { __esModule: true, default: ({ href, children, prefetch, ...p }) => React.createElement("a", { href, ...p }, children) },
 };

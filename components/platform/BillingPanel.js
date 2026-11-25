@@ -9,7 +9,7 @@ import { Table } from "@/components/console/Table";
 import { Field, Input } from "@/components/console/fields";
 import { ConfirmDialog } from "@/components/console/Dialog";
 import { Stat, SkeletonText, ErrorState, EmptyState } from "@/components/console/bits";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 
 // Operator billing reconciliation panel (S40 / OP08, redesigned S50): MRR,
 // revenue by month (gross / refunds / net from the provider-event ledger),

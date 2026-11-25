@@ -195,7 +195,7 @@ await swc.loadBindings();
 const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
 const STUBS = {
-  "@/components/console/Toast": { useToast: () => ({ success() {}, error() {}, info() {} }) },
+  "@/components/kit/toast": { useToast: () => ({ success() {}, error() {}, info() {} }) },
   "next/navigation": { useRouter: () => ({ push() {}, refresh() {}, replace() {} }), usePathname: () => "/admin/offers" },
 };
 const cache = new Map();
@@ -328,11 +328,8 @@ await t("bundle rules: a picked product already listed adds to its quantity; emp
   eq(BC.allWords([{ kind: "sold_out", title: "Serum" }, { kind: "no_saving", sum: 300 }], "INR"), ["Serum: Sold out", "Price must be lower than ₹300"], "reasons in words:");
 });
 
-await t("the new-UI routes and the nav: /admin/offers and /admin/bundles are new UI; Bundles sits after Offers in Growth", async () => {
-  const { isNewUiRoute } = await import("../lib/admin/new-ui-routes.js");
+await t("the nav: Bundles sits after Offers in Growth", async () => {
   const Nav = await import("../lib/admin/nav.js");
-  ok(["/admin/offers", "/admin/offers/new", "/admin/bundles", `/admin/bundles/${BUNDLE_ID}`].every((p) => isNewUiRoute(p)), "new UI:");
-  ok(!isNewUiRoute("/admin/offersx"), "never a partial segment:");
   const growth = Nav.NAV.find((g) => g.label === "Growth").items.map((i) => i.id);
   eq(growth.slice(0, 2), ["offers", "bundles"], "Growth:");
   ok(Nav.navItems(Nav.navFor("support")).some((i) => i.id === "bundles"), "support sees Bundles (offers.read):");

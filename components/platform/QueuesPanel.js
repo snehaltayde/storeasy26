@@ -7,7 +7,7 @@ import { Button } from "@/components/console/Button";
 import { StatusBadge } from "@/components/console/Badge";
 import { Table } from "@/components/console/Table";
 import { Stat, SkeletonText, ErrorState, EmptyState } from "@/components/console/bits";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 
 // Queue & webhook inspector (S29 / OP05, redesigned S50): stats, non-done
 // jobs and inbox rows (metadata only — payloads never leave the server),

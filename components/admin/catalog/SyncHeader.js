@@ -6,7 +6,7 @@ import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RoleGate } from "@/components/kit/role-gate";
 import { StatusBadge } from "@/components/kit/status-badge";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 
 // The Catalog header's facts and action (docs/plans/phase-2.md "Line 3" §1.4):
 // when the catalog last came in from Shopify, how many products there are,

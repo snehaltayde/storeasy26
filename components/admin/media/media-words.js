@@ -1,7 +1,6 @@
 // The media screen's words and small pure helpers (Phase 2 line 5). No
 // React, no fetch: test:media-library runs these as they are. The usage
-// wording keeps the old screen's rules (components/admin/MediaAdmin.js
-// usageLine, which Phase 2 line 10 removes): a page's name and state, never
+// wording keeps the old media screen's usageLine rules: a page's name and state, never
 // an id or a table name.
 import { CLIENT_MEDIA_LIMITS } from "@/lib/media-upload-plan";
 

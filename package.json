@@ -164,6 +164,7 @@
     "test:phase1-core": "node scripts/test-phase1-core.js",
     "test:seed-roles": "node scripts/test-seed-roles.js",
     "test:no-dead-code": "node scripts/test-no-dead-code.js",
+    "test:no-legacy-ui": "node scripts/test-no-legacy-ui.js",
     "seed:design": "node scripts/dev-design.js seed",
     "dev:design": "node scripts/dev-design.js",
     "seed:roles": "node scripts/dev-roles.js seed",

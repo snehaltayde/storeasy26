@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/kit/page-header";
 import { RoleGate } from "@/components/kit/role-gate";
 import { StatusBadge } from "@/components/kit/status-badge";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 import { ConfirmAction, sendJson, useLeaveGuard } from "@/components/admin/offers/ConfirmAction";
 import { RefCombobox, loadVariants } from "@/components/admin/offers/RefCombobox";
 import { BundleCheck, allWords, applyPick, componentLabel, emptyQuantity, isPickedVariant, quantityFrom, rowWords } from "./BundleCheck";

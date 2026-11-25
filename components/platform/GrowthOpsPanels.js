@@ -10,7 +10,7 @@ import { Field, Input } from "@/components/console/fields";
 import { Switch } from "@/components/console/Switch";
 import { ConfirmDialog } from "@/components/console/Dialog";
 import { SkeletonText, ErrorState, EmptyState } from "@/components/console/bits";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 
 // S47 operator panels (redesigned S50): FlagsPanel (OP13) + CostsPanel (OP09).
 const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;

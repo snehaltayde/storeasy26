@@ -322,7 +322,7 @@ async function load(rel) {
   const deps = new Map();
   for (const [, , id] of out.matchAll(/require\((["'])([^"']+)\1\)/g)) {
     if (deps.has(id)) continue;
-    if (id === "@/components/console/Toast") deps.set(id, toastStub);
+    if (id === "@/components/kit/toast") deps.set(id, toastStub);
     else if (/^@\/(components\/(ui|kit|admin\/media)|lib)\//.test(id)) deps.set(id, await load(resolveLocal(id)));
     else if (id.startsWith("./") && rel.startsWith("lib/")) deps.set(id, await load(join(dirname(rel), id)));
     else if (id.startsWith("@/") || id.startsWith(".")) throw new Error(`${rel} imports ${id}`);

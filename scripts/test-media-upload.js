@@ -1387,8 +1387,8 @@ const code = async (rel) =>
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/^\s*\/\/.*$/gm, "");
 
-await t("MediaAdmin and MediaPicker both upload through uploadImage and hold no copy of their own", async () => {
-  for (const rel of ["components/admin/MediaAdmin.js", "components/admin/shared/MediaPicker.js"]) {
+await t("MediaPicker uploads through uploadImage and holds no copy of its own (the media screen: test:media-library)", async () => {
+  for (const rel of ["components/admin/shared/MediaPicker.js"]) {
     const s = await code(rel);
     includes(s, 'import { uploadImage } from "@/lib/media-upload"', `${rel}:`);
     includes(s, "uploadImage(file, { onProgress: setUploading })", `${rel}:`);
@@ -1411,26 +1411,6 @@ const offlineFetch = async () => {
   throw new TypeError("Failed to fetch");
 };
 const FAILED_UPLOAD = { ok: false, message: "The upload didn't go through. Check your connection and try again." };
-
-async function libraryUpload({ result, fetch = async () => ({ json: async () => ({ ok: true, media: ["fresh"] }) }) }) {
-  const state = { uploading: "in flight", error: null, media: null, toasts: [], input: { value: "C:\\fakepath\\IMG_0042.jpg" } };
-  const body = await sliceOf("components/admin/MediaAdmin.js", "async function refresh()", "async function saveAlt");
-  const make = new Function("fetch", "uploadImage", "setUploading", "setError", "setMedia", "toast", "fileRef", `${body}\nreturn upload;`);
-  const upload = make(
-    (...args) => {
-      state.inputAtRefresh = state.input.value;
-      return fetch(...args);
-    },
-    async () => result,
-    (v) => (state.uploading = v),
-    (v) => (state.error = v),
-    (v) => (state.media = v),
-    { success: (m) => state.toasts.push(m) },
-    { current: state.input }
-  );
-  await upload([{ name: "IMG_0042.jpg" }]);
-  return state;
-}
 
 async function pickerUpload({ result, closeDuringUpload = false, closeDuringLoad = false }) {
   const state = { uploading: "in flight", error: "old error", selected: [], loads: 0, toasts: [], errorToasts: [], input: { value: "C:\\fakepath\\IMG_0042.jpg" } };
@@ -1458,22 +1438,7 @@ async function pickerUpload({ result, closeDuringUpload = false, closeDuringLoad
   return state;
 }
 
-await t("library, connection down: the message shows, the same photo can be picked again, nothing rejects", async () => {
-  const s = await libraryUpload({ result: FAILED_UPLOAD, fetch: offlineFetch });
-  eq(s.error, FAILED_UPLOAD.message);
-  eq(s.input.value, "", "input reset so the retry fires:");
-  eq(s.inputAtRefresh, "", "reset before the refresh, which may never answer:");
-  eq(s.uploading, null);
-});
 
-await t("library, uploaded: list refreshed, input reset, the right words shown", async () => {
-  const plain = await libraryUpload({ result: { ok: true, media: {}, notice: null } });
-  eq([plain.toasts, plain.media, plain.input.value, plain.uploading], [["IMG_0042.jpg uploaded"], ["fresh"], "", null]);
-  const smaller = await libraryUpload({ result: { ok: true, media: {}, notice: "made smaller" } });
-  eq(smaller.toasts, ["made smaller"]);
-  const reused = await libraryUpload({ result: { ok: true, media: { deduped: true }, notice: null } });
-  includes(reused.toasts[0], "already in the library");
-});
 
 await t("picker, failed: the message shows, the same photo can be picked again, nothing is picked", async () => {
   const s = await pickerUpload({ result: FAILED_UPLOAD });
@@ -1537,10 +1502,6 @@ await t("picker grid shows the preview when there is one", async () => {
 });
 
 await t("the JSX shows what the handlers set", async () => {
-  const admin = await code("components/admin/MediaAdmin.js");
-  includes(admin, '{error && <Banner tone="danger">{error}</Banner>}');
-  includes(admin, "onChange={(e) => e.target.files?.length && upload([...e.target.files])}");
-  includes(admin, "disabled={!!uploading}", "library input waits for the upload:");
   const picker = await code("components/admin/shared/MediaPicker.js");
   includes(picker, '{uploadErr && <Banner tone="danger">{uploadErr}</Banner>}');
   includes(picker, "onChange={(e) => upload(e.target.files?.[0])}");
@@ -1553,11 +1514,6 @@ await t("the JSX shows what the handlers set", async () => {
   includes(banner, 'aria-live="polite"', "screen readers hear the progress:");
 });
 
-await t("the library's hint leads with what happens to a photo, in plain words, not with limits", async () => {
-  const admin = await code("components/admin/MediaAdmin.js");
-  includes(admin, "Photos are made smaller for you before they upload. GIFs and animated images can be up to 1.5MB and SVGs up to 300KB. Duplicates are detected and reused.");
-  for (const bad of ["up to 1.5MB ·", "sanitized", "PNG, JPEG, WebP, GIF"]) ok(!admin.includes(bad), `the library still says ${bad}:`);
-});
 
 await t("nothing else in the console posts files to the media route", async () => {
   const { readdir } = await import("node:fs/promises");

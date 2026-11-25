@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Ban, RefreshCw, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RoleGate } from "@/components/kit/role-gate";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 import { pushAnswer, reconcileAnswer } from "@/lib/admin/order-view";
 import { CancelDialog } from "./CancelDialog";
 

@@ -11,8 +11,7 @@ import { TeamPage, TeamNoAccess } from "@/components/admin/team/TeamPage";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Team · Admin", robots: { index: false } };
 
-// The team screen on the new UI (Phase 2 line 8; lib/admin/new-ui-routes.js
-// lists /admin/settings/team). Gated on team.manage: staff and support get the
+// The team screen on the new UI (Phase 2 line 8). Gated on team.manage: staff and support get the
 // no-access page and the team is never read for them. The view is read fresh
 // on every request (nothing caches a role), so after a transfer the reload
 // renders the page for the caller's new role. A failed read hands the screen

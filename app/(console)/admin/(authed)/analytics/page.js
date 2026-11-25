@@ -11,8 +11,7 @@ import { AnalyticsError, AnalyticsRange, AnalyticsTables, CoverageNote, SalesNum
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Analytics · Admin", robots: { index: false } };
 
-// Analytics on the new UI (Phase 2 line 9; lib/admin/new-ui-routes.js lists
-// /admin/analytics). ?days= is 7, 30 or 90 (30 is the plain address). Every
+// Analytics on the new UI (Phase 2 line 9). ?days= is 7, 30 or 90 (30 is the plain address). Every
 // role with orders.read sees the same aggregates: the sales rollup carries
 // totals and a daily series, never an order or a shopper, and the screen is
 // handed only the fields it shows. A failed read says so with Try again.

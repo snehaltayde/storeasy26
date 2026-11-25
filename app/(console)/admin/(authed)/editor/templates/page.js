@@ -12,11 +12,10 @@ import TemplatesList from "@/components/admin/editor/templates/TemplatesList";
 
 // P4-ED05 (DOC-09 partly pulled in; plan decision 12): the store's old saved
 // page templates, READ-ONLY, on a documents store. They are not blueprints
-// (DOC-09 is P1); "Make a page from this" makes a new draft page from one
-// (components/admin/SavedTemplates.js). This page reads cms_templates and
+// (DOC-09 is P1); "Make a page from this" makes a new draft page from one. This page reads cms_templates and
 // never writes it: the table is never edited or deleted here.
 // Phase 2 line 6 (6a): on the new UI (components/admin/editor/templates/
-// TemplatesList.js, which replaces SavedTemplates.js). Besides "Make a page
+// TemplatesList.js, which replaced the old SavedTemplates). Besides "Make a page
 // from this", "Insert into a page" adds a template's sections to the end of a
 // page that exists (the editor at ?doc=<id>&template=<id>, through its draft).
 // Both are storefront.write (RoleGate, hidden for anyone without it).

@@ -9,10 +9,7 @@
 //      buttons, remove, alt text, "Use Shopify's images" clears the overlay
 //   3. PairsControl and ProductListControl: order kept, effective titles with
 //      the Shopify title as secondary text, the catalog picker's choice
-//   4. MediaAdmin, through the real /api/admin/media route on file
-//      databases: Archive, Unarchive, "Show archived files", "Where it's
-//      used", a delete refused because the file is used (plain reason, no
-//      way round it)
+//   4. (the old MediaAdmin's section, removed in Phase 2 line 11)
 //   5. every control: labelled, and every action a button (keyboard)
 // Components run with Next's own SWC: react-dom/server for markup, and a
 // small hook driver (the component called as a function, hooks kept per
@@ -217,7 +214,7 @@ const nameOf = (n) => n.props["aria-label"] || n.props.label || textOf(n.props.c
 // to render (it reads the latest props), so a test can feed onChange back.
 async function mount(file, exportName, makeProps, { stubs = {}, inflight = null } = {}) {
   const d = driver();
-  const load = world({ react: d.react, "@/components/console/Toast": toastStub, "next/navigation": navStub, ...stubs });
+  const load = world({ react: d.react, "@/components/kit/toast": toastStub, "next/navigation": navStub, ...stubs });
   const mod = await load(join(ROOT, file));
   const C = exportName === "default" ? mod.default : mod[exportName];
   ok(typeof C === "function", `${file} has no ${exportName}`);
@@ -360,7 +357,7 @@ console.log("— 1. the library picker in the editor");
 // =====================================================================================
 
 // the glue, plain: no React
-const ssr = world({ "@/components/console/Toast": toastStub, "next/navigation": navStub });
+const ssr = world({ "@/components/kit/toast": toastStub, "next/navigation": navStub });
 const Idx = await ssr(join(ROOT, "components/admin/editor/fields/index.js"));
 
 await t("unit: mediaPick turns MediaPicker's { url, alt, id } into { media: '/api/media/<id>', alt }; anything that isn't a library file gives null", () => {
@@ -428,7 +425,7 @@ await t("unit (test-media-picker): choosing a library image in ImageControl stor
 
 // The editor gives every form pickImage (DocumentEditor), and the product's
 // gallery, pairs and pins under its settings.
-const EditorWorld = world({ "@/components/console/Toast": toastStub, "next/navigation": navStub });
+const EditorWorld = world({ "@/components/kit/toast": toastStub, "next/navigation": navStub });
 const Editor = await EditorWorld(join(ROOT, "components/admin/editor/DocumentEditor.js"));
 const h = React.createElement;
 const homeState = () => {
@@ -682,161 +679,22 @@ await t("unit: PairsControl keeps the order, effective titles with the Shopify t
   eq(state.value, null, "no title and no product: none:");
 });
 
-// =====================================================================================
-console.log("— 4. MediaAdmin, through the real /api/admin/media route");
-// =====================================================================================
-
-const listFor = (fx) => fx.run(async () => (await M.listMedia()).map((m) => ({ ...m, url: M.mediaUrl(m.id) })));
-async function mediaAdmin(fx) {
-  const sf = storeFetch(fx.id);
-  const initial = await listFor(fx);
-  const view = await withFetch(sf.fetch, () => mount("components/admin/MediaAdmin.js", "default", () => ({ initial }), { inflight: sf.inflight }));
-  const act = (fn) => withFetch(sf.fetch, fn);
-  const files = () => view.nodes().filter((n) => n.props?.["data-media-file"]).map((n) => `${n.props["data-media-file"]}${n.props["data-archived"] != null ? " (archived)" : ""}`);
-  return { sf, view, act, files };
-}
-
-await t("unit: MediaAdmin archive and unarchive call the API and the archived filter shows them", async () => {
-  const a = await upload(docs, "unused-a.png");
-  const b = await upload(docs, "unused-b.png");
-  const { sf, view, act, files } = await mediaAdmin(docs);
-  ok(files().includes(a.id) && files().includes(b.id), "both listed");
-  toasts.length = 0;
-  await act(() => view.click("Archive"));
-  const arch = sf.calls.filter((c) => c.method === "PATCH");
-  eq(arch.length, 1, "one PATCH:");
-  const archivedId = arch[0].body.id;
-  eq(arch[0].body, { id: archivedId, archived: true }, "archive asks the API:");
-  ok((await archivedAt(docs, archivedId)) != null, "the store holds it as archived");
-  ok(!files().some((f) => f.startsWith(archivedId)), "hidden from the list");
-  ok(toasts.some(([k, m]) => k === "success" && /is archived\. It's hidden from the image picker, and pages that use it still show it\./.test(m)), `plain words: ${JSON.stringify(toasts)}`);
-  // the filter
-  const box = view.find((n) => n.props?.id === "media-show-archived");
-  ok(view.find((n) => n.type === "label" && n.props.htmlFor === "media-show-archived" && textOf(n.props.children) === "Show archived files"), "the box has a visible label");
-  await act(async () => {
-    box.props.onChange({ target: { checked: true } });
-    await view.flush();
-  });
-  eq(sf.calls.at(-1), { method: "GET", url: "/api/admin/media?archived=include", body: null }, "lists archived files too:");
-  ok(files().includes(`${archivedId} (archived)`), `shown and marked: ${files()}`);
-  ok(view.all().includes("Archived: hidden from the image picker. Pages that use it still show it."), "with what archived means");
-  await act(() => view.click("Unarchive"));
-  eq(sf.calls.filter((c) => c.method === "PATCH").at(-1).body, { id: archivedId, archived: false }, "unarchive asks the API:");
-  eq(await archivedAt(docs, archivedId), null, "back in the library");
-  ok(files().includes(archivedId), "and listed as a plain file");
-  // turning the filter off lists without archived files again
-  await act(async () => {
-    view.find((n) => n.props?.id === "media-show-archived").props.onChange({ target: { checked: false } });
-    await view.flush();
-  });
-  eq(sf.calls.at(-1).url, "/api/admin/media", "the filter off:");
-});
-
-await t("unit (P4-FIX4): MediaAdmin says '<file> was archived. It's back in your library now.' when an upload's bytes match an archived file (the real saveMedia brings it back); a plain duplicate says 'reused'", async () => {
-  const n = pngN++;
-  const first = await docs.run(() => M.saveMedia({ filename: "amber-jar.png", mime: "image/png", bytes: PNG(n) }));
-  await sql(docs, "UPDATE media SET archived_at = ? WHERE id = ?", ["2026-11-01T00:00:00Z", first.id]);
-  ok((await archivedAt(docs, first.id)) != null, "archived first");
-  const sf = storeFetch(docs.id);
-  const initial = await listFor(docs);
-  // the upload itself is the real saveMedia on this store (the upload route spreads its answer)
-  const uploaded = [];
-  const uploadStub = {
-    uploadImage: async (file) => {
-      const media = await docs.run(() => M.saveMedia({ filename: file.name, mime: "image/png", bytes: PNG(n) }));
-      uploaded.push(media);
-      return { ok: true, media };
-    },
-  };
-  const view = await withFetch(sf.fetch, () => mount("components/admin/MediaAdmin.js", "default", () => ({ initial }), { inflight: sf.inflight, stubs: { "@/lib/media-upload": uploadStub } }));
-  const pick = async (name) =>
-    withFetch(sf.fetch, async () => {
-      const input = view.find((n2) => n2.type === "input" && n2.props?.type === "file");
-      ok(input, "the file input");
-      input.props.onChange({ target: { files: [{ name }] } });
-      await view.flush();
-    });
-  toasts.length = 0;
-  await pick("amber-jar-again.png");
-  eq(uploaded.length, 1, "one upload:");
-  eq([uploaded[0].id, uploaded[0].deduped, uploaded[0].unarchived], [first.id, true, true], "the store brought the archived file back:");
-  eq(await archivedAt(docs, first.id), null, "no longer archived");
-  eq(toasts, [["success", "amber-jar-again.png was archived. It's back in your library now."]], "the founder is told:");
-  // the same bytes again: a plain duplicate, no longer archived
-  toasts.length = 0;
-  await pick("amber-jar-third.png");
-  eq([uploaded[1].deduped, uploaded[1].unarchived ?? false], [true, false], "a plain duplicate:");
-  eq(toasts, [["success", "amber-jar-third.png was already in the library — reused"]], "reused:");
-});
-
-await t("unit: MediaAdmin, delete of a used file shows the plain reason and where it is used, offers Archive it instead and no way round it (documents store); 'Where it's used' lists pages by name", async () => {
-  // a fresh store's view: one used file only
-  await sql(docs, "DELETE FROM media");
-  const used = await upload(docs, "hero-jar.png", "Jar");
-  const hero = R.newSection("hero", { id: "sec_mp1" });
-  hero.settings = { ...hero.settings, title: "Hello", image: { media: `/api/media/${used.id}`, alt: "Jar" } };
-  await docs.run(() => Docs.createDocument({ type: "home", body: { ...R.emptyBody("home"), sections: [hero] }, actor: { kind: "merchant", id: owner.id } }));
-  const { sf, view, act } = await mediaAdmin(docs);
-  // where it's used
-  await act(() => view.click("Where it’s used"));
-  eq(sf.calls.at(-1), { method: "PUT", url: "/api/admin/media", body: { id: used.id } }, "the usage read:");
-  const usedBy = view.find((n) => n.props?.["data-media-used-by"] === used.id);
-  ok(usedBy && textOf(usedBy.props.children).includes("Home page (draft)"), `the page by name and state: ${usedBy && textOf(usedBy.props.children)}`);
-  ok(!/doc_|med_|ver_|block:|release:/.test(textOf(usedBy.props.children)), "no ids or codes");
-  // delete
-  await view.click(`Delete hero-jar.png`);
-  const confirm = view.nodes().find((n) => n.type === "button" && nameOf(n) === "Delete");
-  ok(confirm, "the confirm dialog");
-  await act(async () => {
-    await confirm.props.onClick();
-    await view.flush();
-  });
-  eq(sf.calls.filter((c) => c.method === "DELETE").map((c) => c.body), [{ id: used.id }], "one plain delete (there is no forced delete):");
-  const refused = view.find((n) => n.props?.["data-delete-refused"] != null);
-  ok(refused, "the refusal shows");
-  const words = textOf(refused.props.children);
-  ok(words.startsWith("This file is still used, so it wasn't deleted. Remove it from the places below first."), `the console's fixed words (P4-FIX2): ${words}`);
-  ok(words.includes("Used by:") && words.includes("Home page (draft)"), "where it is used");
-  ok(!view.hasButton("Delete anyway"), "no way round it");
-  ok(view.hasButton("Archive it instead"), "archive offered instead");
-  eq(await archivedAt(docs, used.id), null, "the file is kept");
-  await act(() => view.click("Archive it instead"));
-  ok((await archivedAt(docs, used.id)) != null, "archived instead");
-  ok(!view.find((n) => n.props?.["data-delete-refused"] != null), "the refusal closed");
-});
-
-await t("unit: usageLine says every kind of use in plain words, never an id", async () => {
-  const MA = await world({ "@/components/console/Toast": toastStub })(join(ROOT, "components/admin/MediaAdmin.js"));
-  const cases = [
-    [{ where: "live:doc_home", label: "live", document: "doc_home", name: "Home page" }, "Home page (live)"],
-    [{ where: "older version:doc_x", label: "older version", document: "doc_x", name: null }, "A page (an earlier version)"],
-    [{ where: "live release:rel_1", release: "rel_1" }, "What your store shows now"],
-    [{ where: "retained release:rel_0", release: "rel_0" }, "An earlier published version of your store"],
-    [{ where: "brand settings", config: "brand" }, "Your brand settings"],
-    [{ where: "scheduled release:rel_2" }, "A scheduled update of your store"],
-    [{ where: "something new" }, "Another part of your store"],
-    // the old editor's usage words are gone with its scan
-    [{ where: "block:hero" }, "Another part of your store"],
-  ];
-  for (const [u, want] of cases) eq(MA.usageLine(u), want, `${u.where}:`);
-  for (const [, words] of cases) ok(!/doc_|rel_|gid:|med_/.test(words), `no id in ${words}`);
-});
+// (section 4, the old MediaAdmin, went with it in Phase 2 line 11; the media
+// screen is components/admin/media/, test:media-library)
 
 // =====================================================================================
 console.log("— 5. keyboard and labels");
 // =====================================================================================
 
 await t("rendered: every new control's text box has a visible label, and every action is a button with a name", async () => {
-  const W = world({ "@/components/console/Toast": toastStub });
+  const W = world({ "@/components/kit/toast": toastStub });
   const G = await W(join(ROOT, "components/admin/editor/fields/GalleryControl.js"));
   const Pa = await W(join(ROOT, "components/admin/editor/fields/PairsControl.js"));
   const PL = await W(join(ROOT, "components/admin/editor/fields/ProductListControl.js"));
-  const MA = await W(join(ROOT, "components/admin/MediaAdmin.js"));
   const pages = {
     gallery: renderToStaticMarkup(h(G.default, { field: field("product_content", "gallery"), value: { value: [{ media: "/api/media/med_1", alt: "A" }, { media: "https://cdn.shopify.com/s/b.jpg", alt: "" }] }, onChange() {}, issues: [], owner: null, context: { pickImage: async () => null, shopify: { gallery: SHOPIFY } } })),
     pairs: renderToStaticMarkup(h(Pa.default, { field: field("product_content", "pairs"), value: { title: "X", products: [P(1)] }, onChange() {}, issues: [], owner: null, context: { lookupProducts: async () => [] } })),
     pinned: renderToStaticMarkup(h(PL.default, { field: field("collection_content", "pinned"), value: [P(1), P(2)], onChange() {}, issues: [], owner: null, context: { lookupProducts: async () => [] } })),
-    media: renderToStaticMarkup(h(MA.default, { initial: [{ id: "med_1", filename: "a.png", mime: "image/png", size: 2000, alt: "", url: "/api/media/med_1", variants: [] }, { id: "med_2", filename: "b.png", mime: "image/png", size: 2000, alt: "", url: "/api/media/med_2", variants: [], archived_at: "2026-11-01T00:00:00Z" }] })),
   };
   for (const [name, html] of Object.entries(pages)) {
     const inputs = [...html.matchAll(/<(input|textarea|select)\b([^>]*)>/g)].filter((m) => !/type="file"/.test(m[2]));
@@ -845,7 +703,7 @@ await t("rendered: every new control's text box has a visible label, and every a
       const id = /\sid="([^"]+)"/.exec(m[2])?.[1];
       const labelled = (id && html.includes(`for="${id}"`)) || /aria-label="[^"]+"/.test(m[2]);
       ok(labelled, `${name}: a field without a label: ${m[0].slice(0, 120)}`);
-      if (name !== "media") ok(id && html.includes(`for="${id}"`), `${name}: the label is visible (label for=): ${id}`);
+      ok(id && html.includes(`for="${id}"`), `${name}: the label is visible (label for=): ${id}`);
     }
     const buttons = [...html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)];
     ok(buttons.length > 0, `${name}: has buttons`);
@@ -856,7 +714,6 @@ await t("rendered: every new control's text box has a visible label, and every a
     }
     ok(!/<div[^>]*onclick/i.test(html) && !/role="button"/.test(html), `${name}: no clickable non-buttons`);
   }
-  ok(pages.media.includes("Archive") && pages.media.includes("Unarchive"), "media: archive and unarchive are buttons");
 });
 
 // ---- done -------------------------------------------------------------------------------

@@ -287,7 +287,7 @@ const swc = require("next/dist/build/swc/index.js");
 await swc.loadBindings();
 const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
-const stubs = { "@/components/console/Toast": { useToast: () => ({ success() {}, error() {}, info() {} }) }, "next/navigation": { useRouter: () => ({ refresh() {}, push() {} }) } };
+const stubs = { "@/components/kit/toast": { useToast: () => ({ success() {}, error() {}, info() {} }) }, "next/navigation": { useRouter: () => ({ refresh() {}, push() {} }) } };
 const cache = new Map();
 const resolveLocal = (id) => [`${id.slice(2)}.js`, id.slice(2)].find((c) => {
   try {

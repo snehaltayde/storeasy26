@@ -1560,9 +1560,12 @@ console.log("— the console card, rendered");
     const React = require("react");
     const h = React.createElement;
     const stubs = {
-      "@/components/console/Card": { Card: ({ children }) => h("section", null, children), CardHeader: ({ title }) => h("h2", null, title) },
-      "@/components/console/Banner": { Banner: ({ tone, title, children }) => h("div", { "data-tone": tone, role: tone === "danger" ? "alert" : undefined }, title, children) },
-      "@/components/console/Button": { Button: ({ children, onClick, busy, icon, variant }) => h("button", { type: "button", "data-variant": variant, disabled: busy || undefined }, children) },
+      "@/components/ui/alert": {
+        Alert: ({ children, variant, ...p }) => h("div", { ...p, "data-variant": variant }, children),
+        AlertTitle: ({ children }) => h("p", null, children),
+        AlertDescription: ({ children }) => h("div", null, children),
+      },
+      "@/components/ui/button": { Button: ({ children, onClick, disabled, variant }) => h("button", { type: "button", "data-variant": variant, disabled: disabled || undefined }, children) },
     };
     const { code } = await swc.transform(await rf(join(root, "components/admin/SyncProgress.js"), "utf8"), {
       filename: "SyncProgress.js",
@@ -1600,7 +1603,7 @@ console.log("— the console card, rendered");
     ok(html.includes("Your products didn&#x27;t finish coming in"), html);
     ok(html.includes("Shopify didn&#x27;t answer."), html);
     ok(html.includes('role="alert"'), "danger banner");
-    ok(/<button[^>]*>Try again<\/button>/.test(html), `button: ${html}`);
+    ok(/<button[^>]*>(?:<svg[\s\S]*?<\/svg>)?Try again<\/button>/.test(html), `button: ${html}`);
     ok(!/502|graphql|bad gateway/i.test(html), "no raw text");
   });
 
@@ -1689,8 +1692,9 @@ await t("the dashboard shows the card while a sync isn't complete; settings uses
   const card = await readFile(join(root, "components/admin/dashboard/SyncCard.js"), "utf8");
   ok(/catalogSyncStatus\(\)/.test(dash) && /state !== "complete"/.test(dash) && /<SyncCard/.test(dash) && /<ImportStepBody/.test(card), "dashboard card");
   ok(/v\.firstSync \|\| v\.state === "failed" \|\| v\.state === "stalled"/.test(dash), "a refresh shows on the dashboard only when it needs the founder");
-  const settings = await readFile(join(root, "components/admin/SettingsAdmin.js"), "utf8");
-  ok(/<SyncProgress/.test(settings) && !/Syncing — this can take a minute/.test(settings), "settings card");
+  // Phase 2 line 11: settings' Sync tab shows the same card (the old SettingsAdmin is gone)
+  const settings = await readFile(join(root, "components/admin/settings/SyncPanel.js"), "utf8");
+  ok(/<SyncCard/.test(settings) && !/Syncing — this can take a minute/.test(settings), "settings card");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

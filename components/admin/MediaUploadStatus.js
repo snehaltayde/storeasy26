@@ -1,21 +1,18 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
-import { Banner } from "@/components/console/Banner";
+import { LoaderCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { progressLabel } from "@/lib/media-upload-plan";
 
-// What the founder sees while an image is on its way (MED-01), in both the
-// media library and the image picker. `progress` comes from uploadImage.
+// What the founder sees while an image is on its way (MED-01), in the image
+// picker. `progress` comes from uploadImage. On components/ui since Phase 2
+// line 11.
 export function MediaUploadStatus({ progress }) {
   if (!progress) return null;
   return (
-    <div role="status" aria-live="polite">
-      <Banner tone="info">
-        <span className="inline-flex items-center gap-2">
-          <Loader2 size={13} className="motion-safe:animate-spin" aria-hidden />
-          {progressLabel(progress)}
-        </span>
-      </Banner>
-    </div>
+    <Alert variant="info" role="status" aria-live="polite">
+      <LoaderCircle aria-hidden className="motion-safe:animate-spin" />
+      <AlertDescription className="text-current">{progressLabel(progress)}</AlertDescription>
+    </Alert>
   );
 }

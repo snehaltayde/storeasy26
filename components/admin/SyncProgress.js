@@ -1,19 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { RefreshCw, RotateCcw } from "lucide-react";
-import { Card, CardHeader } from "@/components/console/Card";
-import { Banner } from "@/components/console/Banner";
-import { Button } from "@/components/console/Button";
+import { CircleAlert, LoaderCircle, RefreshCw, RotateCcw, TriangleAlert } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
 // Bringing products in from Shopify (GEN-02): honest progress, read from the
-// sync's own record. While a sync runs the card polls /api/admin/sync, which
-// also gives the sync its next slice; a failure shows a plain message and a
-// retry. The view object (state, headline, detail, message) is built server
+// sync's own record. While a sync runs, onboarding's Brand step polls
+// /api/admin/sync (readSync), which also gives the sync its next slice; a
+// failure shows a plain message and a retry. On components/ui since Phase 2
+// line 11. The view object (state, headline, detail, message) is built server
 // side by lib/admin/sync-view.js, so the words match everywhere.
 
 export const POLL_MS = 3000;
-const LIVE = new Set(["running", "retrying"]);
 
 export async function readSync() {
   const res = await fetch("/api/admin/sync", { headers: { Accept: "application/json" }, cache: "no-store" });
@@ -48,17 +46,21 @@ export function SyncProgressBody({ view, busy = false, error = null, canRun = tr
   // alarm: the store keeps working on what it had.
   const tone = state === "retrying" || view.firstSync === false ? "warning" : "danger";
   const canStartHere = view.canStart && (state === "none" || showStart);
+  const Busy = ({ icon: Icon }) => (busy ? <LoaderCircle aria-hidden className="motion-safe:animate-spin" /> : <Icon aria-hidden />);
   return (
     <div className="space-y-3">
       <div aria-live="polite" className="space-y-1.5">
-        <p className="text-sm font-medium text-fg">{view.headline}</p>
+        <p className="text-sm font-medium text-foreground">{view.headline}</p>
         {view.message && (
-          <Banner tone={tone}>
-            <p>{view.message}</p>
-          </Banner>
+          <Alert variant={tone === "danger" ? "destructive" : "warning"} role={tone === "danger" ? "alert" : "status"} data-tone={tone}>
+            {tone === "danger" ? <CircleAlert aria-hidden /> : <TriangleAlert aria-hidden />}
+            <AlertDescription className="text-current">
+              <p>{view.message}</p>
+            </AlertDescription>
+          </Alert>
         )}
-        {view.detail && <p className="text-xs text-fg-muted">{view.detail}</p>}
-        {view.retryAt && timeOf(view.retryAt) && <p className="text-xs text-fg-muted">Next try at about {timeOf(view.retryAt)}.</p>}
+        {view.detail && <p className="text-xs text-muted-foreground">{view.detail}</p>}
+        {view.retryAt && timeOf(view.retryAt) && <p className="text-xs text-muted-foreground">Next try at about {timeOf(view.retryAt)}.</p>}
       </div>
       {working && (
         <div
@@ -67,7 +69,7 @@ export function SyncProgressBody({ view, busy = false, error = null, canRun = tr
           aria-valuemin={pct != null ? 0 : undefined}
           aria-valuemax={pct != null ? 100 : undefined}
           aria-valuenow={pct ?? undefined}
-          className="h-1.5 w-full overflow-hidden rounded-full bg-surface-sunken"
+          className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
         >
           <div
             className={pct != null ? "h-full rounded-full bg-primary motion-safe:transition-[width]" : "h-full w-1/3 rounded-full bg-primary/60 motion-safe:animate-pulse"}
@@ -76,67 +78,30 @@ export function SyncProgressBody({ view, busy = false, error = null, canRun = tr
         </div>
       )}
       {error && (
-        <Banner tone="danger" title="Couldn't start">
-          <p>{error}</p>
-        </Banner>
+        <Alert variant="destructive" data-tone="danger">
+          <CircleAlert aria-hidden />
+          <AlertTitle>Couldn&apos;t start</AlertTitle>
+          <AlertDescription className="text-current">
+            <p>{error}</p>
+          </AlertDescription>
+        </Alert>
       )}
       {canRun && (view.canRetry || canStartHere) && (
         <div className="flex flex-wrap gap-2">
           {view.canRetry && (
-            <Button variant="primary" busy={busy} icon={<RotateCcw size={14} aria-hidden />} onClick={onRetry}>
+            <Button disabled={busy} aria-busy={busy || undefined} onClick={onRetry}>
+              <Busy icon={RotateCcw} />
               {retryLabel}
             </Button>
           )}
           {!view.canRetry && canStartHere && (
-            <Button variant={state === "none" ? "primary" : "secondary"} busy={busy} icon={<RefreshCw size={14} aria-hidden />} onClick={onStart}>
+            <Button variant={state === "none" ? "default" : "outline"} disabled={busy} aria-busy={busy || undefined} onClick={onStart}>
+              <Busy icon={RefreshCw} />
               {startLabel}
             </Button>
           )}
         </div>
       )}
     </div>
-  );
-}
-
-export default function SyncProgress({ initial, canRun = true, showStart = false, id, title = "Your products from Shopify", description }) {
-  const [view, setView] = useState(initial);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-
-  // Poll while it runs. Each answer re-arms the timer, so a stopped sync
-  // stops the polling too.
-  useEffect(() => {
-    if (!view || !LIVE.has(view.state)) return undefined;
-    const timer = setTimeout(async () => {
-      const next = await readSync().catch(() => null);
-      if (next) setView(next);
-      else setView((v) => ({ ...v }));
-    }, POLL_MS);
-    return () => clearTimeout(timer);
-  }, [view]);
-
-  async function act(body) {
-    setBusy(true);
-    setError(null);
-    const res = await requestSync(body);
-    if (res.ok && res.sync) setView(res.sync);
-    else if (!res.ok) setError(res.error);
-    setBusy(false);
-  }
-
-  if (!view) return null;
-  return (
-    <Card id={id}>
-      <CardHeader title={title} description={description} />
-      <SyncProgressBody
-        view={view}
-        busy={busy}
-        error={error}
-        canRun={canRun}
-        showStart={showStart}
-        onRetry={() => act({ retry: true })}
-        onStart={() => act({})}
-      />
-    </Card>
   );
 }

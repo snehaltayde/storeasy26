@@ -3,9 +3,8 @@
 // Real code paths throughout: the real engine, the real simulator and store
 // against real tenant file databases (all tenant migrations applied), the
 // real API route files called with real requests (host-resolved tenant, real
-// requireAdmin), and the real OfferForm and OffersAdmin compiled with Next's
-// own SWC. Components render with react-dom/server, and the form also runs on
-// a small hook driver so the test can pick, type and click. No browser is
+// requireAdmin). The old OfferForm and OffersAdmin went in Phase 2 line 11;
+// the offers screens are test:offers-console's. No browser is
 // involved: layout and real pickers are browser drills (docs/cms-reviews/P1-COM-03.md).
 import { readFile, rm } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -241,26 +240,7 @@ const rawGift = {
   config: { id: "free-gift-mask", type: "FREE_GIFT", scope: "gift", priority: 40, title: "Free mask", threshold: 30, gift: { variantId: "gid://shopify/ProductVariant/1051", title: "Lip Sleeping Mask", value: 5.49 } },
 };
 
-await t("the offer form shows no raw target kinds, no identifier fields, and the store's currency", async () => {
-  const { default: OfferForm } = await load("components/admin/OfferForm.js");
-  const problems = [];
-  for (const existing of [null, rawBxgy, rawGift]) {
-    const where = `form for ${existing?.type || "a new offer"}`;
-    const html = renderToStaticMarkup(React.createElement(OfferForm, { existing, onDone() {}, onCancel() {}, currency: "USD", names: {}, offers: [] }));
-    problems.push(...rawWordsIn(html, where));
-    if (html.includes("₹")) problems.push(`${where} shows a rupee sign in a USD store`);
-  }
-  ok(!problems.length, problems.join("; "));
-});
 
-await t("the offers list says each offer in plain words, in the store's currency", async () => {
-  const { default: OffersAdmin } = await load("components/admin/OffersAdmin.js", { "@/components/console/Toast": { useToast: () => ({ success() {}, error() {} }) } });
-  const html = renderToStaticMarkup(React.createElement(OffersAdmin, { initialOffers: [rawBxgy, rawGift], currency: "USD", initialNames: {} }));
-  const problems = rawWordsIn(html, "offers list");
-  if (html.includes("₹")) problems.push("offers list shows a rupee sign in a USD store");
-  if (!html.includes("Buy 2 products tagged “glow”, get 1 free")) problems.push("offers list lacks the plain sentence");
-  ok(!problems.length, problems.join("; "));
-});
 
 const PLAIN = await import("../lib/offers/plain.js");
 const MODEL = await import("../components/admin/offerFormModel.js");
@@ -626,11 +606,7 @@ await t("a bundle's offer row has no way back here, so it can't drift from its b
   eq([err.code, err.message], ["NOT_HERE", "This offer belongs to a bundle. Change it where you edit the bundle."], "refused plainly:");
   eq((await inIN(() => STORE.getOfferRow("bundle-b-duo"))).config.price, 1700, "unchanged:");
   ok(!(await inIN(() => STORE.listRecentOfferChanges())).some((c) => c.id === "bundle-b-duo"), "not in recent changes");
-  const { default: OffersAdmin } = await load("components/admin/OffersAdmin.js", { "@/components/console/Toast": { useToast: () => ({ success() {}, error() {} }) } });
-  const row = await inIN(() => STORE.getOfferRow("bundle-b-duo"));
-  const html = renderToStaticMarkup(React.createElement(OffersAdmin, { initialOffers: [row], currency: "INR", initialNames: {} }));
-  ok(html.includes("Change it in Catalog") && !html.includes(">Edit<") && !html.includes(">Delete<"), "the list sends bundles to Catalog");
-  await inIN(() => STORE.deleteOffer("bundle-b-duo"));
+  // Phase 2 line 11: the old screen's rendered half went with it (the offers screens: test:offers-console)
 });
 
 await t("PUB-04 hook: recent offer changes, newest first, with the settings before and after", async () => {
@@ -720,374 +696,24 @@ await t("routes: the simulator answers with the store's example, and refuses an 
 console.log("— the form: pick, check, start; edit live offers safely");
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-// Runs the real OfferForm as a function with stand-in hooks (effects run after
-// each render, as React would). Child components are not expanded; pickers
-// and dialogs are driven through the props the form gives them.
-async function mountForm(props, tenantId = "of-in") {
-  const inflight = new Set();
-  const calls = [];
-  const savedFetch = globalThis.fetch;
-  globalThis.fetch = (url, init = {}) => {
-    const method = init.method || "GET";
-    const body = init.body ? JSON.parse(init.body) : undefined;
-    calls.push({ method, url, body });
-    const p = (async () => {
-      const res = await route(tenantId, method, url, body);
-      const data = await res.json();
-      return { ok: res.status < 400, status: res.status, json: async () => data };
-    })();
-    inflight.add(p);
-    p.finally(() => inflight.delete(p));
-    return p;
-  };
-  const slots = [];
-  let cursor = 0;
-  let pending = [];
-  const hooks = {
-    useState(init) {
-      const k = cursor++;
-      if (!(k in slots)) slots[k] = typeof init === "function" ? init() : init;
-      return [slots[k], (v) => void (slots[k] = typeof v === "function" ? v(slots[k]) : v)];
-    },
-    useRef(init) {
-      const k = cursor++;
-      if (!(k in slots)) slots[k] = { current: init };
-      return slots[k];
-    },
-    useEffect(fn, deps) {
-      const k = cursor++;
-      const prev = slots[k];
-      if (prev && deps && deps.length === prev.deps.length && deps.every((d, i) => Object.is(d, prev.deps[i]))) return;
-      const slot = { deps, cleanup: null };
-      slots[k] = slot;
-      pending.push(() => {
-        prev?.cleanup?.();
-        const c = fn();
-        slot.cleanup = typeof c === "function" ? c : null;
-      });
-    },
-  };
-  const { default: OfferForm } = await load("components/admin/OfferForm.js", { react: hooks });
-  const done = [];
-  const changed = [];
-  const allProps = { onDone: (r) => done.push(r), onCancel() {}, onChanged: () => changed.push(1), ...props };
-  const render = () => {
-    cursor = 0;
-    pending = [];
-    const tree = OfferForm(allProps);
-    for (const run of pending) run();
-    return tree;
-  };
-  const nodes = () => {
-    const out = [];
-    const walk = (n) => {
-      if (Array.isArray(n)) return n.forEach(walk);
-      if (!React.isValidElement(n)) return;
-      out.push(n);
-      if (n.type?.name === "SimulatorResult") walk(n.type(n.props));
-      Object.values(n.props).forEach(walk);
-    };
-    walk(render());
-    return out;
-  };
-  const textOf = (n) => {
-    if (Array.isArray(n)) return n.map(textOf).join("");
-    if (typeof n === "string" || typeof n === "number") return String(n);
-    if (!React.isValidElement(n)) return "";
-    if (n.type?.name === "SimulatorResult") return textOf(n.type(n.props));
-    return [n.props.title, n.props.children, n.props.actions, n.props.label].map(textOf).join("");
-  };
-  const find = (pred, what) => {
-    const el = nodes().find(pred);
-    ok(el, `not on screen: ${what}`);
-    return el;
-  };
-  const named = (name) => (n) => n.type?.name === name;
-  const button = (label) => (n) => n.type?.name === "Button" && textOf(n.props.children).trim() === label;
-  const typed = [];
-  const view = {
-    calls,
-    done,
-    changed,
-    nodes,
-    textOf,
-    find,
-    has: (pred) => nodes().some(pred),
-    text: () => textOf(render()),
-    sentence: (which = "new") => textOf(find((n) => n.props?.["data-sentence"] === which, `${which} sentence`)),
-    button: (label) => find(button(label), `button "${label}"`),
-    hasButton: (label) => nodes().some(button(label)),
-    click(label) {
-      const el = view.button(label);
-      ok(!el.props.disabled && !el.props.busy, `button "${label}" can't be pressed`);
-      return el.props.onClick?.();
-    },
-    choose: (label) => find((n) => n.type === "button" && n.props["aria-pressed"] !== undefined && textOf(n.props.children).includes(label), `choice "${label}"`).props.onClick(),
-    type(id, value) {
-      typed.push(id);
-      find((n) => n.props?.id === id, `field ${id}`).props.onChange({ target: { value } });
-    },
-    typed,
-    picker: (title) => find((n) => n.props?.title === title && "open" in n.props, `picker "${title}"`),
-    async submit() {
-      const form = find((n) => n.type === "form", "the form");
-      await form.props.onSubmit({ preventDefault() {} });
-      await view.idle();
-    },
-    async idle() {
-      render(); // React re-renders after a state change, which is what schedules the check
-      await sleep(400); // the form waits 350ms after the last change before it checks
-      while (inflight.size) await Promise.all([...inflight]);
-      render();
-      while (inflight.size) await Promise.all([...inflight]);
-    },
-    order: (...preds) => {
-      const all = nodes();
-      return preds.map((p) => all.findIndex(p));
-    },
-    unmount() {
-      for (const s of slots) s?.cleanup?.();
-      globalThis.fetch = savedFetch;
-    },
-  };
-  return view;
-}
 const refItem = async (tenant, qs) => (await withTenant(tenant, () => handleRefsGet({ url: `http://x.test/api/admin/refs?${qs}`, cookies: { get: (n) => (n === "_admin" ? { value: TOKENS[tenant.id] } : undefined) }, headers: { get: () => null } }))).body.items;
 const NUMBER_FIELDS = new Set(["offer-buy", "offer-free", "offer-threshold", "offer-gift-value", "offer-disc-value", "offer-min-subtotal"]);
 const IN_NAMES = async () => (await json(await route("of-in", "GET", "/api/admin/offers"))).body;
 
-await t("Buy some, get some free: started by picking a product, no identifier typed, and the cart applies it", async () => {
-  await inIN(() => db.deleteFrom("offers").execute());
-  const v = await mountForm({ existing: null, currency: "INR", names: {}, offers: [] });
-  eq(v.hasButton("Start offer"), false, "no start button before a kind is chosen");
-  v.choose("Buy some, get some free");
-  v.choose("One product");
-  v.click("Choose a product");
-  const [serum] = await refItem(IN, "type=product&q=Radiance");
-  v.picker("Choose the product").props.onConfirm([serum]);
-  eq(v.sentence(), "Buy 2 of Radiance Glow Serum, get 1 free", "sentence from the pick:");
-  await v.idle(); // the example loads by itself
-  const sim = v.find((n) => n.type?.name === "SimulatorResult", "the example").props.sim;
-  ok(sim.example.agrees && /^3 × Radiance Glow Serum — 30ml/.test(sim.example.text), `example: ${sim.example.text}`);
-  const [iSentence, iExample, iButton] = v.order((n) => n.props?.["data-sentence"] === "new", (n) => n.props?.["data-simulator"] === "result", (n) => n.type?.name === "Button" && n.props.type === "submit");
-  ok(iSentence >= 0 && iSentence < iExample && iExample < iButton, `the start button sits below the sentence and the example: ${[iSentence, iExample, iButton]}`);
-  eq(v.textOf(v.find((n) => n.type?.name === "Button" && n.props.type === "submit", "submit").props.children), "Start offer", "primary label:");
-  await v.submit();
-  const post = v.calls.find((c) => c.method === "POST" && c.url === "/api/admin/offers");
-  eq(post.body.offer.target, { kind: "productId", value: G(101), label: "Radiance Glow Serum" }, "target from the picker:");
-  eq(post.body.offer.title, "Buy 2 of Radiance Glow Serum, get 1 free", "blank title becomes the sentence:");
-  ok(/^bxgy-radiance-glow-serum-[0-9a-f]{6}$/.test(post.body.offer.id), `id made for the founder: ${post.body.offer.id}`);
-  eq(post.body.enabled, true, "starts live:");
-  eq(v.done.length, 1, "the form closes");
-  eq(v.typed.filter((id) => !NUMBER_FIELDS.has(id)), [], "nothing but numbers typed:");
-  eq((await cartDiscount(IN, [[V(1011), 3]])).discountTotal, 1299, "the next cart gets it:");
-  await inIN(() => STORE.deleteOffer(post.body.offer.id));
-  v.unmount();
-});
 
-await t("P4-FIX5: the form's new id is never one the store's offers already use (the form passes their ids in)", async () => {
-  await inIN(() => db.deleteFrom("offers").execute());
-  const realRandom = globalThis.crypto.getRandomValues;
-  // the form's random ending, fixed for this test: abcdef
-  globalThis.crypto.getRandomValues = (a) => (a.set([0xab, 0xcd, 0xef].slice(0, a.length)), a);
-  let v;
-  try {
-    v = await mountForm({ existing: null, currency: "INR", names: {}, offers: [{ id: "bxgy-radiance-glow-serum-abcdef", type: "BXGY", config: {} }] });
-    v.choose("Buy some, get some free");
-  } finally {
-    globalThis.crypto.getRandomValues = realRandom;
-  }
-  v.choose("One product");
-  v.click("Choose a product");
-  const [serum] = await refItem(IN, "type=product&q=Radiance");
-  v.picker("Choose the product").props.onConfirm([serum]);
-  await v.idle();
-  await v.submit();
-  const post = v.calls.find((c) => c.method === "POST" && c.url === "/api/admin/offers");
-  try {
-    eq(post?.body.offer.id, "bxgy-radiance-glow-serum-abcdf0", "the next free id, not the store's own:");
-    eq(v.done.length, 1, "started");
-  } finally {
-    // whatever was made, so the tests after this one start clean
-    if (post) await inIN(() => STORE.deleteOffer(post.body.offer.id));
-    v.unmount();
-  }
-});
 
-await t("an example for rules that have since changed is never shown next to the new sentence", async () => {
-  const v = await mountForm({ existing: null, currency: "INR", names: {}, offers: [] });
-  v.choose("Buy some, get some free");
-  v.click("Choose a product");
-  const [cream] = await refItem(IN, "type=product&q=Night");
-  v.picker("Choose the product").props.onConfirm([cream]);
-  await v.idle();
-  ok(/^3 × Night Repair Cream/.test(v.find((n) => n.type?.name === "SimulatorResult", "example").props.sim.example.text), "the example for get 1 free");
-  v.type("offer-free", "2");
-  eq(v.sentence(), "Buy 2 of Night Repair Cream, get 2 free", "the new sentence at once:");
-  ok(!v.has((n) => n.type?.name === "SimulatorResult"), "the old example is gone");
-  ok(v.text().includes("Checking on your store’s products…"), "it says it's checking");
-  await v.idle();
-  const sim = v.find((n) => n.type?.name === "SimulatorResult", "the new example").props.sim;
-  ok(/^4 × Night Repair Cream/.test(sim.example.text) && sim.example.agrees, `new example: ${sim.example.text}`);
-  v.unmount();
-});
 
-await t("Buy more, save more: started by picking a tag from the store's list, steps typed as numbers", async () => {
-  const v = await mountForm({ existing: null, currency: "INR", names: {}, offers: [] });
-  v.choose("Buy more, save more");
-  v.choose("Products with a tag");
-  v.click("Choose a tag");
-  await v.idle();
-  const picker = v.picker("Choose a tag");
-  eq(picker.props.options.map((o) => o.value), ["glow", "daily", "lip", "night", "serum", "gentle"].sort((a, b) => (a === "glow" ? -1 : b === "glow" ? 1 : a.localeCompare(b))), "the store's own tags:");
-  picker.props.onPick("glow");
-  v.click("Add a step");
-  eq(v.sentence(), "Buy 2 or more products tagged “glow”, get 10% off; 3 or more, 15% off", "sentence:");
-  await v.idle();
-  const sim = v.find((n) => n.type?.name === "SimulatorResult", "the example").props.sim;
-  eq(sim.steps.length, 2, "one example per step:");
-  ok(sim.steps.every((s) => s.agrees), "each step agrees");
-  await v.submit();
-  eq(v.done.length, 1, "started");
-  eq(v.typed.filter((id) => !NUMBER_FIELDS.has(id)), [], "nothing but numbers typed:");
-  eq((await cartDiscount(IN, [[V(1031), 2]])).appliedOffers.find((o) => o.type === "TIERED_QTY")?.amount, 180, "2 × SPF (tagged glow): 10% of ₹1,798:");
-  await inIN(() => STORE.deleteOffer(v.calls.find((c) => c.method === "POST" && c.url === "/api/admin/offers").body.offer.id));
-  v.unmount();
-});
 
-await t("Free gift over a spend: the gift is picked, its worth filled in, the amount typed as a number", async () => {
-  const v = await mountForm({ existing: null, currency: "INR", names: {}, offers: [] });
-  v.choose("Free gift over a spend");
-  v.type("offer-threshold", "2000");
-  v.click("Choose the gift");
-  const [mask] = await refItem(IN, "type=product&q=Lip");
-  const [maskVariant] = await refItem(IN, `type=variant&product=${encodeURIComponent(mask.id)}`);
-  v.picker("Choose the free gift").props.onConfirm({ variantId: maskVariant.id, productId: mask.id, productHandle: mask.handle, label: mask.title, variant: maskVariant, product: mask });
-  eq(v.find((n) => n.props?.id === "offer-gift-value", "worth").props.value, "549", "worth filled from the price:");
-  eq(v.sentence(), "Spend more than ₹2,000, get Lip Sleeping Mask free", "sentence:");
-  await v.submit();
-  const post = v.calls.find((c) => c.method === "POST" && c.url === "/api/admin/offers");
-  eq(post.body.offer.gift.variantId, V(1051), "gift from the picker:");
-  eq(v.typed.filter((id) => !NUMBER_FIELDS.has(id)), [], "nothing but numbers typed:");
-  const cart = await cartDiscount(IN, [[V(1021), 2]]);
-  eq(cart.gifts.map((g) => g.variantId), [V(1051)], "the next cart over ₹2,000 gets the gift:");
-  await inIN(() => STORE.deleteOffer(post.body.offer.id));
-  v.unmount();
-});
 
-await t("Discount code: a code is suggested, so it starts with nothing typed at all", async () => {
-  const v = await mountForm({ existing: null, currency: "INR", names: {}, offers: [] });
-  v.choose("Discount code");
-  eq(v.find((n) => n.props?.id === "offer-code", "code").props.value, "SAVE10", "suggested:");
-  v.find((n) => n.props?.["aria-label"] === "Kind of discount", "kind").props.onChange({ target: { value: "fixed" } });
-  eq(v.find((n) => n.props?.id === "offer-code", "code").props.value, "FLAT10", "follows the discount until the founder types one:");
-  v.find((n) => n.props?.["aria-label"] === "Kind of discount", "kind").props.onChange({ target: { value: "percent" } });
-  eq(v.sentence(), "Code SAVE10 takes 10% off the order", "sentence:");
-  await v.submit();
-  eq(v.done.length, 1, "started");
-  eq(v.typed, [], "nothing typed:");
-  const cart = await cartDiscount(IN, [[V(1041), 1]], "SAVE10");
-  eq(cart.couponStatus?.valid && cart.discountTotal, 65, "the next cart takes the code:");
-  await inIN(() => STORE.deleteOffer(v.calls.find((c) => c.method === "POST" && c.url === "/api/admin/offers").body.offer.id));
-  v.unmount();
-});
 
 const liveRow = async (id) => {
   const list = await IN_NAMES();
   return { row: list.offers.find((o) => o.id === id), names: list.names };
 };
 
-await t("editing a live offer: old and new sentences side by side, then 'Update live offer'", async () => {
-  await inIN(() => STORE.upsertOffer({ offer: glowDeal(1) }));
-  const { row, names } = await liveRow("bxgy-glow-deal");
-  const v = await mountForm({ existing: row, currency: "INR", names, offers: [row] });
-  eq(v.sentence("old"), "Buy 2 of Radiance Glow Serum, get 1 free", "live now:");
-  eq(v.sentence("new"), "Buy 2 of Radiance Glow Serum, get 1 free", "after:");
-  const submit = () => v.find((n) => n.type?.name === "Button" && n.props.type === "submit", "submit");
-  eq([v.textOf(submit().props.children), submit().props.disabled], ["Update live offer", true], "nothing to update yet:");
-  ok(v.text().includes("No changes yet."), "says so");
-  v.type("offer-free", "2");
-  const compare = v.find((n) => n.props?.["data-compare"] === "sentences", "side by side");
-  const both = [];
-  const walk = (n) => (Array.isArray(n) ? n.forEach(walk) : React.isValidElement(n) && (n.props["data-sentence"] && both.push([n.props["data-sentence"], v.textOf(n.props.children)]), Object.values(n.props).forEach(walk)));
-  walk(compare);
-  eq(both, [["old", "Buy 2 of Radiance Glow Serum, get 1 free"], ["new", "Buy 2 of Radiance Glow Serum, get 2 free"]], "both in one place:");
-  eq(submit().props.disabled, false, "update enabled once changed:");
-  await v.submit();
-  eq(v.calls.find((c) => c.method === "PUT").url, "/api/admin/offers/bxgy-glow-deal", "updates in place:");
-  eq((await inIN(() => STORE.getOfferRow("bxgy-glow-deal"))).previous.config.free, 1, "the way back is kept:");
-  v.unmount();
-});
 
-await t("'Turn off' is always at the top of a live offer, and takes it out of the next cart", async () => {
-  const { row, names } = await liveRow("bxgy-glow-deal");
-  const v = await mountForm({ existing: row, currency: "INR", names, offers: [row] });
-  ok(v.hasButton("Turn off"), "shown on open");
-  v.type("offer-buy", ""); // a half-finished edit
-  ok(v.hasButton("Turn off"), "still shown while the form has problems");
-  v.type("offer-buy", "2");
-  await v.click("Turn off");
-  await v.idle();
-  ok(v.hasButton("Turn on") && !v.hasButton("Turn off"), "now offers Turn on");
-  eq(v.changed.length, 1, "the list is told");
-  eq((await inIN(() => STORE.getOfferRow("bxgy-glow-deal"))).enabled, false, "off in the database:");
-  const after = await cartDiscount(IN, [[V(1011), 4]]);
-  eq([after.appliedOffers.some((o) => o.id === "bxgy-glow-deal"), after.discountTotal], [false, 0], "the next cart has no discount:");
-  eq(v.textOf(v.find((n) => n.type?.name === "Button" && n.props.type === "submit", "submit").props.children), "Save changes", "an offer that's off says Save changes, not 'live':");
-  await v.click("Turn on");
-  await v.idle();
-  v.unmount();
-});
 
-await t("'Go back to previous offer settings' shows the earlier sentence, asks once, and is live on the next cart read", async () => {
-  const { row, names } = await liveRow("bxgy-glow-deal"); // live: get 2 free; before: get 1 free
-  eq(row.previous.config.free, 1, "has a way back:");
-  const v = await mountForm({ existing: row, currency: "INR", names, offers: [row] });
-  eq(v.sentence("previous"), "Buy 2 of Radiance Glow Serum, get 1 free", "earlier sentence:");
-  const dialog = () => v.find((n) => n.type?.name === "ConfirmDialog", "confirm");
-  eq(dialog().props.open, false, "asks only when pressed:");
-  v.click("Go back to previous offer settings");
-  eq(dialog().props.open, true, "asks:");
-  await dialog().props.onConfirm();
-  eq(v.done.at(-1)?.reverted, true, "closes as reverted:");
-  eq((await inIN(() => STORE.getOfferRow("bxgy-glow-deal"))).config.free, 1, "restored:");
-  const next = await cartDiscount(IN, [[V(1011), 4]]);
-  eq(next.appliedOffers.find((o) => o.id === "bxgy-glow-deal")?.amount, 1299, "the next cart read uses it:");
-  v.unmount();
-  const fresh = await mountForm({ existing: { ...row, previous: null }, currency: "INR", names, offers: [] });
-  ok(!fresh.hasButton("Go back to previous offer settings"), "no button when there's nothing to go back to");
-  fresh.unmount();
-});
 
-await t("form-level warnings: more than half off, or a free item worth more than the threshold; saving is still allowed", async () => {
-  eq(PLAIN.FREE_ITEM_WARN_AT.INR, 2000, "the threshold, in lib/offers/plain.js:");
-  const v = await mountForm({ existing: null, currency: "INR", names: {}, offers: [] });
-  v.choose("Buy more, save more");
-  v.choose("Products with a tag");
-  v.click("Choose a tag");
-  await v.idle();
-  v.picker("Choose a tag").props.onPick("glow");
-  v.find((n) => n.props?.["aria-label"] === "Step 1: percent off", "step").props.onChange({ target: { value: "60" } });
-  const warning = () => v.nodes().find((n) => n.type?.name === "Banner" && n.props.title === "Check this is right");
-  ok(warning() && v.textOf(warning()).includes("Buying 2 or more takes 60% off. That's more than half off."), "60% warns");
-  const submit = () => v.find((n) => n.type?.name === "Button" && n.props.type === "submit", "submit");
-  eq(submit().props.disabled, false, "a warning, not a block:");
-  v.find((n) => n.props?.["aria-label"] === "Step 1: percent off", "step").props.onChange({ target: { value: "50" } });
-  ok(!warning(), "exactly half off doesn't warn");
-  v.unmount();
-
-  const g = await mountForm({ existing: null, currency: "INR", names: {}, offers: [] });
-  g.choose("Free gift over a spend");
-  g.type("offer-threshold", "1000");
-  g.picker("Choose the free gift").props.onConfirm({ variantId: V(1012), productId: G(101), productHandle: "glow-serum", label: "Radiance Glow Serum — 50ml", variant: { price: 1899 }, product: {} });
-  ok(g.textOf(g.find((n) => n.type?.name === "Banner" && n.props.title === "Check this is right", "warning")).includes("worth more than the ₹1,000 a shopper must spend"), "gift worth more than the spend warns");
-  g.type("offer-gift-value", "2500");
-  ok(g.textOf(g.find((n) => n.type?.name === "Banner" && n.props.title === "Check this is right", "warning")).includes("The free gift is worth ₹2,500, which is more than ₹2,000."), "gift over the threshold warns");
-  g.type("offer-threshold", "5000");
-  g.type("offer-gift-value", "2000");
-  ok(!g.nodes().some((n) => n.type?.name === "Banner" && n.props.title === "Check this is right"), "₹2,000 exactly is fine");
-  g.unmount();
-});
 
 await t("warnings, one by one: the rule, its edge, and validation left exactly as it was", () => {
   const w = (o, opts) => PLAIN.offerWarnings(o, { currency: "INR", ...opts });
@@ -1107,34 +733,7 @@ await t("warnings, one by one: the rule, its edge, and validation left exactly a
   for (const o of [bx(1, 2), cp({ kind: "percent", value: 90 }), base("TIERED_QTY", { target: { kind: "tag", value: "g" }, tiers: [{ minQty: 1, percent: 90 }] })]) eq(validateOffer(o), [], `still valid: ${o.type}`);
 });
 
-await t("validation messages reach the founder in plain words, never as field names or a rupee sign", async () => {
-  const usd = PLAIN.plainErrors(validateOffer(base("FREE_GIFT", { threshold: 0, gift: { variantId: "gid://v/1" } })), { currency: "USD" });
-  eq(usd, ["Enter the amount a cart must be over, more than $0.", "Choose the free gift from your products. It has to be a product from your Shopify catalog."], "gift:");
-  const all = [
-    ...validateOffer({ id: "x", type: "COUPON" }),
-    ...validateOffer(base("TIERED_QTY", { tiers: [{ minQty: 0, percent: 99 }] })),
-    ...validateOffer(base("BXGY", { buy: 0, free: 0 })),
-    ...validateOffer(base("COUPON", { code: "a b", discount: { kind: "percent", value: 95 }, minSubtotal: -1, combinable: "yes" })),
-    "Schedule: start must be before end",
-  ];
-  for (const m of PLAIN.plainErrors(all, { currency: "USD" })) ok(!/[.[\]:]\w|₹|gid|target|minQty|minSubtotal/.test(m.replace(/\.$/, "").replace(/\. /g, " ")), `not plain: ${m}`);
-  const v = await mountForm({ existing: null, currency: "USD", names: {}, offers: [] }, "of-us");
-  v.choose("Free gift over a spend");
-  v.type("offer-threshold", "30");
-  v.picker("Choose the free gift").props.onConfirm({ variantId: "gid://v/1", productId: "gid://p/1", productHandle: "x", label: "Not from Shopify", variant: { price: 5 }, product: {} });
-  ok(v.text().includes("Choose the free gift from your products. It has to be a product from your Shopify catalog."), "said in the form");
-  eq(v.find((n) => n.type?.name === "Button" && n.props.type === "submit", "submit").props.disabled, true, "start waits:");
-  ok(!v.text().includes("₹"), "no rupee sign in a USD store's form");
-  v.unmount();
-});
 
-await t("a code another offer already uses is flagged in the form", async () => {
-  const other = { id: "coupon-other", type: "COUPON", config: { code: "SAVE10" } };
-  const v = await mountForm({ existing: null, currency: "INR", names: {}, offers: [other] });
-  v.choose("Discount code");
-  ok(v.text().includes("Another offer already uses the code SAVE10."), "flagged");
-  v.unmount();
-});
 
 await t("the model: new ids never collide, edits keep the id, and a saved 'handle' pick still reads as one product", () => {
   const offer = base("BXGY", { target: { kind: "productId", value: G(1), label: "Serum" }, buy: 2, free: 1 });
@@ -1243,74 +842,7 @@ await t("a blank name follows the rules on edit: Buy more, save more (another pr
   await inIN(() => STORE.deleteOffer(id));
 });
 
-await t("the form: a blank name stays blank on edit, and the hint, the side-by-side and the save use the new rules", async () => {
-  const id = "bxgy-blank-oat";
-  let f = MODEL.updateForm(MODEL.formFromOffer(null), { type: "BXGY" });
-  f = MODEL.updateForm(f, { target: { kind: "productId", value: G(104), label: "Gentle Oat Cleanser" }, buy: "2", free: "1" });
-  await inIN(() => STORE.upsertOffer({ offer: MODEL.offerFromForm(f, { id, currency: "INR" }) }));
-  const { row, names } = await liveRow(id);
-  const v = await mountForm({ existing: row, currency: "INR", names, offers: [row] });
-  const field = () => v.find((n) => n.props?.id === "offer-title", "the name field");
-  const hint = () => v.find((n) => n.type?.name === "Field" && n.props.htmlFor === "offer-title", "the name's hint").props.hint || "";
-  const nameIn = (which) => v.textOf(v.find((n) => n.props?.["data-name"] === which, `${which} name`).props.children);
-  const submit = () => v.find((n) => n.type?.name === "Button" && n.props.type === "submit", "submit");
-  eq(field().props.value, "", "the name field is blank, not the saved sentence:");
-  eq(submit().props.disabled, true, "opening it changes nothing:");
-  eq([nameIn("old"), nameIn("new")], ["Buy 2 of Gentle Oat Cleanser, get 1 free", "Buy 2 of Gentle Oat Cleanser, get 1 free"], "names before any change:");
-  v.type("offer-free", "2");
-  ok(hint().includes("“Buy 2 of Gentle Oat Cleanser, get 2 free”"), `the hint names the new default: ${hint()}`);
-  eq([nameIn("old"), nameIn("new")], ["Buy 2 of Gentle Oat Cleanser, get 1 free", "Buy 2 of Gentle Oat Cleanser, get 2 free"], "the name shoppers see, old and new, side by side:");
-  await v.submit();
-  eq(v.calls.find((c) => c.method === "PUT")?.body.offer.title, "Buy 2 of Gentle Oat Cleanser, get 2 free", "the update saves the new name:");
-  const cart = await cartDiscount(IN, [[V(1041), 4]]);
-  eq(cart.appliedOffers.find((o) => o.id === id), { id, type: "BXGY", label: "Buy 2 of Gentle Oat Cleanser, get 2 free", amount: 1298 }, "the next cart's label matches what it gives:");
-  v.unmount();
-  await inIN(() => STORE.deleteOffer(id));
-  // an older offer by web address, no mark, its name the default from the
-  // catalog's name: the form needs the store's names to see that
-  const legacy = { id: "tiered-oat-legacy", type: "TIERED_QTY", label: "Buy more Gentle Oat Cleanser, save more", enabled: true, starts_at: null, ends_at: null, previous: null, config: base("TIERED_QTY", { id: "tiered-oat-legacy", target: { kind: "handle", value: "oat-cleanser" }, tiers: [{ minQty: 2, percent: 10 }], title: "Buy more Gentle Oat Cleanser, save more" }) };
-  const l = await mountForm({ existing: legacy, currency: "INR", names: { "oat-cleanser": "Gentle Oat Cleanser" }, offers: [] });
-  eq(l.find((n) => n.props?.id === "offer-title", "the name field").props.value, "", "opens blank with the store's names:");
-  l.unmount();
-});
 
-await t("the form: a typed name that still has the old numbers is flagged; a name without numbers isn't", async () => {
-  const id = "bxgy-typed-oat";
-  const offer = base("BXGY", { id, title: "Oat: buy 2 get 1 free", target: { kind: "productId", value: G(104), label: "Gentle Oat Cleanser" }, buy: 2, free: 1 });
-  await inIN(() => STORE.upsertOffer({ offer }));
-  const { row, names } = await liveRow(id);
-  const v = await mountForm({ existing: row, currency: "INR", names, offers: [row] });
-  const warning = () => v.nodes().find((n) => n.type?.name === "Banner" && n.props.title === "Check this is right");
-  const stale = () => (warning() ? v.textOf(warning()) : "").includes("mentions something you just changed");
-  eq(v.find((n) => n.props?.id === "offer-title", "the name field").props.value, "Oat: buy 2 get 1 free", "a typed name is kept:");
-  ok(!stale(), "no flag before any change");
-  v.type("offer-free", "2");
-  ok(stale(), "flagged once the rules change");
-  ok(v.textOf(warning()).includes("“Buy 2 of Gentle Oat Cleanser, get 2 free”"), "and offers the new default");
-  eq(v.find((n) => n.type?.name === "Button" && n.props.type === "submit", "submit").props.disabled, false, "a warning, not a block:");
-  v.type("offer-title", "Oat deal");
-  ok(!stale(), "a name without numbers isn't flagged");
-  v.type("offer-title", "Oat: buy 2 more");
-  ok(!stale(), "nor one whose numbers the new rules still have");
-  v.type("offer-title", "Diwali 2026 oat deal");
-  ok(!stale(), "nor one whose numbers were never in the rules");
-  v.type("offer-title", "");
-  ok(!stale(), "nor a blank one");
-  v.unmount();
-  await inIN(() => STORE.deleteOffer(id));
-  // the other way round: the old number is still used elsewhere (buy 2)
-  const w = (title, before, after) => PLAIN.staleNameWarning(title, before, after, { currency: "INR" });
-  const oat = (buy, free, extra = {}) => base("BXGY", { target: { kind: "productId", value: G(104), label: "Gentle Oat Cleanser" }, buy, free, ...extra });
-  ok(w("Oat: buy 2 get 2 free", oat(2, 2), oat(2, 1)), "get 2 free → get 1 free, with buy 2 kept");
-  ok(w("Oat: buy 2, get some free", oat(2, 2), oat(3, 2)), "buy 2 → buy 3 flags a name with 2");
-  ok(w("Night Repair Cream deal", oat(2, 1, { target: { kind: "productId", value: G(102), label: "Night Repair Cream" } }), oat(2, 1)), "a name with the product moved away from");
-  const gift = (threshold) => base("FREE_GIFT", { threshold, gift: { variantId: V(1051), title: "Lip Sleeping Mask", value: 549 } });
-  ok(w("Free mask over ₹2,000", gift(2000), gift(3000)), "a gift's old amount, written with a sign and a comma");
-  const code = (value, c = "SAVE10") => base("COUPON", { code: c, discount: { kind: "percent", value } });
-  ok(w("SAVE10 · 10% off", code(10), code(25)), "a code's old percent, not confused with the code's own digits");
-  ok(!w("SAVE10 · 25% off", code(10), code(25)), "the new percent is fine");
-  ok(w("Use SAVE10 today", code(10), code(10, "SAVE15")), "an old code");
-});
 
 await t("the model: a saved name equal to the default is treated as automatic, a typed one is kept", () => {
   const cfg = base("BXGY", { target: { kind: "productId", value: G(104), label: "Gentle Oat Cleanser" }, buy: 2, free: 1, title: "Buy 2 of Gentle Oat Cleanser, get 1 free" });
@@ -1342,65 +874,7 @@ await t("default names never show a store's internal tags or types to shoppers",
 
 console.log("— going back, safely");
 
-await t("going back from a page that is out of date is refused, and nothing changes", async () => {
-  const id = "coupon-stale-page";
-  const c = (value) => base("COUPON", { id, title: "Stale page code", code: "STALE", discount: { kind: "percent", value } });
-  await inIN(() => STORE.upsertOffer({ offer: c(10) }));
-  await sleep(5);
-  await inIN(() => STORE.upsertOffer({ offer: c(20) }));
-  const { row: page, names } = await liveRow(id); // the page: live 20%, way back 10%
-  await sleep(5);
-  await inIN(() => STORE.upsertOffer({ offer: c(30) })); // another tab saves 30%
-  const err = await inIN(() => STORE.revertOffer(id, { expect: page.previous.replaced_at })).catch((e) => e);
-  eq(err?.code, "CHANGED", "the store refuses:");
-  const res = await json(await route("of-in", "POST", `/api/admin/offers/${id}/revert`, { expect: page.previous.replaced_at }));
-  eq([res.status, res.body.code], [409, "CHANGED"], "the route refuses:");
-  eq((await inIN(() => STORE.getOfferRow(id))).config.discount.value, 30, "still 30%:");
-  const v = await mountForm({ existing: page, currency: "INR", names, offers: [page] });
-  v.click("Go back to previous offer settings");
-  const said = await v.find((n) => n.type?.name === "ConfirmDialog", "confirm").props.onConfirm().then(() => null, (e) => e.message);
-  ok(said && /changed/i.test(said), `the dialog says why: ${said}`);
-  eq(v.done.length, 0, "no success message:");
-  eq((await inIN(() => STORE.getOfferRow(id))).config.discount.value, 30, "the form didn't change it either:");
-  v.unmount();
-  const fresh = (await liveRow(id)).row; // a fresh page goes back as promised
-  const okRes = await json(await route("of-in", "POST", `/api/admin/offers/${id}/revert`, { expect: fresh.previous.replaced_at }));
-  eq([okRes.status, okRes.body.offer.config.discount.value], [200, 20], "a fresh page goes back:");
-  const rows = await C.platformDb().execute({ sql: "SELECT diff FROM audit_log WHERE resource = ? AND diff LIKE ?", args: [`offer:${id}`, "%reverted%"] });
-  eq(rows.rows.length, 1, "going back is in the audit log:");
-  await inIN(() => STORE.deleteOffer(id));
-});
 
-await t("the go-back dialog says when shoppers won't get the earlier settings, and that unsaved edits are dropped", async () => {
-  const id = "coupon-ended-dates";
-  const day = 86_400_000;
-  const ended = { startsAt: new Date(Date.now() - 60 * day).toISOString(), endsAt: new Date(Date.now() - 30 * day).toISOString() };
-  const c = (value) => base("COUPON", { id, title: "Ended dates code", code: "ENDED", discount: { kind: "percent", value } });
-  await inIN(() => STORE.upsertOffer({ offer: c(10), ...ended }));
-  await inIN(() => STORE.upsertOffer({ offer: c(15) }));
-  const { row, names } = await liveRow(id);
-  const v = await mountForm({ existing: row, currency: "INR", names, offers: [row] });
-  const body = () => v.textOf(v.find((n) => n.type?.name === "ConfirmDialog", "confirm").props.body);
-  ok(!body().includes("Shoppers get this on their next cart"), `doesn't promise the next cart: ${body()}`);
-  ok(body().includes("dates ended"), `says the dates ended: ${body()}`);
-  ok(!body().includes("haven't saved"), "nothing unsaved yet");
-  v.type("offer-disc-value", "12");
-  ok(body().includes("The changes you haven't saved here will be lost."), `unsaved edits: ${body()}`);
-  v.unmount();
-  await inIN(() => STORE.revertOffer(id));
-  ok(!(await inIN(() => STORE.getActiveOffers())).some((o) => o.id === id), "and indeed shoppers don't get it");
-  await inIN(() => STORE.upsertOffer({ offer: c(15) }));
-  await inIN(() => STORE.upsertOffer({ offer: c(20) })); // the way back is now 15%, with no dates
-  await inIN(() => STORE.setOfferEnabled(id, false));
-  const off = await mountForm({ existing: (await liveRow(id)).row, currency: "INR", names, offers: [] });
-  const offBody = off.textOf(off.find((n) => n.type?.name === "ConfirmDialog", "confirm").props.body);
-  ok(offBody.includes("This offer is off") && !offBody.includes("Shoppers get this on their next cart"), `an offer that's off: ${offBody}`);
-  off.unmount();
-  const live = await mountForm({ existing: { ...row, previous: { ...row.previous, starts_at: null, ends_at: null } }, currency: "INR", names, offers: [] });
-  ok(live.textOf(live.find((n) => n.type?.name === "ConfirmDialog", "confirm").props.body).includes("Shoppers get this on their next cart"), "a live offer going back to running settings");
-  live.unmount();
-  await inIN(() => STORE.deleteOffer(id));
-});
 
 await t("the message after saving says when shoppers really get the offer", () => {
   const at = new Date("2026-06-01T00:00:00.000Z");
@@ -1415,81 +889,10 @@ await t("the message after saving says when shoppers really get the offer", () =
   ok(MODEL.doneMessage({ reverted: true, offer: o({ ends_at: "2026-02-01T00:00:00.000Z" }) }, at).includes("ended"), "going back to dates that ended");
 });
 
-await t("the list shows that message after the form closes", async () => {
-  const toasts = [];
-  const slots = [];
-  let cursor = 0;
-  const hooks = {
-    useState(init) {
-      const k = cursor++;
-      if (!(k in slots)) slots[k] = typeof init === "function" ? init() : init;
-      return [slots[k], (v) => void (slots[k] = typeof v === "function" ? v(slots[k]) : v)];
-    },
-  };
-  const savedFetch = globalThis.fetch;
-  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ offers: [] }) });
-  try {
-    const { default: OffersAdmin } = await load("components/admin/OffersAdmin.js", { react: hooks, "@/components/console/Toast": { useToast: () => ({ success: (m) => toasts.push(m), error() {} }) } });
-    const render = () => {
-      cursor = 0;
-      return OffersAdmin({ initialOffers: [], initialNames: {}, currency: "INR" });
-    };
-    const page = render();
-    const newOffer = [];
-    const walk = (n) => (Array.isArray(n) ? n.forEach(walk) : React.isValidElement(n) && (n.type?.name === "Button" && n.props.variant === "primary" && newOffer.push(n), Object.values(n.props).forEach(walk)));
-    walk(page);
-    newOffer[0].props.onClick();
-    const form = render();
-    ok(form.type?.name === "OfferForm", "the form opens");
-    const later = new Date(Date.now() + 7 * 86_400_000).toISOString();
-    await form.props.onDone({ created: true, offer: { label: "Weekend code", enabled: true, starts_at: later, ends_at: null } });
-    ok(toasts.length === 1 && /^“Weekend code” starts /.test(toasts[0]), `a future start isn't called started: ${toasts[0]}`);
-  } finally {
-    globalThis.fetch = savedFetch;
-  }
-});
 
 console.log("— cases the mutation check found untested");
 
-await t("Buy some, get some free on a dear product warns about the free item, in the form and the simulator", async () => {
-  await inIN(async () => {
-    await db.insertInto("products").values({ id: G(106), handle: "luxe-oil", title: "Luxe Face Oil", available: 1, currency: "INR", price_min: 3200, price_max: 3200, product_type: "Oils", tags: '["luxe"]' }).execute();
-    await db.insertInto("variants").values({ id: V(1061), product_id: G(106), title: "Default Title", price: 3200, currency: "INR", available: 1, position: 0 }).execute();
-  });
-  const said = "A free item here can be worth ₹3,200, which is more than ₹2,000.";
-  try {
-    const sim = await json(await route("of-in", "POST", "/api/admin/offers/simulate", { offer: base("BXGY", { target: { kind: "productId", value: G(106) }, buy: 2, free: 1 }) }));
-    eq(sim.body.warnings, [said], "the simulator:");
-    const v = await mountForm({ existing: null, currency: "INR", names: {}, offers: [] });
-    v.choose("Buy some, get some free");
-    v.click("Choose a product");
-    v.picker("Choose the product").props.onConfirm([{ id: G(106), title: "Luxe Face Oil" }]);
-    await v.idle();
-    const warning = v.nodes().find((n) => n.type?.name === "Banner" && n.props.title === "Check this is right");
-    ok(warning && v.textOf(warning).includes(said), "the form shows it once the example arrives");
-    v.unmount();
-  } finally {
-    await inIN(async () => {
-      await db.deleteFrom("variants").where("id", "=", V(1061)).execute();
-      await db.deleteFrom("products").where("id", "=", G(106)).execute();
-    });
-  }
-});
 
-await t("saving an offer that's off keeps it off, and editing a code doesn't flag its own code", async () => {
-  const id = "coupon-kept-off";
-  await inIN(() => STORE.upsertOffer({ offer: base("COUPON", { id, title: "Kept off", code: "KEPTOFF", discount: { kind: "percent", value: 10 } }), enabled: false }));
-  const { row, names } = await liveRow(id);
-  const v = await mountForm({ existing: row, currency: "INR", names, offers: [row] });
-  ok(!v.text().includes("Another offer already uses the code"), "its own code isn't 'taken'");
-  v.type("offer-disc-value", "15");
-  await v.submit();
-  eq(v.calls.find((c) => c.method === "PUT")?.body.enabled, false, "the save asks to stay off:");
-  const saved = await inIN(() => STORE.getOfferRow(id));
-  eq([saved.enabled, saved.config.discount.value], [false, 15], "saved, still off:");
-  v.unmount();
-  await inIN(() => STORE.deleteOffer(id));
-});
 
 await t("a big catalog: a tag's products are found even when 500 other products come first", async () => {
   const BIG = await C.getTenant("of-big");
@@ -1529,11 +932,7 @@ await t("a bundle's offer can't be turned on, off, changed or deleted from Offer
   eq((await json(await route("of-in", "DELETE", path))).status, 409, "delete:");
   const row = await inIN(() => STORE.getOfferRow("bundle-b-trio"));
   eq([row.enabled, row.config.price], [true, 1800], "unchanged:");
-  const { default: OffersAdmin } = await load("components/admin/OffersAdmin.js", { "@/components/console/Toast": { useToast: () => ({ success() {}, error() {} }) } });
-  const html = renderToStaticMarkup(React.createElement(OffersAdmin, { initialOffers: [row], currency: "INR", initialNames: {} }));
-  const sw = /<button[^>]*role="switch"[^>]*>/.exec(html)?.[0] || "";
-  ok(/disabled=""/.test(sw) && sw.includes("in Catalog"), `the list's switch can't be pressed and says where to go: ${sw}`);
-  await inIN(() => STORE.deleteOffer("bundle-b-trio"));
+  // Phase 2 line 11: the old screen's rendered half went with it (the offers screens: test:offers-console)
 });
 
 // ---- rendered with react-dom/server ---------------------------------------------------------------
@@ -1548,42 +947,13 @@ await inIN(async () => {
   await STORE.upsertOffer({ offer: base("COUPON", { id: "coupon-flat", title: "FLAT200", code: "FLAT200", discount: { kind: "fixed", value: 200 }, minSubtotal: 999 }), enabled: false });
 });
 
-await t("rendered: every kind of offer, new and live, in plain words with the right money and labels", async () => {
-  const { default: OfferForm } = await load("components/admin/OfferForm.js");
-  const render = (props) => renderToStaticMarkup(React.createElement(OfferForm, { onDone() {}, onCancel() {}, offers: [], names: {}, ...props }));
-  const list = (await IN_NAMES()).offers;
-  const problems = [];
-  for (const row of list) {
-    const html = render({ existing: row, currency: "INR", names: (await IN_NAMES()).names });
-    problems.push(...rawWordsIn(html, `live ${row.type}`));
-    const iSentence = html.indexOf('data-sentence="new"');
-    const iExample = html.indexOf('data-simulator="result"');
-    const iButton = html.indexOf(row.enabled ? ">Update live offer<" : ">Save changes<");
-    if (!(iSentence > 0 && iSentence < iExample && iExample < iButton)) problems.push(`${row.type}: button not below sentence and example (${iSentence}, ${iExample}, ${iButton})`);
-    if (row.enabled && !html.includes(">Turn off<")) problems.push(`${row.type}: no Turn off`);
-  }
-  eq(list.map((o) => o.type).sort(), ["BXGY", "COUPON", "FREE_GIFT", "TIERED_QTY"], "rendered every kind:");
-  const usd = render({ existing: { ...rawGift, previous: null }, currency: "USD" });
-  if (usd.includes("₹")) problems.push("USD gift form shows ₹");
-  if (!usd.includes("Cart total over ($)")) problems.push("USD gift form lacks the dollar label");
-  ok(!problems.length, problems.join("; "));
-});
 
-await t("rendered: the list reads each offer as its sentence, with plain kinds and switches that say Turn off", async () => {
-  const { default: OffersAdmin } = await load("components/admin/OffersAdmin.js", { "@/components/console/Toast": { useToast: () => ({ success() {}, error() {} }) } });
-  const { offers, names, currency } = await IN_NAMES();
-  const html = renderToStaticMarkup(React.createElement(OffersAdmin, { initialOffers: offers, initialNames: names, currency }));
-  noRawWords(html, "list");
-  for (const o of offers) ok(html.includes(PLAIN.offerSentence(o.config, { names, currency }).replace(/“/g, "“").replace(/&/g, "&amp;")), `sentence for ${o.id}`);
-  ok(html.includes("Buy some, get some free") && html.includes("Discount code"), "plain kinds");
-  ok(html.includes('aria-label="Turn off '), "switch says Turn off");
-});
 
 // ---- guards ---------------------------------------------------------------------------------
 console.log("— guards");
 
 await t("no money sign is hard-coded in the offer console or its shared source", async () => {
-  for (const f of ["components/admin/OfferForm.js", "components/admin/OffersAdmin.js", "components/admin/offerFormModel.js", "lib/offers/plain.js", "lib/offers/simulate.js", "lib/offers/catalog.js", "lib/offers/engine.js"]) {
+  for (const f of ["components/admin/offers/OfferEditor.js", "components/admin/offers/OffersList.js", "components/admin/offerFormModel.js", "lib/offers/plain.js", "lib/offers/simulate.js", "lib/offers/catalog.js", "lib/offers/engine.js"]) {
     const src = await readFile(join(ROOT, f), "utf8");
     ok(!src.includes("₹"), `${f} contains a rupee sign`);
   }
@@ -1600,8 +970,9 @@ await t("the console's offer code never reaches the built-in store offers (they'
       if (dep) await walk(dep);
     }
   };
-  await walk(join(ROOT, "components/admin/OfferForm.js"));
-  await walk(join(ROOT, "components/admin/OffersAdmin.js"));
+  // Phase 2 line 11: the offers screens (the old OfferForm and OffersAdmin are gone)
+  await walk(join(ROOT, "components/admin/offers/OfferEditor.js"));
+  await walk(join(ROOT, "components/admin/offers/OffersList.js"));
   ok(seen.has(join(ROOT, "lib/offers/plain.js")) && seen.has(join(ROOT, "lib/offers/match.js")), "the walk reaches the shared source");
   ok(!seen.has(join(ROOT, "lib/offers/config.js")), "lib/offers/config.js is imported by the console");
   ok(!seen.has(join(ROOT, "lib/offers/engine.js")), "the engine (and its built-in offers) is imported by the console");

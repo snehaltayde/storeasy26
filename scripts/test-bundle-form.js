@@ -1,10 +1,11 @@
 // P5-PANEL suite (COM-02): the console bundle form (components/admin/bundles/
 // BundleForm.js) and the Catalog > Bundles panel that uses it
-// (components/admin/CommercePanels.js BundlesPanel). P5-SOURCES registered it
+// (the old CommercePanels BundlesPanel, gone since Phase 2 line 11; the
+// bundles screens are components/admin/bundles/). P5-SOURCES registered it
 // as a placeholder; P5-PANEL fills it in and P5-EDITOR extends it.
 //   1. source scan: no typed variant-id placeholder, no slug input, no rupee
 //      sign or 'INR', no legacy compat.problems, in BundleForm.js and in the
-//      BundlesPanel part of CommercePanels.js
+//      (the old BundlesPanel's sections went with it in Phase 2 line 11)
 //   2. full mode renders Name, Products (picked rows), Price, Description and
 //      'Save as draft' / 'Save and show to shoppers'; compact mode renders
 //      only Name, Products, Price and 'Create bundle'
@@ -15,9 +16,7 @@
 //      'Create bundle' waits for a passing check, then sends enable: true and
 //      mustPass: true and the bundle is saved turned on; a full-mode edit
 //      sends no slug and no on/off and shows the shoppers' link
-//   5. the panel: card id 'bundles'; a draft that fails the check (a
-//      quantity of 1.5) is not offered Enable; Disable and Delete of a bundle
-//      on the live home say shoppers stop seeing it there
+//   5. (the old panel's section, removed in Phase 2 line 11)
 //   6. P5-EDITOR: the editor's inline create (components/admin/editor/fields/
 //      BundleControl.js): the Dialog holds only Name, Products and Price and
 //      says the bundle goes live now; 'Create bundle' waits for a passing
@@ -223,7 +222,7 @@ const nameOf = (n) => n.props["aria-label"] || n.props.label || textOf(n.props.c
 
 async function mount(file, exportName, makeProps, { inflight = null } = {}) {
   const d = driver();
-  const load = world({ react: d.react, "@/components/console/Toast": toastStub, "next/navigation": navStub });
+  const load = world({ react: d.react, "@/components/kit/toast": toastStub, "next/navigation": navStub });
   const mod = await load(join(ROOT, file));
   const C = mod[exportName];
   ok(typeof C === "function", `${file} has no ${exportName}`);
@@ -341,38 +340,24 @@ const withFetch = async (f, fn) => {
   }
 };
 const FORM = "components/admin/bundles/BundleForm.js";
-const PANEL = "components/admin/CommercePanels.js";
 
 // =====================================================================================
 console.log("— 1. source scan");
 
-await t("BundleForm.js and the BundlesPanel part of CommercePanels.js hold no typed variant-id placeholder, no slug input, no rupee sign or 'INR', and no compat.problems", async () => {
+await t("BundleForm.js holds no typed variant-id placeholder, no slug input, no rupee sign or 'INR', and no compat.problems", async () => {
   const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
   const form = strip(await readFile(join(ROOT, FORM), "utf8"));
-  const panelAll = await readFile(join(ROOT, PANEL), "utf8");
-  const a = panelAll.indexOf("export function BundlesPanel");
-  const b = panelAll.indexOf("// ---- Quiz editor");
-  ok(a > 0 && b > a, "BundlesPanel found before the quiz editor");
-  // the quiz editor keeps its own slug field (not a bundle); everything
-  // above it, imports and helpers included, is scanned
-  const panel = strip(panelAll.slice(0, b));
-  for (const [name, src] of [
-    [FORM, form],
-    [`${PANEL} (bundles part)`, panel],
-  ]) {
-    ok(!src.includes("gid://"), `${name}: a typed variant-id placeholder`);
-    ok(!/placeholder="[^"]*(handle|ProductVariant)/i.test(src), `${name}: a handle placeholder`);
-    ok(!/bundle-slug|label="Slug"|setForm\(\{[^}]*slug:/i.test(src), `${name}: a slug input`);
-    ok(!/<Input[^>]*slug/i.test(src), `${name}: an Input bound to the slug`);
-    ok(!src.includes("₹"), `${name}: a rupee sign`);
-    ok(!/\bINR\b/.test(src), `${name}: 'INR'`);
-    ok(!/\.problems\b|problems\b/.test(src), `${name}: the legacy problems`);
-    ok(!/component \$\{|component \d/.test(src), `${name}: "component N" words`);
-    ok(!/const inr\b|\binr\(/.test(src), `${name}: the old inr() formatter`);
-  }
-  ok(/formatMoney\(/.test(form) && /formatMoney\(/.test(panel), "both format money through formatMoney");
-  ok(/from "@\/lib\/commerce\/bundle-words"/.test(form) && /from "@\/lib\/commerce\/bundle-words"/.test(panel), "both take their words from bundle-words");
-  ok(/<Card id="bundles">/.test(panel), "the card is the #bundles anchor");
+  ok(!form.includes("gid://"), "a typed variant-id placeholder");
+  ok(!/placeholder="[^"]*(handle|ProductVariant)/i.test(form), "a handle placeholder");
+  ok(!/bundle-slug|label="Slug"|setForm\(\{[^}]*slug:/i.test(form), "a slug input");
+  ok(!/<Input[^>]*slug/i.test(form), "an Input bound to the slug");
+  ok(!form.includes("₹"), "a rupee sign");
+  ok(!/\bINR\b/.test(form), "'INR'");
+  ok(!/\.problems\b|problems\b/.test(form), "the legacy problems");
+  ok(!/component \$\{|component \d/.test(form), '"component N" words');
+  ok(!/const inr\b|\binr\(/.test(form), "the old inr() formatter");
+  ok(/formatMoney\(/.test(form), "it formats money through formatMoney");
+  ok(/from "@\/lib\/commerce\/bundle-words"/.test(form), "it takes its words from bundle-words");
 });
 
 // =====================================================================================
@@ -522,95 +507,6 @@ await t("full mode: 'Save as draft' creates it turned off; the edit's 'Save chan
     eq([row.slug, Number(row.enabled), Number(row.bundle_price), row.description], ["draft-kit", 1, 650, "Two things"], "kept live, new price");
     await store.run(() => B.deleteBundle(id.id));
   });
-});
-
-// =====================================================================================
-console.log("— 5. the panel");
-
-await t("the panel: card id 'bundles'; a draft with a quantity of 1.5 is not ready and is never offered Enable; money in the store's currency", async () => {
-  const frac = await store.run(() => B.createBundle({ title: "Frac kit", items: [{ variantId: V(1), quantity: 1.5 }, { variantId: V(2), quantity: 1 }], bundle_price: 250 }));
-  const good = await store.run(() => B.createBundle({ title: "Good kit", items: [{ variantId: V(1), quantity: 1 }, { variantId: V(2), quantity: 1 }], bundle_price: 250 }));
-  try {
-    eq([frac.compat.state, frac.compat.reasons.map((r) => r.kind)], ["not_ready", ["bad_quantity"]], "createBundle reports it not ready");
-    const list = await store.run(() => B.listBundles());
-    const f = storeFetch();
-    await withFetch(f.fetch, async () => {
-      const v = await mount(PANEL, "BundlesPanel", () => ({ initial: list, currency: "USD" }), f);
-      ok(v.find((n) => n.type === "section" && n.props.id === "bundles"), "the #bundles anchor");
-      const li = (id) => v.find((n) => n.type === "li" && n.props["data-bundle-id"] === id);
-      const buttonsIn = (id) => {
-        const out = [];
-        const walk = (n) => {
-          if (!React.isValidElement(n)) return Array.isArray(n) ? n.forEach(walk) : undefined;
-          if (typeof n.type === "function" && n.type.name === "Button") out.push(textOf(n.props.children).trim());
-          walk(n.props.children);
-        };
-        walk(li(id).props.children);
-        return out;
-      };
-      eq(buttonsIn(frac.id), ["Edit", "Delete"], "the 1.5 draft: no Enable");
-      eq(buttonsIn(good.id), ["Enable", "Edit", "Delete"], "a passing draft: Enable");
-      ok(/The quantity must be a whole number, 1 or more/.test(textOf(li(frac.id).props.children)), "says why");
-      ok(/\$250/.test(v.all()) && !/₹/.test(v.all()), "USD money");
-      eq(f.calls.length, 0, "no reads on mount");
-    });
-    // the server refuses too
-    const r = await store.run(() => B.setBundleEnabled(frac.id, true).then(() => null, (e) => e.code));
-    eq(r, "BUNDLE_INVALID", "turning it on is refused");
-  } finally {
-    for (const b of [frac, good]) await store.run(() => B.deleteBundle(b.id));
-  }
-});
-
-await t("the panel: Disable and Delete of a bundle on the live home say shoppers stop seeing it there right away; one not on the home disables at once", async () => {
-  const onHome = await store.run(() => B.createBundle({ title: "Home kit", items: [{ variantId: V(1) }, { variantId: V(2) }], bundle_price: 250, enable: true }));
-  const offHome = await store.run(() => B.createBundle({ title: "Other kit", items: [{ variantId: V(3) }, { variantId: V(4) }], bundle_price: 600, enable: true }));
-  const ts = new Date().toISOString();
-  await raw("INSERT INTO documents (id, type, label, draft, draft_hash, schema_version, published_version_id, created_at, updated_at) VALUES ('doc_home', 'home', 'Home', '{}', 'h', 1, 'ver_live', ?, ?) ON CONFLICT(id) DO UPDATE SET published_version_id = 'ver_live'", [ts, ts]);
-  await raw("INSERT INTO document_refs (version_id, ref_type, ref_id) VALUES ('ver_live', 'bundle', ?), ('ver_old', 'bundle', ?)", [onHome.id, offHome.id]);
-  const HOME = "Shoppers will stop seeing this bundle on your home page right away.";
-  try {
-    const list = await store.run(() => B.listBundles());
-    eq(list.filter((b) => b.usedOnHome).map((b) => b.id), [onHome.id], "usedOnHome from the live home only");
-    const f = storeFetch();
-    await withFetch(f.fetch, async () => {
-      const v = await mount(PANEL, "BundlesPanel", () => ({ initial: list, currency: "USD" }), f);
-      const btn = (id, name) => {
-        let found = null;
-        const walk = (n) => {
-          if (found) return;
-          if (Array.isArray(n)) return n.forEach(walk);
-          if (!React.isValidElement(n)) return;
-          if (typeof n.type === "function" && n.type.name === "Button" && textOf(n.props.children).trim() === name) found = n;
-          walk(n.props.children);
-        };
-        walk(v.find((n) => n.type === "li" && n.props["data-bundle-id"] === id).props.children);
-        ok(found, `${name} for ${id}`);
-        return found;
-      };
-      ok(!v.dialogText().includes(HOME), "nothing said before a click");
-      await btn(onHome.id, "Disable").props.onClick();
-      await v.flush();
-      ok(v.dialogText().includes(HOME), `the Disable confirm says it: ${v.dialogText()}`);
-      eq(f.calls.length, 0, "nothing sent before confirming");
-      await v.click("Cancel");
-      await btn(onHome.id, "Delete").props.onClick();
-      await v.flush();
-      ok(v.dialogText().includes(HOME), `the Delete confirm says it: ${v.dialogText()}`);
-      await v.click("Cancel");
-      await btn(offHome.id, "Delete").props.onClick();
-      await v.flush();
-      ok(!v.dialogText().includes(HOME) && /Removes Other kit permanently/.test(v.dialogText()), `a bundle not on the home: the plain delete words: ${v.dialogText()}`);
-      await v.click("Cancel");
-      await btn(offHome.id, "Disable").props.onClick();
-      await v.flush();
-      eq(f.calls.filter((c) => c.method === "POST").map((c) => c.body), [{ enable: { id: offHome.id, enabled: false } }], "not on the home: turned off at once");
-    });
-  } finally {
-    await raw("DELETE FROM document_refs");
-    await raw("DELETE FROM documents WHERE id = 'doc_home'");
-    for (const b of [onHome, offHome]) await store.run(() => B.deleteBundle(b.id));
-  }
 });
 
 // =====================================================================================
@@ -790,61 +686,6 @@ await t("P5-PANEL review: a stored row that holds a web name (not a picked produ
 // =====================================================================================
 console.log("— 7. P5-FIX2: the batch 2 review findings");
 
-await t("P5-FIX2: when the home page can't be checked (usedOnHome null), Disable asks first in neutral words and Delete says the same; nothing is sent before Confirm", async () => {
-  const b1 = await store.run(() => B.createBundle({ title: "Unk kit", items: [{ variantId: V(1) }, { variantId: V(2) }], bundle_price: 250, enable: true }));
-  const UNKNOWN = "We couldn't check whether your home page uses this bundle.";
-  const HOME = "Shoppers will stop seeing this bundle on your home page right away.";
-  // a real fault in the live-home lookup (a missing table reads as "not
-  // migrated yet", so a column is renamed for the length of one read)
-  await raw("ALTER TABLE documents RENAME COLUMN archived_at TO archived_at_gone");
-  let list;
-  try {
-    list = await store.run(() => B.listBundles());
-  } finally {
-    await raw("ALTER TABLE documents RENAME COLUMN archived_at_gone TO archived_at");
-  }
-  try {
-    const mine = list.find((b) => b.id === b1.id);
-    eq(mine.usedOnHome, null, "listBundles says it could not read the home");
-    const f = storeFetch();
-    await withFetch(f.fetch, async () => {
-      const v = await mount(PANEL, "BundlesPanel", () => ({ initial: list, currency: "USD" }), f);
-      const btn = (name) => {
-        let found = null;
-        const walk = (n) => {
-          if (found) return;
-          if (Array.isArray(n)) return n.forEach(walk);
-          if (!React.isValidElement(n)) return;
-          if (typeof n.type === "function" && n.type.name === "Button" && textOf(n.props.children).trim() === name) found = n;
-          walk(n.props.children);
-        };
-        walk(v.find((n) => n.type === "li" && n.props["data-bundle-id"] === b1.id).props.children);
-        ok(found, name);
-        return found;
-      };
-      await btn("Disable").props.onClick();
-      await v.flush();
-      eq(f.calls.filter((c) => c.method === "POST").length, 0, "nothing sent on Disable");
-      ok(v.dialogText().includes(`${UNKNOWN} Turn it off anyway?`), `the Disable confirm: ${v.dialogText()}`);
-      ok(!v.dialogText().includes(HOME), "no claim that the home page shows it");
-      await v.click("Cancel");
-      eq(f.calls.filter((c) => c.method === "POST").length, 0, "Cancel sends nothing");
-      await btn("Delete").props.onClick();
-      await v.flush();
-      ok(v.dialogText().includes(`${UNKNOWN} Delete it anyway?`) && /Removes Unk kit permanently/.test(v.dialogText()), `the Delete confirm: ${v.dialogText()}`);
-      await v.click("Cancel");
-      await btn("Disable").props.onClick();
-      await v.flush();
-      const confirmBtn = v.filter((n) => n.type === "button" && nameOf(n) === "Disable").at(-1);
-      ok(confirmBtn && confirmBtn !== v.button("Disable"), "the Dialog's own Disable");
-      await confirmBtn.props.onClick();
-      await v.flush();
-      eq(f.calls.filter((c) => c.method === "POST").map((c) => c.body), [{ enable: { id: b1.id, enabled: false } }], "turned off only after Confirm");
-    });
-  } finally {
-    await store.run(() => B.deleteBundle(b1.id));
-  }
-});
 
 await t("P5-FIX2: the create Dialog never names an earlier name's page: after a Cancel with a name typed, and after a create, it opens again on /bundles/bundle", async () => {
   const f = storeFetch();

@@ -14,7 +14,7 @@ import { PageHeader } from "@/components/kit/page-header";
 import { RoleGate } from "@/components/kit/role-gate";
 import { StatusBadge, offerState } from "@/components/kit/status-badge";
 import { cn } from "@/components/ui/utils";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 import { doneMessage, formFromOffer, formProblems, newOfferId, offerFromForm, randomSuffix, reachOf, sameSettings, updateForm } from "@/components/admin/offerFormModel";
 import { currencySign, defaultOfferTitle, offerDetails, offerSentence, offerWarnings, plainErrors, staleNameWarning } from "@/lib/offers/plain";
 import { ConfirmAction, sendJson, useLeaveGuard } from "./ConfirmAction";

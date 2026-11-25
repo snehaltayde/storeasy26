@@ -339,7 +339,7 @@ const h = React.createElement;
 const STUBS = {
   "next/link": { __esModule: true, default: ({ href, children, prefetch, ...p }) => h("a", { href, ...p }, children) },
   "next/navigation": { useRouter: () => ({ refresh() {}, push() {}, replace() {} }) },
-  "@/components/console/Toast": { useToast: () => ({ success() {}, error() {}, info() {} }) },
+  "@/components/kit/toast": { useToast: () => ({ success() {}, error() {}, info() {} }) },
 };
 let swcReady = null;
 const loaded = new Map();

@@ -13,17 +13,14 @@
 // roles store is closed; Phase 1 line 3) in the onboarding shell (no sidebar,
 // the 56px top bar, the step panel); then /admin/dashboard with the sidebar
 // and a 56px top bar; the onboarding nav item opens the onboarding shell; the nav's hrefs are navFor(role); every item
-// opens with 200, no error boundary, a non-empty [data-legacy] (on a new-UI
-// route, lib/admin/new-ui-routes.js: content in main and no [data-legacy] but
-// the notices') and aria-current on that item; at 900 the sidebar is icon width and a tooltip
+// opens with 200, no error boundary, content straight in main (every page is
+// new UI since Phase 2 line 11: no old region) and aria-current on that item; at 900 the sidebar is icon width and a tooltip
 // shows on focus; at 375 the trigger opens the sheet, Esc closes it with
 // focus back on the trigger, and a link tap closes it.
-// Support: outside [data-legacy] (on a new-UI route: anywhere) only
-// allowlisted controls on every page; the
-// account menu (name, email, "Support", the read-only note, Sign out the only
-// action); no create item in the switcher; the write buttons support still
-// sees inside the old screens go to support-write-controls.json (Phase 2's
-// list, not a failure).
+// Support: anywhere on every page only allowlisted controls (the
+// stray-control rule covers the whole of main); the account menu (name,
+// email, "Support", the read-only note, Sign out the only action); no create
+// item in the switcher.
 // Owner: the switcher (Roles Demo Co and Roles Annex with roles, current
 // checked; choosing Annex requests the annex host's /admin); ⌘B collapses
 // and survives a reload; Esc on the account menu returns focus; Tab from the
@@ -35,7 +32,6 @@ import { join } from "node:path";
 import { ROOT } from "../../design-harness.js";
 import { runDrill, settle } from "../p3/lib.mjs";
 import { navFor, navItems } from "../../../lib/admin/nav.js";
-import { isNewUiRoute } from "../../../lib/admin/new-ui-routes.js";
 import { RANGES, rangeHref } from "../../../lib/admin/dashboard-ranges.js";
 import { readPost } from "../../support/read-post-match.js";
 import { OPERATOR_ONLY_PAGES } from "../../support/platform-pages.js";
@@ -50,13 +46,12 @@ const ONBOARDING = "/admin/onboarding";
 
 // The onboarding shell (Phase 1 line 3): its main, the step panel, no sidebar,
 // the top bar's height, and the step panel's controls a role could press
-// (outside the old screens' [data-legacy] regions; the step list and "Next"
-// only move between steps) and the reasons shown for disabled ones.
+// (the step list and "Next" only move between steps) and the reasons shown for disabled ones.
 async function onboardingShell(page) {
   return page.evaluate(() => {
     const panel = document.querySelector('[data-onboarding="panel"]');
     const bar = document.querySelector('[data-shell="topbar"]');
-    const enabledWrites = [...(panel?.querySelectorAll("button:not([disabled])") || [])].filter((b) => !b.closest("[data-legacy]") && !b.hasAttribute("data-onboarding")).map((b) => b.innerText.trim());
+    const enabledWrites = [...(panel?.querySelectorAll("button:not([disabled])") || [])].filter((b) => !b.hasAttribute("data-onboarding")).map((b) => b.innerText.trim());
     return {
       main: Boolean(document.querySelector('main[data-shell="onboarding"]')),
       panel: Boolean(panel),
@@ -76,21 +71,20 @@ const seed = () => JSON.parse(readFileSync(join(ROOT, ".design-data-roles", "rol
 
 // In the page: interactive elements (contenteditable regions and ARIA
 // switches, checkboxes, tabs and options count, native buttons or not) that
-// are not nav links or allowlisted shell controls, outside [data-legacy] (an old route) or anywhere (a new-UI
-// route, lib/admin/new-ui-routes.js: the rule covers the whole of main). On a
-// new-UI route a control also passes when it carries data-read-control itself
+// are not nav links or allowlisted shell controls, anywhere on the page (the
+// rule covers the whole of main). A control also passes when it carries data-read-control itself
 // (never through an ancestor), is natively disabled, or is RoleGate's
 // (aria-disabled="true" with data-role-gate="disabled"). Radix's focus
 // guards (an empty span[data-radix-focus-guard] with tabindex="0" around a
 // sheet, select or dialog) are not controls; anything else in a portal is.
-function strayControls([allowed, newUi]) {
+function strayControls([allowed]) {
   const q = 'a[href], button, input, select, textarea, summary, label[for], [contenteditable]:not([contenteditable="false"]), [role="button"], [role="menuitem"], [role="link"], [role="switch"], [role="checkbox"], [role="tab"], [role="option"], [onclick], [tabindex]:not([tabindex="-1"])';
-  const own = (el) => newUi && (el.hasAttribute("data-read-control") || el.disabled === true || (el.getAttribute("aria-disabled") === "true" && el.getAttribute("data-role-gate") === "disabled"));
+  const own = (el) => (el.hasAttribute("data-read-control") || el.disabled === true || (el.getAttribute("aria-disabled") === "true" && el.getAttribute("data-role-gate") === "disabled"));
   // Phase 2 line 6: a label[for] does what its control does: it passes when that control passes (a disabled field, a marked read)
-  const passes = (el) => own(el) || (newUi && el.matches("label[for]") && Boolean(document.getElementById(el.htmlFor)) && own(document.getElementById(el.htmlFor)));
+  const passes = (el) => own(el) || (el.matches("label[for]") && Boolean(document.getElementById(el.htmlFor)) && own(document.getElementById(el.htmlFor)));
   const focusGuard = (el) => el.matches("span[data-radix-focus-guard]") && el.getAttribute("tabindex") === "0" && el.textContent === "" && el.children.length === 0;
   return [...document.querySelectorAll(q)]
-    .filter((el) => (newUi || !el.closest("[data-legacy]")) && !el.closest("[data-nav-item]") && !allowed.some((c) => el.closest(`[data-shell-control="${c}"]`)) && !passes(el) && !focusGuard(el))
+    .filter((el) => !el.closest("[data-nav-item]") && !allowed.some((c) => el.closest(`[data-shell-control="${c}"]`)) && !passes(el) && !focusGuard(el))
     .map((el) => `${el.tagName.toLowerCase()}${el.getAttribute("aria-label") ? `[${el.getAttribute("aria-label")}]` : ""} "${(el.innerText || "").trim().slice(0, 40)}"`);
 }
 // In the page (a new-UI route): marked reads that could still write: a
@@ -324,7 +318,7 @@ async function supportNewUiControls(page, href) {
       softNavCheck(m);
       // a link to another path: that page gets its own pass; the same path
       // (a menu, a popover, or a new ?query) is checked again here
-      if (new URL(page.url()).pathname === target) for (const x of await page.evaluate(strayControls, [CONTROLS, true])) found.revealed.push(`after read #${i} (${page.url().slice(ORIGIN.length)}): ${x}`);
+      if (new URL(page.url()).pathname === target) for (const x of await page.evaluate(strayControls, [CONTROLS])) found.revealed.push(`after read #${i} (${page.url().slice(ORIGIN.length)}): ${x}`);
       // a read that opened a dialog (a sheet, a details panel): each marked
       // read inside it is clicked once, from a fresh open, and the document
       // checked again (Phase 2 line 5)
@@ -341,7 +335,7 @@ async function supportNewUiControls(page, href) {
         await settle(page);
         softNavCheck(mi);
         found.dialogReads++;
-        if (new URL(page.url()).pathname === target) for (const x of await page.evaluate(strayControls, [CONTROLS, true])) found.revealed.push(`after read #${i}, dialog read #${j} (${page.url().slice(ORIGIN.length)}): ${x}`);
+        if (new URL(page.url()).pathname === target) for (const x of await page.evaluate(strayControls, [CONTROLS])) found.revealed.push(`after read #${i}, dialog read #${j} (${page.url().slice(ORIGIN.length)}): ${x}`);
       }
     }
     await fresh();
@@ -514,29 +508,13 @@ async function supportSelfTest(drill, ctx) {
   const finder = await run("finder");
   drill.check(["Bio", "On", "Pick", "Tab", "Opt"].every((n) => finder.revealed.some((x) => x.endsWith(`"${n}"`))) && !finder.revealed.some((x) => x.endsWith('"No"')), "self-test: contenteditable and role=switch, checkbox, tab and option (not native buttons) are controls; contenteditable=false is not", finder.revealed);
   drill.check(passes.every(([, logSeen, pending]) => logSeen && pending.length === 0), "self-test: every pass found its own GET line in its server's log, with nothing pending at its close", passes);
-  drill.check(gatedForm.revealed.length === 0 && (await (async () => { await page.goto(`${ORIGIN}${SELFTEST}/gated-form`); return (await page.evaluate(strayControls, [CONTROLS, true])).length; })()) === 1, "self-test: its editable field is still a stray control for support", gatedForm);
+  drill.check(gatedForm.revealed.length === 0 && (await (async () => { await page.goto(`${ORIGIN}${SELFTEST}/gated-form`); return (await page.evaluate(strayControls, [CONTROLS])).length; })()) === 1, "self-test: its editable field is still a stray control for support", gatedForm);
   await page.close();
 }
 
-// In the page: an old route's content sits in main > [data-legacy]; a new-UI
-// route's sits in main directly, and the only [data-legacy] regions left are
-// the notices' own (no old-screen tray anywhere: Phase 2 line 10 moved the
-// catalog's quizzes to /admin/quizzes).
-function regionOk([newUi]) {
-  const main = document.querySelector("main");
-  if (!newUi) {
-    const el = document.querySelector("main > [data-legacy]");
-    return el ? el.children.length > 0 && (el.textContent || "").trim().length > 0 : false;
-  }
-  const strays = [...main.querySelectorAll("[data-legacy]")].filter((el) => !el.querySelector("[data-console-notices]"));
-  return strays.length === 0 && (main.textContent || "").trim().length > 0;
-}
-// In the page: the enabled buttons and action links inside the old screens.
-function legacyControls() {
-  return [...document.querySelectorAll("main [data-legacy] button, main [data-legacy] [role=button], main [data-legacy] a[href]")]
-    .filter((el) => !el.disabled && el.getAttribute("aria-disabled") !== "true" && el.getClientRects().length)
-    .map((el) => ({ tag: el.tagName.toLowerCase(), text: (el.innerText || el.getAttribute("aria-label") || "").trim().replace(/\s+/g, " ").slice(0, 60), href: el.getAttribute("href") || null }))
-    .filter((c) => c.text && (c.tag !== "a" || /\b(new|create|add|edit|delete|archive|publish|save|cancel|refund|sync|upload|duplicate|invite|remove)\b/i.test(c.text)));
+// In the page: the content sits in main directly, with something in it.
+function contentOk() {
+  return (document.querySelector("main")?.textContent || "").trim().length > 0;
 }
 
 async function signInForm(drill, ctx, creds) {
@@ -636,14 +614,13 @@ async function roleAtWidth(drill, page, role, width, out) {
     await settle(page);
     const body = await page.locator("body").innerText().catch(() => "");
     if (href === ONBOARDING) {
-      // new UI in its own shell: no sidebar to mark, no [data-legacy] region
+      // its own shell: no sidebar to mark
       const o = await onboardingShell(page);
       check(r?.status() === 200 && !ERROR_TEXT.test(body) && o.main && o.panel && !o.sidebar, `${href} opens in the onboarding shell (200, no error, the step panel, no sidebar)`, { status: r?.status(), error: ERROR_TEXT.test(body), ...o });
       if (role === "support" && width === 1280) check(o.enabledWrites.length === 0, `${href}: support sees no enabled control in the step panel`, o.enabledWrites);
       continue;
     }
-    const newUi = isNewUiRoute(href);
-    const legacy = await page.evaluate(regionOk, [newUi]);
+    const content = await page.evaluate(contentOk);
     let current;
     if (width === 375) {
       await page.locator('[data-shell-control="toggle"]').click();
@@ -654,17 +631,12 @@ async function roleAtWidth(drill, page, role, width, out) {
     } else {
       current = await page.locator('[data-slot="sidebar-container"] a[aria-current="page"]').evaluateAll((els) => els.map((e) => e.getAttribute("href")));
     }
-    check(r?.status() === 200 && !ERROR_TEXT.test(body) && legacy && JSON.stringify(current) === JSON.stringify([href]), `${href} opens (200, no error, ${newUi ? "new UI: content in main, no [data-legacy] but the notices'" : "content in [data-legacy]"}, aria-current)`, { status: r?.status(), error: ERROR_TEXT.test(body), legacy, current });
+    check(r?.status() === 200 && !ERROR_TEXT.test(body) && content && JSON.stringify(current) === JSON.stringify([href]), `${href} opens (200, no error, content in main, aria-current)`, { status: r?.status(), error: ERROR_TEXT.test(body), content, current });
     if (role === "support" && width === 1280) {
-      const stray = await page.evaluate(strayControls, [CONTROLS, newUi]);
-      check(stray.length === 0, `${href}: ${newUi ? "anywhere" : "outside [data-legacy]"} only nav links and shell controls`, stray);
-      if (newUi) {
-        // each variant of the page (a query that changes what it shows) gets its own pass
-        for (const v of NEW_UI_VARIANTS[href] ?? [href]) checkNewUi(check, v, await supportNewUiControls(page, v));
-        await page.goto(ORIGIN + href, { waitUntil: "load" });
-        await settle(page);
-      }
-      out.supportWrites.push({ page: href, controls: await page.evaluate(legacyControls) });
+      const stray = await page.evaluate(strayControls, [CONTROLS]);
+      check(stray.length === 0, `${href}: anywhere only nav links, shell controls, marked reads and gated writes`, stray);
+      // each variant of the page (a query that changes what it shows) gets its own pass
+      for (const v of NEW_UI_VARIANTS[href] ?? [href]) checkNewUi(check, v, await supportNewUiControls(page, v));
     }
   }
   out.rows.push(row);
@@ -796,10 +768,9 @@ async function supportEmptyStates(drill, ctx, creds) {
     const r = await page.goto(ANNEX + href, { waitUntil: "load" });
     await settle(page);
     const body = await page.locator("body").innerText().catch(() => "");
-    const legacy = await page.evaluate(regionOk, [isNewUiRoute(href)]);
-    // onboarding is new UI in its own shell (no [data-legacy]): its step panel is the content
-    const content = href === ONBOARDING ? (await onboardingShell(page)).panel : legacy;
-    drill.check(r?.status() === 200 && !ERROR_TEXT.test(body) && content, `support on the empty Roles Annex: ${href} renders (200, no error, content)`, { status: r?.status(), error: ERROR_TEXT.test(body), legacy, content, url: page.url() });
+    // onboarding has its own shell: its step panel is the content
+    const content = href === ONBOARDING ? (await onboardingShell(page)).panel : await page.evaluate(contentOk);
+    drill.check(r?.status() === 200 && !ERROR_TEXT.test(body) && content, `support on the empty Roles Annex: ${href} renders (200, no error, content)`, { status: r?.status(), error: ERROR_TEXT.test(body), content, url: page.url() });
   }
   await page.close();
 }
@@ -917,7 +888,7 @@ async function shell(drill) {
   if (!port) throw new Error("drill:shell needs ROLES_PORT (run it as pnpm drill:shell).");
   if (!NEXT_LOG) throw new Error("drill:shell needs DRILL_LOG_DIR (the roles store's Next log is the support pass's second witness; run it as pnpm drill:shell).");
   const s = seed();
-  const out = { rows: [], supportWrites: [] };
+  const out = { rows: [] };
   const pages = {};
   for (const role of ROLES) {
     const m = s.members.find((x) => x.role === role);
@@ -940,12 +911,10 @@ async function shell(drill) {
   await phase1Anonymous(drill, anonCtx);
   await ownerFlows(drill, pages.owner);
   const dir = drill.dir;
-  writeFileSync(join(dir, "support-write-controls.json"), `${JSON.stringify({ id: DRILL_ID, note: "Write controls support still sees inside the old screens: Phase 2's list, not a failure.", total: out.supportWrites.reduce((n, p) => n + p.controls.length, 0), pages: out.supportWrites }, null, 2)}\n`);
   writeFileSync(
     join(dir, "result.json"),
     `${JSON.stringify({ id: DRILL_ID, ranAt: new Date().toISOString(), passed: drill.checks.filter((c) => c.ok).length, failed: drill.checks.filter((c) => !c.ok).length, byRoleAndWidth: out.rows, notes: drill.notes, failures: drill.checks.filter((c) => !c.ok) }, null, 2)}\n`,
   );
-  drill.note(`support still sees ${out.supportWrites.reduce((n, p) => n + p.controls.length, 0)} write control(s) inside the old screens (support-write-controls.json)`);
 }
 
 runDrill({ id: DRILL_ID, part: "main", title: "SHELL — the new console shell, every role and width" }, shell).then(

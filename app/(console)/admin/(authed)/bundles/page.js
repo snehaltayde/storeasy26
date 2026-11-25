@@ -10,7 +10,7 @@ import { tfetch } from "@/lib/console-request";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Bundles · Admin", robots: { index: false } };
 
-// Phase 2 line 4: the bundles list on the new UI (lib/admin/new-ui-routes.js),
+// Phase 2 line 4: the bundles list on the new UI,
 // under offers.read like GET /api/admin/bundles. canWrite says whether the
 // page shows writes; the API refuses them regardless.
 export default async function AdminBundlesPage() {

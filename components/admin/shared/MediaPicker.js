@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ImagePlus, Upload } from "lucide-react";
 import { Dialog, Button, Input, Banner, SkeletonText, EmptyState } from "@/components/admin/editor/fields/parts";
 import { cn as cx } from "@/components/ui/utils";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 import { MediaUploadStatus } from "@/components/admin/MediaUploadStatus";
 import { uploadImage } from "@/lib/media-upload";
 import { UPLOAD_ACCEPT, uploadMessage } from "@/lib/media-upload-plan";

@@ -6,7 +6,6 @@ import { Eye } from "lucide-react";
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { readOnlyLabel } from "@/lib/admin/nav";
-import { isNewUiRoute } from "@/lib/admin/new-ui-routes";
 import { AdminNav } from "./AdminNav";
 import { StoreSwitcher } from "./StoreSwitcher";
 import { AccountMenu } from "./AccountMenu";
@@ -16,15 +15,10 @@ import { AccountMenu } from "./AccountMenu";
 // server for defaultOpen), a 56px sticky top bar, a skip link, and the
 // content capped at 1200px with 24px side padding (16px below 768px).
 //
-// The old screens render inside `main > [data-legacy]` (display: contents):
-// app/console.css gives that region the old tokens, so they keep their old
-// look until Phase 2 rebuilds them. Everything outside it is the new shell.
-// A route Phase 2 has rebuilt (isNewUiRoute, lib/admin/new-ui-routes.js) puts
-// the page straight into `main`; the notices keep their own [data-legacy]
-// region there (they still use the old Banner).
+// Every page is new UI (Phase 2 line 11): it goes straight into `main`, the
+// notices above it.
 //
-// Onboarding (/admin/onboarding, docs/UI.md "Onboarding"): new UI, so no
-// [data-legacy] region; no sidebar, the top bar without its toggle, and one
+// Onboarding (/admin/onboarding, docs/UI.md "Onboarding"): no sidebar, the top bar without its toggle, and one
 // centred column of at most 640px (data-onboarding="column"); from 1024px the
 // main grows to 1200px so the step list sits to the column's left (the
 // column stays 640px; a wide step, Brand, uses the full width).
@@ -84,20 +78,11 @@ function TopBar({ actor, account, stores, storeName, storeId, toggle = true }) {
 // <ConsoleNotices/>; defaultOpen: the sidebar_state cookie.
 export function AdminShell({ nav, badges = {}, actor, account = null, stores = [], storeName, storeId = null, notices = null, defaultOpen = true, children }) {
   const pathname = usePathname();
-  const content = isNewUiRoute(pathname) ? (
+  const content = (
     <>
-      {notices && (
-        <div data-legacy className="contents">
-          <div className="mb-6">{notices}</div>
-        </div>
-      )}
-      {children}
-    </>
-  ) : (
-    <div data-legacy className="contents">
       {notices && <div className="mb-6">{notices}</div>}
       {children}
-    </div>
+    </>
   );
 
   if (isOnboardingRoute(pathname)) {

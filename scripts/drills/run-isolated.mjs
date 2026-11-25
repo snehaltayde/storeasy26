@@ -507,7 +507,8 @@ export const DRILLS = {
   // Phase 2 line 10: product-finder quizzes on the roles store (staff, admin, support); evidence in docs/cms-reviews/drills/QUIZZES/
   quizzes: { id: "QUIZZES", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/quizzes/run.mjs", ...c.headed])) },
 };
-export const ALL = ["smoke", "p5", "p6", "agency-gone", "shell", "signup", "connect", "operator-onboarding", "operator-create-store"];
+// Phase 2 line 11 (phase end): every merchant console screen's drill joins the block suite
+export const ALL = ["smoke", "p5", "p6", "agency-gone", "shell", "signup", "connect", "operator-onboarding", "operator-create-store", "dashboard", "orders", "catalog", "offers", "media", "editor", "settings", "team", "growth", "quizzes", "console-styles"];
 
 const git = (root, args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
 

@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/kit/empty-state";
 import { RoleGate } from "@/components/kit/role-gate";
-import { useToast } from "@/components/console/Toast";
+import { useToast } from "@/components/kit/toast";
 import { ReadState, useRead } from "@/components/admin/settings/SaveBar";
 
 // Settings → Domains and SEO (Phase 2 line 7): this store's domains from

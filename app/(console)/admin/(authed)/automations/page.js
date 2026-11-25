@@ -10,8 +10,7 @@ import { PermissionNote, RulesList } from "@/components/admin/automations/RulesL
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Automations · Admin", robots: { index: false } };
 
-// Automations on the new UI (Phase 2 line 9; lib/admin/new-ui-routes.js lists
-// /admin/automations). Admins and owners only: rules can email customers, so
+// Automations on the new UI (Phase 2 line 9). Admins and owners only: rules can email customers, so
 // a role without settings.read (staff, support) gets the no-access note and
 // no rule, run or setting is read for it (Phase 0 line 2, S2).
 export default async function AdminAutomationsPage() {

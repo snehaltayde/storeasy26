@@ -11,7 +11,7 @@ import { tfetch } from "@/lib/console-request";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Offers · Admin", robots: { index: false } };
 
-// Phase 2 line 4: the offers list on the new UI (lib/admin/new-ui-routes.js).
+// Phase 2 line 4: the offers list on the new UI.
 // offers.read for every role; canWrite says whether the page shows writes
 // (support reads only; the API refuses writes regardless).
 export default async function AdminOffersPage() {

@@ -239,7 +239,7 @@ const textOf = (n) => {
 const nameOf = (n) => n.props["aria-label"] || n.props.label || textOf(n.props.children).trim();
 async function mount(file, exportName, makeProps, { stubs = {} } = {}) {
   const d = driver();
-  const load = world({ react: d.react, "@/components/console/Toast": toastStub, "next/navigation": navStub, ...stubs });
+  const load = world({ react: d.react, "@/components/kit/toast": toastStub, "next/navigation": navStub, ...stubs });
   const mod = await load(join(ROOT, file));
   const C = exportName === "default" ? mod.default : mod[exportName];
   ok(typeof C === "function", `${file} has no ${exportName}`);
@@ -340,7 +340,7 @@ async function publishDoc(id) {
 const sync = (n, over) => run(() => Sync.writeProduct(F.fixtureProduct(n, over)));
 
 // ---- the components -------------------------------------------------------------------
-const loadPlain = world({ "next/navigation": navStub, "@/components/console/Toast": toastStub });
+const loadPlain = world({ "next/navigation": navStub, "@/components/kit/toast": toastStub });
 const PF = await loadPlain(join(ROOT, "components/admin/editor/ProductForm.js"));
 const CF = await loadPlain(join(ROOT, "components/admin/editor/CollectionForm.js"));
 const h = React.createElement;
@@ -360,7 +360,7 @@ const pageState = { actor: OWNER_ACTOR };
 const DocStub = () => null;
 const pageWorld = world({
   "next/navigation": navStub,
-  "@/components/console/Toast": toastStub,
+  "@/components/kit/toast": toastStub,
   "next/headers": { cookies: async () => ({ get: () => ({ value: "cookie" }) }) },
   "@/lib/admin-auth": { adminActor: async () => pageState.actor, ADMIN_COOKIE: "_admin", PLATFORM_COOKIE: "_platform" },
   "@/lib/console-request": { tfetch: (fn) => docs.run(fn) },
@@ -423,7 +423,7 @@ await t("unit: a read-only person opening product content never triggers a write
   await openPage({ product: P(1) });
   ok((await sql(docs, "SELECT archived_at FROM documents WHERE id = ?", [d1.id]))[0].archived_at == null, "the owner's open brings it back");
   // rendered: the empty, read-only form with Shopify's values, never "Loading Shopify's images…"
-  const E = await world({ "next/navigation": navStub, "@/components/console/Toast": toastStub })(join(ROOT, "components/admin/editor/DocumentEditor.js"));
+  const E = await world({ "next/navigation": navStub, "@/components/kit/toast": toastStub })(join(ROOT, "components/admin/editor/DocumentEditor.js"));
   const m = html(h(E.EditorView, { entry: p.document, load: { status: "missing" }, docs: [], entity: p.entity, readOnly: p.readOnly }));
   ok(!plain(m).includes("Loading Shopify"), "no loading line");
   ok(plain(m).includes(EE.ENTRY_WORDS.readOnly) && plain(m).includes("Nothing has been changed on this product yet"), `the plain words: ${plain(m).slice(0, 300)}`);
@@ -797,7 +797,7 @@ await t("unit: product 31 and later open from the switcher; a renamed product is
   eq(EM.productRows(found.body.items)[0].secondary, "Shopify title: Fixture product 35", "with Shopify's name under it:");
   // the counts in the shell
   const counts = found.body.counts;
-  const E = await world({ "next/navigation": navStub, "@/components/console/Toast": toastStub })(join(ROOT, "components/admin/editor/DocumentEditor.js"));
+  const E = await world({ "next/navigation": navStub, "@/components/kit/toast": toastStub })(join(ROOT, "components/admin/editor/DocumentEditor.js"));
   const homeState = { id: "doc_home", type: "home", body: { type: "home", sections: [] }, revision: 1, draftHash: "h", document: { id: "doc_home", type: "home", label: "Home page", access: { canPublish: true } }, issues: [], ackCount: 0 };
   const shell = plain(html(h(E.EditorView, { entry: { id: "doc_home", type: "home", label: "Home page" }, load: { status: "ready" }, state: homeState, docs: [], products: { items: found.body.items, counts } })));
   ok(shell.includes(`Products ${counts.all} · Changed in Shopify ${counts.changedInShopify} · No longer in Shopify ${counts.orphaned}`), `the counts line: ${shell.slice(0, 400)}`);
@@ -988,7 +988,7 @@ await t("unit: a product document opened without the entity answer shows plain w
   ok(plain(m).includes(PF.DESCRIPTION_WORDS.noEntity), `the plain words: ${plain(m)}`);
   ok(!plain(m).includes("Loading Shopify"), "no endless loading line");
   ok(!/<input|<button/.test(m), "no form to type into");
-  const E = await world({ "next/navigation": navStub, "@/components/console/Toast": toastStub })(join(ROOT, "components/admin/editor/DocumentEditor.js"));
+  const E = await world({ "next/navigation": navStub, "@/components/kit/toast": toastStub })(join(ROOT, "components/admin/editor/DocumentEditor.js"));
   const st = { id: "doc_prod_nullentity01", type: "product_content", body, revision: 1, draftHash: "h", document: { id: "doc_prod_nullentity01", type: "product_content", label: "Mine", access: { canPublish: true } }, issues: [], ackCount: 0 };
   const shell = plain(html(h(E.EditorView, { entry: { id: st.id, type: st.type, label: "Mine" }, load: { status: "ready" }, state: st, docs: [], entity: null })));
   ok(shell.includes(PF.DESCRIPTION_WORDS.noEntity) && !shell.includes("Loading Shopify"), `in the editor: ${shell.slice(0, 400)}`);
@@ -1271,7 +1271,7 @@ await t("rendered: the catalog page says the brand and product type shown are se
   const marker = (name) => (p) => h("div", { "data-stub": name, "data-props": JSON.stringify(p ?? {}) });
   const catWorld = world({
     "next/navigation": navStub,
-    "@/components/console/Toast": toastStub,
+    "@/components/kit/toast": toastStub,
     "next/headers": { cookies: async () => ({ get: () => ({ value: "cookie" }) }) },
     "@/lib/admin-auth": { adminActor: async () => OWNER_ACTOR, ADMIN_COOKIE: "_admin", PLATFORM_COOKIE: "_platform" },
     "@/lib/console-request": { tfetch: (fn) => fn() },
@@ -1283,7 +1283,6 @@ await t("rendered: the catalog page says the brand and product type shown are se
       browseProducts: async () => ({ items: [], nextCursor: null, total: 0, counts: { all: 0, edited: 0, changedInShopify: 0, orphaned: 0 } }),
       catalogHeader: async () => ({ lastSyncedAt: null, lastSynced: null, products: 0, sync: null }),
     },
-    "@/components/admin/CommercePanels": { QuizPanel: marker("QuizPanel") },
   });
   const CatalogPage = (await catWorld(join(ROOT, "app/(console)/admin/(authed)/catalog/page.js"))).default;
   const page = plain(html(await CatalogPage({ searchParams: Promise.resolve({}) })));
