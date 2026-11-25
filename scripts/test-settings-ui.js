@@ -337,7 +337,7 @@ const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
 const STUBS = {
   "@/components/console/Toast": { useToast: () => ({ success() {}, error() {}, info() {} }) },
-  "next/navigation": { useRouter: () => ({ push() {}, replace() {}, refresh() {} }), usePathname: () => "/admin/settings/checkout", useSearchParams: () => new URLSearchParams("from=onboarding") },
+  "next/navigation": { useRouter: () => ({ push() {}, replace() {}, refresh() {} }), usePathname: () => globalThis.__setuiPath || "/admin/settings/checkout", useSearchParams: () => new URLSearchParams("from=onboarding") },
   "next/link": { __esModule: true, default: ({ href, children, prefetch, ...p }) => React.createElement("a", { href, ...p }, children) },
 };
 const cache = new Map();
@@ -408,6 +408,22 @@ await t("the section nav: a select and the tab links, all marked reads; onboardi
   eq((s.match(/data-read-control/g) || []).length, 11, "one select and ten links:");
   ok(s.includes('href="/admin/settings/checkout?from=onboarding" aria-current="page"') || /aria-current="page"[^>]*href="\/admin\/settings\/checkout\?from=onboarding"/.test(s), "the current tab:");
   ok(s.includes("Back to onboarding"), "back link:");
+});
+
+await t("the layout's title: on every tab but Team (line 8's page has its own title and breadcrumb), so no page has two", async () => {
+  const { SettingsTitle, SettingsColumn } = await load("components/admin/settings/SettingsFrame.js");
+  const at = (path, el) => {
+    globalThis.__setuiPath = path;
+    try {
+      return html(el);
+    } finally {
+      globalThis.__setuiPath = undefined;
+    }
+  };
+  ok(at("/admin/settings/checkout", React.createElement(SettingsTitle)).includes(">Settings</h1>"), "a tab gets the Settings title:");
+  eq(at("/admin/settings/team", React.createElement(SettingsTitle)), "", "Team gets none:");
+  ok(at("/admin/settings/team", React.createElement(SettingsColumn, null, "x")).startsWith('<div class="min-w-0">'), "Team's column is full width:");
+  ok(at("/admin/settings", React.createElement(SettingsColumn, null, "x")).includes("max-w-3xl"), "a tab's column is capped:");
 });
 
 await store.cleanup();

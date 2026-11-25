@@ -70,9 +70,12 @@ export const READ_CONTROLS = [
   { path: "components/admin/integrations/IntegrationsList.js", reason: "Test asks POST /api/admin/integrations { action: \"test\" } (settings.read): the cheapest provider check, it stores nothing", marks: 1 },
 ];
 
-// Reads sent as a non-GET request: { page, method, path, reason }. page is a
-// route pattern (routeMatches above); method and path match exactly (the
-// shell drill's readPost). test:console-kit refuses a row without a reason, a
+// Reads sent as a non-GET request: { page, method, path, reason, body? }. page
+// is a route pattern (routeMatches above); method and path match exactly (the
+// shell drill's readPost). body (Phase 2 line 7): when a path also takes writes
+// (POST /api/admin/integrations is Test and Revoke), the fields the request's
+// JSON body must carry, compared by bodyMatches below; a request without a
+// readable JSON body, or a server-log line, never matches such a row. test:console-kit refuses a row without a reason, a
 // GET row, and one whose path is the page itself (that would let a Server
 // Action POST to the page through). Phase 2 lines append rows; keep both sides.
 // test:media-library proves the media row is the usage read: storefront.read, writes nothing.
@@ -81,6 +84,20 @@ export const READ_POSTS = [
   // Phase 2 line 5
   { page: "/admin/media", method: "PUT", path: "/api/admin/media", reason: "\"Where it's used\" in a file's details: the usage list (mediaUsage), gated on storefront.read; it writes nothing" },
   // Phase 2 line 7 (test:settings-ui proves the test action writes nothing)
-  { page: "/admin/settings/checkout", method: "POST", path: "/api/admin/integrations", reason: "\"Test keys\": the integrations test action (settings.read), a provider check that stores nothing" },
-  { page: "/admin/integrations", method: "POST", path: "/api/admin/integrations", reason: "a provider's Test: the integrations test action (settings.read), a provider check that stores nothing" },
+  { page: "/admin/settings/checkout", method: "POST", path: "/api/admin/integrations", body: { action: "test" }, reason: "\"Test keys\": the integrations test action (settings.read), a provider check that stores nothing" },
+  { page: "/admin/integrations", method: "POST", path: "/api/admin/integrations", body: { action: "test" }, reason: "a provider's Test: the integrations test action (settings.read), a provider check that stores nothing" },
 ];
+
+// A READ_POSTS row's body rule: no `body` matches any request; otherwise the
+// request's body must be JSON and hold every listed field with that exact value.
+//   body: the request's raw body (a string), or undefined when it can't be read
+export function bodyMatches(row, body) {
+  if (!row?.body) return true;
+  let parsed;
+  try {
+    parsed = typeof body === "string" ? JSON.parse(body) : null;
+  } catch {
+    return false;
+  }
+  return parsed != null && typeof parsed === "object" && Object.entries(row.body).every(([k, v]) => JSON.stringify(parsed[k]) === JSON.stringify(v));
+}

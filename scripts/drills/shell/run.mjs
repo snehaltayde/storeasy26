@@ -147,7 +147,9 @@ function implicitSubmits() {
 //     write the old document sends while it unloads still counts. A read link
 //     that loads another document gets its own pass. Skipped only: a
 //     READ_POSTS row for this page (scripts/support/read-controls.js, a read
-//     sent as POST: { page (a route pattern), method, path, reason }), and
+//     sent as POST: { page (a route pattern), method, path, reason, body? }; a
+//     row with a body rule lets through only a request whose JSON body holds
+//     those fields), and
 //     Next's dev error overlay (POST /__nextjs_*) when the server is a dev
 //     server (its page opened the HMR socket), never against a production build.
 //   - and, as a second witness, the server's own request log (the roles
@@ -202,7 +204,8 @@ function nextLogLines(from, to) {
 // the server's request lines between two marks: [{ method, path }]
 const loggedRequests = (from, to) => [...nextLogLines(from.next, to.next), ...SELFTEST_SERVER_LOG.slice(from.own, to.own)];
 const WRITE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-const readPost = (page, method, path) => READ_POSTS.some((r) => RC.routeMatches(r.page, page) && r.method === method && r.path === path);
+// body: the request's raw body; a row with a body rule needs it (a server-log line has none, so never matches one)
+const readPost = (page, method, path, body) => READ_POSTS.some((r) => RC.routeMatches(r.page, page) && r.method === method && r.path === path && RC.bodyMatches(r, body));
 // Each document's first request: an init script on the tab under test asks
 // for DOC_SENTINEL with its path; page.route answers it (it never reaches the
 // server). Once per tab.
@@ -254,7 +257,7 @@ async function supportNewUiControls(page, href) {
       } catch {}
     }
   };
-  const skip = (method, path) => (devServer && path.startsWith("/__nextjs")) || readPost(target, method, path);
+  const skip = (method, path, body) => (devServer && path.startsWith("/__nextjs")) || readPost(target, method, path, body);
   const onSocket = (ws) => {
     if (/\/_next\/webpack-hmr/.test(ws.url())) devServer = true;
   };
@@ -276,7 +279,11 @@ async function supportNewUiControls(page, href) {
     pending.add(req);
     if (req.method() === "GET" || req.method() === "HEAD") return;
     seen.push({ method: req.method(), path: url.pathname });
-    if (!counting || skip(req.method(), url.pathname)) return;
+    let body;
+    try {
+      body = req.postData() ?? undefined;
+    } catch {}
+    if (!counting || skip(req.method(), url.pathname, body)) return;
     (away ? found.softNav : writes).push(`${req.method()} ${url.pathname}`);
   };
   const onDone = (req) => pending.delete(req);

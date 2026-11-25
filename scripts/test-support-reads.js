@@ -590,15 +590,17 @@ await t("page sweep (S1, S2): no prop on any console page holds a canary for sup
 
 await t("S2 pages: every settings tab, Integrations and Billing show support and staff only the no-access page (Phase 2 line 7), Automations its PermissionNote, and none of their data", async () => {
   const NEW_UI = ADMIN_PAGES.map((r) => r.page).filter((p) => p === "settings" || p.startsWith("settings/") || p === "integrations" || p === "billing");
-  ok(NEW_UI.length >= 11, `the settings, integrations and billing pages (${NEW_UI.join(",")}):`);
+  ok(NEW_UI.length >= 12 && NEW_UI.includes("settings/team"), `the settings, integrations and billing pages (${NEW_UI.join(",")}):`);
   for (const role of LEAST) {
     for (const page of NEW_UI) {
       const run = role === "support" ? pageRuns[page] : await pages.run(pageRel(page), { cookies: cookies[role] });
       ok(!run.error, `${role} ${page}: ${run.error?.message}`);
       const names = [...new Set(run.props.map((p) => p.component))];
-      // the no-access page and nothing else: no form, list or panel that could carry data
-      eq(JSON.stringify(names), JSON.stringify(["@/components/admin/settings/NoAccess#NoAccess"]), `${role} ${page} components:`);
-      eq(JSON.stringify(run.props[0].props), JSON.stringify({ role }), `${role} ${page} hands NoAccess only the role:`);
+      // the no-access page and nothing else: no form, list or panel that could carry data.
+      // settings/team is line 8's page with line 8's own no-access part (TeamNoAccess, no props)
+      const team = page === "settings/team";
+      eq(JSON.stringify(names), JSON.stringify([team ? "@/components/admin/team/TeamPage#TeamNoAccess" : "@/components/admin/settings/NoAccess#NoAccess"]), `${role} ${page} components:`);
+      eq(JSON.stringify(run.props[0].props), JSON.stringify(team ? {} : { role }), `${role} ${page} hands its no-access page ${team ? "nothing" : "only the role"}:`);
       const found = leaks(run.text, { skip: skipFor(role) });
       eq(found.join(","), "", `${role} ${page} canaries:`);
     }

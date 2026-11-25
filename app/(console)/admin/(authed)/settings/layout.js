@@ -4,7 +4,7 @@ import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { roleAllows } from "@/lib/platform/authz";
 import { SETTINGS_SECTIONS } from "@/lib/admin/settings-sections";
 import { tfetch } from "@/lib/console-request";
-import { PageHeader } from "@/components/kit/page-header";
+import { SettingsTitle, SettingsColumn } from "@/components/admin/settings/SettingsFrame";
 import { SettingsNav } from "@/components/admin/settings/SettingsNav";
 import { HashRedirect } from "@/components/admin/settings/HashRedirect";
 
@@ -22,12 +22,12 @@ export default async function SettingsLayout({ children }) {
   return (
     <>
       <HashRedirect />
-      <PageHeader title="Settings" description="How your store runs. Changes here go live within a minute, with no publish." />
+      <SettingsTitle />
       <div className="grid gap-6 lg:grid-cols-[208px_minmax(0,1fr)]">
         <aside className="lg:sticky lg:top-4 lg:self-start">
           <SettingsNav sections={sections} />
         </aside>
-        <div className="min-w-0 max-w-3xl">{children}</div>
+        <SettingsColumn>{children}</SettingsColumn>
       </div>
     </>
   );

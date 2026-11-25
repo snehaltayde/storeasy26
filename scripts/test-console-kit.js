@@ -333,7 +333,7 @@ await t("components/kit holds the six parts and imports only components/ui, lib/
 });
 
 // ---------- 8. data-read-control ----------
-const { READ_CONTROLS, READ_POSTS, routeMatches } = await import("./support/read-controls.js");
+const { READ_CONTROLS, READ_POSTS, routeMatches, bodyMatches } = await import("./support/read-controls.js");
 const walk = (rel) => readdirSync(join(ROOT, rel), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(`${rel}/${e.name}`) : /\.(js|jsx|tsx?)$/.test(e.name) ? [`${rel}/${e.name}`] : []));
 const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
 // each mark: its opening tag, whether it submits, whether it sits in a form that isn't method="get"
@@ -442,6 +442,7 @@ function readPostProblems(rows) {
     else if (r.path === r.page || routeMatches(r.page, r.path)) problems.push(`${tag}: its path is the page itself, which would let a Server Action POST to the page through`);
     if (!WRITE_METHODS.has(r?.method)) problems.push(`${tag}: method must be POST, PUT, PATCH or DELETE (a GET needs no row)`);
     if (typeof r?.reason !== "string" || r.reason.trim().length < 10) problems.push(`${tag}: needs a reason`);
+    if (r?.body !== undefined && (r.body === null || typeof r.body !== "object" || Array.isArray(r.body) || !Object.keys(r.body).length)) problems.push(`${tag}: body must be an object of the fields the request must carry`);
   }
   return problems;
 }
@@ -462,6 +463,15 @@ await t("READ_POSTS: every row has a reason, a non-GET method and a path that is
     [1, 1, 1, 1, 1, 1, 1],
     "the rule bites (path is the page, as a pattern and as a match; GET; no method; no reason):",
   );
+  const t1 = { ...ok1, body: { action: "test" } };
+  eq(
+    [bodyMatches(ok1, undefined), bodyMatches(t1, '{"action":"test","provider":"razorpay"}'), bodyMatches(t1, '{"action":"revoke","provider":"razorpay"}'), bodyMatches(t1, "{}"), bodyMatches(t1, "not json"), bodyMatches(t1, undefined)],
+    [true, true, false, false, false, false],
+    "a body rule lets through only a body holding its fields (Revoke, an empty or unreadable body and a server-log line never pass):",
+  );
+  eq(readPostProblems([{ ...ok1, body: {} }, { ...ok1, body: "test" }]).length, 2, "an empty or non-object body rule is refused:");
+  // the one path that takes both a read and a write has a body rule on every row
+  for (const r of READ_POSTS.filter((x) => x.path === "/api/admin/integrations")) eq(r.body, { action: "test" }, `${r.page}:`);
   ok(READ_POSTS.length > 0, "there are rows:");
   eq(readPostProblems(READ_POSTS), [], "rows:");
 });
