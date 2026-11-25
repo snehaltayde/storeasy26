@@ -137,7 +137,9 @@ async function quizzes(drill) {
   }
   // the home draft links to the quiz (a banner button), through the documents API
   const listed = await docsApi(ad.page, { listDocuments: { type: "home" } });
-  const homeId = (listed.body?.documents || []).find((d) => d.type === "home")?.id || null;
+  let homeId = (listed.body?.documents || []).find((d) => d.type === "home")?.id || null;
+  // the closed roles store may have no home document yet (as drill:media finds)
+  if (!homeId) homeId = (await docsApi(ad.page, { createDocument: { type: "home" } })).body?.document?.id || null;
   const home = homeId ? await docsApi(ad.page, { getDocument: homeId }) : { body: null };
   const doc = home.body?.document;
   let linked = false;

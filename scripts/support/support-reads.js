@@ -50,6 +50,10 @@ export const SUPPORT_PROBES = Object.freeze([
   { name: "preview-session showDesign (owner's)", path: "preview-session", method: "POST", variant: "showDesign", req: (ctx) => ({ body: { showDesign: { sid: ctx.ownerSid, on: true } } }), status: 404, keys: ["error", "code"] },
   { name: "quiz", path: "quiz", method: "GET", keys: ["ok", "quizzes"] },
   { name: "quiz ?slug=", path: "quiz", method: "GET", req: () => ({ query: "slug=fit" }), status: 404, keys: ["error"], note: "no quiz by that slug: the miss answers 404" },
+  // Phase 2 line 10: the quiz editor's reads
+  { name: "quiz ?view=usage", path: "quiz", method: "GET", variant: "usage", req: () => ({ query: "view=usage&slug=fit" }), keys: ["ok", "pages"] },
+  { name: "quiz ?view=tags", path: "quiz", method: "GET", variant: "tags", req: () => ({ query: "view=tags" }), keys: ["ok", "tags"] },
+  { name: "quiz ?view=try", path: "quiz", method: "GET", variant: "try", req: () => ({ query: "view=try&tags=fixture" }), keys: ["ok", "topTags", "products"] },
   ...["product", "collection", "variant", "bundle"].map((type) => ({
     name: `refs ${type}`,
     path: "refs",
