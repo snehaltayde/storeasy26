@@ -323,7 +323,7 @@ await t("READ_POSTS rows for /admin/editor and /admin/releases: PUT /api/admin/d
 });
 await t("the shell drill's matcher: a READ_POSTS row with ops passes only a body whose single top-level operation is listed (saveDraft never)", async () => {
   // the matcher itself is scripts/support/read-post-match.js (test-drills runs it on real bodies)
-  ok(/from "\.\.\/\.\.\/support\/read-post-match\.js"/.test(read("scripts/drills/shell/run.mjs")), "the drill uses the shared matcher:");
+  ok(/from "\.\.\/\.\.\/support\/read-post-match\.js"/.test(read("scripts/drills/support/stray.mjs")), "the drill uses the shared matcher (the pass in scripts/drills/support/stray.mjs since Phase 3 line 5):");
   const { readPost } = await import("./support/read-post-match.js");
   const rp = (body, status) => readPost("/admin/editor", "PUT", "/api/admin/documents", body, status);
   ok(rp(JSON.stringify({ listDocuments: true })) && !rp(JSON.stringify({ saveDraft: { id: "doc_home", body: {} }, revision: 3 })), "a read passes, saveDraft never");
