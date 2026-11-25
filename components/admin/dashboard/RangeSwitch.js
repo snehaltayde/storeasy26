@@ -16,7 +16,7 @@ export function RangeSwitch({ days }) {
           data-read-control
           aria-current={days === r ? "page" : undefined}
           className={cn(
-            "inline-flex h-7 items-center rounded-[4px] px-2.5 text-[0.8125rem] font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none pointer-coarse:h-10",
+            "inline-flex h-7 items-center rounded-[4px] px-2.5 text-[0.8125rem] font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card focus-visible:outline-none pointer-coarse:h-10",
             days === r ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
           )}
         >

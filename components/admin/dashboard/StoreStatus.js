@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { CircleHelp, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/components/ui/utils";
@@ -9,13 +9,19 @@ import { cn } from "@/components/ui/utils";
 // changes. A fact the server couldn't read says "Couldn't check", never a
 // guess. Links are reads.
 const LINK = "rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
-const UNKNOWN = "Couldn't check";
+// Muted, with a help icon: it reads as a gap in what we know, not as a fact.
+const UNKNOWN = (
+  <span className="inline-flex items-center gap-1.5 text-muted-foreground" data-dashboard="unknown">
+    <CircleHelp aria-hidden className="size-3.5" />
+    Couldn't check
+  </span>
+);
 
 function Fact({ label, children }) {
   return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2.5">
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2.5 first:pt-0 last:pb-0">
       <dt className="text-[0.8125rem] text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 text-right text-sm text-foreground">{children}</dd>
+      <dd className="ml-auto min-w-0 text-right text-sm text-foreground tabular-nums">{children}</dd>
     </div>
   );
 }
@@ -42,7 +48,7 @@ export function StoreBanner({ status }) {
 export function StoreStatus({ status, pushPct, syncedWords }) {
   const { open, shopify, catalog, unpublished } = status;
   return (
-    <Card data-dashboard="status">
+    <Card data-dashboard="status" className="self-start">
       <CardHeader>
         <CardTitle>Your store</CardTitle>
       </CardHeader>

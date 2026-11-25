@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { CircleAlert, CircleHelp } from "lucide-react";
+import { CircleAlert, CircleCheck, CircleHelp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EmptyState } from "@/components/kit/empty-state";
 import { cn } from "@/components/ui/utils";
 
 // Orders to act on (actionQueue in lib/admin/dashboard.js): each row a count,
@@ -16,7 +15,7 @@ function Row({ row }) {
     <li className="flex items-start gap-3 py-3" data-queue={row.id}>
       <Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", row.unknown ? "text-muted-foreground" : "text-warning")} />
       <div className="min-w-0 flex-1 space-y-1">
-        <p className="text-sm text-foreground">
+        <p className={cn("text-sm", row.unknown ? "text-muted-foreground" : "text-foreground")}>
           {row.href ? (
             <Link href={row.href} data-read-control className={LINK}>
               {row.words}
@@ -39,7 +38,7 @@ function Row({ row }) {
           </ul>
         )}
       </div>
-      {!row.unknown && <span className="font-mono text-sm font-medium tabular-nums text-foreground">{row.count}</span>}
+      <span className={cn("min-w-8 text-right font-mono text-sm font-semibold tabular-nums", row.unknown ? "text-muted-foreground" : "text-foreground")}>{row.unknown ? "" : row.count}</span>
     </li>
   );
 }
@@ -52,7 +51,14 @@ export function ActionQueue({ rows }) {
       </CardHeader>
       <CardContent>
         {rows.length === 0 ? (
-          <EmptyState title="Nothing needs you right now." description="Failed pushes, returns and stuck orders show up here." className="py-6" />
+          // Flat inside the card (no box in a box): a calm line, not an alarm.
+          <div className="flex items-start gap-3 py-2" data-dashboard="queue-empty">
+            <CircleCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-success" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">Nothing needs you right now.</p>
+              <p className="text-[0.8125rem] text-muted-foreground">Failed pushes, returns and stuck orders show up here.</p>
+            </div>
+          </div>
         ) : (
           <ul className="divide-y divide-border">
             {rows.map((r) => (

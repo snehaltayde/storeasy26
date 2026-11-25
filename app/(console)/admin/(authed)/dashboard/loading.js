@@ -14,14 +14,14 @@ export default function DashboardLoading() {
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-28 rounded-card" />
+          <Skeleton key={i} className="h-26 rounded-card" />
         ))}
       </div>
       <Skeleton className="h-4 w-2/3" />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="space-y-4">
-          <Skeleton className="h-48 rounded-card" />
-          <Skeleton className="h-56 rounded-card" />
+          <Skeleton className="h-32 rounded-card" />
+          <Skeleton className="h-64 rounded-card" />
         </div>
         <Skeleton className="h-80 rounded-card" />
       </div>
