@@ -482,6 +482,49 @@ await t("only lib/addresses.js and lib/privacy.js name the table; only the accou
   );
 });
 
+// ---------------------------------------------------------------------------
+// 4. The checkout picker's memory (components/checkout/savedAddressMemo.js)
+// ---------------------------------------------------------------------------
+const Memo = await import("../components/checkout/savedAddressMemo.js");
+const fakeStorage = () => {
+  const m = new Map();
+  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), m };
+};
+
+await t("picker memo: an address saved in one order is never edited by the next checkout on the same cart id", async () => {
+  const st = fakeStorage();
+  const k = Memo.memoKey("cart_1");
+  const order1 = { items: [{ variantId: "v1", quantity: 1 }], total: 400 };
+  const fp1 = Memo.cartFingerprint(order1);
+  // checkout 1 saves X
+  Memo.writeMemo(k, { savedId: "adr_x", fp: fp1 }, st);
+  eq(Memo.savedIdFor(Memo.readMemo(k, st), fp1), "adr_x", "same checkout: X is edited");
+  // the order clears the cart but keeps its id; checkout 2 has other lines
+  const order2 = { items: [{ variantId: "v2", quantity: 2 }], total: 800 };
+  eq(Memo.savedIdFor(Memo.readMemo(k, st), Memo.cartFingerprint(order2)), null, "another cart: X is not edited");
+  // the same lines again: a fresh checkout starts the memo again
+  Memo.startMemo(k, st);
+  eq(Memo.savedIdFor(Memo.readMemo(k, st), fp1), null, "a fresh checkout forgets X even with the same lines");
+  same(Memo.readMemo(k, st), {}, "and the tick");
+  // and the picker starts it on a fresh mount, and passes the fingerprint on every save
+  const src = await readFile(join(ROOT, "components/checkout/SavedAddressPicker.js"), "utf8");
+  ok(/const fresh = !knownShopper\(\)/.test(src) && /if \(fresh\) startMemo\(memo\.current\)/.test(src), "fresh mount starts the memo");
+  ok(/savedIdFor\(readMemo\(key\), fp\.current\)/.test(src) && /writeMemo\(key, \{ savedId: [^}]*fp: fp\.current \}\)/.test(src), "savedId is read and written with the fingerprint");
+});
+
+await t("picker cache: holds signed-in, the memo key and the fingerprint only, never addresses; forgotten when the page is left or the shopper is signed out", async () => {
+  Memo.rememberShopper({ signedIn: true, memo: "k", fp: "f", list: [{ line1: "cnyleak" }], state: { list: [{ line1: "cnyleak" }] } });
+  same(Memo.knownShopper(), { signedIn: true, memo: "k", fp: "f" }, "only these");
+  ok(!JSON.stringify(Memo.knownShopper()).includes("cnyleak"), "no address");
+  Memo.forgetShopper();
+  eq(Memo.knownShopper(), null, "forgotten");
+  const src = await readFile(join(ROOT, "components/checkout/SavedAddressPicker.js"), "utf8");
+  // the first render's list is always empty: addresses come only from the fetch
+  ok(/useState\(\(\) => \(\{ loaded: Boolean\(knownShopper\(\)\), signedIn: Boolean\(knownShopper\(\)\?\.signedIn\), email: "", list: \[\] \}\)\)/.test(src), "initial state has no list from the cache");
+  ok(!/let known\b/.test(src), "no module cache of its own");
+  eq((src.match(/forgetShopper\(\)/g) || []).length, 2, "forgotten on sign-out and when the checkout is left");
+});
+
 await t("the address copy passes the banned-copy scan (shopper rules)", async () => {
   const { scanText } = await import("./support/banned-copy.js");
   for (const f of ["components/account/AddressBook.js", "components/account/AddressForm.js", "components/checkout/SavedAddressPicker.js"]) {

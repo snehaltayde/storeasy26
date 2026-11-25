@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { addressValid } from "./checkoutModel";
+import { cartFingerprint, forgetShopper, knownShopper, memoKey, readMemo, rememberShopper, savedIdFor, startMemo, writeMemo } from "./savedAddressMemo";
 
 // Phase 8 line 3: saved addresses at checkout, at AddressStep's
 // {/* saved-addresses */} anchor. It finds the shopper itself (GET /api/account;
@@ -17,7 +18,8 @@ import { addressValid } from "./checkoutModel";
 //   Saving the same address twice keeps one (the server checks too). The tick
 //   and the id of an address saved in this checkout live in sessionStorage per
 //   cart, so going back from review keeps an unticked box unticked, and fixing
-//   an address saved moments ago edits that row instead of adding another.
+//   an address saved moments ago edits that row instead of adding another
+//   (./savedAddressMemo: never across carts or orders, never an address list).
 const PICK = ["name", "phone", "line1", "line2", "city", "state", "pincode"];
 const ADDRESS_ONLY = ["line1", "line2", "city", "state", "pincode"];
 // a pincode alone (line 1's prefill) still counts as an empty address
@@ -30,31 +32,18 @@ async function getJson(url) {
   return res.ok ? res.json().catch(() => null) : null;
 }
 
-// What the last mount learned, so a remount (review → Edit) knows the shopper
-// at once instead of after its fetches; they still refresh it.
-let known = null;
-
-const memoKey = (cartId) => `sf_saved_address:${cartId || "cart"}`;
-function readMemo(k) {
-  try {
-    return JSON.parse(sessionStorage.getItem(k) || "null") || {};
-  } catch {
-    return {};
-  }
-}
-function writeMemo(k, patch) {
-  try {
-    sessionStorage.setItem(k, JSON.stringify({ ...readMemo(k), ...patch }));
-  } catch {
-    // private mode: the tick just isn't remembered
-  }
-}
-
 export default function SavedAddressPicker({ form, onAddress }) {
-  const [state, setState] = useState(() => known?.state || { loaded: false, signedIn: false, email: "", list: [] });
-  const [save, setSaveState] = useState(() => (known?.memo && typeof readMemo(known.memo).save === "boolean" ? readMemo(known.memo).save : true));
+  // A remount (review → Edit) knows at once that the shopper is signed in, so a
+  // quick Continue still saves; the addresses always come from the fetch.
+  const [state, setState] = useState(() => ({ loaded: Boolean(knownShopper()), signedIn: Boolean(knownShopper()?.signedIn), email: "", list: [] }));
+  const [save, setSaveState] = useState(() => {
+    const k = knownShopper()?.memo;
+    const v = k ? readMemo(k).save : undefined;
+    return typeof v === "boolean" ? v : true;
+  });
   const anchor = useRef(null);
-  const memo = useRef(known?.memo || null); // the sessionStorage key, once the cart is known
+  const memo = useRef(knownShopper()?.memo || null); // the sessionStorage key, once the cart is known
+  const fp = useRef(knownShopper()?.fp ?? null); // the cart's fingerprint, once the cart is known
   const latest = useRef({});
   const setSave = (v) => {
     setSaveState(v);
@@ -65,22 +54,24 @@ export default function SavedAddressPicker({ form, onAddress }) {
 
   useEffect(() => {
     let live = true;
+    const fresh = !knownShopper(); // not a remount within this checkout
     (async () => {
       const me = await getJson("/api/account");
       if (!live) return;
       if (!me?.authenticated) {
-        known = null;
+        forgetShopper();
         return setState({ loaded: true, signedIn: false, email: "", list: [] });
       }
       const [r, cart] = await Promise.all([getJson("/api/account?view=addresses"), getJson("/api/cart")]);
       if (!live) return;
       memo.current = memoKey(cart?.id);
+      fp.current = cartFingerprint(cart);
+      if (fresh) startMemo(memo.current);
       const remembered = readMemo(memo.current);
-      if (typeof remembered.save === "boolean") setSaveState(remembered.save);
+      setSaveState(typeof remembered.save === "boolean" ? remembered.save : true);
+      rememberShopper({ signedIn: true, memo: memo.current, fp: fp.current });
       const list = r?.addresses || [];
-      const next = { loaded: true, signedIn: true, email: r?.email || "", list };
-      known = { state: next, memo: memo.current };
-      setState(next);
+      setState({ loaded: true, signedIn: true, email: r?.email || "", list });
       const f = latest.current.form;
       const empty = ADDRESS_TYPED.every((k) => !String(f[k] || "").trim());
       const patch = {};
@@ -96,23 +87,31 @@ export default function SavedAddressPicker({ form, onAddress }) {
 
   // Save on Continue: this step unmounts while the checkout stays mounted.
   // Leaving the page removes the checkout too, and then nothing is saved.
+  // React's development double mount runs this cleanup at once; `armed` (set a
+  // tick after mounting) tells that apart from a real Continue.
   useEffect(() => {
     const flow = anchor.current?.closest('[data-protected="checkout"]') || null;
+    let armed = false;
+    const arm = setTimeout(() => {
+      armed = true;
+    }, 0);
     return () => {
+      clearTimeout(arm);
+      if (!armed) return;
       const { form: f, save: ticked, signedIn, picked: p } = latest.current;
       if (!flow?.isConnected) {
-        known = null; // the page was left: forget the shopper
+        forgetShopper(); // the page was left
         return;
       }
       if (!signedIn || p || !ticked || !addressValid(f)) return;
       const key = memo.current;
-      const savedId = key ? readMemo(key).savedId : null;
+      const savedId = key ? savedIdFor(readMemo(key), fp.current) : null;
       // an address saved earlier in this checkout is edited, not added again
       const address = { ...Object.fromEntries(PICK.map((k) => [k, f[k]])), ...(savedId ? { id: savedId } : {}) };
       fetch("/api/account", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "address_save", address }) })
         .then((res) => res.json().catch(() => null))
         .then((j) => {
-          if (key) writeMemo(key, { savedId: j?.address?.id || null });
+          if (key) writeMemo(key, { savedId: j?.address?.id || null, fp: fp.current });
         })
         .catch(() => {});
     };

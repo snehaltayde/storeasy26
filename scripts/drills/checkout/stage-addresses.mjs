@@ -15,6 +15,7 @@ const HOME = { label: "Home", name: "Address Drill", phone: "9999999999", line1:
 const WORK = { label: "Work", name: "Address Drill", phone: "9999999999", line1: "22 Work Road", line2: "", city: "Mumbai", state: "Maharashtra", pincode: "400001" };
 const TYPO = { line1: "33 New Lnae", city: "Nagpur", state: "Maharashtra", pincode: "440001" };
 const NEW = { ...TYPO, line1: "33 New Lane" };
+const NEXT = { line1: "44 Next Avenue", city: "Nashik", state: "Maharashtra", pincode: "422001" };
 
 async function until(fn, what, ms = 15_000) {
   const end = Date.now() + ms;
@@ -122,7 +123,7 @@ stage("addresses", async (drill) => {
   await f.getByRole("button", { name: "Edit" }).click();
   await until(async () => (await line1.inputValue()) === TYPO.line1, "the address step is back");
   await line1.fill(NEW.line1);
-  const edited = page.waitForResponse(isSave);
+  const edited = page.waitForResponse((x) => isSave(x) && x.request().postDataJSON()?.address?.line1 === NEW.line1);
   await f.getByRole("button", { name: "Continue to review" }).click();
   await f.getByRole("heading", { name: "Review your order" }).waitFor();
   const er = await edited;
@@ -162,11 +163,30 @@ stage("addresses", async (drill) => {
   drill.check(Boolean(used), "placing the order stamps the address's last_used_at", used?.last_used_at);
   drill.check((await addressRows()).filter((r) => r.last_used_at).length === 1, "only that address is stamped");
 
+  // the next checkout on the same cart id: a new address is added, the last order's is never edited
+  const before = (await addressRows()).find((r) => r.line1 === NEW.line1);
+  await addToCart(drill, page, item);
+  await page.goto(`${ORIGIN}/checkout`, { waitUntil: "load" });
+  await f.getByRole("radio", { name: "Use a new address" }).waitFor();
+  await until(async () => (await line1.inputValue()) !== "", "the default fills the form");
+  await f.getByRole("radio", { name: "Use a new address" }).check();
+  await until(async () => (await line1.inputValue()) === "", "a new address clears the address fields");
+  drill.check(await saveBox.isChecked(), "a fresh checkout starts with the box ticked");
+  for (const [k, v] of Object.entries(NEXT)) await f.locator(`input[name="${k}"]`).fill(v);
+  const nextSave = page.waitForResponse(isSave);
+  await f.getByRole("button", { name: "Continue to review" }).click();
+  await f.getByRole("heading", { name: "Review your order" }).waitFor();
+  const ns = await nextSave;
+  drill.check(ns.status() === 200 && !ns.request().postDataJSON()?.address?.id, "the next checkout adds its address (no id sent)", ns.request().postDataJSON()?.address?.id);
+  const afterNext = await addressRows();
+  const kept = afterNext.find((r) => r.id === before?.id);
+  drill.check(kept?.line1 === NEW.line1 && kept?.updated_at === before?.updated_at && afterNext.some((r) => r.line1 === NEXT.line1), "the last order's address is unchanged and the new one is added", afterNext.map((r) => r.line1));
+
   // /account: the new one is there; delete it after the confirm
   await page.goto(`${ORIGIN}/account`, { waitUntil: "load" });
   const newCard = page.locator("li[data-address]").filter({ hasText: NEW.line1 });
   await newCard.waitFor();
-  drill.check((await page.locator("li[data-address]").count()) === 3, "the address saved at checkout appears in /account", await page.locator("li[data-address]").count());
+  drill.check((await page.locator("li[data-address]").count()) === 4, "the addresses saved at checkout appear in /account", await page.locator("li[data-address]").count());
   await newCard.getByRole("button", { name: "Delete" }).click();
   await newCard.getByText("Delete this address? Past orders keep their copy.").waitFor();
   await drill.shoot(page, "addresses-delete-confirm");
