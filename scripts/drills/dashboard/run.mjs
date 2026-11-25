@@ -53,10 +53,12 @@ async function open(page, path) {
   return { status: res?.status() ?? 0, body: await page.locator("main").innerText().catch(() => "") };
 }
 
-// In the page: controls in main that are not a marked read, natively disabled or RoleGate's.
+// In the page: controls in main that are not the shell's own (its top bar and
+// nav, which drill:shell checks), a marked read, natively disabled or RoleGate's.
 function unmarked() {
   const q = 'a[href], button, input, select, textarea, [role="link"], [tabindex]:not([tabindex="-1"])';
   return [...document.querySelectorAll(`main ${q}`)]
+    .filter((el) => !el.closest("[data-shell-control], [data-nav-item]"))
     .filter((el) => !el.hasAttribute("data-read-control") && el.disabled !== true && !(el.getAttribute("aria-disabled") === "true" && el.getAttribute("data-role-gate") === "disabled"))
     .map((el) => `${el.tagName.toLowerCase()} "${(el.innerText || "").trim().slice(0, 40)}"`);
 }
