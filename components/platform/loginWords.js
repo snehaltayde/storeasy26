@@ -9,6 +9,7 @@ export const LOGIN = Object.freeze({
   password: "Password",
   totp: "Authenticator code",
   totpHint: "The 6 digits your authenticator app shows now.",
+  totpHintEnroll: "After you add the key, enter the 6 digits your app shows for Storeasy.",
   submit: "Sign in",
   busy: "Signing in…",
   enrollTitle: "Add Storeasy to your authenticator app",

@@ -31,7 +31,7 @@ export function CopyButton({ value, label, id, className }) {
   }
   return (
     <div data-kit="copy" className={className}>
-      <div className="flex items-stretch overflow-hidden rounded-md border border-border bg-muted">
+      <div className="flex items-stretch overflow-hidden rounded-md border border-border bg-card">
         <code ref={ref} id={id} className="min-w-0 flex-1 px-2.5 py-2 font-mono text-[0.8125rem] break-all select-all">
           {value}
         </code>

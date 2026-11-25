@@ -14,6 +14,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { StoreasyMark } from "@/components/kit/storeasy-mark";
 import { activePlatformItem } from "@/lib/platform/nav";
 
 // The operator navigation (Phase 3 line 0). Icons by item id; later lines add theirs.
@@ -22,16 +23,6 @@ const ICONS = {
   onboarding: ListChecks,
   "new-store": Plus,
 };
-
-// The Storeasy mark: the platform lime is the logo's colour only (docs/UI.md).
-function StoreasyMark() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden className="size-6 shrink-0 rounded-md">
-      <rect width="24" height="24" rx="6" fill="#84cc16" />
-      <path d="M15.5 8.2c-.8-.9-2-1.4-3.4-1.4-2 0-3.4 1.1-3.4 2.6 0 3.4 6.8 1.9 6.8 5.2 0 1.6-1.5 2.6-3.5 2.6-1.5 0-2.8-.6-3.6-1.6" fill="none" stroke="#1a2e05" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 // 240px from 1024px, icons with tooltips at 768-1023px, a sheet below 768px
 // (components/ui/sidebar.js). A link tapped in the phone sheet closes it.

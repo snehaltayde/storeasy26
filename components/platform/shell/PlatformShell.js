@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { LogOut } from "lucide-react";
+import { KeyRound, LogOut } from "lucide-react";
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -104,6 +104,14 @@ export function PlatformShell({ nav, account, defaultOpen = true, children }) {
           <header data-shell="topbar" className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-4 md:px-6">
             <SidebarTrigger data-shell-control="toggle" aria-label="Show or hide navigation" aria-keyshortcuts="Meta+B Control+B" className="-ml-1" />
             <div className="flex-1" />
+            {/* the setup password's standing reminder: a quiet warning pill,
+                icon-only on phones (the account menu says it in full) */}
+            {account?.note && (
+              <p data-shell="setup-password" title={account.note} className="flex h-6 min-w-0 shrink items-center gap-1 rounded-full border border-warning/40 bg-warning/10 px-2 text-xs font-medium text-warning-text">
+                <KeyRound aria-hidden className="size-3.5 shrink-0" />
+                <span className="sr-only truncate sm:not-sr-only">Setup password</span>
+              </p>
+            )}
             <AccountMenu account={account} />
           </header>
           <SidebarInset id="console-content" tabIndex={-1} className="mx-auto block w-full max-w-[1200px] flex-none px-4 py-6 outline-none md:px-6">
