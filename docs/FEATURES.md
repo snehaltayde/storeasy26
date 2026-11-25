@@ -54,7 +54,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - [x] An admin can invite a team member with a role and remove one; only the owner can grant or transfer ownership
 - [x] A merchant can see analytics, experiments, insights and automations on the new UI (the Publishing page is built with the editor line)
 - [x] A merchant can create and edit product-finder quizzes on the new UI; support sees them read-only
-- [ ] The old console screens and their components are removed once every route has a new screen
+- [x] The old console screens and their components are removed once every route has a new screen
 
 ## Phase 3: operator console on shadcn
 

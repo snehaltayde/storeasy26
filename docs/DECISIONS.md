@@ -3,6 +3,15 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Old merchant console screens removed (on the owner's behalf)
+
+- **Scope:** the 18 old `components/admin/*` screens, `lib/admin/new-ui-routes.js` and `AdminShell`'s legacy branch, and the merchant-only console parts (`PageHeader`, `Tabs`, `charts`) are deleted. `components/console/*` and the `data-legacy` CSS stay for the operator console until Phase 3 line 7. `Toast` moved to `components/kit/toast.js`. `test:no-legacy-ui` follows every merchant route's imports and fails on an old part or a `data-legacy` wrapper; its four operator rows say "removed by Phase 3 line 7".
+- **Sign-in:** login, reset and accept-invite use the operator sign-in's lockup and card (`components/admin/auth/AuthFrame.js`), with every request and check unchanged; `/signup` keeps its 640px column. Error fallbacks are plain sentences without status codes.
+- **Kept, not migrated:** `fields/parts.js` (built on `components/ui`, ~100 call sites); migrate it later if it gets in the way.
+- **Tests:** suites that only drove deleted screens were removed; their rules are covered by the new screens' suites. "Keep these rates" got a rendered test, with staff and support never getting a live button.
+- **Decided by:** Claude
+- **Slice:** Phase 2 line 11
+
 ## 2026-11-25 Operator guard, route harness, shell and sign-in (on the owner's behalf)
 
 - **Permissions:** `requireOperator` (`lib/platform/require-operator.js`) gates all 18 operator routes, with the origin check before auth on every write; exempt are login and logout (origin-checked), the billing webhook (signature) and the export link GET (its signed token). Bootstrap ends when one active operator exists and denies on a failed lookup. `scripts/test-platform-permissions.js` calls 58 rows as 10 callers and searches every denied answer for store ids, names, `db_url` and the operator's email; a route with no row fails it.
