@@ -57,6 +57,8 @@ export const ADMIN_ROUTES = Object.freeze([
   { path: "domains", method: "POST", action: "settings.write", probe: { body: {} } },
   { path: "experiments", method: "GET", action: "storefront.read" },
   { path: "experiments", method: "POST", action: "storefront.write", probe: { body: {} } },
+  // Phase 2 line 9 (D6): a start puts a variant live, so the route asks storefront.write and then checks storefront.publish
+  { path: "experiments", method: "POST", variant: "start", action: "storefront.publish", asks: "storefront.write", probe: { body: { start: { slug: "exp-missing" } } } },
   { path: "first-run", method: "GET", action: "storefront.read" },
   { path: "first-run", method: "POST", action: "storefront.write", probe: { body: {} } },
   // F3: Help needs settings.read, so staff and support cannot open it (recorded, not changed)

@@ -25,4 +25,7 @@ export const ALLOWLIST = [
   { path: "components/admin/ReconcileButton.js", reason: "removed by Phase 2 line 10" },
   { path: "components/admin/RetryPushButton.js", reason: "removed by Phase 2 line 10" },
   { path: "components/console/Tabs.js", reason: "removed by Phase 2 line 10" },
+  // Phase 2 line 9: the analytics and insights pages stopped importing these
+  { path: "components/admin/ExportCsv.js", reason: "removed by Phase 2 line 11" },
+  { path: "components/admin/InsightsAdmin.js", reason: "removed by Phase 2 line 11" },
 ];

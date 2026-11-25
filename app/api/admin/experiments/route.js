@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/platform/audit";
 import { listExperiments, upsertExperiment, startExperiment, setExperimentStatus, analyzeExperiment, adoptVariant } from "@/lib/experiments";
 import { tenantHandler } from "@/lib/tenant-request";
+import { roleAllows } from "@/lib/platform/authz";
 import { writeRefusalBody } from "@/lib/content-writes";
 import { validationBody } from "@/lib/cms/issues";
 import * as documents from "@/lib/documents/service";
@@ -16,7 +17,10 @@ import * as documents from "@/lib/documents/service";
 //   GET                     → experiments list
 //   GET ?analyze=<slug>     → analysis (cells, SRM, blocks, verdict)
 //   POST {experiment:{…}}   → create/update a DRAFT (frozen once started)
-//   POST {start|pause|complete:{slug}}
+//   POST {start:{slug}}            → start, or resume a paused one: puts a
+//                                     variant live, so it needs storefront.publish
+//                                     (Phase 2 line 9, D6); audited as that
+//   POST {pause|complete:{slug}}
 //   POST {adopt:{slug, variant}}
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,8 +48,9 @@ export const POST = tenantHandler(async (request) => {
       return NextResponse.json({ ok: true, experiment: saved });
     }
     if (body.start) {
+      if (!roleAllows(auth.actor.role, "storefront.publish")) return NextResponse.json({ error: `Your role (${auth.actor.role}) can't start an experiment: it shows shoppers a variant, so it needs an owner or admin` }, { status: 403 });
       const r = await startExperiment(String(body.start.slug || ""));
-      await audit({ actor: auth.actor, action: "storefront.write", resource: `experiment:${r.slug}`, diff: { status: "running" } });
+      await audit({ actor: auth.actor, action: "storefront.publish", resource: `experiment:${r.slug}`, diff: { status: "running" } });
       return NextResponse.json({ ok: true, ...r });
     }
     if (body.pause || body.complete) {

@@ -49,6 +49,10 @@ export const READ_CONTROLS = [
   { path: "components/admin/catalog/CollectionsTable.js", reason: "a collection's title opens its products in a sheet, and Try again re-reads the list: GET reads", marks: 2 },
   // Phase 2 line 8: the team screen
   { path: "components/admin/team/TeamPage.js", reason: "Try again re-reads GET /api/admin/team after a failed load", marks: 1 },
+  // Phase 2 line 9: analytics and insights
+  { path: "components/admin/analytics/AnalyticsTables.js", reason: "the 7/30/90-day links only change ?days= on the analytics page, and Try again reloads it (GETs)", marks: 2 },
+  { path: "components/admin/analytics/CsvButton.js", reason: "CSV builds a file in the browser from the aggregated rows on screen; nothing is sent", marks: 1 },
+  { path: "components/admin/insights/InsightsList.js", reason: "Try again re-reads GET /api/admin/insights; \"Show the numbers\" opens a <details>; \"Open in editor\" is a link to the editor", marks: 3 },
 ];
 
 // Reads sent as a non-GET request: { page, method, path, reason }. page is a
