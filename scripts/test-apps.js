@@ -41,7 +41,7 @@ const ok = (cond, label = "") => {
 };
 const started = Date.now();
 
-const { APP_SCOPES, scopeAllows, roleAllows } = await import("../lib/platform/authz.js");
+const { APP_PERMISSIONS, scopeAllows, roleAllows } = await import("../lib/platform/authz.js");
 const M = await import("../lib/plugins/manifest.js");
 const CAT = await import("../lib/plugins/catalog.js");
 const SET = await import("../lib/plugins/settings.js");
@@ -72,10 +72,12 @@ const FIXTURE = {
 const undoFixture = CAT.registerPlugin(FIXTURE);
 
 // --- the catalog and its checks ------------------------------------------------------
-await t("APP_SCOPES: exactly storefront.read, offers.read and orders.read (no customer details, owner decision); scopeAllows", () => {
-  eq(Object.keys(APP_SCOPES).join(","), "storefront.read,offers.read,orders.read", "scopes:");
-  ok(!("customers.read" in APP_SCOPES), "no customers.read");
-  ok(Object.isFrozen(APP_SCOPES), "frozen");
+await t("APP_PERMISSIONS: exactly storefront.read, offers.read and orders.read (no customer details, owner decision); scopeAllows", () => {
+  eq(Object.keys(APP_PERMISSIONS).join(","), "storefront.read,offers.read,orders.read", "scopes:");
+  ok(!("customers.read" in APP_PERMISSIONS), "no customers.read");
+  ok(Object.isFrozen(APP_PERMISSIONS), "frozen");
+  // the plugin permission table is never a Shopify scope list (test:shopify-boundary keeps the only scope list in lib/platform/oauth.js)
+  eq(Object.keys(APP_PERMISSIONS).filter((k) => !/^[a-z]+\.read$/.test(k) || /_/.test(k)).join(","), "", "keys that are not <area>.read names:");
   ok(scopeAllows(["orders.read"], "orders.read") && !scopeAllows(["orders.read"], "offers.read") && !scopeAllows(null, "orders.read"), "scopeAllows");
 });
 
@@ -175,7 +177,7 @@ await t("empty store: every role reads an empty Installed list and the catalog",
     ok(r.body.catalog.every((c) => c.available && c.installId === null), `${caller} available`);
   }
   const fx = (await call("owner", "apps", "GET")).body.catalog.find((c) => c.id === "fixture-secrets");
-  eq(fx.scopes[0].words, APP_SCOPES["orders.read"], "scopes carry their words:");
+  eq(fx.scopes[0].words, APP_PERMISSIONS["orders.read"], "scopes carry their words:");
 });
 
 await t("staff, support and operator support: 403 on install, and nothing is installed", async () => {

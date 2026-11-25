@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { AppRefusal } from "@/components/admin/apps/AppRefusal";
 import { SEES_NOTHING, postApp } from "@/components/admin/apps/app-words";
 
-// Install an app: what it does, every permission it asks for in APP_SCOPES
+// Install an app: what it does, every permission it asks for in APP_PERMISSIONS
 // words (or that it can see nothing), then "Approve and install", which sends
 // the permissions shown here as the ones approved. Installing changes nothing
 // on the storefront by itself. On success the app's own page opens.

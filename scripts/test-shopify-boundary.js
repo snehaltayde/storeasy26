@@ -504,12 +504,7 @@ const READ_SCOPE_MENTIONS = ["lib/platform/shopify-webhooks.js: read_orders", "s
 
 await t("SHOP-01: there is one scope list in the codebase", async () => {
   const declarations = files.flatMap((f) => [...f.text.matchAll(/\b\w*SCOPES\s*=(?!=)/g)].map((m) => `${f.path}: ${m[0].trim()}`));
-  // Phase 4 line 1: APP_SCOPES is the plugin permission table (docs/plans/phase-4.md,
-  // `<area>.<verb>` names such as orders.read), not a Shopify scope list; its
-  // keys are checked below never to be a Shopify scope.
-  eq(declarations, ["lib/platform/authz.js: APP_SCOPES =", "lib/platform/oauth.js: OAUTH_SCOPES ="], "scope list declarations:");
-  const { APP_SCOPES } = await import("../lib/platform/authz.js");
-  eq(Object.keys(APP_SCOPES).filter((k) => !/^[a-z]+\.read$/.test(k) || /_/.test(k)), [], "APP_SCOPES keys that look like Shopify scopes:");
+  eq(declarations, ["lib/platform/oauth.js: OAUTH_SCOPES ="], "scope list declarations:");
   const named = prodFiles.filter((f) => f.path !== "lib/platform/oauth.js").flatMap((f) => [...f.text.matchAll(READ_SCOPE_TOKEN)].map((m) => `${f.path}: ${m[0]}`));
   eq(named.filter((n) => !READ_SCOPE_MENTIONS.includes(n)), [], "Read scopes belong in OAUTH_SCOPES. If this is not a Shopify scope, add it to READ_SCOPE_MENTIONS here. Found:");
   const params = files.flatMap((f) => [...f.text.matchAll(/[?&]scope=([^\s"'`&]*)/g)].map((m) => [f.path, m[1]]));

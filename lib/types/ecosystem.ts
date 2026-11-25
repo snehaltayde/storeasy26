@@ -18,7 +18,7 @@ import type { EffectiveProduct, Cart, ShippingQuote } from "./commerce";
 // Plugins never run their own JavaScript in Storeasy: storefront blocks are
 // declarative only (line 2), events reach them as signed webhooks (line 3).
 
-/** A key of APP_SCOPES (lib/platform/authz.js): read-only, `<area>.<verb>`. */
+/** A key of APP_PERMISSIONS (lib/platform/authz.js): read-only, `<area>.<verb>`. */
 export type PluginScope = "storefront.read" | "offers.read" | "orders.read";
 
 export type PluginKind = "first_party" | "custom";

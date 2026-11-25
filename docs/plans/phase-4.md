@@ -37,7 +37,7 @@ Line 1 rewrites these types to match the decisions below. Phase 5 themes already
 
 | Shared file | Who appends what (keep both sides on conflict) |
 |---|---|
-| `lib/platform/authz.js` | line 1 only: `apps.read`, `apps.manage`, `APP_SCOPES`, `scopeAllows` |
+| `lib/platform/authz.js` | line 1 only: `apps.read`, `apps.manage`, `APP_PERMISSIONS`, `scopeAllows` |
 | `lib/types/ecosystem.ts` | 1 rewrites the plugin types; 2 `SlotId` and `BlockPrimitive`; 3 `WebhookTopic`; 4 `AppTokenScope` |
 | `lib/plugins/manifest.js` (line 1) | 2 validates `blocks`; 3 validates `events` and `egress`. Each adds one function at its own anchor comment (`// line 2: blocks`, `// line 3: events`) |
 | `lib/plugins/first-party/trust-badges/manifest.js` (line 1) | line 2 adds `blocks` |
@@ -74,7 +74,7 @@ The runner (`lib/platform/migrate.js`) keeps a ledger by id and runs any un-appl
    - A test-only seam, `registerPlugin(manifest)` → undo function (like `registerSectionComponent`), lets suites add fixture plugins.
 2. **Manifest validation** (`lib/plugins/manifest.js`, pure, Edge-safe):
    - id slug `^[a-z0-9][a-z0-9-]{1,48}$`, name, semver version, summary, description, a lucide icon name;
-   - `scopes` (keys of `APP_SCOPES`) and `settings` (registry setting kinds plus `secret`);
+   - `scopes` (keys of `APP_PERMISSIONS`) and `settings` (registry setting kinds plus `secret`);
    - a contract check `checkCatalog()` that returns `[]` when every manifest keeps its promises (as `checkRegistry()` does).
 3. **`/admin/apps`**, gated on `apps.read`:
    - an "Installed" tab: name, status badge (On / Off), installed by and when;
@@ -82,7 +82,7 @@ The runner (`lib/platform/migrate.js`) keeps a ledger by id and runs any un-appl
    - empty states in plain words;
    - plugins an operator has switched off are shown as unavailable.
 4. **Install dialog:**
-   - says what the plugin does and lists every permission in `APP_SCOPES` words, or "It can't see your orders or customers" when there are none;
+   - says what the plugin does and lists every permission in `APP_PERMISSIONS` words, or "It can't see your orders or customers" when there are none;
    - "Approve and install" records `granted_scopes`.
    - Installing never changes the storefront by itself (line 2 adds blocks switched off).
 5. **`/admin/apps/[id]`** (the install id):
@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS plugin_installs (
   name           TEXT,                          -- custom apps only
   version        TEXT NOT NULL,
   status         TEXT NOT NULL,                 -- enabled | disabled | uninstalled
-  granted_scopes TEXT NOT NULL DEFAULT '[]',    -- APP_SCOPES keys the admin approved
+  granted_scopes TEXT NOT NULL DEFAULT '[]',    -- APP_PERMISSIONS keys the admin approved
   settings       TEXT NOT NULL DEFAULT '{}',
   secrets_enc    TEXT,                          -- encryptJson; never sent to a browser
   installed_by   TEXT NOT NULL,
@@ -162,8 +162,8 @@ const ADMIN   = [...existing, "apps.manage"];
 
 ### File plan
 1. `migrations/tenant/0030_plugin_installs.sql`
-2. `lib/platform/authz.js` (actions, `APP_SCOPES`, `scopeAllows`; see the line 4 design, which defines the table now so the install dialog can word scopes)
-3. `lib/types/ecosystem.ts` (rewrite the plugin section: scopes = `APP_SCOPES` keys; slot kind `declarative` only; no `iframe_widget` or `script_tag`)
+2. `lib/platform/authz.js` (actions, `APP_PERMISSIONS`, `scopeAllows`; see the line 4 design, which defines the table now so the install dialog can word scopes)
+3. `lib/types/ecosystem.ts` (rewrite the plugin section: scopes = `APP_PERMISSIONS` keys; slot kind `declarative` only; no `iframe_widget` or `script_tag`)
 4. `lib/plugins/manifest.js`, `lib/plugins/catalog.js`, `lib/plugins/first-party/trust-badges/manifest.js`, `lib/plugins/settings.js` (validate and split secrets), `lib/plugins/installs.js` (list, get, install, enable, disable, uninstall, settings, kill-switch check, audit, `invalidateTenantCache("plugins")`)
 5. `app/api/admin/apps/route.js` (GET `apps.read`; POST `{install}` `apps.manage`), `app/api/admin/apps/[id]/route.js` (GET `apps.read`; POST `{enable}|{disable}|{uninstall}|{settings}` `apps.manage`)
 6. `lib/admin/nav.js` (the Apps item)
@@ -477,7 +477,7 @@ CREATE INDEX IF NOT EXISTS idx_plugin_deliveries_status ON plugin_deliveries(sta
 ### Scoped-token design
 - **Scopes** are defined once in `lib/platform/authz.js` (added in line 1), using the project's `<area>.<verb>` names. They are read-only in v1:
   ```js
-  export const APP_SCOPES = Object.freeze({
+  export const APP_PERMISSIONS = Object.freeze({
     "storefront.read": "See your live store content, products and collections",
     "offers.read":     "See your offers and bundles",
     "orders.read":     "See your orders, without customer details",
@@ -610,7 +610,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_tenant_actor_at ON audit_log(tenant_id, act
 5. **The outbox is store-database rows delivered by the existing job queue.** Job payloads hold ids only. Deliveries keep their own 8-attempt schedule (about 45 h) through requeue. An endpoint failure never dead-letters or alerts operators; Storeasy infrastructure errors still do.
 6. **Tokens are stored as a SHA-256 hash** of a 256-bit secret in the store's database. They are shown once, expire after 90 days by default (30 or 365 to choose), and an app has at most 5 active.
 7. **Permissions:** `apps.read` for every role; `apps.manage` for admin and owner, covering install, on/off, uninstall, settings, placements, webhooks, custom apps and tokens. An app's call list needs `audit.read`. Support access stays read-only.
-8. **App scopes are a separate `APP_SCOPES` table in `authz.js`** with `<area>.<verb>` names. v1 is read-only: `storefront.read`, `offers.read`, `orders.read`, and `customers.read`, which is separate, needs `orders.read`, and is off by default. A call's scopes are the token's scopes intersected with the app's current approval.
+8. **App scopes are a separate `APP_PERMISSIONS` table in `authz.js`** with `<area>.<verb>` names. v1 is read-only: `storefront.read`, `offers.read`, `orders.read`, and `customers.read`, which is separate, needs `orders.read`, and is off by default. A call's scopes are the token's scopes intersected with the app's current approval.
 9. **Tokens work only on `/api/apps/v1/*`** (Bearer, GET, no CORS). Admin routes never accept them, and v1 never accepts cookies.
 10. **Every token call is audited, and fails closed:** no audit row means a 503 and no data. Denied and rate-limited calls are audited too.
 11. **Order topics need `orders.read`.** The customer block is included only with `customers.read`, checked at send time.
