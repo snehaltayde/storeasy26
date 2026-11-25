@@ -122,8 +122,25 @@ function implicitSubmits() {
 // Returns what it found; the caller checks.
 async function supportNewUiControls(page, href) {
   const writes = [];
+  const target = new URL(ORIGIN + href).pathname;
+  // Only a request sent by the page under test counts: its Referer (the
+  // document that sent it; same-origin keeps the full URL under
+  // strict-origin-when-cross-origin) or, without one, the frame's URL. A read
+  // link that leads to another page leaves that page's own requests to its
+  // own pass; a control that writes and then navigates still counts (its
+  // Referer is this page). Next's dev error overlay (POST /__nextjs_*) is
+  // skipped only against a dev server (one whose page opened the HMR socket).
+  let devServer = false;
+  const onSocket = (ws) => {
+    if (/\/_next\/webpack-hmr/.test(ws.url())) devServer = true;
+  };
   const onRequest = (req) => {
-    if (req.method() !== "GET" && req.method() !== "HEAD") writes.push(`${req.method()} ${new URL(req.url()).pathname}`);
+    if (req.method() === "GET" || req.method() === "HEAD") return;
+    const path = new URL(req.url()).pathname;
+    if (devServer && path.startsWith("/__nextjs")) return;
+    const from = req.headers().referer || req.frame()?.url() || page.url();
+    if (new URL(from, ORIGIN).pathname !== target) return;
+    writes.push(`${req.method()} ${path}`);
   };
   const fresh = async () => {
     await page.goto(ORIGIN + href, { waitUntil: "load" });
@@ -131,6 +148,7 @@ async function supportNewUiControls(page, href) {
   };
   const found = { unsafe: [], implicit: [], revealed: [], moved: [], writes, reads: 0, gated: 0, fields: 0 };
   page.on("request", onRequest);
+  page.on("websocket", onSocket);
   try {
     await fresh();
     found.unsafe = await page.evaluate(unsafeReads);
@@ -177,6 +195,7 @@ async function supportNewUiControls(page, href) {
     }
   } finally {
     page.off("request", onRequest);
+    page.off("websocket", onSocket);
   }
   return found;
 }
@@ -200,6 +219,11 @@ const SELFTEST_PAGES = {
   // a write form whose default submit is gated: Enter can't submit it (its
   // editable field is still a stray control for support, checked elsewhere)
   "gated-form": `<main><form onsubmit="fetch('${SELFTEST}/w',{method:'POST'})"><input name="n"><button aria-disabled="true" data-role-gate="disabled" onclick="event.preventDefault()">Save</button></form></main>`,
+  // a read link to another page that POSTs on load: that page's request is its own pass's
+  "nav-read": `<main><a href="${SELFTEST}/posts-on-load" data-read-control>Open</a></main>`,
+  "posts-on-load": `<main><p>Landed</p><script>fetch('${SELFTEST}/w',{method:'POST'})</script></main>`,
+  // a "read" that POSTs and then navigates away: still this page's write
+  "post-then-leave": `<main><button type="button" data-read-control onclick="fetch('${SELFTEST}/w',{method:'POST',keepalive:true});location.href='${SELFTEST}/posts-on-load'">Open</button></main>`,
 };
 async function supportSelfTest(drill, ctx) {
   const page = await ctx.newPage();
@@ -220,6 +244,10 @@ async function supportSelfTest(drill, ctx) {
   drill.check(!clean.unsafe.length && !clean.implicit.length && !clean.revealed.length && !clean.writes.length && !clean.moved.length, "self-test: a GET search and a gated save pass", clean);
   const gatedForm = await run("gated-form");
   drill.check(!gatedForm.implicit.length && !gatedForm.writes.length, "self-test: a form whose default submit is gated does not submit on Enter", gatedForm);
+  const navRead = await run("nav-read");
+  drill.check(navRead.reads === 1 && navRead.writes.length === 0, "self-test: a read link to a page that POSTs on load passes (that page's request is not this page's)", navRead);
+  const leave = await run("post-then-leave");
+  drill.check(leave.writes.some((x) => x.startsWith("POST")), "self-test: a control that POSTs before navigating away is caught", leave);
   drill.check(gatedForm.revealed.length === 0 && (await (async () => { await page.goto(`${ORIGIN}${SELFTEST}/gated-form`); return (await page.evaluate(strayControls, [CONTROLS, true])).length; })()) === 1, "self-test: its editable field is still a stray control for support", gatedForm);
   await page.close();
 }
