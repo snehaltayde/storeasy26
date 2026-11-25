@@ -590,15 +590,15 @@ await t("page sweep (S1, S2): no prop on any console page holds a canary for sup
 
 await t("S2 pages: every settings tab, Integrations and Billing show support and staff only the no-access page (Phase 2 line 7), Automations its PermissionNote, and none of their data", async () => {
   const NEW_UI = ADMIN_PAGES.map((r) => r.page).filter((p) => p === "settings" || p.startsWith("settings/") || p === "integrations" || p === "billing");
-  eq(NEW_UI.length >= 11, true, `the settings, integrations and billing pages (${NEW_UI.join(",")}):`);
+  ok(NEW_UI.length >= 11, `the settings, integrations and billing pages (${NEW_UI.join(",")}):`);
   for (const role of LEAST) {
     for (const page of NEW_UI) {
       const run = role === "support" ? pageRuns[page] : await pages.run(pageRel(page), { cookies: cookies[role] });
       ok(!run.error, `${role} ${page}: ${run.error?.message}`);
       const names = [...new Set(run.props.map((p) => p.component))];
       // the no-access page and nothing else: no form, list or panel that could carry data
-      eq(names, ["@/components/admin/settings/NoAccess#NoAccess"], `${role} ${page} components:`);
-      eq(run.props[0].props, { role }, `${role} ${page} hands NoAccess only the role:`);
+      eq(JSON.stringify(names), JSON.stringify(["@/components/admin/settings/NoAccess#NoAccess"]), `${role} ${page} components:`);
+      eq(JSON.stringify(run.props[0].props), JSON.stringify({ role }), `${role} ${page} hands NoAccess only the role:`);
       const found = leaks(run.text, { skip: skipFor(role) });
       eq(found.join(","), "", `${role} ${page} canaries:`);
     }
