@@ -125,8 +125,16 @@ const B_PRODUCTS = [prod(1, { type: "Otherstore Type", vendor: "Otherstore Brand
 const CONFIG = { site: { name: "SF Store" }, site_url: "https://sf.test", shopify_store_domain: "sf-store.myshopify.com" };
 const A = await F.makeTenant({ name: "sf-a", id: "sfa", mode: "documents", products: A_PRODUCTS, config: { ...CONFIG, typesense_collection: "sfa_products" } });
 const B = await F.makeTenant({ name: "sf-b", id: "sfb", mode: "documents", products: B_PRODUCTS, config: CONFIG });
+// non-ASCII option names (SQLite lower()/trim() are ASCII-only) and a value
+// with a trailing tab; a real Unicode value
+const U_PRODUCTS = [
+  prod(1, { type: "Étoffe", vendor: "Maison", price: 100, variants: [[true, [["ÉPAISSEUR", "Très fin\t"], ["Taille", "日本"]]], [true, [["ÉPAISSEUR", "Épais"], ["Taille", "M"]]]] }),
+  prod(2, { type: "Étoffe", vendor: "Maison", price: 200, variants: [[true, [[" Épaisseur ", "Très fin"], ["Taille", "M"]]]] }),
+  prod(3, { type: "Étoffe", vendor: "Maison", price: 300, variants: [[true, [["ÉPAISSEUR", "Épais"], ["Taille", "日本"]]]] }),
+];
+const U = await F.makeTenant({ name: "sf-u", id: "sfu", mode: "documents", products: U_PRODUCTS, config: { ...CONFIG, typesense_collection: "sfu_products" } });
 const owner = await I.createUser({ email: "owner@sf.test", name: "Asha", password: "owner-pass-facets" });
-for (const fx of [A, B]) await I.addMembership(owner.id, fx.id, "owner");
+for (const fx of [A, B, U]) await I.addMembership(owner.id, fx.id, "owner");
 const ACTOR = { kind: "merchant", id: owner.id };
 
 // sf-6: Shopify's type "Mug", the founder PUBLISHED "Drinkware", then saved a
@@ -181,6 +189,7 @@ await t("parse: negative, non-numeric and absurd prices are ignored; instock onl
 });
 
 await t("filter_by: every value is in backticks; injection attempts (`, &&, ||, ), 5,000 chars, 100 repeated keys) never reach it raw", () => {
+  eq(P({ type: "b\\c`\\" }).types, ["bc"], "backslashes stripped:");
   const s = P({ type: ["a`,b", "x && vendor:=[y]", "z || available:=false", "w)", "q".repeat(5000)], vendor: Array.from({ length: 100 }, () => "Same"), o: ["size:M`] || options:=[`x"], min: "10", max: "20", instock: "1" });
   const f = FX.typesenseFilter(s);
   const m = f.match(/^product_type:=\[(.*?)\] && vendor:=\[`Same`\] && options_available:=\[(.*?)\] && price:>=10 && price:<=20 && available:=true$/);
@@ -283,6 +292,7 @@ realLog("— 3. Typesense");
 
 // A stand-in Typesense: evaluates the filter_by grammar this code writes over
 // the real documents (buildSearchDoc over indexRows) and answers multi_search.
+// (also used by the Unicode test below)
 const docsOf = async (fx) => (await fx.run(() => E.indexRows({ limit: 1000 }))).rows.map(SD.buildSearchDoc);
 function evalFilter(doc, filter) {
   if (!filter) return true;
@@ -395,6 +405,34 @@ await t("a tenant without a Typesense namespace uses SQL and sends nothing", asy
   eq(fetchCalls.length, before, "no fetch:");
 });
 
+await t("Unicode: a non-ASCII option name (ÉPAISSEUR, ' Épaisseur ') is one group on both engines and matches; a trailing tab is trimmed; a Unicode value (日本) filters", async () => {
+  const all = await shaped(U, {});
+  const keys = all.groups.map((g) => g.key);
+  eq(keys.filter((k) => k.startsWith("o:")).sort(), ["o:taille", "o:Épaisseur"], "one group per name:");
+  const ep = all.groups.find((g) => g.key === "o:Épaisseur");
+  eq(ep.values.map((v) => [v.value, v.count]).sort(), [["Très fin", 2], ["Épais", 2]].sort(), "the tab is trimmed, counts per product:");
+  // the URL the rail links to, parsed back, matches
+  const href = FX.facetHref(FX.toggled(FX.parseFacetParams({}), "o:Épaisseur", "Très fin"));
+  const back = Object.fromEntries([...new URL(href, "https://x.test").searchParams].map(([k, v]) => [k, v]));
+  eq(handles(await db(U, back)), ["sf-1", "sf-2"], `${href}:`);
+  eq(handles(await db(U, { o: "taille:日本" })), ["sf-1", "sf-3"], "日本:");
+  eq(handles(await db(U, { o: ["ÉPAISSEUR:Très fin", "taille:日本"] })), ["sf-1"], "the name as typed in capitals normalises the same:");
+  const d = (await docsOf(U)).find((x) => x.handle === "sf-1");
+  eq(d.options.sort(), ["taille:M", "taille:日本", "Épaisseur:Très fin", "Épaisseur:Épais"].sort(), "Typesense keys agree:");
+  for (const sp of [{}, { o: "Épaisseur:Très fin" }, { o: ["Épaisseur:Épais", "taille:日本"] }]) sameAnswer(await viaTypesense(U, sp, fakeTypesense(await docsOf(U))), await viaSql(U, sp), `U ${JSON.stringify(sp)}`);
+});
+
+await t("six selected groups: groups with nothing selected are left out (a value there would be dropped), full is set; at five they show", async () => {
+  const full = await shaped(A, { type: "Tee", vendor: "Acme", o: ["size:M", "colour:Red", "fit:x", "cut:y"] });
+  ok(full.full, "full");
+  ok(full.groups.every((g) => g.selectedCount > 0), `only selected groups: ${full.groups.map((g) => g.key)}`);
+  const five = await shaped(A, { type: "Tee", o: ["size:M", "fit:x", "cut:y", "hem:z"] });
+  eq(five.full, false, "at five:");
+  const counts = { type: [{ value: "A", count: 1 }, { value: "B", count: 1 }] };
+  ok(FX.shapeFacets(P({ o: ["a:1", "b:1", "c:1", "d:1", "e:1"] }), counts).groups.some((g) => g.key === "type"), "at five an unselected group shows");
+  ok(!FX.shapeFacets(P({ vendor: "V", o: ["a:1", "b:1", "c:1", "d:1", "e:1"] }), counts).groups.some((g) => g.key === "type"), "at six it is left out");
+});
+
 // =============================================================================
 realLog("— 4. the page");
 // =============================================================================
@@ -416,6 +454,44 @@ await t("the page (anonymous, no cookies): its props carry the results and group
   ok(r.text.includes("3 products"), "the count");
   const empty = await PH.run(PAGE, { cookies: {}, searchParams: Promise.resolve({ q: "thing", type: "Nothing-like-this" }) });
   ok(empty.text.includes("No products match these filters.") && empty.text.includes("Clear all filters"), `empty: ${empty.text.slice(0, 300)}`);
+});
+
+await t("paging past the end redirects to the last page; an empty result does not redirect", async () => {
+  const r = await PH.run(PAGE, { cookies: {}, searchParams: Promise.resolve({ q: "thing", page: "50" }) });
+  eq(r.redirect, "/search?q=thing", "6 results, page 50 -> page 1:");
+  const n = await PH.run(PAGE, { cookies: {}, searchParams: Promise.resolve({ q: "thing", type: "Nope", page: "3" }) });
+  ok(!n.redirect && n.text.includes("No products match these filters."), "no results: the empty state");
+});
+
+await t("a signed-in shopper and support see exactly what anonymous sees (props and text)", async () => {
+  const S = await import("../lib/platform/sessions.js");
+  const K = await import("../lib/customers.js");
+  const { runDueJobs } = await import("../lib/platform/worker.js");
+  const { db: tdb } = await import("../lib/db.js");
+  const sup = await I.createUser({ email: "support@sf.test", name: "Sam", password: "support-pass-facets" });
+  await I.addMembership(sup.id, A.id, "support");
+  const supportCookie = (await S.createSession({ userId: sup.id, kind: "merchant", ttlMs: 600_000 })).token;
+  const shopperToken = await A.run(async () => {
+    await K.requestOtp("shopper@sf.test");
+    await runDueJobs({ limit: 10 }).catch(() => {});
+    const row = await tdb.selectFrom("notifications").select(["subject"]).where("type", "=", "customer_otp").orderBy("created_at", "desc").executeTakeFirst();
+    return (await K.verifyOtp("shopper@sf.test", /(\d{6})/.exec(row.subject)[1])).token;
+  });
+  ok(await A.run(() => K.customerFromToken(shopperToken)), "the shopper session is real");
+  const sp = { q: "thing", type: ["Tee", "Hoodie"], o: "size:M", sort: "price-asc" };
+  const as = async (cookies) => {
+    const r = await PH.run(PAGE, { cookies, searchParams: Promise.resolve(sp) });
+    ok(!r.error, String(r.error?.stack || r.error).slice(0, 300));
+    return JSON.stringify(r.props) + "\n" + r.text;
+  };
+  const anon = await as({});
+  eq(await as({ _customer: shopperToken }), anon, "shopper:");
+  eq(await as({ _admin: supportCookie }), anon, "support:");
+});
+
+await t("element ids in the rail come from the group's position, never an option name", async () => {
+  const src = await readFile(join(ROOT, "components/search/FacetRail.js"), "utf8");
+  ok(!/id=\{`[^`]*\$\{g\.key\}/.test(src) && /facet-\$\{i\}/.test(src), "ids by index");
 });
 
 await t("metadata: a filtered search is noindex; a plain query page is not", async () => {

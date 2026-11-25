@@ -37,7 +37,7 @@ function ValueLink({ state, group, v }) {
   );
 }
 
-export default function FacetRail({ state, groups, price, idPrefix = "r" }) {
+export default function FacetRail({ state, groups, price, full = false, idPrefix = "r" }) {
   const instockHref = facetHref({ ...state, instock: !state.instock });
   return (
     <div className="space-y-6" data-facet-rail>
@@ -60,12 +60,17 @@ export default function FacetRail({ state, groups, price, idPrefix = "r" }) {
           {state.instock ? <span className="sr-only"> (selected)</span> : null}
         </Link>
       </div>
-      {groups.map((g) => {
+      {full ? (
+        <p className="text-sm text-sf-text-subtle" data-facet-full>
+          Remove a filter to filter by something else.
+        </p>
+      ) : null}
+      {groups.map((g, i) => {
         const shown = g.values.slice(0, SHOWN_VALUES);
         const more = g.values.slice(SHOWN_VALUES);
         return (
-          <section key={g.key} data-facet-group={g.key} aria-labelledby={`${idPrefix}-facet-${g.key}`}>
-            <h2 id={`${idPrefix}-facet-${g.key}`} className="text-xs font-semibold uppercase tracking-wide text-sf-text-muted">
+          <section key={g.key} data-facet-group={g.key} aria-labelledby={`${idPrefix}-facet-${i}`}>
+            <h2 id={`${idPrefix}-facet-${i}`} className="text-xs font-semibold uppercase tracking-wide text-sf-text-muted">
               {g.title}
             </h2>
             <ul className="mt-2">

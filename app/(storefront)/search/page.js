@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import ProductGrid from "@/components/ProductGrid";
 import TrackEvent from "@/components/analytics/TrackEvent";
 import SearchResults from "@/components/analytics/SearchResults";
@@ -49,8 +50,10 @@ export default async function SearchPage({ searchParams }) {
     available: h.available,
   }));
   const pages = Math.max(1, Math.ceil(found / PER_PAGE));
+  // paged past the end (an old link, a hand-typed page): the last page
+  if (result && found > 0 && !result.hits.length && s.page > pages) redirect(facetHref(s, { page: pages }));
   const labels = Object.fromEntries((result?.groups ?? []).filter((g) => g.key.startsWith("o:")).map((g) => [g.key.slice(2), g.title]));
-  const rail = (idPrefix) => (result ? <FacetRail state={s} groups={result.groups} price={result.price} idPrefix={idPrefix} /> : null);
+  const rail = (idPrefix) => (result ? <FacetRail state={s} groups={result.groups} price={result.price} full={result.full} idPrefix={idPrefix} /> : null);
   const keepForSort = [...facetParams({ ...s, sort: "relevance", page: 1 })];
 
   return (
