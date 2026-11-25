@@ -3,6 +3,14 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Settings, integrations and billing on the new UI (on the owner's behalf)
+
+- **Permissions:** no new actions. Staff and support get only a no-access page on every settings tab, integrations and billing, with no settings data (`test-support-reads` S2, Team included). The support-access banner is shown only to signed-in members. Secrets are write-only: only `has_*` flags reach pages, answers or audit; an empty secret field keeps the stored one. The integrations Test is the only non-GET read, matched on its body (`action: "test"`), so Revoke never passes.
+- **Integrity:** `patchTenant` writes each config key (and each `site` key) on its own with `json_set`, and secrets only if unchanged since read (retried otherwise), so two tabs saving at once both stick; Details sends only changed fields. The audit route returns only redacted `changes` (no raw `diff`), with filters and a tie-safe cursor; who-did-it labels come from one batched read. Founder-facing words never name env vars.
+- **UI:** settings are sub-pages from `lib/admin/settings-sections.js`, each saving only its own section; old `#hash` links redirect. `components/ui/alert.js` was hand-written to the README's rules.
+- **Decided by:** Claude
+- **Slice:** Phase 2 line 7
+
 ## 2026-11-25 Quizzes on the new UI (on the owner's behalf)
 
 - **Permissions:** every quiz write needs `storefront.write`; turning a quiz on, or saving or deleting one that is on, also needs `storefront.publish` (checked before validation, and enforced in the write itself: without publish a save or delete only changes a quiz that is still off). New quizzes start off, and `upsertQuiz` defaults to off. An off quiz, or another store's slug, is 404 to shoppers.
