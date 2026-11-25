@@ -13,100 +13,66 @@ import type { EffectiveProduct, Cart, ShippingQuote } from "./commerce";
 // A. PLUGIN SYSTEM CONTRACTS
 // ============================================================================
 
-export type PluginTier = "declarative" | "remote";
+// Phase 4 line 1: the manifest a first-party plugin declares in code
+// (lib/plugins/first-party/<id>/manifest.js), checked by lib/plugins/manifest.js.
+// Plugins never run their own JavaScript in Storeasy: storefront blocks are
+// declarative only (line 2), events reach them as signed webhooks (line 3).
 
-export type PluginScope =
-  | "storefront:read"
-  | "catalog:read"
-  | "orders:read"
-  | "customers:read"
-  | "analytics:write"
-  | "checkout:ui"
-  | "admin:ui"
-  | "webhooks:receive";
+/** A key of APP_SCOPES (lib/platform/authz.js): read-only, `<area>.<verb>`. */
+export type PluginScope = "storefront.read" | "offers.read" | "orders.read";
 
-export type ExtensionSlotId =
-  | "storefront.head"
-  | "storefront.pdp.under_price"
-  | "storefront.pdp.under_atc"
-  | "storefront.pdp.tabs"
-  | "storefront.pdp.below_fold"
-  | "storefront.cart.above_total"
-  | "storefront.cart.below_cta"
-  | "storefront.checkout.order_summary"
-  | "storefront.footer.above"
-  | "admin.nav"
-  | "admin.order.detail_panel"
-  | "admin.product.detail_panel";
+export type PluginKind = "first_party" | "custom";
 
-export type WebhookTopic =
-  | "order.created"
-  | "order.paid"
-  | "order.cancelled"
-  | "order.refunded"
-  | "customer.created"
-  | "cart.abandoned"
-  | "catalog.synced"
-  | "release.published"
-  | "app.uninstalled";
+/** Registry setting kinds a plugin may use, plus `list` and the write-only `secret`. */
+export type PluginFieldKind = "text" | "number" | "boolean" | "choice";
 
-export interface PluginSettingField {
-  key: string;
-  type: "text" | "textarea" | "number" | "boolean" | "select" | "color" | "url" | "secret";
-  label: string;
-  description?: string;
+export interface PluginField {
+  key: string; // /^[a-z][a-z0-9_]*$/
+  kind: PluginFieldKind;
+  label?: string;
+  help?: string;
   required?: boolean;
   default?: unknown;
-  options?: Array<{ label: string; value: string }>;
+  max?: number;
+  min?: number;
+  options?: string[]; // choice only
 }
 
-export interface PluginSectionDeclaration {
-  kind: string; // namespaced, e.g. "plugin:<pluginId>:<kind>"
-  label: string;
-  surfaces: Array<"home" | "page" | "campaign" | "product" | "collection">;
-  settings: PluginSettingField[];
-  /** Declarative template or sandboxed widget endpoint */
-  template?: string;
-  widgetUrl?: string;
-}
+export type PluginSetting =
+  | PluginField
+  | (Omit<PluginField, "kind" | "options"> & { kind: "list"; fields: PluginField[]; max: number })
+  | (Omit<PluginField, "kind" | "options" | "default"> & { kind: "secret" });
 
 export interface PluginManifest {
   id: string; // slug: /^[a-z0-9][a-z0-9-]{1,48}$/
   name: string;
   version: string; // semver
-  tier: PluginTier;
-  author: {
-    name: string;
-    url?: string;
-    supportEmail?: string;
-  };
+  summary: string; // one line for the catalog card
   description: string;
-  iconUrl?: string;
+  icon: string; // a lucide-react icon name
+  author: { name: string };
   scopes: PluginScope[];
-  settingsSchema: PluginSettingField[];
-  slots?: Array<{
-    slot: ExtensionSlotId;
-    kind: "declarative_template" | "iframe_widget" | "script_tag";
-    template?: string;
-    iframeUrl?: string;
-    scriptUrl?: string; // strict HTTPS allowlist + SRI integrity hash
-    sri?: string;
-  }>;
-  sections?: PluginSectionDeclaration[];
-  webhooks?: Array<{
-    topic: WebhookTopic;
-    endpointPath: string; // resolved against appBaseUrl
-  }>;
-  appBaseUrl?: string; // required for tier === "remote" (HTTPS only)
-  adminPanelPath?: string; // iframe path inside /admin/apps/[id]
+  settings: PluginSetting[];
+  // line 2: blocks (declarative only: no iframe or script slot kinds)
+  // line 3: events and egress
 }
 
-export interface InstalledPlugin {
+export type PluginInstallStatus = "enabled" | "disabled" | "uninstalled";
+
+/** An install as the console reads it: secrets only as "set" or "not set". */
+export interface PluginInstall {
+  id: string; // "pin_" + 16 hex
   pluginId: string;
+  kind: PluginKind;
+  name: string;
   version: string;
-  enabled: boolean;
+  status: PluginInstallStatus;
+  killed: boolean; // turned off by Storeasy (the ff_plugin-<id> flag)
   grantedScopes: PluginScope[];
   settings: Record<string, unknown>;
+  secretsSet: Record<string, boolean>;
+  installedBy: string;
+  installedByName: string | null;
   installedAt: string;
   updatedAt: string;
 }

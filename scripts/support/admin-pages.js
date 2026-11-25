@@ -14,6 +14,9 @@
 export const ADMIN_PAGES = Object.freeze([
   { page: "", action: "storefront.read", note: "redirects to onboarding while the store is closed, else to the dashboard (Phase 1 line 3)" },
   { page: "analytics", action: "orders.read" },
+  // Phase 4 line 1
+  { page: "apps", action: "apps.read" },
+  { page: "apps/[id]", action: "apps.read", params: { id: "$app" }, note: "the fixture's Trust badges install; an unknown or uninstalled id is a not-found (Phase 4 line 1)" },
   { page: "automations", action: "settings.read" },
   { page: "billing", action: "settings.read" },
   { page: "bundles", action: "offers.read" },

@@ -59,6 +59,7 @@
     "drill:team": "node scripts/drills/run-isolated.mjs team",
     "test:support-reads": "node scripts/test-support-reads.js",
     "test:support-access": "node scripts/test-support-access.js",
+    "test:apps": "node scripts/test-apps.js",
     "test:settings-ui": "node scripts/test-settings-ui.js",
     "test:shopper-reads": "node scripts/test-shopper-reads.js",
     "test:platform-core": "node scripts/test-platform-core.js",
