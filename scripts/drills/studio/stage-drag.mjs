@@ -5,7 +5,7 @@
 // (focus stays on the handle), ArrowDown moves, Space drops, and the live
 // region reads the plan's exact words.
 import { stage, state } from "./lib.mjs";
-import { HOME_IDS, frameOrder, openStudio, railOrder, upToDate } from "./stage-open.mjs";
+import { HOME_IDS, frameOrder, frameOrderOnce, openStudio, railOrder, upToDate } from "./stage-open.mjs";
 
 const live = (page) => page.locator("[data-studio-live]").evaluate((el) => el.textContent.replace(/ /g, "").trim());
 
@@ -68,7 +68,9 @@ stage("drag", async (drill) => {
   await page.keyboard.press("ArrowDown");
   drill.check((await live(page)) === "Rich text, position 2 of 4.", "keyboard: the move is announced", await live(page));
   drill.check(await page.evaluate(() => document.activeElement?.getAttribute("data-tree-handle")) === "sec_drilltwo2", "keyboard: focus stays on the held handle");
-  drill.check(JSON.stringify(await frameOrder(page)) === JSON.stringify(["sec_drillthree3", "sec_drilltwo2", "sec_drillone1", "sec_drillfour4"]), "keyboard: the frame follows the hold", await frameOrder(page));
+  const held = ["sec_drillthree3", "sec_drilltwo2", "sec_drillone1", "sec_drillfour4"];
+  const seenHeld = await frameOrderOnce(page, held);
+  drill.check(JSON.stringify(seenHeld) === JSON.stringify(held), "keyboard: the frame follows the hold", seenHeld);
   await page.keyboard.press("Space");
   drill.check((await live(page)) === "Rich text dropped at position 2 of 4.", "keyboard: the drop is announced", await live(page));
   // Escape returns a held section

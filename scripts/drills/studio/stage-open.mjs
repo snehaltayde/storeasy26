@@ -41,6 +41,19 @@ export const frameOrder = (page, doc = "doc_home") =>
       .map((x) => x.id);
   }, doc);
 
+// the frame's order once it matches `want` (the instant message is a
+// postMessage, handled on the frame's next task), or the last order seen
+export async function frameOrderOnce(page, want, { doc = "doc_home", ms = 3000 } = {}) {
+  const end = Date.now() + ms;
+  let got = [];
+  do {
+    got = await frameOrder(page, doc);
+    if (JSON.stringify(got) === JSON.stringify(want)) return got;
+    await page.waitForTimeout(50);
+  } while (Date.now() < end);
+  return got;
+}
+
 export const upToDate = (page) => page.locator('[data-preview-status="Up to date"]').waitFor();
 export const railOrder = (page) => page.locator("[data-studio-sections] [data-section-row]").evaluateAll((els) => els.map((el) => el.getAttribute("data-section-row")));
 

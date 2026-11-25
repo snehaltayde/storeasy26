@@ -63,6 +63,14 @@ export function undoPlan(step, { kept = new Map(), open = null, handles = () => 
   return { store, ops, switchTo: store === open ? null : step.docId };
 }
 
+// the preview never says "Up to date" while the open document holds edits
+// the server hasn't acknowledged (an instant reorder or token draw is drawn
+// before its save): it says "Updating" until the save's reload
+export function previewWhileSaving(view, save) {
+  if (!view || view.label !== "Up to date" || !save?.unacknowledged) return view;
+  return { ...view, label: "Updating", words: null };
+}
+
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const noSub = () => () => {};
 const noState = () => null;
@@ -172,8 +180,14 @@ export default function Studio({ document: entry, note = null, can = {}, role = 
       if (prev && prev === ownDesign.current && id !== DESIGN_DOC) {
         // saved before the studio moves on, so the Design tab's own store
         // (opened when it sees the studio leave) reads the fresh revision
+        // a save that fails (a 409, offline) keeps the studio on the design
+        // with its store open: the save line shows the conflict or the error
+        const f = prev.readOnly ? { ok: true } : await prev.beforeNavigate().catch(() => null);
+        if (!f?.ok) {
+          if (mine === openSeq.current) setLoad({ status: "ready" });
+          return;
+        }
         ownDesign.current = null;
-        if (!prev.readOnly) await prev.beforeNavigate().catch(() => null);
         prev.dispose();
         if (mine !== openSeq.current) return;
       }
@@ -325,7 +339,7 @@ export default function Studio({ document: entry, note = null, can = {}, role = 
   const statusLine = (
     <StatusLine
       save={state}
-      preview={previewView}
+      preview={previewWhileSaving(previewView, state)}
       readOnly={!canWrite}
       role={role}
       on={{ useNewer: () => s?.useNewer(), keepMine: () => s?.keepMine(), acceptBackup: () => s?.acceptBackup(), dismissBackup: () => s?.dismissBackup(), retry: () => s?.retry() }}

@@ -3,7 +3,7 @@
 // draft is under "Other drafts", unticked. After publishing, the anonymous
 // shopper sees the new order and the About page is still a draft.
 import { ORIGIN, stage, state } from "./lib.mjs";
-import { consent, docsApi, openStudio, stubImages, upToDate } from "./stage-open.mjs";
+import { HOME_IDS, consent, docsApi, openStudio, stubImages, upToDate } from "./stage-open.mjs";
 
 stage("publish", async (drill) => {
   const page = await openStudio(drill, "owner");
@@ -43,7 +43,8 @@ stage("publish", async (drill) => {
   anon.on("pageerror", (e) => drill.check(false, "no page error for the shopper", String(e?.message || e).slice(0, 300)));
   const r = await anon.goto(`${ORIGIN}/`, { waitUntil: "load" });
   drill.check(r?.status() === 200, "the shopper's home page answers 200", r?.status());
-  const seen = await anon.locator('[data-doc="doc_home"] [data-section-id]').evaluateAll((els) => els.map((el) => el.getAttribute("data-section-id")));
+  // the live page has no data-doc (that mark is the preview's); each section's root keeps data-section-id
+  const seen = await anon.locator("[data-section-id]").evaluateAll((els, mine) => els.map((el) => el.getAttribute("data-section-id")).filter((id) => mine.includes(id)), HOME_IDS);
   drill.check(JSON.stringify(seen) === JSON.stringify(order), "the shopper sees the new order", seen);
   drill.check((await anon.locator("[data-studio-hidden], .storeasy-ordering").count()) === 0, "the live page has no studio marks");
   await drill.shoot(anon, "publish-live");

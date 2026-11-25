@@ -165,7 +165,7 @@ export default function StudioTopBar({ studio, label = "", statusLine = null, on
       <h1 className="sr-only" data-studio-label="">
         {label}
       </h1>
-      <Select value={openId || undefined} onValueChange={switchTo}>
+      <Select value={openId} onValueChange={switchTo}>
         <SelectTrigger size="sm" className="max-w-56" aria-label={TOP_WORDS.switcher} data-studio-switcher="" data-read-control="">
           <SelectValue placeholder={label}>{label}</SelectValue>
         </SelectTrigger>

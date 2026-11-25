@@ -99,6 +99,8 @@ stage("design", async (drill) => {
   await consent(ctx);
   await open(owner, "/admin");
   await designDraft(drill, owner, { theme: { kit: "pulse", version: 1 }, brand: START });
+  // its own starting state: START is live too, whatever an earlier stage published
+  await publishDesign(drill, owner);
 
   // --- 1. instant: the frame changes before the held save goes out ---
   let held = [];

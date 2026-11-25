@@ -613,5 +613,15 @@ await t("unit: undo on a document that isn't open writes that document's store a
   eq(StudioMod.undoPlan({ ...step, docId: "doc_gone" }, { kept }), null, "not held:");
 });
 
+await t("unit: the preview line never says \"Up to date\" while the open document holds an unacknowledged edit (an instant reorder drawn before its save)", async () => {
+  const StudioMod = await load(join(ROOT, "components/admin/studio/Studio.js"));
+  const up = { label: "Up to date", words: null };
+  eq(StudioMod.previewWhileSaving(up, { unacknowledged: true }).label, "Updating", "pending save:");
+  eq(StudioMod.previewWhileSaving(up, { unacknowledged: false }), up, "acknowledged:");
+  const failed = { label: "Could not update", words: "No connection." };
+  eq(StudioMod.previewWhileSaving(failed, { unacknowledged: true }), failed, "other labels stay:");
+  eq(StudioMod.previewWhileSaving(null, { unacknowledged: true }), null, "no frame yet:");
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
