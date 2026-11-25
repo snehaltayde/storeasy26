@@ -3,6 +3,13 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Media library on the new UI (on the owner's behalf)
+
+- **Permissions and integrity:** no schema change; the library is a GET view mode. Support's write controls are hidden (non-button sections by `roleAllows`, buttons by `RoleGate`); "Where it's used" (`PUT /api/admin/media`, `storefront.read`, writes nothing, tested) is the media `READ_POSTS` row. A delete or alt edit on an id the store doesn't have (another store's included) answers 404 `MEDIA_NOT_FOUND` with no log line or audit row; before, a delete of nothing reported success and wrote a false audit row. There is no force delete in the new UI.
+- **UI:** type and sort are native selects (no Radix portal or focus guards); uploads go one at a time so a duplicate inside one batch is caught as "reused"; Copy URL confirms in a line of text, not a toast (the toast's Dismiss counted as a stray support control).
+- **Decided by:** Claude
+- **Slice:** Phase 2 line 5
+
 ## 2026-11-25 Offers and bundles on the new UI (on the owner's behalf)
 
 - **Permissions:** no new actions; support gets the four pages read-only (`canWrite:false`), and opening `offers/new` or `bundles/new` as support goes back to the list. "Try it" (`POST /api/admin/offers/simulate`, `offers.read`, writes nothing, tested) is the one non-GET read, listed in `READ_POSTS`; its page key `/admin/offers/[id]` doesn't match real URLs yet, so the shell-drill follow-up adds pattern matching. A bundle's own offer has no switch for any role.

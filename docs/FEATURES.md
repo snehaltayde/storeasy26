@@ -48,7 +48,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - [ ] A merchant can list, search and open orders, and admins can push or cancel them, on the new UI; support sees orders read-only
 - [ ] A merchant can browse products and collections and open a product's content in the editor, on the new UI
 - [x] A merchant can create and edit offers and bundles on the new UI; support sees them read-only
-- [ ] A merchant can upload, find, archive and delete media on the new UI
+- [x] A merchant can upload, find, archive and delete media on the new UI
 - [ ] A merchant uses the editor (page list, section tree, inspector, preview, publish panel) in the new shell
 - [ ] An admin can manage settings (store details, checkout and payments, shipping, domains) on the new UI; staff and support cannot reach them
 - [ ] An admin can invite a team member with a role and remove one; only the owner can grant or transfer ownership
