@@ -588,19 +588,30 @@ await t("page sweep (S1, S2): no prop on any console page holds a canary for sup
   eq(bad.join("\n"), "", "");
 });
 
-await t("S2 pages: Settings, Integrations and Automations show support and staff a PermissionNote and none of their data", async () => {
-  const DATA = { settings: "SettingsAdmin", integrations: "IntegrationsAdmin", automations: "AutomationsAdmin" };
+await t("S2 pages: every settings tab, Integrations and Billing show support and staff only the no-access page (Phase 2 line 7), Automations its PermissionNote, and none of their data", async () => {
+  const NEW_UI = ADMIN_PAGES.map((r) => r.page).filter((p) => p === "settings" || p.startsWith("settings/") || p === "integrations" || p === "billing");
+  eq(NEW_UI.length >= 11, true, `the settings, integrations and billing pages (${NEW_UI.join(",")}):`);
   for (const role of LEAST) {
-    for (const [page, comp] of Object.entries(DATA)) {
+    for (const page of NEW_UI) {
       const run = role === "support" ? pageRuns[page] : await pages.run(pageRel(page), { cookies: cookies[role] });
       ok(!run.error, `${role} ${page}: ${run.error?.message}`);
-      const names = run.props.map((p) => p.component);
-      ok(names.some((n) => n.endsWith("#PermissionNote")), `${role} ${page} shows a PermissionNote: ${names.join(",")}`);
-      ok(!names.some((n) => n.includes(comp)), `${role} ${page} renders no ${comp}`);
+      const names = [...new Set(run.props.map((p) => p.component))];
+      // the no-access page and nothing else: no form, list or panel that could carry data
+      eq(names, ["@/components/admin/settings/NoAccess#NoAccess"], `${role} ${page} components:`);
+      eq(run.props[0].props, { role }, `${role} ${page} hands NoAccess only the role:`);
       const found = leaks(run.text, { skip: skipFor(role) });
       eq(found.join(","), "", `${role} ${page} canaries:`);
     }
+    const run = role === "support" ? pageRuns.automations : await pages.run(pageRel("automations"), { cookies: cookies[role] });
+    ok(!run.error, `${role} automations: ${run.error?.message}`);
+    const names = run.props.map((p) => p.component);
+    ok(names.some((n) => n.endsWith("#PermissionNote")), `${role} automations shows a PermissionNote: ${names.join(",")}`);
+    ok(!names.some((n) => n.includes("AutomationsAdmin")), `${role} automations renders no AutomationsAdmin`);
+    eq(leaks(run.text, { skip: skipFor(role) }).join(","), "", `${role} automations canaries:`);
   }
+  // the refusal sentence itself (the no-access page's words, naming the role)
+  const { NO_ACCESS_WORDS } = await import("../lib/admin/settings-sections.js");
+  for (const role of LEAST) ok(/^Your role \(\w+\) can't open settings, integrations or billing; ask an owner or admin/.test(NO_ACCESS_WORDS.body(role)) && NO_ACCESS_WORDS.body(role).includes(`(${role})`), `${role}'s refusal sentence`);
 });
 
 await t("onboarding (Phase 1 line 1): support reads the Welcome page with its own email only; an operator's support session gets no account", async () => {
@@ -633,10 +644,11 @@ await t("onboarding (Phase 1 line 3): support's page gets the four steps with ev
   eq(steps(junk)?.initialStep, s.initial.current, "an unknown ?step is ignored:");
 });
 
-await t("page sweep (positive control): the owner's Settings and Orders pages do carry their canaries", async () => {
-  const s = await pages.run(pageRel("settings"), { cookies: cookies.owner });
-  ok(!s.error, `owner settings: ${s.error?.message}`);
-  ok(s.text.includes(CNY.shopifyScopes) || s.text.includes(CNY.metaTestEventCode), "the owner's settings props carry a config canary");
+await t("page sweep (positive control): the owner's Settings (Tracking) and Orders pages do carry their canaries", async () => {
+  // Phase 2 line 7: the test event code lives on the Tracking tab
+  const s = await pages.run(pageRel("settings/tracking"), { cookies: cookies.owner });
+  ok(!s.error, `owner settings/tracking: ${s.error?.message}`);
+  ok(s.text.includes(CNY.metaTestEventCode), "the owner's Tracking props carry the test event code canary");
   const o = await pages.run(pageRel("orders"), { cookies: cookies.owner });
   ok(o.text.includes(CNY.orderEmail), "the owner's orders props carry the order email");
   ok(!o.text.includes(CNY.cartId), "but never the cart id");

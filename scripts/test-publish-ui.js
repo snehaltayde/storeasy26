@@ -1211,7 +1211,7 @@ const TERMS = { id: "doc_T3R7M5S2X9W4K1Z6", revision: 1, draftHash: "h_terms", l
 // report items in P6-OPEN's words and shapes (lib/documents/opening.js)
 const I = {
   paymentOk: { id: "payment", level: "ok", title: "Shoppers can pay", message: "Shoppers can pay by card, UPI or cash on delivery.", href: null, who: null },
-  paymentCod: { id: "payment", level: "info", title: "Cash on delivery only", message: "Shoppers can only pay cash on delivery for now.", href: "/admin/settings#payments", who: null, linkLabel: "Add your Razorpay keys" },
+  paymentCod: { id: "payment", level: "info", title: "Cash on delivery only", message: "Shoppers can only pay cash on delivery for now.", href: "/admin/settings/checkout", who: null, linkLabel: "Add your Razorpay keys" },
   paymentOff: clone(OC.ok.body.items[0]),
   maintenance: { id: "maintenance", level: "warn", title: "Your store is in maintenance", message: "Your store is in maintenance mode. Ask Storeasy support to turn it off.", href: null, who: "support" },
   privacyOk: { id: "privacy", level: "ok", title: "Privacy page", message: "Your privacy page is ready.", href: null, who: null },
@@ -1225,7 +1225,7 @@ const I = {
   testOrderWarn: clone(OC.ok.body.items[3]),
   testOrderOk: { id: "test_order", level: "ok", title: "Test order placed", message: "You placed a test order.", href: null, who: null },
   catalogOk: { id: "catalog", level: "ok", title: "Products", message: "Your products are in.", href: null, who: null },
-  contactWarn: { id: "contact", level: "warn", title: "No contact details", message: "Shoppers can't see how to reach you. Add a support email or phone.", href: "/admin/settings#store-profile", who: null },
+  contactWarn: { id: "contact", level: "warn", title: "No contact details", message: "Shoppers can't see how to reach you. Add a support email or phone.", href: "/admin/settings", who: null },
   designInfo: clone(OC.ok.body.items[4]),
   designOk: { id: "design", level: "ok", title: "Colours and logo", message: "Your colours and logo are set.", href: null, who: null },
 };
@@ -1412,9 +1412,9 @@ await t("P6-OPEN-UI rendered: each item's message, a link only with an href (its
   eq(
     links.map((l) => [l.text, l.href]),
     [
-      ["Add your Razorpay keys", "/admin/settings#payments"],
+      ["Add your Razorpay keys", "/admin/settings/checkout"],
       ["Open your preview", "/admin/editor"],
-      [M.WORDS.fixThis, "/admin/settings#store-profile"],
+      [M.WORDS.fixThis, "/admin/settings"],
       ["See your colours", "/admin/editor?doc=doc_design"],
     ],
     "a link only where there is an href, with its linkLabel (else 'Fix this'); none for support:",
