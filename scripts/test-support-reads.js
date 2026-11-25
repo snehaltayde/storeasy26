@@ -544,6 +544,8 @@ const SUPPORT_ORDER_KEYS = [
   "financial_status", "fulfillment_status", "refunded_total", "provider_updated_at", "redacted_at",
   // Phase 8 line 2 (0036): the prepaid discount and when the COD phone was confirmed (a time, not PII)
   "payment_discount", "cod_verified_at",
+  // Phase 8 line 4 (0039): the market and its base money (amounts and a rate, not PII; plan: visible, currency labelled)
+  "market", "base_currency", "fx_rate", "base_subtotal", "base_discount_total", "base_shipping_total", "base_total",
   // nulled for support (lib/admin/order-view.js PII_FIELDS, snapshot)
   "email", "phone", "name", "address_line1", "address_line2", "city", "state", "pincode", "country", "customer_id", "snapshot",
 ];

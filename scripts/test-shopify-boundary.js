@@ -659,6 +659,7 @@ const fullOrder = (overrides = {}) => ({
   total: 1900,
   shipping_total: 49,
   payment_discount: 0, // Phase 8 line 2: the prepaid discount column
+  currency: "INR", // Phase 8 line 4: a base-market order (scripts/test-markets.js pushes market orders)
   razorpay_order_id: "order_X",
   razorpay_payment_id: "pay_X",
   snapshot: {
@@ -669,6 +670,7 @@ const fullOrder = (overrides = {}) => ({
     shipping: { method: "standard", label: "Standard shipping" },
     contact: CONTACT,
     address: ADDRESS,
+    base: null, // Phase 8 line 4: a market order's base run (none here)
   },
   ...overrides,
 });

@@ -52,6 +52,7 @@ export const ADMIN_PAGES = Object.freeze([
   { page: "settings/help", action: "settings.read" },
   { page: "settings/privacy", action: "settings.read" },
   { page: "settings/shipping", action: "settings.read" },
+  { page: "settings/markets", action: "settings.write" }, // Phase 8 line 4: admin and owner only
   { page: "settings/sync", action: "settings.read" },
   { page: "settings/tracking", action: "settings.read" },
 ]);

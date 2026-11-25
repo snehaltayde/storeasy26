@@ -10,6 +10,7 @@
 // The scan proves it can fail, on planted text, inside this file.
 // The full inventory and its decisions: docs/storefront-copy-inventory.md.
 //   pnpm test:copy
+import { MARKET_STUBS } from "./support/market-stubs.js";
 import { readFile, readdir, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join, relative } from "node:path";
@@ -631,6 +632,7 @@ async function loadComponent(src, stubs = {}) {
   const mod = { exports: {} };
   const req = (id) => {
     if (id in stubs) return stubs[id];
+    if (id in MARKET_STUBS) return MARKET_STUBS[id]; // Phase 8 line 4: the store's own market
     if (id === "react/jsx-runtime") return JSX_RUNTIME;
     if (id === "react") return React;
     throw new Error(`unstubbed import "${id}"`);

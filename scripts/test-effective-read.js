@@ -18,6 +18,7 @@
 //   8. A draft never reaches the cart, search, the sitemap or an email.
 //   9. Images and alt, empty strings, and indexRows.
 //  10. Edge safety and statement counts.
+import { MARKET_STUBS } from "./support/market-stubs.js";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join, relative } from "node:path";
@@ -196,6 +197,7 @@ async function loadComponent(rel, stubs, { append = "", fallback = null } = {}) 
   const mod = { exports: {} };
   const req = (id) => {
     if (id in stubs) return stubs[id];
+    if (id in MARKET_STUBS) return MARKET_STUBS[id]; // Phase 8 line 4: the store's own market
     if (id === "react/jsx-runtime") return JSX_RUNTIME;
     if (id === "react") return React;
     if (fallback) return fallback(id);
@@ -216,6 +218,8 @@ const ProductCard = await loadComponent("components/ProductCard.js", {
   "next/link": Link,
   "./FadeImage": { __esModule: true, default: ({ src, alt }) => h("img", { src, alt }) },
   "@/lib/format": format,
+  // Phase 8 line 4: with no market, Price renders formatMoney's text exactly
+  "@/components/Price": { __esModule: true, default: ({ amount, currency }) => format.formatMoney(amount, currency) },
 });
 const renderCard = (product) => renderToStaticMarkup(h(ProductCard.default, { product }));
 
@@ -1203,7 +1207,7 @@ await t("the storefront layout's initial cart (CartProvider's prop) has no catal
   eq(cart.items[0].title, "New", "the layout's cart:");
   ok(!hasKeyDeep(cart, SERVER_ONLY), JSON.stringify(cart).slice(0, 300));
   const src = stripComments(await readReal("app/(storefront)/layout.js"));
-  ok(/const \[collections, cart, chrome\] = await Promise\.all\(\[collectionsRead, initialCart\(\), chromeRead\]\)/.test(src), "the layout's cart comes from initialCart()");
+  ok(/const \[collections, cart, chrome\] = await Promise\.all\(\[collectionsRead, initialCart\(markets\.market\), chromeRead\]\)/.test(src), "the layout's cart comes from initialCart()");
   eq((src.match(/<CartProvider initialCart=\{cart\}>/g) || []).length, 1, "CartProvider gets that cart:");
 });
 
@@ -1248,7 +1252,7 @@ await t("every getCart reaching app/ is wrapped in shopperCart, except the check
   const unwrapped = calls.filter((c) => !c.wrapped).map((c) => c.f);
   same([...new Set(unwrapped)].sort(), ["app/api/cart/route.js", "app/api/checkout/route.js"], "files with a bare getCart call");
   const cartSrc = stripComments(await readReal("app/api/cart/route.js"));
-  ok(/getCart as fullCart/.test(cartSrc) && /const getCart = async \(id\) => shopperCart\(await fullCart\(id\)\);/.test(cartSrc), "the cart route's getCart is the projection");
+  ok(/getCart as fullCart/.test(cartSrc) && /const cartFor = \(request\) => async \(id\) => shopperCart\(await fullCart\(id \|\| null, \{ market: requestMarket\(request\)\.market \}\)\);/.test(cartSrc), "the cart route's getCart is the projection");
   const co = stripComments(await readReal("app/api/checkout/route.js"));
   const answers = [...co.matchAll(/NextResponse\.json\(/g)].map((m) => co.slice(m.index, co.indexOf(");", m.index)));
   ok(answers.length > 5, "the checkout API's answers were found");

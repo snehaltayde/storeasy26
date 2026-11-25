@@ -22,6 +22,7 @@
 // and a small hook driver to press buttons). Typesense: dummy localhost values
 // in this process only; nothing is sent anywhere. Nothing writes to Shopify.
 //   pnpm test:product-editor
+import { MARKET_STUBS } from "./support/market-stubs.js";
 import "./support/request-cache.js";
 import { readFile, readdir } from "node:fs/promises";
 import { createRequire, registerHooks } from "node:module";
@@ -684,6 +685,7 @@ async function loadComponent(rel, stubs) {
   const mod = { exports: {} };
   const reqf = (id) => {
     if (id in stubs) return stubs[id];
+    if (id in MARKET_STUBS) return MARKET_STUBS[id]; // Phase 8 line 4: the store's own market
     if (id === "react/jsx-runtime") return JSX_RUNTIME;
     if (id === "react") return React;
     throw new Error(`${rel}: unstubbed import "${id}"`);
@@ -705,7 +707,8 @@ await t("unit: a shopper render of an edited product (card and product page) con
     b.settings.badge = "Bestseller";
   });
   await publishDoc(id);
-  const ProductCard = await loadComponent("components/ProductCard.js", { "next/link": Link, "./FadeImage": { __esModule: true, default: ({ src, alt }) => h("img", { src, alt }) }, "@/lib/format": await import("../lib/format.js") });
+  const { formatMoney: formatMoneyPE } = await import("../lib/format.js"); // Phase 8 line 4: Price with no market
+  const ProductCard = await loadComponent("components/ProductCard.js", { "next/link": Link, "./FadeImage": { __esModule: true, default: ({ src, alt }) => h("img", { src, alt }) }, "@/lib/format": await import("../lib/format.js"), "@/components/Price": { __esModule: true, default: ({ amount, currency }) => formatMoneyPE(amount, currency) } });
   const page = await loadComponent("app/(storefront)/products/[handle]/page.js", {
     "next/link": Link,
     "next/navigation": navStub,

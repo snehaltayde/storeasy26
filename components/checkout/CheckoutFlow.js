@@ -25,7 +25,7 @@ export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeNam
   // changed, so the summary and the button show what the server will charge.
   const [cart, setCart] = useState(pageCart);
   const [shippingConfig, setShippingConfig] = useState(pageShippingConfig);
-  const [form, setForm] = useState(() => emptyForm(initialCountry));
+  const [form, setForm] = useState(emptyForm(initialCountry));
   const [method, setMethod] = useState("cod");
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState("");

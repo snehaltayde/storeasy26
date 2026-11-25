@@ -61,9 +61,10 @@ const SET = await import("../lib/admin/settings.js");
 const OS = await import("../lib/onboarding/open-step.js");
 const AUD = await import("../lib/platform/audit.js");
 
-await t("ten tabs, Team last (line 8's page); sectionFor picks the longest match; Details only for /admin/settings itself", () => {
-  eq(SS.SETTINGS_SECTIONS.map((s) => s.id), ["details", "checkout", "shipping", "domains", "tracking", "sync", "privacy", "audit", "help", "team"]);
+await t("eleven tabs (Markets, Phase 8 line 4), Team last (line 8's page); sectionFor picks the longest match; Details only for /admin/settings itself", () => {
+  eq(SS.SETTINGS_SECTIONS.map((s) => s.id), ["details", "checkout", "shipping", "markets", "domains", "tracking", "sync", "privacy", "audit", "help", "team"]);
   eq(SS.SETTINGS_SECTIONS.find((s) => s.id === "audit").action, "audit.read");
+  eq(SS.SETTINGS_SECTIONS.find((s) => s.id === "markets").action, "settings.write", "Phase 8 line 4: Markets is admin and owner only:");
   eq(SS.SETTINGS_SECTIONS.find((s) => s.id === "team").action, "team.manage");
   eq(SS.SETTINGS_SECTIONS.filter((s) => s.action === "settings.read").length, 8);
   eq(["/admin/settings", "/admin/settings/", "/admin/settings/checkout", "/admin/settings/team/x", "/admin/settingsx", "/admin/orders"].map((p) => SS.sectionFor(p)?.id ?? null), ["details", "details", "checkout", "team", null, null]);
@@ -154,7 +155,7 @@ await t("the settings layout: no nav for staff or support (only the page), the a
   for (const caller of ["staff", "support"]) eq((await pages.run(L, { cookies: cookies[caller] })).props, [], `${caller}:`);
   const run = await pages.run(L, { cookies: cookies.admin });
   const nav = run.props.find((x) => x.component.endsWith("#SettingsNav"));
-  eq(nav.props.sections.map((s) => s.id), ["details", "checkout", "shipping", "domains", "tracking", "sync", "privacy", "audit", "help", "team"]);
+  eq(nav.props.sections.map((s) => s.id), ["details", "checkout", "shipping", "markets", "domains", "tracking", "sync", "privacy", "audit", "help", "team"]);
   eq((await pages.run(L, { cookies: {} })).redirect, "/admin/login");
 });
 
@@ -483,7 +484,7 @@ await t("the integrations and billing screens hold no secret value; the no-acces
 await t("the section nav: a select and the tab links, all marked reads; onboarding's back link kept; the current tab marked", async () => {
   const { SettingsNav } = await load("components/admin/settings/SettingsNav.js");
   const s = html(React.createElement(SettingsNav, { sections: SS.SETTINGS_SECTIONS.map(({ id, label, href }) => ({ id, label, href })) }));
-  eq((s.match(/data-read-control/g) || []).length, 11, "one select and ten links:");
+  eq((s.match(/data-read-control/g) || []).length, 12, "one select and eleven links (Markets, Phase 8 line 4):");
   ok(s.includes('href="/admin/settings/checkout?from=onboarding" aria-current="page"') || /aria-current="page"[^>]*href="\/admin\/settings\/checkout\?from=onboarding"/.test(s), "the current tab:");
   ok(s.includes("Back to onboarding"), "back link:");
 });
