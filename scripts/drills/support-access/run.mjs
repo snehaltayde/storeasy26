@@ -45,7 +45,10 @@ async function context(drill, label) {
   ctx.setDefaultTimeout(30_000);
   const page = await ctx.newPage();
   page.on("console", (msg) => {
-    if (msg.type() === "error" && !/eval\(\) is not supported/.test(msg.text())) browserErrors.push(`${label}: ${msg.text().slice(0, 300)}`);
+    // the editor's document reads answer 404 for a document the roles store
+    // doesn't have yet (the same for every member): an answer, not an error
+    const documentsMiss = /status of 404/.test(msg.text()) && /\/api\/admin\/documents$/.test(msg.location()?.url || "");
+    if (msg.type() === "error" && !documentsMiss && !/eval\(\) is not supported/.test(msg.text())) browserErrors.push(`${label}: ${msg.text().slice(0, 300)} (${msg.location()?.url || ""})`);
   });
   page.on("pageerror", (e) => browserErrors.push(`${label}: ${String(e?.message || e).slice(0, 300)}`));
   return { ctx, page };
@@ -127,6 +130,9 @@ async function strayPassAll(drill, page) {
     const landed = new URL(page.url()).pathname;
     drill.check(!landed.startsWith("/admin/login"), `${href}: opens under support access (not the sign-in)`, page.url());
     if (res?.status() !== 200 || landed !== href) continue; // a redirect (the index) gets its pass on its destination
+    // the onboarding page has its own shell (step list, Next, Preview), checked
+    // for the support role by drill:shell's onboarding rules, not this pass
+    if (r.page === "onboarding") continue;
     const stray = await page.evaluate(strayControls, [CONTROLS]);
     check(stray.length === 0, `${href}: as operator support, only nav links, shell controls, marked reads and gated writes`, stray);
     checkNewUi(check, href, await supportNewUiControls(page, href));
