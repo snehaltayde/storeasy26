@@ -72,6 +72,7 @@ await t("forbiddenWords and the plain-words errors", () => {
 const store = await H.makeRoleStore({ name: "apptok", a: { products: [1, 2, 3].map((i) => F.fixtureProduct(i)) } });
 const { a, b, call, v1, users } = store;
 const hostB = b.tenant.domains[0];
+const HA = await store.appToken(); // the harness app: every scope
 const { db } = await import("../lib/db.js");
 const inA = (fn) => a.run(fn);
 const callsOf = async (installId) => (await listAudit({ tenantId: a.id, limit: 200 })).filter((r) => r.action === "apps.api_call" && r.actor === installId);
@@ -312,10 +313,10 @@ await t("rate limits: 429 with Retry-After per token (audited); unknown tokens a
   process.env[envKey] = "2";
   process.env.RATE_LIMIT_APPS_API_UNKNOWN = "2";
   try {
-    const xff = { "x-forwarded-for": "203.0.113.9" };
+    // one token from two addresses shares one budget (scope "tenant")
     const got = [];
-    for (let i = 0; i < 3; i++) got.push(await v1("me", { token: tok(), headers: xff }));
-    eq(got.map((r) => r.status).join(","), "200,200,429");
+    for (let i = 0; i < 3; i++) got.push(await v1("me", { token: tok(), headers: { "x-forwarded-for": `203.0.113.${i % 2 ? 8 : 9}` } }));
+    eq(got.map((r) => r.status).join(","), "200,200,429", "two addresses, one limit:");
     ok(Number(got[2].headers.get("retry-after")) > 0, "Retry-After");
     ok((await callsOf(APP)).some((r) => JSON.parse(r.diff).status === 429), "the 429 is audited");
     const ip = { "x-forwarded-for": "203.0.113.10" };
@@ -326,6 +327,35 @@ await t("rate limits: 429 with Retry-After per token (audited); unknown tokens a
     process.env.RATE_LIMIT_DISABLED = "1";
     delete process.env[envKey];
     delete process.env.RATE_LIMIT_APPS_API_UNKNOWN;
+  }
+});
+
+await t("at 4 active tokens, two creates at once make exactly one (the cap is counted inside the insert)", async () => {
+  const active = (await tokensOf()).body.tokens.filter((k) => k.status === "active" || k.status === "expiring").length;
+  const extra = [];
+  for (let i = active; i < 4; i++) extra.push((await post("owner", { create: { name: `fill ${i}`, scopes: ["orders.read"] } })).body.token.id);
+  const both = await Promise.all([0, 1].map((i) => post("owner", { create: { name: `race ${i}`, scopes: ["orders.read"] } })));
+  eq(both.map((r) => r.status).sort().join(","), "200,409", both.map((r) => r.text.slice(0, 80)).join(" | "));
+  const now = (await tokensOf()).body.tokens.filter((k) => k.status === "active" || k.status === "expiring").length;
+  eq(now, 5, "five active");
+  for (const id of [...extra, both.find((r) => r.status === 200).body.token.id]) await post("owner", { revoke: id });
+});
+
+await t("a revoked token is rate-limited before its refusal is audited", async () => {
+  const r = await post("owner", { create: { name: "Short lived", scopes: ["orders.read"] } });
+  const k = r.body;
+  await post("owner", { revoke: k.token.id });
+  process.env.RATE_LIMIT_DISABLED = "0";
+  const envKey = `RATE_LIMIT_APPS_API_${k.token.id.toUpperCase()}`;
+  process.env[envKey] = "1";
+  try {
+    eq((await v1("me", { token: k.secret })).status, 401, "first: refused, audited");
+    eq((await v1("me", { token: k.secret })).status, 429, "second: limited first");
+    const rows = (await callsOf(APP)).filter((x) => JSON.parse(x.diff).via === k.token.id).map((x) => JSON.parse(x.diff).status).sort();
+    eq(rows.join(","), "401,429");
+  } finally {
+    process.env.RATE_LIMIT_DISABLED = "1";
+    delete process.env[envKey];
   }
 });
 
@@ -348,8 +378,90 @@ await t("revoked, expired, switched-off and uninstalled apps' tokens: 401 (attri
 });
 
 await t("the harness app-token caller: v1 answers it; every admin route ignores Bearer (test:permissions expects 401 on every row)", async () => {
-  eq((await v1("me", { token: (await store.appToken()).secret })).status, 200);
+  eq((await v1("me", { token: HA.secret })).status, 200);
   eq((await call("app-token", "orders", "GET")).status, 401);
+});
+
+// --- the harness app (every scope) -------------------------------------------------------
+await t("v1 offers: only live offers (enabled, inside their window), terms without a coupon code or engine switches", async () => {
+  const now = Date.now();
+  const iso = (ms) => new Date(now + ms).toISOString();
+  const row = (id, type, config, over = {}) => ({ id, type, label: `Label ${id}`, enabled: 1, starts_at: null, ends_at: null, config: JSON.stringify(config), created_at: iso(0), updated_at: iso(0), ...over });
+  await inA(async () => {
+    await db.insertInto("offers").values([
+      row("apptok-live", "BXGY", { id: "apptok-live", type: "BXGY", scope: "line", priority: 20, title: "Buy 2 get 1", target: { kind: "tag", value: "Whey" }, buy: 2, free: 1 }),
+      row("apptok-coupon", "COUPON", { id: "apptok-coupon", type: "COUPON", scope: "order", priority: 5, combinable: false, title: "Ten off", code: "APPTOKCODE10", discount: { kind: "percent", value: 10 } }),
+      row("apptok-off", "BXGY", { id: "apptok-off", type: "BXGY", title: "APPTOK-DISABLED", buy: 1, free: 1 }, { enabled: 0 }),
+      row("apptok-future", "BXGY", { id: "apptok-future", type: "BXGY", title: "APPTOK-FUTURE", buy: 1, free: 1 }, { starts_at: iso(86400000) }),
+      row("apptok-ended", "BXGY", { id: "apptok-ended", type: "BXGY", title: "APPTOK-ENDED", buy: 1, free: 1 }, { ends_at: iso(-1000) }),
+    ]).execute();
+  });
+  const r = await v1("offers", { token: HA.secret });
+  eq(r.status, 200, r.text.slice(0, 200));
+  const ids = r.body.items.map((o) => o.id);
+  ok(ids.includes("apptok-live") && ids.includes("apptok-coupon"), `live ones listed: ${ids}`);
+  for (const gone of ["apptok-off", "apptok-future", "apptok-ended"]) ok(!ids.includes(gone), `${gone} left out`);
+  ok(!/APPTOK-(DISABLED|FUTURE|ENDED)/.test(r.text), "no hidden offer's words");
+  ok(!r.text.includes("APPTOKCODE10"), "no coupon code");
+  for (const k of ['"code"', '"priority"', '"combinable"', '"scope"', '"enabled"', '"config"']) ok(!r.text.includes(k), `no ${k}`);
+  const live = r.body.items.find((o) => o.id === "apptok-live");
+  eq(live.terms.buy, 2);
+  eq(live.terms.title, "Buy 2 get 1");
+});
+
+await t("v1 products/[handle] and products show the live title, never a draft or unpublished one", async () => {
+  const handle = "fixture-product-1";
+  const pid = (await v1("products/[handle]", { token: HA.secret, params: { handle } })).body.product.id;
+  const draft = { v: 1, type: "product_content", settings: { title: { value: "APPTOK-DRAFT-TITLE" }, description_html: { value: "<p>APPTOK-DRAFT-HTML</p>" } } };
+  const NOW = new Date().toISOString();
+  await inA(() => db.insertInto("documents").values({ id: "doc_prod_apptok", type: "product_content", entity_id: pid, label: "Apptok", draft: JSON.stringify(draft), draft_hash: "h", revision: 1, schema_version: 1, created_at: NOW, updated_at: NOW }).execute());
+  const one = await v1("products/[handle]", { token: HA.secret, params: { handle } });
+  eq(one.status, 200);
+  eq(one.body.product.title, "Fixture product 1", "the synced title until something is published");
+  const list = await v1("products", { token: HA.secret });
+  for (const x of [one, list]) ok(!/APPTOK-DRAFT/.test(x.text), "no draft words");
+});
+
+await t("a token of an app Storeasy turned off (its kill switch) is refused 401", async () => {
+  const { killFlag } = await import("../lib/plugins/catalog.js");
+  const { __resetFlagCache } = await import("../lib/platform/flags.js");
+  const pluginId = await inA(async () => (await db.selectFrom("plugin_installs").select("plugin_id").where("id", "=", HA.installId).executeTakeFirst()).plugin_id);
+  const pdb = platformDb();
+  await pdb.execute({ sql: "INSERT INTO feature_flags (key, description, default_on, tenants, critical, expires_at, updated_at, updated_by) VALUES (?, 'kill', 0, '{}', 0, NULL, ?, 'test')", args: [killFlag(pluginId), new Date().toISOString()] });
+  __resetFlagCache();
+  try {
+    eq((await v1("me", { token: HA.secret })).status, 401, "killed");
+  } finally {
+    await pdb.execute({ sql: "DELETE FROM feature_flags WHERE key = ?", args: [killFlag(pluginId)] });
+    __resetFlagCache();
+  }
+  eq((await v1("me", { token: HA.secret })).status, 200, "back once the switch is gone");
+});
+
+await t("an unwritable audit row on a denied call and on a rate-limited one: 503, no data", async () => {
+  // a token without offers.read: narrow one by hand
+  await inA(() => db.updateTable("plugin_tokens").set({ scopes: JSON.stringify(["orders.read"]) }).where("id", "=", HA.tokenId).execute());
+  const pdb = platformDb();
+  process.env.RATE_LIMIT_DISABLED = "0";
+  const envKey = `RATE_LIMIT_APPS_API_${HA.tokenId.toUpperCase()}`;
+  process.env[envKey] = "1";
+  await pdb.execute("ALTER TABLE audit_log RENAME TO audit_log_off");
+  let denied, limited;
+  try {
+    denied = await v1("offers", { token: HA.secret });
+    limited = await v1("orders", { token: HA.secret });
+  } finally {
+    await pdb.execute("ALTER TABLE audit_log_off RENAME TO audit_log");
+    process.env.RATE_LIMIT_DISABLED = "1";
+    delete process.env[envKey];
+    await inA(() => db.updateTable("plugin_tokens").set({ scopes: JSON.stringify(["offers.read", "orders.read", "storefront.read"]) }).where("id", "=", HA.tokenId).execute());
+  }
+  eq(denied.status, 503, "the 403 becomes 503");
+  eq(limited.status, 503, "the 429 becomes 503");
+  for (const r of [denied, limited]) {
+    eq(r.body.code, "AUDIT_UNAVAILABLE");
+    ok(!r.text.includes(ORDER_ID) && !r.headers.get("retry-after"), "no data");
+  }
 });
 
 // --- static guards -------------------------------------------------------------------
@@ -365,9 +477,9 @@ await t("v1 routes: GET only, through appApiRoute (tenantHandler, runtime nodejs
   const gate = await src("lib/plugins/api-auth.js");
   ok(gate.includes("tenantHandler(") && !/\.cookies\b/.test(gate) && !/access-control/i.test(gate), "api-auth");
   ok(!/headers\.get\(\s*["']authorization/i.test(await src("lib/admin-auth.js")), "admin-auth reads no Authorization header");
-  const r = await v1("me", { token: (await store.appToken()).secret });
+  const r = await v1("me", { token: HA.secret });
   ok(![...r.headers.keys()].some((k) => k.startsWith("access-control")), "no CORS header on an answer");
-  eq((await v1("me", { token: (await store.appToken()).secret, method: "POST" })).status, 405);
+  eq((await v1("me", { token: HA.secret, method: "POST" })).status, 405);
 });
 
 await t("no diff key named like a secret in the token and call rows; the token secret is never logged in lib", async () => {

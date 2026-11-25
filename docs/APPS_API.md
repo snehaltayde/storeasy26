@@ -48,7 +48,7 @@ never returned by any endpoint, and neither is any checkout or cart id.
 | `/api/apps/v1/products` | `{ items: [{ id, handle, title, display_type, price_min, price_max, compare_at_min, currency, available, featured_image, featured_image_alt }], nextCursor }`, by title; live content only |
 | `/api/apps/v1/products/{handle}` | `{ product }`: the card fields plus `display_vendor`, `description`, `description_html`, `options`, `images`, `variants` |
 | `/api/apps/v1/collections` | `{ items: [{ id, handle, title, products }], nextCursor }` |
-| `/api/apps/v1/offers` | `{ items: [{ id, type, label, enabled, starts_at, ends_at, config, updated_at }], nextCursor }` |
+| `/api/apps/v1/offers` | `{ items: [{ id, type, label, starts_at, ends_at, updated_at, terms }], nextCursor }`: live offers only (enabled and inside their start/end window); `terms` is what qualifies and what it gives (`title`, `target`, `buy`, `free`, `tiers`, `discount`, `threshold`, `minSubtotal`, `gift`, `items`, `price`), never a coupon's code |
 | `/api/apps/v1/orders` | `{ items: [order], nextCursor }`, newest first; `?status=` filters |
 | `/api/apps/v1/orders/{id}` | `{ order }` with `items` |
 
@@ -77,8 +77,11 @@ Every error is JSON `{ error, code }` in plain words.
 
 ## Limits and records
 
-- 120 calls a minute per token (per client address). Tokens that don't
-  resolve are limited by address.
+- 120 calls a minute per token, whatever address calls. A revoked, expired
+  or switched-off token counts against the same budget. Tokens that don't
+  resolve are limited by client address.
+- Without Upstash (Redis) configured, each limit is counted per server
+  instance, so the real ceiling is 120 times the number of instances.
 - Every call made with a real token (allowed or refused) is recorded in the
   store's audit log before it is answered. If the record can't be written, the
   call answers 503 with no data. Owners and admins see the last 100 calls on
