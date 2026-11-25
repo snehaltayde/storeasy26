@@ -10,7 +10,7 @@
 //   3. a new operator signs in for the first time: email and password show the
 //      authenticator key once, with Copy; the drill computes the real code from
 //      that key and types it; the shell opens (nav, name and email in the
-//      account menu), the old /platform console inside it
+//      account menu), the Stores list (Phase 3 line 1) inside it
 //   4. the nav goes to Signups & onboarding and New store, marking each active
 //   5. at 375 the nav is a sheet the top bar's toggle opens
 //   6. Sign out revokes the session and leaves the sign-in, no shell
@@ -157,7 +157,8 @@ async function platformShell(drill) {
   const navIds = await page.locator("[data-nav-item]").evaluateAll((els) => els.map((e) => e.getAttribute("data-nav-item")));
   drill.check(navIds.slice(0, 3).join(",") === "stores,onboarding,new-store", "the nav: Stores, Signups & onboarding, New store", navIds);
   drill.check((await page.locator('[data-nav-item="stores"][aria-current="page"]').count()) === 1, "on /platform, Stores is the current item", null);
-  drill.check((await page.locator(`${SHELL} [data-legacy]`).count()) >= 1 && !ERROR_TEXT.test(await text(page)), "the old /platform console renders in its [data-legacy] region inside the shell", null);
+  // Phase 3 line 1: /platform is the Stores list; the old console moved to /platform/legacy
+  drill.check((await page.locator(`${SHELL} [data-screen="platform-stores"]`).count()) === 1 && !ERROR_TEXT.test(await text(page)), "/platform is the Stores list inside the shell", null);
   await page.locator('[data-shell-control="account"]').click();
   const menu = await page.locator('[data-account="name"]').innerText().catch(() => "");
   const mail = await page.locator('[data-account="email"]').innerText().catch(() => "");
