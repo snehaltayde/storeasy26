@@ -40,7 +40,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - [x] A founder can open their store in step 4 once payment and the privacy and returns pages are ready, with each missing item fixable from that step (`test:onboarding-open`, `pnpm drill:p6` stage j)
 - [x] An operator can see every signup and the step each store is on, and help a stuck store from one screen (`test:operator-onboarding`, `pnpm drill:operator-onboarding`; the old operator handoff route is removed)
 - [x] An operator can create a store for a founder in one form (name, owner email, Shopify domain), which sends the founder an invite into the same onboarding (`test:operator-create-store`, `pnpm drill:operator-create-store`)
-- [ ] No legacy code remains: retired modules, routes, screens, components, drills, scripts and docs that the new architecture no longer uses are removed (including the old operator handoff route that shows invite links), proven by a test that fails on any file nothing imports or routes to; legacy tables stay in the database untouched
+- [x] No legacy code remains: retired modules, routes, screens, components, drills, scripts and docs that the new architecture no longer uses are removed (including the old operator handoff route that shows invite links), proven by a test that fails on any file nothing imports or routes to; legacy tables stay in the database untouched
 
 ## Phase 2: merchant console on shadcn
 
@@ -53,6 +53,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - [ ] An admin can manage settings (store details, checkout and payments, shipping, domains) on the new UI; staff and support cannot reach them
 - [ ] An admin can invite a team member with a role and remove one; only the owner can grant or transfer ownership
 - [ ] A merchant can see releases, analytics, experiments and automations on the new UI
+- [ ] A merchant can create and edit product-finder quizzes on the new UI; support sees them read-only
 - [ ] The old console screens and their components are removed once every route has a new screen
 
 ## Phase 3: operator console on shadcn
