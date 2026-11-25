@@ -183,7 +183,7 @@ async function flags(drill, op, tenant) {
   await op.getByRole("button", { name: "Delete flag" }).click();
   drill.check((await done).status() === 200, "delete answers 200");
   await settle(op);
-  drill.check((await op.locator(`text=${FLAG}`).count()) === 0, "the flag is gone from the list");
+  drill.check((await op.locator(`[data-flag-actions="${FLAG}"]`).count()) === 0, "the flag is gone from the list (its row; the notice still names it)");
 }
 
 async function signedOut(drill) {
