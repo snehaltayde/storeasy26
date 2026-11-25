@@ -3,6 +3,17 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Operator store lifecycle and secrets (on the owner's behalf)
+
+- **Schema:** none. New audit actions `tenant.maintenance`, `tenant.secrets_rotate`, `tenant.export`, `tenant.offboard`; new mail kinds `store_suspended`, `store_resumed`.
+- **Permissions and data:** every action uses `requireOperator` and audits with `operatorActor`; no secret value in any audit row, log, error or mail. Suspend/resume needs a 5-character reason (kept in the audit log, never in the owner's email); doing either twice is 409. Offboard checks the typed store id on the server; an unknown store is 404 first.
+- **Rotation:** only keys Storeasy holds: the order-link key and the store console password (the latter only while the store has no members, 409 otherwise). Merchant and Shopify keys are listed by name, never rotated or read. The order-link key also signs shopper sessions, sign-in codes, preview links and maintenance passes, so rotating it signs shoppers out; the dialog lists every effect and the 30-second cross-server cache. A new password is shown once.
+- **Suspended stores:** the storefront and checkout close (503 `TENANT_SUSPENDED`), the merchant console closes on its next request. Their jobs wait 15 minutes at a time keeping attempts and place in line, are made due at once on resume, and dead-letter after 7 days (the worker re-reads the store fresh first, so a resumed store's jobs never die; a dead `webhook_apply` marks its receipt dead).
+- **Known gap (until line 7):** suspend in the old console (`/platform/legacy`) sends no reason and is now refused.
+- **Also fixed:** the incidents timeline breaks same-millisecond ties by insertion order.
+- **Decided by:** Claude
+- **Slice:** Phase 3 line 2
+
 ## 2026-11-25 Operator billing on the new UI (on the owner's behalf)
 
 - **Schema:** platform migration `0016_subscription_changes.sql` adds `replaced_by`, `cancel_state` and `cancel_error` and a unique partial index allowing one current subscription per store. Its backfill keeps a paid-up row over an unpaid one (then the newest) and marks other live duplicates replaced and ended; nothing is deleted. Line 5 takes 0017.
