@@ -237,6 +237,9 @@ export function drillEnv(base, worktree, ports) {
     // Restored across the many harness restarts of a run, it sometimes came
     // back without most routes (the "/admin/login 404" flake).
     STOREASY_TURBOPACK_DEV_CACHE: "off",
+    // Phase 4 line 3: drill:apps stage webhooks sends to a receiver on
+    // 127.0.0.1 (lib/plugins/egress.js refuses this flag in production)
+    STOREASY_PLUGIN_EGRESS_LOCAL: "1",
   };
 }
 

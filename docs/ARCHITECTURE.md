@@ -49,6 +49,7 @@ Full columns and types are in the SQL files named below. This page lists each ta
 | `offers`, `bundles` | Discount engine rows; bundles sync a `bundle-<id>` offer | `id` | Deleted by the founder |
 | `customers`, `customer_otps`, `customer_sessions`, `customer_wishlists` | Shopper accounts (email OTP) | `id` | Privacy erasure via `privacy_requests` |
 | `events`, `notifications`, `contact_messages`, `privacy_requests`, `app_errors` | Analytics events, outgoing email, contact form, privacy requests, errors | `id` | Pruned / kept |
+| `plugin_endpoints`, `plugin_events`, `plugin_deliveries` | Plugin webhooks (Phase 4 line 3, 0032): a custom app's HTTPS address, its one approved host (its egress allowlist), its topics and its signing secret (encrypted; the previous one signs alongside for 24 h after a rotation); the outbox of store events (snapshots with no customer details, unique idempotency key); one delivery per event and subscriber with its own attempts and schedule (its id is the `webhook-id` header) | `id` (`pwe_`, `evt_`, `dlv_`) | Events and deliveries pruned after 30 days during fan-out; endpoints kept (uninstall archives the install) |
 | `plugin_installs` | Installed plugins (Phase 4, 0030): plugin id, version, status `enabled` / `disabled` / `uninstalled`, the scopes the admin approved, plain settings, secret settings encrypted in `secrets_enc` (never sent to a browser); one live install per plugin (a unique partial index) | `id` (`pin_`) | Never deleted: uninstall archives the row |
 
 ### Control-plane database
@@ -129,6 +130,7 @@ Routes outside `app/api/admin/`, by class (`scripts/support/shopper-routes.js`; 
 - **Checkout** → order + `order_events`; a `shopify_push` job creates the Shopify draft order; `payment_confirm` jobs reconcile Razorpay.
 - **Shopper actions** → `events` rows (and Meta CAPI forwarding via `forward_event` jobs).
 - **Shopify and Razorpay webhooks** → `webhook_inbox` → `webhook_apply` / `billing_apply` jobs.
+- **Plugin webhooks** (Phase 4 line 3) → `order.created` from `runOrderEffects` (prepaid once paid, COD once placed) and `order.fulfilled` from `reconcileOrderProjection` (the move to fulfilled) write a `plugin_events` row (key `<topic>:<orderId>`, so once per order) and queue `plugin_fanout`, never failing the flow they ride on. Fan-out writes one `plugin_deliveries` row per subscriber (enabled custom apps holding the topic's permission; a paused endpoint's row is Skipped; enabled first-party installs whose manifest lists the event) and a `plugin_delivery` job each. A delivery re-checks the install, the endpoint and the permission, signs (Standard Webhooks v1) and sends through the egress guard (`lib/plugins/egress.js`: https on 443, a name not an IP, the approved host only, never Shopify, every resolved address checked against private and reserved ranges at connect time, no redirects), or calls the first-party handler. Its own schedule retries 1 m to 24 h (8 attempts); a 410 or 72 h of failures pauses the endpoint (system audit row, owners and admins emailed); only Storeasy infrastructure errors reach the job backoff and dead-letter.
 
 ## Background work
 
@@ -143,6 +145,8 @@ All background work is the durable `jobs` table (control plane), run by `runDueJ
 | `webhook_apply`, `billing_apply` | Webhooks | Catalog, order and billing state |
 | `send_notification` | Order and account events | Email via Resend |
 | `forward_event` | Shopper events | Meta CAPI |
+| `plugin_fanout` | A plugin event (order created or fulfilled) | `plugin_deliveries` rows, one `plugin_delivery` job each, the 30-day prune |
+| `plugin_delivery` | Fan-out, Resend, Send test event | One signed HTTPS POST to a custom app's approved host (or a first-party handler); re-queues itself on its own retry schedule |
 | `generate` | First run | Starter home and design drafts (`lib/first-run/generate.js`) |
 
 ## External services

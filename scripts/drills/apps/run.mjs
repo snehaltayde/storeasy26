@@ -6,6 +6,7 @@
 import { runDrill } from "../p3/lib.mjs";
 import { STAGES, consoleErrors, port } from "./lib.mjs";
 import "./stage-install.mjs";
+import "./stage-webhooks.mjs";
 
 async function apps(drill) {
   if (!port) throw new Error("drill:apps needs ROLES_PORT (run it as pnpm drill:apps).");
