@@ -38,6 +38,7 @@ import { navFor, navItems } from "../../../lib/admin/nav.js";
 import { isNewUiRoute } from "../../../lib/admin/new-ui-routes.js";
 import { RANGES, rangeHref } from "../../../lib/admin/dashboard-ranges.js";
 import { readPost } from "../../support/read-post-match.js";
+import { OPERATOR_ONLY_PAGES } from "../../support/platform-pages.js";
 
 const DRILL_ID = "SHELL";
 const WIDTHS = [1280, 900, 375];
@@ -749,7 +750,9 @@ async function ownerFlows(drill, page) {
 const DENIED_PAGES = ["/admin/settings", "/admin/integrations", "/admin/billing", "/admin/automations"];
 const ONBOARDING_OPEN = "/admin/onboarding?step=open";
 const NOTE = /Your role \(support\) can.t .+ ask an owner or admin/;
-const PLATFORM_CONSOLE = /New store|Tenant registry|Provision/;
+// Phase 3 line 0: the operator shell (its nav and account menu) counts as the console too
+const PLATFORM_CONSOLE = /New store|Tenant registry|Provision|Signups & onboarding|Sign out|Open account menu/;
+const NOT_SET_UP = /Not configured|isn.t set up yet/;
 
 async function supportDeepLinks(drill, page) {
   await page.setViewportSize({ width: 1280, height: HEIGHT });
@@ -781,7 +784,7 @@ async function supportDeepLinks(drill, page) {
   const plat = await page.goto(`${ORIGIN}/platform`, { waitUntil: "load" });
   await settle(page);
   const platBody = await page.locator("body").innerText().catch(() => "");
-  drill.check(plat?.status() === 200 && !PLATFORM_CONSOLE.test(platBody) && ((await page.locator("#pl-password").count()) === 1 || /Not configured/.test(platBody)), "support at /platform: the operator sign-in (or not configured), never the console", { status: plat?.status(), body: platBody.slice(0, 160) });
+  drill.check(plat?.status() === 200 && !PLATFORM_CONSOLE.test(platBody) && ((await page.locator("#pl-password").count()) === 1 || NOT_SET_UP.test(platBody)), "support at /platform: the operator sign-in (or not configured), never the console", { status: plat?.status(), body: platBody.slice(0, 160) });
 }
 
 async function supportEmptyStates(drill, ctx, creds) {
@@ -819,7 +822,7 @@ async function anonymousPass(drill, ctx) {
   await page.goto(`${ORIGIN}/platform`, { waitUntil: "load" });
   await settle(page);
   const platBody = await page.locator("body").innerText().catch(() => "");
-  drill.check(!PLATFORM_CONSOLE.test(platBody) && ((await page.locator("#pl-password").count()) === 1 || /Not configured/.test(platBody)), "anonymous at /platform: the operator sign-in (or not configured), never the console", platBody.slice(0, 160));
+  drill.check(!PLATFORM_CONSOLE.test(platBody) && ((await page.locator("#pl-password").count()) === 1 || NOT_SET_UP.test(platBody)), "anonymous at /platform: the operator sign-in (or not configured), never the console", platBody.slice(0, 160));
   for (const path of ["/", "/collections", "/products/fixture-product-1", "/journal", "/search?q=a", "/policies/privacy-policy", "/bundles/any"]) {
     const r = await page.goto(ANNEX + path, { waitUntil: "load" });
     await settle(page);
@@ -840,14 +843,14 @@ async function anonymousPass(drill, ctx) {
 // made-up token with their generic words, the Shopify callback is 401, the
 // operator onboarding APIs are 401, and signup on a store host is 404.
 const STEPS = ["connect", "import", "brand", "open"];
-const OPERATOR_PAGES = ["/platform/onboarding", "/platform/stores/new"];
+const OPERATOR_PAGES = OPERATOR_ONLY_PAGES; // scripts/support/platform-pages.js
 
 async function operatorPagesClosed(drill, page, who) {
   for (const path of OPERATOR_PAGES) {
     await page.goto(ORIGIN + path, { waitUntil: "load" });
     await settle(page);
     const body = await page.locator("body").innerText().catch(() => "");
-    drill.check(new URL(page.url()).pathname === "/platform" && !/Signups & onboarding|Create store/.test(body) && ((await page.locator("#pl-password").count()) === 1 || /Not configured/.test(body)), `${who} at ${path}: sent to the operator sign-in, never the screen`, { url: page.url(), body: body.slice(0, 160) });
+    drill.check(new URL(page.url()).pathname === "/platform" && !PLATFORM_CONSOLE.test(body) && !/Create store/.test(body) && (await page.locator('[data-shell="platform"]').count()) === 0 && ((await page.locator("#pl-password").count()) === 1 || NOT_SET_UP.test(body)), `${who} at ${path}: sent to the operator sign-in, never the screen`, { url: page.url(), body: body.slice(0, 160) });
   }
 }
 

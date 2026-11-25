@@ -180,3 +180,25 @@ Line 7. `/admin/settings` and its tabs under one `settings/layout.js`, `/admin/i
 ### Editor: preview and publishing
 
 Phase 2 line 6 (6c). In the editor's preview pane a bar above the frame: the device widths (Phone 375, Tablet 768, Desktop the pane's width; a `toggle-group` of icons with their names), "Show design changes" (a `switch`: the design draft's colours on every page of the preview; on and fixed while the design is open), Reload ("Open the preview again" when the session has ended) and "Open in a new tab". The frame is the store's own page and keeps the storefront's styles. The editor bar: Publish (its panel lists what goes live, the checks with their fixes, "Before you open your store" on a closed store), Take this page offline (its confirm is a panel in place that names the pages linking here), the Undo notice after a publish, and Earlier versions (Restore to draft). `/admin/releases` (Publishing, `components/admin/releases/`): `PageHeader`, then "Waiting to publish" (pages whose draft isn't live, each with its state badge and "Open in the editor"; boxes and "Publish selected" for a role with `storefront.publish`, the same panel and checks as the editor, `publishSet` for two or more), then "Recently published" (grouped by publish, Undo and "Undo all N"). `releases/loading.js` is skeleton rows. Staff and support see the reason in words where Publish, Take offline and Undo would be (no button, not even disabled); support's Earlier versions have no Restore. Every read control (the preview bar, the editor links) carries `data-read-control`.
+
+## Operator screens (Phase 3)
+
+Each Phase 3 line fills only its own sub-heading.
+
+### Shell and sign-in (line 0)
+
+- **Shell.** `components/platform/shell/PlatformShell.js` is the merchant shell's twin on `components/ui`: the sidebar (240px from 1024px, icons at 768-1023px, a sheet below 768px; its `sidebar_state` cookie is on `/platform`), a 56px top bar with the toggle and the account menu (the operator's name and email, or a note for the setup password; Sign out), a skip link, and content capped at 1200px. The nav is plain data in `lib/platform/nav.js`; later lines append their items. Only signed-in operators get the shell; anyone else gets the page alone.
+- **Old screens.** The signed-in `/platform` page is still the old console, in its own `[data-legacy]` region inside the shell, until line 1 replaces it.
+- **Sign-in.** One card, at most 384px wide, centred: Operator email (with the setup-password hint), Password, Authenticator code (mono, 6 digits). Errors are one plain sentence in a destructive Alert under the fields (`components/platform/loginWords.js`). A first sign-in shows the authenticator key once, in the kit's Copy box (`components/kit/copy-button.js`), with the setup link behind a disclosure. With no `PLATFORM_ADMIN_PASSWORD`, the card holds only a warning Alert saying the console isn't set up.
+
+### Stores (line 1)
+
+### Lifecycle and secrets (line 2)
+
+### Billing (line 3)
+
+### Flags and incidents (line 4)
+
+### Support access (line 5)
+
+### Operations (line 6)

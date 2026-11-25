@@ -4,7 +4,7 @@
 // and its data are never touched: a drill seeds and wipes only the worktree's
 // own folders, and this runner fails if the owner's seed files change anyway.
 //
-//   node scripts/drills/run-isolated.mjs <p5|p6|orders|smoke|agency-gone|shell|editor|signup|connect|operator-onboarding|operator-create-store|sf-styles|console-styles|all> [stage,…] [--keep] [--headed]
+//   node scripts/drills/run-isolated.mjs <p5|p6|orders|smoke|agency-gone|shell|editor|signup|connect|operator-onboarding|operator-create-store|platform-shell|sf-styles|console-styles|all> [stage,…] [--keep] [--headed]
 //   (pnpm drill:p5, drill:p6, drill:smoke, drill:agency-gone, drill:shell, drill:signup, drill:sf-styles,
 //   drill:console-styles, drill:all; sf-styles and console-styles are not in all)
 //
@@ -493,6 +493,15 @@ export const DRILLS = {
     async run(c) {
       const seeded = await c.node(["scripts/seed-design-documents.js", "--p3"]);
       return seeded !== 0 ? seeded : c.node(["scripts/drills/operator-create-store/run.mjs", ...c.headed]);
+    },
+  },
+  // Phase 3 line 0: the operator sign-in (a real authenticator code) and shell, on the --p3 design store
+  "platform-shell": {
+    id: "PLATFORM-SHELL",
+    warm: true,
+    async run(c) {
+      const seeded = await c.node(["scripts/seed-design-documents.js", "--p3"]);
+      return seeded !== 0 ? seeded : c.node(["scripts/drills/platform-shell/run.mjs", ...c.headed]);
     },
   },
   // Phase 2 line 10: product-finder quizzes on the roles store (staff, admin, support); evidence in docs/cms-reviews/drills/QUIZZES/
