@@ -59,6 +59,15 @@ export const READ_CONTROLS = [
   { path: "components/admin/quizzes/QuizList.js", reason: "the search box and Clear search filter the quizzes already on the page; nothing is sent", marks: 2 },
   { path: "components/admin/quizzes/QuizEditor.js", reason: "Open on the store (the quiz's public page in a new tab) and Back to quizzes / Cancel (a link to the list): navigation only", marks: 2 },
   { path: "components/admin/quizzes/QuizTry.js", reason: "\"Try it\": each question's radio group (Radix makes the group itself focusable), the answer radios, Show the picks and Start again score in the page (scoreQuiz) and ask GET /api/admin/quiz?view=try (storefront.read) for the picks; nothing is saved", marks: 4 },
+  // Phase 2 line 7: settings, integrations and billing
+  { path: "components/admin/settings/NoAccess.js", reason: "the no-access page's link to the dashboard (a GET)", marks: 1 },
+  { path: "components/admin/settings/SettingsNav.js", reason: "the section nav: the phone's section select and each tab's link only open another settings page (GETs)", marks: 2 },
+  { path: "components/admin/settings/SaveBar.js", reason: "Try again on a tab that reads in the browser asks its GET again", marks: 1 },
+  { path: "components/admin/settings/CheckoutForm.js", reason: "\"Test keys\" asks POST /api/admin/integrations { action: \"test\" } (settings.read): it checks the saved keys with Razorpay and stores nothing", marks: 1 },
+  { path: "components/admin/settings/DomainsList.js", reason: "Copy puts a domain's TXT value on the clipboard; nothing is sent", marks: 1 },
+  { path: "components/admin/settings/AuditTable.js", reason: "the who and what selects, the two dates, Try again, Clear filters and Load more only ask GET /api/admin/audit for another page", marks: 7 },
+  { path: "components/admin/settings/HelpPanel.js", reason: "Copy diagnostics (the clipboard) and the mailto link to Storeasy's team send nothing from the page", marks: 2 },
+  { path: "components/admin/integrations/IntegrationsList.js", reason: "Test asks POST /api/admin/integrations { action: \"test\" } (settings.read): the cheapest provider check, it stores nothing", marks: 1 },
 ];
 
 // Reads sent as a non-GET request: { page, method, path, reason }. page is a
@@ -71,4 +80,7 @@ export const READ_POSTS = [
   { page: "/admin/offers/[id]", method: "POST", path: "/api/admin/offers/simulate", reason: "the offer simulator (Phase 2 line 4): offers.read, example carts worked out in memory, nothing stored (scripts/support/admin-routes.js marks it a read)" },
   // Phase 2 line 5
   { page: "/admin/media", method: "PUT", path: "/api/admin/media", reason: "\"Where it's used\" in a file's details: the usage list (mediaUsage), gated on storefront.read; it writes nothing" },
+  // Phase 2 line 7 (test:settings-ui proves the test action writes nothing)
+  { page: "/admin/settings/checkout", method: "POST", path: "/api/admin/integrations", reason: "\"Test keys\": the integrations test action (settings.read), a provider check that stores nothing" },
+  { page: "/admin/integrations", method: "POST", path: "/api/admin/integrations", reason: "a provider's Test: the integrations test action (settings.read), a provider check that stores nothing" },
 ];

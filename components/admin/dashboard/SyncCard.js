@@ -22,7 +22,8 @@ async function readSync() {
 
 const withoutReconnect = (view) => (view?.problem ? { ...view, problem: { ...view.problem, next: view.problem.next.filter((n) => n.id !== "reconnect") } } : view);
 
-export function SyncCard({ initial, gate, canReconnect }) {
+// title: the card's heading (Settings → Products from Shopify names it so, Phase 2 line 7)
+export function SyncCard({ initial, gate, canReconnect, title = "Bringing in your products" }) {
   const router = useRouter();
   const [view, setView] = useState(initial);
   const [busy, setBusy] = useState(false);
@@ -55,7 +56,7 @@ export function SyncCard({ initial, gate, canReconnect }) {
   return (
     <Card data-dashboard="sync">
       <CardHeader>
-        <CardTitle>Bringing in your products</CardTitle>
+        <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent>
         <ImportStepBody

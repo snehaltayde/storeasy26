@@ -448,6 +448,9 @@ export const DRILLS = {
       return seeded !== 0 ? seeded : c.node(["scripts/drills/signup/run.mjs", ...c.headed]);
     },
   },
+  // settings, integrations and billing (Phase 2 line 7): the roles store; the
+  // drill opens an operator's support grant in its control plane for the banner check
+  settings: { id: "SETTINGS", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/settings/run.mjs", ...c.headed])) },
   // a founder connects Shopify from onboarding step 1 (Phase 1 line 4 §5 item 14):
   // the roles store plus the Roles Annex; the drill starts the Shopify stand-in
   // on SHOPIFY_FAKE_PORT (a free slot in this run's block), and the harness gets

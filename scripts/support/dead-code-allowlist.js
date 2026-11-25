@@ -32,4 +32,10 @@ export const ALLOWLIST = [
   { path: "components/admin/AutomationsAdmin.js", reason: "removed by Phase 2 line 11" },
   // Phase 2 line 10: the catalog page stopped importing the old quiz (and bundle) panels
   { path: "components/admin/CommercePanels.js", reason: "removed by Phase 2 line 11" },
+  // Phase 2 line 7: settings, integrations and billing stopped importing these
+  { path: "components/admin/SettingsAdmin.js", reason: "removed by Phase 2 line 11" },
+  { path: "components/admin/OpsPanels.js", reason: "removed by Phase 2 line 11" },
+  { path: "components/admin/IntegrationsAdmin.js", reason: "removed by Phase 2 line 11" },
+  { path: "components/admin/MessagesPanel.js", reason: "removed by Phase 2 line 11" },
+  { path: "components/admin/BillingAdmin.js", reason: "removed by Phase 2 line 11" },
 ];
