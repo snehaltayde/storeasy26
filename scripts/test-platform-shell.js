@@ -137,6 +137,14 @@ const opSession = async (userId, ttlMs = 10 * 60_000) => (await S.createSession(
 const revoked = await opSession(operatorUser.id);
 await S.revokeSessionByToken(revoked);
 const bootstrap = await AA.platformSessionToken();
+// P3-C: an operator's support tokens are never operator sessions. The support
+// session (from the harness's cross-host entry) and a fresh, unspent support-entry
+// token, each put in _platform, and the __Host-support cookie on its own.
+const SP = await import("../lib/platform/support.js");
+const supportSession = store.cookies["operator-support-entry"]["__Host-support"];
+const supportEntry = (await SP.mintSupportEntry({ tenantId: store.a.id, operator: { kind: "operator", id: operatorUser.id }, consoleOrigin: H.CONSOLE_ORIGIN })).token;
+// kept live for the whole run, so the 401 is the kind check and not the 60-second expiry
+await db().execute({ sql: "UPDATE sessions SET expires_at = ? WHERE token_hash = ?", args: [new Date(Date.now() + 60 * 60_000).toISOString(), await S.sha256Hex(supportEntry)] });
 const JARS = {
   operator: { _platform: await opSession(operatorUser.id) },
   "bootstrap-before": { _platform: bootstrap },
@@ -148,6 +156,9 @@ const JARS = {
   "non-operator-session": { _platform: await opSession(store.users.owner.id) },
   "revoked-operator": { _platform: revoked },
   "expired-operator": { _platform: await opSession(operatorUser.id, -60_000) },
+  "support-session-in-platform": { _platform: supportSession },
+  "support-entry-in-platform": { _platform: supportEntry },
+  "host-support-only": { "__Host-support": supportSession },
 };
 const ALLOWED = ["operator", "bootstrap-before"];
 const DENIED = Object.keys(JARS).filter((c) => !ALLOWED.includes(c));
