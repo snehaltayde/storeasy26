@@ -3,6 +3,13 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Editor: archive stays terminal; saved templates stay read-only (on the owner's behalf)
+
+- **Decision:** the editor rebuild (Phase 2 line 6) does not add "bring back an archived page" or "rename/delete a saved template", though the line 6 plan listed them. Archive is terminal by design (no code sets `documents.archived_at` back to NULL, a grep test guards it, and the publish and slug rules rely on it); archived pages are listed read-only, and "make a new page from this one" is the way back. Saved templates live in the retired `cms_templates` table, which only read-only helpers may name; the new templates screen lists them and inserts their sections into a page through `saveDraft`. Both are recorded under Later for a line with its own design.
+- **Why:** the plan item contradicted two earlier decisions; reversing either needs its own plan (slug release, publish state, a new templates store).
+- **Decided by:** Claude
+- **Slice:** Phase 2 line 6
+
 ## 2026-11-25 Catalog on the new UI (on the owner's behalf)
 
 - **Permissions:** browse, sheets and collections are `storefront.read`; "Sync from Shopify" is `RoleGate`d on `sync.run` (and disabled for everyone on a store not linked to Shopify); support gets "View content" (the editor's read-only path) and no editor-list link; another store's gid answers 404 with nothing about it. The quiz tray stays an old-screen tray for writers only, allowed by the shell drill only on `/admin/catalog`, only for `storefront.write`, exactly one.

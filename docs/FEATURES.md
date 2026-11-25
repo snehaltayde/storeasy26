@@ -111,7 +111,6 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - `lib/shopify-admin.js` uses Admin API version `2025-10`, past Shopify's 12-month support window; move to a supported version.
 
 - `orders/[id]` POST push answers 500 for an unknown order; it should be 404 (allowed as `allowStatus` in `scripts/support/admin-routes.js` until fixed).
-- Opening the editor runs the first-store generator during the page render for any role, support included (`app/(console)/admin/(authed)/editor/page.js` ~85); it writes drafts only, but a read-only role shouldn't trigger writes.
 - Order ids carry only 32 random bits; lengthen them (order links are the only thing that protects an order page, so this matters once links can leak).
 - The checkout client's fallback idempotency key (`components/checkout/CheckoutFlow.js` ~134) uses `Math.random`; use `crypto.randomUUID()`.
 - Preview tokens in `lib/releases.js` still fall back to `"dev-only-secret"`; make them fail closed in production like order links.
@@ -122,6 +121,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - The collectors (`/api/track`, `/api/exp`, `/api/errors`), `/api/shopify/webhooks` and the 23 public storefront pages have library tests and the browser pass but no route-level least-trusted suite. (Phase 0 audit, open gap 4.)
 - The "operator has support access" banner (operator id and reason) also shows to signed-out visitors on `/admin/login`; show it only to signed-in members.
 - **Shell drill escapes:** close the remaining support-write escapes in `scripts/drills/shell/run.mjs` (count across `pushState` round trips; wait for in-flight requests and the server log to settle; keep counting through `pagehide` for `sendBeacon`/keepalive; refuse `READ_POSTS` rows whose path is the page and require a reason; let a row's `page` be a route pattern like `/admin/offers/[id]`). In progress 2026-11-25.
+- **Archived pages and saved templates:** bringing back an archived page (archive is terminal today) and renaming or deleting saved templates (they sit in retired `cms_templates`; move templates to their own store first) need a line with its own design.
 - **Font licences (owner):** fonts are now self-hosted from `app/fonts/` (done 2026-11-25). Before the site is hosted, add each family's SIL OFL 1.1 text (`OFL.txt` for Geist/Geist Mono and for Fraunces) next to its files; no copy existed on this machine.
 - `requireAdmin`'s origin check passes a write with no Origin header; add a `Sec-Fetch-Site: cross-site` refusal as a second layer.
 
