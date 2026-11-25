@@ -8,7 +8,9 @@
 //      editing or deleting one that is On, is 403 for staff and works for
 //      admin, audited as storefront.publish
 //   3. where a quiz is used (live and draft pages, exact slug) and the 409
-//      QUIZ_IN_USE with the page names; the row stays
+//      QUIZ_IN_USE with the page names; the row stays. 3b: the delete and
+//      the staff save are each one guarded statement (a link or a turn-On
+//      that lands after the reads stops them); try writes nothing
 //   4. the anonymous shopper: an Off quiz is 404 at /api/quiz/<slug> and
 //      /quiz/<slug>; another store's slug is 404 everywhere
 //   5. the pages as support, staff and signed out (scripts/support/page-harness.js)
@@ -202,6 +204,64 @@ await t("deleting a quiz the home page uses: 409 QUIZ_IN_USE with the page names
   eq(r.body.pages.map((p) => p.name), ["Home page", "Summer promo"]);
   ok(/turn it off instead/i.test(r.body.error), "the words offer turning it off:");
   ok(await rowOf(a, "fit"), "the row stays:");
+});
+
+console.log("— 3b. the races: one guarded statement each");
+const QZ = await import("../lib/quiz.js");
+await t("guardedDeleteQuiz: a draft or live link that lands after the usage read stops the delete; the state the caller read must still hold; /quiz/race-two never blocks race", async () => {
+  await plantQuiz(a, "race", false);
+  await plantQuiz(a, "race-two", false);
+  await plantQuiz(a, "race-live", false);
+  await plantQuiz(a, "race-on", true);
+  // as if a founder saved these links between the route's usage read and its DELETE
+  await sql(a, "INSERT INTO documents (id, type, slug, label, draft, draft_hash, schema_version, created_at, updated_at) VALUES ('doc_race', 'page', 'race', 'Race page', ?, 'h4', 1, ?, ?)", [JSON.stringify({ ...R.emptyBody("home"), sections: [banner("/quiz/race-two")] }), now, now]);
+  await sql(a, "INSERT INTO documents (id, type, slug, label, draft, draft_hash, schema_version, published_version_id, created_at, updated_at) VALUES ('doc_race_live', 'page', 'race-live', 'Live race page', '{}', 'h5', 1, 'ver_race', ?, ?)", [now, now]);
+  await sql(a, "INSERT INTO document_refs (version_id, ref_type, ref_id) VALUES ('ver_race', 'quiz', 'race-live')");
+  eq(await a.run(() => U.guardedDeleteQuiz("race-two", false)), 0, "a draft link:");
+  eq(await a.run(() => U.guardedDeleteQuiz("race-live", false)), 0, "a live link:");
+  eq(await a.run(() => U.guardedDeleteQuiz("race-on", false)), 0, "turned On since it was read:");
+  ok((await rowOf(a, "race-two")) && (await rowOf(a, "race-live")) && (await rowOf(a, "race-on")), "the rows stay:");
+  eq(await a.run(() => U.guardedDeleteQuiz("race", false)), 1, "race (only race-two is linked):");
+  eq(await rowOf(a, "race"), null);
+  const r = await call("owner", "quiz", "POST", { body: { remove: { slug: "race-two" } } });
+  eq([r.status, r.body.code, r.body.pages.map((p) => p.name)], [409, "QUIZ_IN_USE", ["Race page"]]);
+});
+await t("gate race: staff opens a quiz that is Off, admin turns it On, staff's save is refused and the quiz stays On (in the route, and in the write itself)", async () => {
+  await plantQuiz(a, "gate", false);
+  const seen = (await call("staff", "quiz", "GET", { query: "slug=gate" })).body.quiz;
+  eq(seen.enabled, false, "staff loaded it Off:");
+  eq((await call("admin", "quiz", "POST", { body: { quiz: quiz("gate"), enabled: true } })).status, 200);
+  const r = await call("staff", "quiz", "POST", { body: { quiz: { ...seen, title: "Staff's stale edit" } } });
+  eq([r.status, r.body.code], [403, "QUIZ_NEEDS_PUBLISH"]);
+  eq(await rowOf(a, "gate"), { slug: "gate", title: "Quiz gate", enabled: 1 });
+  // the statement's own guard, for a turn-On that lands after the route's read
+  let code = null;
+  await a.run(() => QZ.upsertQuiz(quiz("gate", { title: "Raced" }), { onlyIfOff: true })).catch((e) => (code = e.code));
+  eq([code, await rowOf(a, "gate")], ["QUIZ_NOW_ON", { slug: "gate", title: "Quiz gate", enabled: 1 }]);
+  // and the delete's: staff's enabled = 0 guard leaves an On quiz in place
+  eq(await a.run(() => U.guardedDeleteQuiz("gate", false)), 0);
+  ok(await rowOf(a, "gate"), "still there:");
+});
+await t("staff creating a new slug with enabled:true is 403 and makes nothing; upsertQuiz saves Off unless told", async () => {
+  const r = await call("staff", "quiz", "POST", { body: { quiz: quiz("staff-on"), create: true, enabled: true } });
+  eq([r.status, r.body.code, await rowOf(a, "staff-on")], [403, "QUIZ_NEEDS_PUBLISH", null]);
+  await a.run(() => QZ.upsertQuiz(quiz("default-off")));
+  eq((await rowOf(a, "default-off")).enabled, 0);
+});
+await t("view=try writes no audit row and no slog line", async () => {
+  const before = (await listAudit({ tenantId: a.id, limit: 200 })).length;
+  const lines = [];
+  const orig = console.log;
+  console.log = (...x) => lines.push(x.map(String).join(" "));
+  let r;
+  try {
+    r = await call("staff", "quiz", "GET", { query: "view=try&tags=muscle" });
+  } finally {
+    console.log = orig;
+  }
+  eq(r.status, 200);
+  eq(lines.filter((l) => /"evt"/.test(l)), [], "slog lines:");
+  eq((await listAudit({ tenantId: a.id, limit: 200 })).length, before, "audit rows:");
 });
 
 console.log("— 4. the anonymous shopper and the other store");

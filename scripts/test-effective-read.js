@@ -998,7 +998,7 @@ await t("the rendered header search box shows each hit's display_type (the type 
 });
 
 async function quizEmail(tn, marker) {
-  await tn.run(() => Quiz.upsertQuiz({ slug: "finder", title: "Find it", questions: [{ prompt: "Goal?", options: [{ label: "Strength", tags: ["protein"] }, { label: "Gear", tags: ["gear"] }] }] }));
+  await tn.run(() => Quiz.upsertQuiz({ slug: "finder", title: "Find it", questions: [{ prompt: "Goal?", options: [{ label: "Strength", tags: ["protein"] }, { label: "Gear", tags: ["gear"] }] }] }, { enabled: true }));
   quizRoute ??= await import("../app/api/quiz/[slug]/route.js");
   globalThis.__effAfter = [];
   globalThis.__effRequest = { host: `${tn.id}.test`, cookies: {} };

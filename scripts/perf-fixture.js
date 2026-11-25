@@ -422,7 +422,7 @@ export async function seedPerfFixture({ libsql, log = () => {}, spec = PERF_FIXT
     await upsertBundle({ ...b, id: had?.id ?? null });
   }
   const { upsertQuiz } = await import("../lib/quiz.js");
-  for (const q of fx.quizzes) await upsertQuiz(q);
+  for (const q of fx.quizzes) await upsertQuiz(q, { enabled: true });
 
   // the cart the report measures (cart API and checkout's first step)
   await libsql.execute({ sql: "INSERT INTO carts (id, coupon_code, created_at, updated_at) VALUES (?, NULL, ?, ?)", args: [fx.measured.cart.id, iso(0), iso(0)] });
