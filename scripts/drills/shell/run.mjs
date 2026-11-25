@@ -308,7 +308,8 @@ const SELFTEST_PAGES = {
   worker: `<main><button type="button" data-read-control onclick="new Worker(window.URL.createObjectURL(new Blob(['fetch(&quot;'+location.origin+'${SELFTEST}/w&quot;,{method:&quot;POST&quot;})'],{type:'text/javascript'})))">Open</button></main>`,
   "blank-form": `<main><form id="bf" method="post" action="${SELFTEST}/w" target="_blank"></form><button type="button" data-read-control onclick="document.getElementById('bf').submit()">Open</button></main>`,
   // (an inline handler sees document.URL as URL: hence window.URL above)
-  "window-open": `<main><button type="button" data-read-control onclick="const w=window.open('${SELFTEST}/blank','_blank');w.addEventListener('load',()=>w.fetch(location.origin+'${SELFTEST}/w',{method:'POST'}))">Open</button></main>`,
+  // a tab whose page POSTs on load, opened while this page stays put
+  "window-open": `<main><button type="button" data-read-control onclick="window.open('${SELFTEST}/posts-on-load','_blank')">Open</button></main>`,
   // a Radix portal: its empty focus guards are not controls; a button in it is,
   // and so is a "guard" with text
   "radix-portal": `<main><button type="button" data-read-control onclick="document.body.insertAdjacentHTML('beforeend','<div data-radix-portal><span data-radix-focus-guard tabindex=0></span><div role=dialog><button>Delete store</button><span data-radix-focus-guard tabindex=0>x</span></div><span data-radix-focus-guard tabindex=0></span></div>')">More</button></main>`,
