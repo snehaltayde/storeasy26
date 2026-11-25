@@ -3,6 +3,15 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Time-boxed support access across hosts (on the owner's behalf)
+
+- **Schema:** platform migration `0017_support_sessions.sql` adds `sessions.grant_id`, `sessions.entry_origin` and an index; additive. "Closed by whom" is read from `audit_log` (no new column on `support_grants`).
+- **Entry (the one new credential path):** an operator signed in with an authenticator code mints a single-use, 60-second token bound to the grant and recording the console's origin; the store's `support-entry` route spends it with one conditional update (one winner under concurrency) and accepts only a form POST whose `Origin` matches. Bootstrap (setup password), merchant and support sessions can't mint. The token is never in a URL, log or audit row; the redirect uses `requestOrigin`. Operator pages' CSP allows `form-action` to any https origin (and `*.localhost` outside production) so the form can reach a store host; the rest of the app keeps `form-action 'self'`.
+- **Session:** a host-only `__Host-support` cookie (Secure, HttpOnly, Lax, Path=/), valid only for the store's current open grant, ending on the next request when the grant is closed or expires or the operator is removed; Max-Age within the grant and a 12-hour cap. Read-only and redacted exactly like the `support` role on every admin route and page. It lifts the maintenance curtain only while its grant is open (no 15-minute `_mx` pass).
+- **Merchants:** owners and admins end access (`team.manage`, which ends every open grant) and read its history (`audit.read`); support and staff can't. The banner and audit view name the operator, never the id or email (operator rows carry `actor: null`). Only owners and admins are emailed when access opens.
+- **Decided by:** Claude
+- **Slice:** Phase 3 line 5
+
 ## 2026-11-25 Old operator console and components/console removed (on the owner's behalf)
 
 - **Scope:** `/platform/legacy`, `PlatformAdmin`, `TenantDetail` and the 11 old panels, all of `components/console/`, the `data-legacy` CSS, the nav's "Old console" and `GET /api/platform/tenants?legacy=1` (only the old console used it; it now returns the ordinary list) are deleted. No table dropped, no migration. `useToast` stays in `components/kit/toast.js` (no sonner). The console body uses the shadcn tokens.

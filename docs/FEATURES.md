@@ -62,7 +62,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - [x] An operator can suspend or resume a store and rotate its secrets, with an audit row for each
 - [x] An operator can manage plans, subscriptions and billing events
 - [x] An operator can manage feature flags and incidents
-- [ ] An operator can open time-boxed support access to a store, and the store's team sees that it is open
+- [x] An operator can open time-boxed support access to a store, and the store's team sees that it is open
 - [x] An operator can run job queues, provisioning runs, privacy requests, themes and case studies on the new UI
 - [x] The old operator console and `components/console/` are removed once every operator screen is on the new UI
 
@@ -108,6 +108,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 
 ## Later (not planned yet)
 
+- Support access hardening (line 5 review nits): the support-access drill skips the onboarding page entirely; keep its server-log write check there and skip only the stray-control scan. The `/platform` CSP's open `form-action` also applies if `/platform` is ever served on a store host; set it per request naming the store's origin if that matters.
 - **Flaky under the full suite's load (2026-11-25):** `test:editor-store` ("409 stops autosave": status `saving`, not `conflict`) and `test:design-doc` ("a failing pin write does not change the publish result") each failed once in a full `pnpm test` while three heavy jobs ran, and pass alone every time. Find the timing they depend on and wait on a real signal.
 - A read-only operator role (Phase 3 gives every operator every action; decided 2026-11-25).
 - Support access: signing every member out and rotating the Turso database token as part of secret rotation (Phase 3 rotates only the keys Storeasy holds).
