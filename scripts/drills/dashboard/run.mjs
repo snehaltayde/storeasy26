@@ -112,8 +112,9 @@ async function support(drill, page, s) {
   const html = await page.content();
   const leaks = [s.shopper.email, s.shopper.name, ROLES_LOGINS.shopper?.phone].filter((x) => typeof x === "string" && x && html.includes(x));
   drill.check(leaks.length === 0, "support: no customer name, email or phone in the page (the Shopify domain: test:dashboard)", leaks);
-  // a failed import for this check only, so the sync card and its Run again show
-  await rolesSql([{ sql: "INSERT INTO sync_runs (id, status, error, started_at, finished_at) VALUES ('sync_drillfail', 'failed', 'Shopify said no', ?, ?)", args: [new Date(Date.now() - 60_000).toISOString(), new Date().toISOString()] }]);
+  // a failed import for this check only, so the sync card and its Run again show;
+  // started now, so it is the latest run (latestSyncRun orders by started_at)
+  await rolesSql([{ sql: "INSERT INTO sync_runs (id, status, error, started_at, finished_at) VALUES ('sync_drillfail', 'failed', 'Shopify said no', ?, ?)", args: [new Date().toISOString(), new Date().toISOString()] }]);
   try {
     await open(page, "/admin/dashboard");
     const card = page.locator('[data-dashboard="sync"]');
