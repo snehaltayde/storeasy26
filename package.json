@@ -62,6 +62,7 @@
     "test:apps": "node scripts/test-apps.js",
     "test:theme-format": "node scripts/test-theme-format.js",
     "test:theme-packages": "node scripts/test-theme-packages.js",
+    "test:theme-render": "node scripts/test-theme-render.js",
     "test:plugin-webhooks": "node scripts/test-plugin-webhooks.js",
     "test:app-tokens": "node scripts/test-app-tokens.js",
     "test:plugin-slots": "node scripts/test-plugin-slots.js",

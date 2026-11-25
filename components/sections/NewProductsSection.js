@@ -9,9 +9,9 @@ function NewProductsSection({ section, data = {}, ctx = {}, attrs = {} }) {
   if (!NewProductsSection.shows(section, data)) return null;
   const s = settingsOf(section);
   return (
-    <section data-sec={ctx.secKey} {...attrs} id={ctx.newAnchor ? "new" : undefined} className="scroll-mt-24 py-sf-section">
+    <section data-sec={ctx.secKey} {...attrs} data-part="section" id={ctx.newAnchor ? "new" : undefined} className="scroll-mt-24 py-sf-section">
       <div className="mb-6 flex items-end justify-between">
-        <h2 className="text-2xl font-bold tracking-tight">{s.title}</h2>
+        <h2 data-part="section-heading" className="text-2xl font-bold tracking-tight">{s.title}</h2>
       </div>
       <ProductGrid products={data.products} priorityCount={4} />
     </section>

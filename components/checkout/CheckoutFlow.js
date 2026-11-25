@@ -254,7 +254,7 @@ export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeNam
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+    <div data-protected="checkout" className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <Link href="/" className="text-xl font-extrabold tracking-tight">
           {/* S55 fix: the tenant's own wordmark — this hardcoded BEASTLIFE on every store */}

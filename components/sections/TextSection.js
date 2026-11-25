@@ -21,8 +21,8 @@ function TextSection({ section, ctx = {}, attrs = {} }) {
     );
   }
   return (
-    <section data-sec={ctx.secKey} {...attrs} className="py-sf-section">
-      {s.title ? <h2 className="mb-4 text-2xl font-bold tracking-tight">{s.title}</h2> : null}
+    <section data-sec={ctx.secKey} {...attrs} data-part="section" className="py-sf-section">
+      {s.title ? <h2 data-part="section-heading" className="mb-4 text-2xl font-bold tracking-tight">{s.title}</h2> : null}
       <div className="max-w-3xl space-y-3">
         {body.map((p, i) => (
           <p key={i} className="leading-relaxed text-sf-text-muted">

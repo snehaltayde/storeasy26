@@ -1053,6 +1053,8 @@ const SPOTS = {
 const imgsOf = (h) => [...h.matchAll(/<img\b[^>]*>/g)].map((m) => m[0]);
 const attrOf = (tag, a) => tag.match(new RegExp(`\\s${a}="([^"]*)"`))?.[1] ?? null;
 const sha = (s) => createHash("sha256").update(s).digest("hex").slice(0, 16);
+// Phase 5 line 2: the theme hooks (data-part) are inert attributes; today's hashes are of the markup without them
+const noHooks = (h) => h.replace(/ data-part="[a-z-]+"/g, "");
 
 await t("P6-LOGO-RENDER rendered: both Header variants and both Footer spots with logo.image { media:'/api/media/x', alt:'Acme' } render one img with that src and alt and the size styles, inside the header's home link", async () => {
   const logo = { image: { media: "/api/media/x", alt: "Acme" }, name: "Acme Store", text1: "Acme", text2: "" };
@@ -1100,9 +1102,9 @@ await t("P6-LOGO-RENDER rendered: with no image the text wordmark markup is byte
   for (const [k, base] of Object.entries(TODAY)) {
     for (const [spot, render] of Object.entries(SPOTS)) {
       const want = TODAY_HASHES[k][spot];
-      eq(sha(render(base)), want, `${k} ${spot}, today's props:`);
-      eq(sha(render({ ...base, image: null, name: "Beast Life Store" })), want, `${k} ${spot}, image null:`);
-      eq(sha(render({ ...base, image: { alt: "No file" }, name: "Beast Life Store" })), want, `${k} ${spot}, no media:`);
+      eq(sha(noHooks(render(base))), want, `${k} ${spot}, today's props:`);
+      eq(sha(noHooks(render({ ...base, image: null, name: "Beast Life Store" }))), want, `${k} ${spot}, image null:`);
+      eq(sha(noHooks(render({ ...base, image: { alt: "No file" }, name: "Beast Life Store" }))), want, `${k} ${spot}, no media:`);
       ok(!render(base).includes("<img"), `${k} ${spot}: no img`);
     }
   }

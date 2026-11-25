@@ -127,8 +127,8 @@ function BundleCardSection({ section, data = {}, ctx = {}, attrs = {} }) {
   if (!BundleCardSection.shows(section, data)) return null;
   const s = settingsOf(section);
   return (
-    <section data-sec={ctx.secKey} {...attrs} className="py-sf-section">
-      {isText(s.title) ? <h2 className="mb-6 text-2xl font-bold tracking-tight">{s.title}</h2> : null}
+    <section data-sec={ctx.secKey} {...attrs} data-part="section" className="py-sf-section">
+      {isText(s.title) ? <h2 data-part="section-heading" className="mb-6 text-2xl font-bold tracking-tight">{s.title}</h2> : null}
       <div className="max-w-xl">
         <BundleBox bundle={data.bundle} ctx={ctx} />
       </div>

@@ -23,7 +23,7 @@ export default function ProductCard({ product, priority = false }) {
   const ranged = price_max != null && Number(price_max) > Number(price_min);
 
   return (
-    <Link href={`/products/${handle}`} className="group block">
+    <Link href={`/products/${handle}`} data-part="product-card" className="group block">
       <div className="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
         {featured_image ? (
           <FadeImage
@@ -41,12 +41,12 @@ export default function ProductCard({ product, priority = false }) {
         )}
 
         {!available && (
-          <span className="absolute left-3 top-3 rounded-full bg-sf-inverse/85 px-2.5 py-1 text-sf-2xs font-semibold uppercase tracking-wide text-sf-on-inverse">
+          <span data-part="badge" className="absolute left-3 top-3 rounded-full bg-sf-inverse/85 px-2.5 py-1 text-sf-2xs font-semibold uppercase tracking-wide text-sf-on-inverse">
             Sold out
           </span>
         )}
         {available && pct > 0 && (
-          <span className="absolute left-3 top-3 rounded-full bg-sf-sale px-2.5 py-1 text-sf-2xs font-bold text-sf-on-sale">
+          <span data-part="badge" className="absolute left-3 top-3 rounded-full bg-sf-sale px-2.5 py-1 text-sf-2xs font-bold text-sf-on-sale">
             -{pct}%
           </span>
         )}
@@ -58,10 +58,10 @@ export default function ProductCard({ product, priority = false }) {
             {display_type}
           </p>
         ) : null}
-        <h3 className="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+        <h3 data-part="product-card-title" className="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
           {title}
         </h3>
-        <p className="text-sm">
+        <p data-part="product-card-price" className="text-sm">
           {ranged && <span className="text-sf-text-subtle">from </span>}
           <span className="font-semibold text-sf-text">{formatMoney(price_min, currency)}</span>
           {onSale && (

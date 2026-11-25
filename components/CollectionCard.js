@@ -6,6 +6,7 @@ export default function CollectionCard({ collection }) {
   return (
     <Link
       href={`/collections/${handle}`}
+      data-part="collection-card"
       className="group relative block aspect-[4/3] overflow-hidden rounded-sf-card bg-sf-media"
     >
       {image ? (

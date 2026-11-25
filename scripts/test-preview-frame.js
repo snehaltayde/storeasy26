@@ -904,7 +904,8 @@ await t("no cookies at all: no bridge, no bar, no preview-only attribute, and th
     ok(!FRAME_ATTRS.test(h), `${label}: a frame attribute in a shopper's HTML: ${h.match(FRAME_ATTRS)?.[0]}`);
     ok(!/unpublished changes|preview has ended|Edit this page|Draft preview/.test(h), `${label}: preview words`);
   }
-  const diff = Object.keys(BEFORE).filter((k) => sha(now[k]) !== BEFORE[k]);
+  // Phase 5 line 2: an uploaded theme's data-part hooks are inert attributes; the base is compared without them
+  const diff = Object.keys(BEFORE).filter((k) => sha(now[k].replace(/ data-part="[a-z-]+"/g, "")) !== BEFORE[k]);
   same(diff, [], "renders that differ from 5bbc819:");
 });
 

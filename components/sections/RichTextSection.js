@@ -15,8 +15,8 @@ function RichTextSection({ section, ctx = {}, attrs = {} }) {
     );
   }
   return (
-    <section data-sec={ctx.secKey} {...attrs} className="py-sf-section">
-      {s.title ? <h2 className="mb-4 text-2xl font-bold tracking-tight">{s.title}</h2> : null}
+    <section data-sec={ctx.secKey} {...attrs} data-part="section" className="py-sf-section">
+      {s.title ? <h2 data-part="section-heading" className="mb-4 text-2xl font-bold tracking-tight">{s.title}</h2> : null}
       <div className="rte max-w-3xl" dangerouslySetInnerHTML={{ __html: s.html || "" }} />
     </section>
   );

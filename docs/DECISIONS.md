@@ -19,6 +19,16 @@ without asking the owner are marked so they are easy to review.
 - **Decided by:** Claude
 - **Slice:** Phase 5 line 1
 
+## 2026-11-25 Phase 5 line 2: rendering an uploaded theme (on the owner's behalf)
+
+- **No schema or permission change.** The storefront reads `theme_packages` by id inside the store's own database; the anonymous shopper only ever sees the package the published design names.
+- **Kill switch fails open for rendering.** `ff_theme-packages` off renders the base kit, but when the flags can't be read the live package stays: it was checked at upload and publish, and a control-plane outage should not change a store's look. This differs from plugin blocks (fail closed), which are optional decoration. `themePackagesOff()` and `THEMES_OFF_WORDS` live in `lib/themes/live-package.js` for line 1's upload refusal.
+- **Archived rows still render.** A row is immutable, so a published design naming an archived package keeps rendering it; only a missing, corrupt or turned-off package falls back to the base kit (slog `theme_package_missing` / `theme_packages_killed`).
+- **The package's base kit sets `data-kit`.** `data-kit` is `<base>-<kit version>` from the row, not the design's `theme.kit`, so the surfaces a package lays over are always its own kit's.
+- **Package surfaces are CSS variables under `:root[data-theme]`.** That selector is more specific than `[data-kit]`, so they override the kit block. Only `#rrggbb` values are used; any other value keeps the kit's colour. `kitSurfaces`, `brandRoles`, `pairMatrix`, `checkBrand` and `brandCssVars` take an optional `surfaces`, so accents are corrected against them.
+- **Template precedence: entity, then founder family, then theme, then platform.** A published `doc_header`, `doc_footer` or layout document that carries a template counts as the founder's choice. The theme's templates therefore show where the store has no such document yet; line 3's apply writes them into drafts.
+- **Hooks are attributes placed after the existing ones.** `data-part` sits after `data-sec`, `data-doc` and the section attributes, so preview selectors keep working. The byte-baseline suites (`test-design-doc`, `test-sections-render`, `test-preview-frame`) compare markup with the inert `data-part` hooks stripped. The buy box gains one `<div data-protected="buy-box">` wrapper; the cart drawer, `CheckoutFlow` and the checkout page's empty states carry `data-protected` on their existing roots. There is no separate cart page.
+
 ## 2026-11-25 Phase 5 uploadable themes plan (on the owner's behalf)
 
 - **Schema:** one additive tenant table `theme_packages` (migration 0034). Rows are immutable and archived, never deleted; slug + version is unique. No platform migration.

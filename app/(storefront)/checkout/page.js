@@ -47,7 +47,7 @@ export default async function CheckoutPage() {
 
   if (!capability.available) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-24 text-center">
+      <div data-protected="checkout" className="mx-auto max-w-2xl px-4 py-24 text-center">
         <h1 className="text-2xl font-bold">Checkout is temporarily unavailable</h1>
         <p className="mt-2 text-sf-text-subtle">
           Your cart is saved — nothing was charged. Please try again a little later.
@@ -64,7 +64,7 @@ export default async function CheckoutPage() {
 
   if (!cart.items.length) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-24 text-center">
+      <div data-protected="checkout" className="mx-auto max-w-2xl px-4 py-24 text-center">
         <h1 className="text-2xl font-bold">Your cart is empty</h1>
         <p className="mt-2 text-sf-text-subtle">Add something before checking out.</p>
         <Link

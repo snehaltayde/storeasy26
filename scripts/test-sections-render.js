@@ -108,7 +108,10 @@ const same = (got, want, m = "") => {
   if (a !== b) throw new Error(`${m}\n      expected ${b.slice(0, 600)}\n      got      ${a.slice(0, 600)}`);
 };
 // The attributes this item adds, taken out for comparing with a6d028e.
-const normalize = (h) => h.replace(/ data-section-(?:id|kind)="[^"]*"/g, "");
+// Phase 5 line 2: an uploaded theme's data-part hooks are inert attributes; the
+// legacy and base markups are compared without them
+const noHooks = (h) => h.replace(/ data-part="[a-z-]+"/g, "");
+const normalize = (h) => noHooks(h).replace(/ data-section-(?:id|kind)="[^"]*"/g, "");
 
 // ---- the JSX loader (Next's SWC, as test-releases and test-images do) -------------
 const require = createRequire(import.meta.url);
@@ -302,7 +305,7 @@ function liveWorstCaseDigests() {
       parts.push(`${c.name}/home-nodata`, home([c.section], new Map()));
       parts.push(`${c.name}/home-nodata-empty-note`, home([c.section], new Map(), true));
     }
-    out[kind] = sha(parts.join("\n\u0000"));
+    out[kind] = sha(noHooks(parts.join("\n\u0000")));
   }
   return out;
 }

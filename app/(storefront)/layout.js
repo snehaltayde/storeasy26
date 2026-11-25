@@ -17,6 +17,8 @@ import { tenantOwnCfg } from "@/lib/tenant-context";
 import { resolveBrand, brandCssVars } from "@/lib/brand";
 import { resolvedAnnouncement, resolvedNav, resolvedBrand, resolvedTheme, resolvedLogo, resolvedContentPageList, resolvedSurfaceTemplates, contentSource, isContentUnavailable, previewFrameRoutes } from "@/lib/content/resolve";
 import { kitAttr } from "@/lib/themes/kits";
+import { packageFor } from "@/lib/themes/live-package";
+import { compileStyles } from "@/lib/themes/styles";
 import { tfetch, requestResolution } from "@/lib/tenant-request";
 import { isGated } from "@/lib/tenant-gate";
 import { isPlatformSiteHost } from "@/lib/platform-site";
@@ -102,6 +104,10 @@ async function chromeData() {
         previewFrameRoutes().catch(() => null), // P3-FRAME: documents preview only, else null
         resolvedLogo(), // P6-LOGO-RENDER: null unless a v4 source's design has a logo
       ]);
+      // Phase 5 line 2: the uploaded theme package the live design names (null:
+      // none, turned off by Storeasy, or missing: the base kit renders)
+      const pkg = await packageFor(theme);
+      const kit = pkg ? pkg.kit : kitAttr(theme);
       // S39 (MC11): footer links only to pages that EXIST on this store.
       const enabledPages = pageList.filter((p) => p.enabled && (p.family || "page") === "page");
       const footerPages = {
@@ -134,8 +140,11 @@ async function chromeData() {
         // nothing (globals.css already carries those values).
         // TOK-01: the kit decides the header/hero surfaces the accent is checked on;
         // with no brand, only the kit's header/hero accent corrections (if any)
-        brandCss: brandCssVars(brand ? resolveBrand(brand) : null, { kit: kitAttr(theme) }),
-        kitAttr: kitAttr(theme),
+        // Phase 5 line 2: a package's header/hero surfaces, then its compiled
+        // styles (every selector and value written by lib/themes/styles.js)
+        brandCss: [brandCssVars(brand ? resolveBrand(brand) : null, { kit, surfaces: pkg?.surfaces ?? null }), pkg ? compileStyles(pkg.styles, pkg.slug) : ""].filter(Boolean).join("\n"),
+        kitAttr: kit,
+        themeAttr: pkg?.slug ?? null,
         preview: src.preview,
         // P2-PREVIEW: what a documents preview shows
         // P6-LOGO-RENDER: designShown too, so the bar never says the new
@@ -161,6 +170,7 @@ async function chromeData() {
       metaPixelId: "",
       brandCss: "",
       kitAttr: "pulse-1",
+      themeAttr: null,
       preview: false,
       previewOverlay: null,
       frame: null,
@@ -354,7 +364,7 @@ export default async function RootLayout({ children }) {
   const editing = frame?.kind === "documents"; // preview-only data-doc / data-field
   const liveConsole = frame?.kind === "live" && (await consoleCookiePresent());
   return (
-    <html lang="en" data-kit={chrome.kitAttr} className={`${Geist.variable} ${GeistMono.variable} ${Fraunces.variable} h-full`}>
+    <html lang="en" data-kit={chrome.kitAttr} data-theme={chrome.themeAttr ?? undefined} className={`${Geist.variable} ${GeistMono.variable} ${Fraunces.variable} h-full`}>
       {/* Brand variables: values come from lib/brand.js (validated hex/enum
           tokens only — nothing merchant-typed reaches this string raw). */}
       {/* precedence+href let React hoist this into <head> (without them React

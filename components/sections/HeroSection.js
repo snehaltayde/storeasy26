@@ -82,11 +82,11 @@ function HeroSection({ section, ctx = {}, attrs = {} }) {
         <span className="h-1.5 w-1.5 rounded-full bg-sf-hero-accent" />
         <BadgeWords field={!empty && hero.badge ? field("badge") : {}} words={empty ? "Coming soon" : hero.badge || `${stats.products} products · ${stats.collections} collections`} />
       </p>
-      <h1 {...field("title")} className="max-w-3xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
+      <h1 {...field("title")} data-part="hero-title" className="max-w-3xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
         <HeroTitle title={title} highlight={highlight} />
       </h1>
       {subtitle ? (
-        <p {...field("subtitle")} className="mt-5 max-w-xl text-lg text-hero-muted">
+        <p {...field("subtitle")} data-part="hero-subtitle" className="mt-5 max-w-xl text-lg text-hero-muted">
           {subtitle}
         </p>
       ) : null}
@@ -114,7 +114,7 @@ function HeroSection({ section, ctx = {}, attrs = {} }) {
   );
 
   return (
-    <section data-sec="hero" {...attrs} className="relative overflow-hidden bg-hero text-hero-fg">
+    <section data-sec="hero" {...attrs} data-part="hero" className="relative overflow-hidden bg-hero text-hero-fg">
       <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-sf-hero-glow/20 blur-3xl" />
       <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
         {image ? (

@@ -84,12 +84,16 @@ export function PairsSection({ pairs }) {
 }
 
 // Phase 4 line 2: the three product-page plugin slots, the same in both layouts.
+// Phase 5 line 2: the buy box is Storeasy's own (data-protected): an uploaded
+// theme's styles target data-part hooks, and none is inside it.
 const Purchase = ({ product }) => (
-  <ProductPurchase
-    product={product}
-    underPrice={<PluginSlot name="storefront.pdp.under_price" ctx={product} className="mt-4" />}
-    underAtc={<PluginSlot name="storefront.pdp.under_atc" ctx={product} className="mt-5" />}
-  />
+  <div data-protected="buy-box">
+    <ProductPurchase
+      product={product}
+      underPrice={<PluginSlot name="storefront.pdp.under_price" ctx={product} className="mt-4" />}
+      underAtc={<PluginSlot name="storefront.pdp.under_atc" ctx={product} className="mt-5" />}
+    />
+  </div>
 );
 const BelowFold = ({ product }) => <PluginSlot name="storefront.pdp.below_fold" ctx={product} className="mt-8" />;
 

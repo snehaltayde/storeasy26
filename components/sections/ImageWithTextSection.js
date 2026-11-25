@@ -22,7 +22,7 @@ function ImageWithTextSection({ section, ctx = {}, attrs = {} }) {
   const right = s.image_side === "right";
   const button = buttonOf(s.button);
   return (
-    <section data-sec={ctx.secKey} {...attrs} className="py-sf-section">
+    <section data-sec={ctx.secKey} {...attrs} data-part="section" className="py-sf-section">
       <div className="grid items-center gap-8 md:grid-cols-2">
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -31,7 +31,7 @@ function ImageWithTextSection({ section, ctx = {}, attrs = {} }) {
           <MediaFallback alt={altOf(s.image)} className={`aspect-[4/3] w-full rounded-brand ${right ? "md:order-2" : ""}`} />
         )}
         <div className={right ? "md:order-1" : ""}>
-          {s.title ? <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">{s.title}</h2> : null}
+          {s.title ? <h2 data-part="section-heading" className="font-display text-2xl font-bold tracking-tight sm:text-3xl">{s.title}</h2> : null}
           {s.text ? <p className="mt-3 max-w-prose text-base text-foreground/75">{s.text}</p> : null}
           {button.href && button.label ? (
             <Link

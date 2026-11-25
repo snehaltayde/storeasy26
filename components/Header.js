@@ -32,7 +32,7 @@ const docAttr = (editing, id) => (editing ? { "data-doc": id } : {});
 
 const Announcement = ({ announcement, editing = false }) =>
   announcement?.enabled && announcement.text ? (
-    <div data-sec="announcement" {...docAttr(editing, "doc_announcement")} className="bg-sf-accent px-4 py-1.5 text-center text-xs font-semibold text-sf-on-accent">
+    <div data-sec="announcement" {...docAttr(editing, "doc_announcement")} data-part="announcement" className="bg-sf-accent px-4 py-1.5 text-center text-xs font-semibold text-sf-on-accent">
       {announcement.href ? (
         <Link href={announcement.href} className="hover:underline">
           {announcement.text}
@@ -126,6 +126,7 @@ const NavStrip = ({ items, centered = false }) =>
             <Link
               key={i.key}
               href={i.href}
+              data-part="header-link"
               className="whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg"
             >
               {i.label}
@@ -143,11 +144,11 @@ export default function Header({ collections = [], logo = { text1: "Store", text
 
   if (variant === "centered") {
     return (
-      <header {...docAttr(editing, "doc_header")} className="sticky top-0 z-30 bg-header text-header-fg">
+      <header {...docAttr(editing, "doc_header")} data-part="header" className="sticky top-0 z-30 bg-header text-header-fg">
         <Announcement announcement={announcement} editing={editing} />
         <div className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 py-3 sm:px-6">
           <nav className="hidden items-center text-sm font-medium md:flex">
-            <Link href="/collections" className="text-header-muted transition hover:text-header-fg">
+            <Link href="/collections" data-part="header-link" className="text-header-muted transition hover:text-header-fg">
               Shop all
             </Link>
           </nav>
@@ -167,7 +168,7 @@ export default function Header({ collections = [], logo = { text1: "Store", text
   }
 
   return (
-    <header {...docAttr(editing, "doc_header")} className="sticky top-0 z-30 bg-header text-header-fg">
+    <header {...docAttr(editing, "doc_header")} data-part="header" className="sticky top-0 z-30 bg-header text-header-fg">
       <Announcement announcement={announcement} editing={editing} />
 
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
@@ -178,7 +179,7 @@ export default function Header({ collections = [], logo = { text1: "Store", text
         </div>
 
         <nav className="ml-auto hidden items-center gap-6 text-sm font-medium md:flex">
-          <Link href="/collections" className="text-header-muted transition hover:text-header-fg">
+          <Link href="/collections" data-part="header-link" className="text-header-muted transition hover:text-header-fg">
             Shop all
           </Link>
         </nav>
