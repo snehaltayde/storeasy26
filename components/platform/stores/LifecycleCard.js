@@ -8,7 +8,7 @@
 // Recent activity show the new state at once.
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Download, KeyRound, Pause, Pencil, Play, RefreshCw, Trash2, Wrench } from "lucide-react";
+import { Clock, Download, KeyRound, Mail, Pause, Pencil, Play, RefreshCw, Server, Store, Trash2, Users, Wrench } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -32,6 +32,23 @@ import EditStoreDialog from "./EditStoreDialog";
 import OffboardDialog from "./OffboardDialog";
 import RotateSecretsDialog from "./RotateSecretsDialog";
 import { DEFAULT_MAINTENANCE_MESSAGE, REASON_MIN, SUSPEND_EFFECTS, mailWords, storeApi } from "./lifecycleWords";
+
+// One icon per SUSPEND_EFFECTS line, in its order: shoppers, team, jobs, servers.
+const EFFECT_ICONS = [Store, Users, Clock, Server];
+const RESUME_EFFECTS = [
+  [Store, "Shoppers can browse and check out again."],
+  [Users, "The store's console opens for its team."],
+  [Clock, "Background jobs that waited run now."],
+  [Server, "Other servers can take up to 30 seconds to apply it."],
+];
+
+// What shoppers and the team get right now, under the status badge.
+const statusLine = (lifecycle) =>
+  lifecycle.status !== "active"
+    ? "Shoppers see the store as unavailable and the team can't open the console."
+    : lifecycle.maintenance.enabled
+      ? "Shoppers see the maintenance page and checkout is closed. The team can work as usual."
+      : "Shoppers can browse and check out. The team can use the console.";
 
 function StatusDialog({ store, lifecycle, open, onOpenChange, onDone }) {
   const suspending = lifecycle.status === "active";
@@ -59,22 +76,38 @@ function StatusDialog({ store, lifecycle, open, onOpenChange, onDone }) {
 
   return (
     <AlertDialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
-      <AlertDialogContent data-dialog="store-status">
+      <AlertDialogContent data-dialog="store-status" className="sm:max-w-md">
         <form onSubmit={submit} className="contents">
           <AlertDialogHeader>
             <AlertDialogTitle>{suspending ? `Suspend ${store.name}?` : `Resume ${store.name}?`}</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-left">
                 {suspending ? (
-                  <ul className="list-disc space-y-1 pl-5">
-                    {SUSPEND_EFFECTS.map((w) => (
-                      <li key={w}>{w}</li>
-                    ))}
+                  <ul className="space-y-2" data-suspend-effects>
+                    {SUSPEND_EFFECTS.map((w, i) => {
+                      const Icon = EFFECT_ICONS[i] || Clock;
+                      return (
+                        <li key={w} className="flex gap-2.5">
+                          <Icon aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
+                          <span className="text-foreground">{w}</span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : (
-                  <p>The storefront and the console open again, and waiting jobs run. Other servers can take up to 30 seconds to apply it.</p>
+                  <ul className="space-y-2">
+                    {RESUME_EFFECTS.map(([Icon, w]) => (
+                      <li key={w} className="flex gap-2.5">
+                        <Icon aria-hidden className="mt-0.5 size-4 shrink-0 text-success" />
+                        <span className="text-foreground">{w}</span>
+                      </li>
+                    ))}
+                  </ul>
                 )}
-                <p>{lifecycle.mailReady ? "The owner is emailed." : "Email isn't set up on this server, so the owner won't be told."}</p>
+                <p className={lifecycle.mailReady ? "flex gap-2.5" : "flex gap-2.5 text-warning-text"}>
+                  <Mail aria-hidden className="mt-0.5 size-4 shrink-0" />
+                  <span>{lifecycle.mailReady ? "The owner is emailed." : "Email isn't set up on this server, so the owner won't be told. Tell them another way."}</span>
+                </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -141,7 +174,7 @@ function MaintenanceDialog({ store, lifecycle, open, onOpenChange, onDone }) {
         onOpenChange(o);
       }}
     >
-      <DialogContent data-dialog="store-maintenance">
+      <DialogContent data-dialog="store-maintenance" className="sm:max-w-md">
         <form onSubmit={submit} className="contents">
           <DialogHeader>
             <DialogTitle>Maintenance</DialogTitle>
@@ -160,10 +193,17 @@ function MaintenanceDialog({ store, lifecycle, open, onOpenChange, onDone }) {
               </div>
               <figure className="space-y-1.5" data-maintenance-preview>
                 <figcaption className="text-xs font-medium text-muted-foreground">Preview</figcaption>
-                <div className="rounded-md border border-border bg-muted px-4 py-6 text-center">
-                  <p className="text-xs font-medium text-muted-foreground">{store.name}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Scheduled maintenance</p>
-                  <p className="mt-2 text-sm whitespace-pre-wrap">{message.trim() || DEFAULT_MAINTENANCE_MESSAGE}</p>
+                <div className="overflow-hidden rounded-md border border-border bg-background">
+                  <div className="flex items-center gap-1.5 border-b border-border bg-muted px-3 py-1.5" aria-hidden>
+                    <span className="size-1.5 rounded-full bg-border" />
+                    <span className="size-1.5 rounded-full bg-border" />
+                    <span className="size-1.5 rounded-full bg-border" />
+                  </div>
+                  <div className="px-4 py-6 text-center">
+                    <p className="text-xs font-medium text-muted-foreground">{store.name}</p>
+                    <p className="mt-1 text-base font-semibold">Scheduled maintenance</p>
+                    <p className="mx-auto mt-2 max-w-[40ch] text-sm break-words whitespace-pre-wrap">{message.trim() || DEFAULT_MAINTENANCE_MESSAGE}</p>
+                  </div>
                 </div>
               </figure>
             </>
@@ -240,15 +280,21 @@ export default function LifecycleCard({ store, lifecycle }) {
         <dl className="space-y-2">
           <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-4">
             <dt className="shrink-0 text-muted-foreground sm:w-36">Status</dt>
-            <dd data-lifecycle-status={lifecycle.status}>{active ? <Badge variant="success">Active</Badge> : <Badge variant="danger">Suspended</Badge>}</dd>
+            <dd className="min-w-0 space-y-1" data-lifecycle-status={lifecycle.status}>
+              <div>{active ? <Badge variant="success">Active</Badge> : <Badge variant="danger">Suspended</Badge>}</div>
+              <p className="text-muted-foreground">{statusLine(lifecycle)}</p>
+            </dd>
           </div>
           <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-4">
             <dt className="shrink-0 text-muted-foreground sm:w-36">Maintenance</dt>
-            <dd className="min-w-0 break-words" data-lifecycle-maintenance={lifecycle.maintenance.enabled ? "on" : "off"}>
+            <dd className="min-w-0 space-y-1.5 break-words" data-lifecycle-maintenance={lifecycle.maintenance.enabled ? "on" : "off"}>
               {lifecycle.maintenance.enabled ? (
-                <span className="space-y-1">
-                  <Badge variant="warning">On</Badge> <span className="text-muted-foreground">{lifecycle.maintenance.message || DEFAULT_MAINTENANCE_MESSAGE}</span>
-                </span>
+                <>
+                  <div>
+                    <Badge variant="warning">On</Badge>
+                  </div>
+                  <blockquote className="max-w-prose rounded-md border-l-2 border-warning bg-muted px-3 py-2 whitespace-pre-wrap">{lifecycle.maintenance.message || DEFAULT_MAINTENANCE_MESSAGE}</blockquote>
+                </>
               ) : (
                 "Off"
               )}
@@ -256,29 +302,38 @@ export default function LifecycleCard({ store, lifecycle }) {
           </div>
         </dl>
 
-        <div className="flex flex-wrap gap-2">
-          <Button variant={active ? "destructive" : "default"} onClick={() => setOpen("status")} data-action={active ? "suspend" : "resume"}>
-            {active ? <Pause aria-hidden /> : <Play aria-hidden />} {active ? "Suspend" : "Resume"}
-          </Button>
-          <Button variant="outline" onClick={() => setOpen("maintenance")} data-action="maintenance">
-            <Wrench aria-hidden /> {lifecycle.maintenance.enabled ? "Maintenance settings" : "Maintenance"}
-          </Button>
-          <Button variant="outline" onClick={() => setOpen("rotate")} data-action="rotate">
-            <KeyRound aria-hidden /> Rotate secrets
-          </Button>
-          <Button variant="outline" onClick={() => setOpen("edit")} data-action="edit">
-            <Pencil aria-hidden /> Edit details
-          </Button>
-          <Button variant="outline" onClick={runSync} disabled={!active || busy === "sync"} data-action="sync" title={active ? undefined : "A suspended store can't sync."}>
-            <RefreshCw aria-hidden className={busy === "sync" ? "animate-spin" : undefined} /> {busy === "sync" ? "Starting…" : "Sync catalog now"}
-          </Button>
-          <Button variant="outline" onClick={makeExport} disabled={busy === "export"} data-action="export">
-            <Download aria-hidden /> {busy === "export" ? "Preparing…" : "Export"}
-          </Button>
-          <Button variant="destructive" onClick={() => setOpen("offboard")} data-action="offboard">
-            <Trash2 aria-hidden /> Offboard
-          </Button>
+        <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Everyday actions">
+            <Button variant="outline" onClick={() => setOpen("maintenance")} data-action="maintenance">
+              <Wrench aria-hidden /> {lifecycle.maintenance.enabled ? "Maintenance settings" : "Maintenance"}
+            </Button>
+            <Button variant="outline" onClick={() => setOpen("edit")} data-action="edit">
+              <Pencil aria-hidden /> Edit details
+            </Button>
+            <Button variant="outline" onClick={runSync} disabled={!active || busy === "sync"} data-action="sync" title={active ? undefined : "A suspended store can't sync."} aria-describedby={active ? undefined : "sync-off-hint"}>
+              <RefreshCw aria-hidden className={busy === "sync" ? "animate-spin motion-reduce:animate-none" : undefined} /> {busy === "sync" ? "Starting…" : "Sync catalog now"}
+            </Button>
+            <Button variant="outline" onClick={makeExport} disabled={busy === "export"} data-action="export">
+              <Download aria-hidden /> {busy === "export" ? "Preparing…" : "Export"}
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Actions that ask you to confirm">
+            <Button variant={active ? "destructive" : "default"} onClick={() => setOpen("status")} data-action={active ? "suspend" : "resume"}>
+              {active ? <Pause aria-hidden /> : <Play aria-hidden />} {active ? "Suspend" : "Resume"}
+            </Button>
+            <Button variant="outline" onClick={() => setOpen("rotate")} data-action="rotate">
+              <KeyRound aria-hidden /> Rotate secrets
+            </Button>
+            <Button variant="destructive" onClick={() => setOpen("offboard")} data-action="offboard">
+              <Trash2 aria-hidden /> Offboard
+            </Button>
+          </div>
         </div>
+        {!active && (
+          <p id="sync-off-hint" className="text-[0.8125rem] text-muted-foreground">
+            Catalog sync is off while the store is suspended. Resume it to sync.
+          </p>
+        )}
 
         {error && (
           <Alert variant="destructive">
@@ -293,7 +348,7 @@ export default function LifecycleCard({ store, lifecycle }) {
           </Alert>
         )}
         {exportLink && (
-          <div className="space-y-1.5" data-export-link>
+          <div className="space-y-1.5 rounded-md border border-border bg-muted p-3" data-export-link>
             <p>
               Export link ready. It expires in {exportLink.expires} and only works for this store. Anyone with the link can download the store&apos;s data, so share it with care.
             </p>

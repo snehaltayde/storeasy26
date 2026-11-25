@@ -5,7 +5,8 @@
 // console password. Nothing is ticked by default. A new password is shown
 // once, here, with Copy; closing the dialog forgets it. The merchant's own
 // keys are listed by name only: the store's team changes them in Settings.
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { KeyRound, ShieldAlert } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,12 +20,22 @@ const HINTS = {
   order_link_secret: "Order-status links already in customers' emails stop working. New emails get working links.",
   admin_password: "The shared password that opens the console before the store has team members.",
 };
+// Who notices each rotation, said before the confirm.
+const WHO = {
+  order_link_secret: "Shoppers: order links in earlier emails stop working. They can still sign in to see their orders.",
+  admin_password: "Team: the old console password stops working; give them the new one.",
+};
 
 export default function RotateSecretsDialog({ store, lifecycle, open, onOpenChange, onDone }) {
   const [picked, setPicked] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null); // { rotated, consolePassword? }
+  const resultHeading = useRef(null);
+  // the result replaces the form: move focus to it so it is read out first
+  useEffect(() => {
+    if (result) resultHeading.current?.focus();
+  }, [result]);
 
   const reset = () => {
     setPicked([]);
@@ -61,7 +72,7 @@ export default function RotateSecretsDialog({ store, lifecycle, open, onOpenChan
         onOpenChange(o);
       }}
     >
-      <DialogContent data-dialog="rotate-secrets">
+      <DialogContent data-dialog="rotate-secrets" className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Rotate secrets</DialogTitle>
           <DialogDescription>Only the keys Storeasy holds for {store.name} can be rotated here. Nothing is rotated unless you tick it.</DialogDescription>
@@ -70,15 +81,20 @@ export default function RotateSecretsDialog({ store, lifecycle, open, onOpenChan
         {result ? (
           <div className="space-y-3 text-sm" data-rotate-result>
             <Alert variant="success">
-              <AlertTitle>Rotated</AlertTitle>
+              <AlertTitle ref={result.consolePassword ? undefined : resultHeading} tabIndex={result.consolePassword ? undefined : -1} className="outline-none">
+                Rotated
+              </AlertTitle>
               <AlertDescription>{result.rotated.map(label).join(" and ")}.</AlertDescription>
             </Alert>
             {result.consolePassword && (
-              <div className="space-y-1.5">
-                <p className="font-medium">New store console password</p>
-                <p className="text-muted-foreground">It is shown only this once. Copy it now and give it to the store&apos;s owner over a safe channel.</p>
+              <section className="space-y-2 rounded-md border border-warning/40 bg-warning/10 p-3" aria-labelledby="new-password-heading" data-one-time-secret>
+                <h3 id="new-password-heading" ref={resultHeading} tabIndex={-1} className="flex items-center gap-2 font-semibold outline-none">
+                  <KeyRound aria-hidden className="size-4 text-warning" /> New store console password
+                </h3>
+                <p className="font-medium text-warning-text">You won&apos;t see this again. Copy it now: closing this dialog forgets it.</p>
+                <p className="text-muted-foreground">Give it to the store&apos;s owner over a safe channel. If it is lost, rotate the password again.</p>
                 <CopyButton value={result.consolePassword} label="the new console password" />
-              </div>
+              </section>
             )}
             <DialogFooter>
               <Button type="button" onClick={() => onOpenChange(false)}>
@@ -93,7 +109,10 @@ export default function RotateSecretsDialog({ store, lifecycle, open, onOpenChan
               {lifecycle.rotatable.map((r) => {
                 const blocked = r.key === "admin_password" && lifecycle.hasMembers;
                 return (
-                  <div key={r.key} className="flex items-start gap-3">
+                  <div
+                    key={r.key}
+                    className={`flex items-start gap-3 rounded-md border p-3 ${picked.includes(r.key) ? "border-destructive/50 bg-destructive/5" : "border-border"} ${blocked ? "opacity-70" : ""}`}
+                  >
                     <Checkbox id={`rotate-${r.key}`} checked={picked.includes(r.key)} onCheckedChange={(v) => toggle(r.key, v === true)} disabled={blocked} aria-describedby={`rotate-${r.key}-hint`} className="mt-0.5" />
                     <div className="space-y-0.5">
                       <Label htmlFor={`rotate-${r.key}`}>{r.label}</Label>
@@ -106,13 +125,22 @@ export default function RotateSecretsDialog({ store, lifecycle, open, onOpenChan
                 );
               })}
             </fieldset>
-            {picked.includes("order_link_secret") && (
-              <Alert variant="warning">
-                <AlertDescription>Customers who open an order link from an earlier email will see it fail. They can still sign in to see their orders.</AlertDescription>
+            {picked.length > 0 && (
+              <Alert variant="warning" data-rotate-impact>
+                <ShieldAlert aria-hidden />
+                <AlertTitle>What changes when you rotate</AlertTitle>
+                <AlertDescription>
+                  <ul className="space-y-1">
+                    {picked.map((k) => (
+                      <li key={k}>{WHO[k] || label(k)}</li>
+                    ))}
+                  </ul>
+                  <p className="mt-1.5 font-medium">This can&apos;t be undone.</p>
+                </AlertDescription>
               </Alert>
             )}
 
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 border-t border-border pt-4">
               <p className="font-medium">The store&apos;s own keys</p>
               <p className="text-xs text-muted-foreground">The store&apos;s team changes these in Settings.</p>
               <ul className="flex flex-wrap gap-1.5" data-merchant-keys>
@@ -138,7 +166,7 @@ export default function RotateSecretsDialog({ store, lifecycle, open, onOpenChan
                 Cancel
               </Button>
               <Button type="submit" variant="destructive" disabled={!picked.length || busy} data-action="confirm-rotate">
-                {busy ? "Rotating…" : "Rotate"}
+                {busy ? "Rotating…" : picked.length > 1 ? `Rotate ${picked.length} secrets` : "Rotate secret"}
               </Button>
             </DialogFooter>
           </form>
