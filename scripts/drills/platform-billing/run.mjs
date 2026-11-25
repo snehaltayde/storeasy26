@@ -189,8 +189,8 @@ async function billing(drill) {
   // 4. events: the orphan filter
   await page.goto(at("/platform/billing?tab=events&store=orphan"), { waitUntil: "load" });
   await page.getByRole("table", { name: "Billing events" }).waitFor();
-  const events = await text(page);
-  drill.check(/No store/.test(events) && /\+\s*₹999/.test(events), "the orphan event is marked, with its signed amount", events.slice(0, 300));
+  const events = await page.getByRole("table", { name: "Billing events" }).innerText();
+  drill.check(/No store/.test(events) && /\+\s*₹999/.test(events), "the orphan event is marked, with its signed amount", events.slice(0, 400));
   await drill.screenshot(page, "05-events-orphans");
 
   // 5. overrides
