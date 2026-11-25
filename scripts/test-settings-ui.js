@@ -281,6 +281,54 @@ await t("the audit log pages with no gap or repeat and filters by who, action an
   ok((await call("admin", "audit", "GET", { query: `since=${today}` })).body.entries.length >= 7, "since today:");
 });
 
+await t("two tabs saving at once both stick: Shipping and Tracking sent together, each key written on its own (patchTenant json_set)", async () => {
+  for (let round = 0; round < 3; round++) {
+    const rate = 40 + round;
+    const code = `TESTCONC${round}`;
+    const [s1, s2] = await Promise.all([
+      call("admin", "settings", "PUT", { body: { shipping: { flatRate: rate, freeThreshold: 5000, codFee: 0, codFeeWaivedAt: "", basis: "net", zones: [] } } }),
+      call("owner", "settings", "PUT", { body: { tracking: { ga4_measurement_id: "", meta_pixel_id: "", meta_test_event_code: code, ga4_api_secret: "", meta_capi_token: "" } } }),
+    ]);
+    eq([s1.status, s2.status], [200, 200], `round ${round}:`);
+    const cfg = (await fresh()).config;
+    eq([cfg.shipping_config.flatRate, cfg.meta_test_event_code], [rate, code], `round ${round} both kept:`);
+  }
+  // and the secrets blob: two secret saves at once keep both
+  await Promise.all([
+    call("admin", "settings", "PUT", { body: { payments: { razorpay_key_id: CNY.rzpKeyId, razorpay_key_secret: "cnyconcA7", razorpay_webhook_secret: "" } } }),
+    call("owner", "settings", "PUT", { body: { tracking: { ga4_measurement_id: "", meta_pixel_id: "", meta_test_event_code: "", ga4_api_secret: "cnyconcB7", meta_capi_token: "" } } }),
+  ]);
+  const sec = (await fresh()).secrets;
+  eq([sec.razorpay_key_secret, sec.ga4_api_secret, sec.meta_capi_token], ["cnyconcA7", "cnyconcB7", CNY.capiToken], "secrets kept:");
+});
+await t("a stale Details tab can't undo a newer logo text: it sends only what it changed, and site keys are written one by one", async () => {
+  eq(SET.changedIdentity({ name: "S", tagline: "new", logo_text1: "Old" }, { name: "S", tagline: "old", logo_text1: "Old" }), { tagline: "new" });
+  eq(SET.changedIdentity({ a: "" }, {}), {});
+  await call("admin", "settings", "PUT", { body: { identity: { logo_text1: "Fresh", logo_text2: "Logo" } } });
+  // the stale tab loaded before that save; the founder changed only the tagline
+  const stale = { tagline: "Stale tab tagline", logo_text1: "", logo_text2: "" };
+  const r = await call("owner", "settings", "PUT", { body: { identity: SET.changedIdentity(stale, { tagline: CNY.tagline, logo_text1: "", logo_text2: "" }) } });
+  eq(r.status, 200);
+  const site = (await fresh()).config.site;
+  eq([site.tagline, site.logo, site.name, site.support_email], ["Stale tab tagline", { text1: "Fresh", text2: "Logo" }, "Setui Store", CNY.supportEmail]);
+  const C2 = await import("../lib/platform/control.js");
+  await C2.patchTenant(a.id, { config: { site: { footer_tagline: "only this" } } });
+  const after = (await fresh()).config.site;
+  eq([after.footer_tagline, after.logo, after.tagline], ["only this", { text1: "Fresh", text2: "Logo" }, "Stale tab tagline"], "a site key on its own leaves the others:");
+});
+await t("the audit route sends no raw diff, only the redacted lines; one read labels every member", async () => {
+  const g = await call("admin", "audit", "GET", { query: "limit=200&facets=1" });
+  ok(g.body.entries.length > 0 && g.body.entries.every((e) => !("diff" in e) && Array.isArray(e.changes)), "no diff key:");
+  const src = readFileSync(join(ROOT, "app/api/admin/audit/route.js"), "utf8");
+  ok(!src.includes("getUser(") && /WHERE id IN \(/.test(src), "one batched users read:");
+});
+await t("an integration Test answers the founder in plain words: never an env var name or a raw server error", async () => {
+  for (const provider of ["shopify", "razorpay", "typesense", "mail", "ga4", "meta"]) {
+    const r = await call("admin", "integrations", "POST", { body: { action: "test", provider } });
+    ok(!/[A-Z][A-Z0-9]*_[A-Z0-9_]+/.test(String(r.body?.detail || "")), `${provider}: ${r.body?.detail}`);
+  }
+});
+
 // ---- 6. markup ---------------------------------------------------------------------------
 console.log("— 6. the screens' markup");
 const swc = require("next/dist/build/swc/index.js");

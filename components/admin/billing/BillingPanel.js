@@ -17,7 +17,7 @@ import { ConfirmAction, sendJson } from "@/components/admin/offers/ConfirmAction
 // Subscribe (POST /api/admin/billing { action: "subscribe" }, settings.write,
 // asks first), and charges and refunds. Every number comes from the payment
 // provider's confirmed events (lib/admin/billing-view.js). A provider that
-// isn't set up answers 503 with its reason, shown as it is; never a pretend plan.
+// isn't set up answers 503; the founder gets plain words, never its reason or a pretend plan.
 //   initial: buildBillingView()
 const money = (paise, currency = "INR") => (paise === 0 ? "Free" : `₹${(paise / 100).toLocaleString("en-IN")}${currency !== "INR" ? ` ${currency}` : ""}`);
 const day = (iso) => (iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "");

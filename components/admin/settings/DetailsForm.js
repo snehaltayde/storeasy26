@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field } from "@/components/admin/settings/SecretField";
 import { SaveBar, ReadOnlyNote, useSettingsSection } from "@/components/admin/settings/SaveBar";
+import { changedIdentity } from "@/lib/admin/settings";
 
 // Settings → Details (Phase 2 line 7): the store's name, address, contact and
 // brand words; the domains and the Shopify store read-only (operators claim
@@ -12,7 +13,8 @@ import { SaveBar, ReadOnlyNote, useSettingsSection } from "@/components/admin/se
 //   initial: { readOnly, identity, domains, shopify } from settingsView
 const IDENTITY = ["name", "site_url", "support_email", "support_phone", "title", "tagline", "footer_tagline", "logo_text1", "logo_text2", "legal_name"];
 const toState = (v) => ({ identity: Object.fromEntries(IDENTITY.map((k) => [k, v.identity?.[k] ?? ""])), adminPassword: "" });
-const toBody = (s) => ({ identity: s.identity, ...(s.adminPassword ? { admin_password: s.adminPassword } : {}) });
+// only what changed since the tab loaded (changedIdentity): a stale tab can't undo a newer save
+const toBody = (s, view) => ({ identity: changedIdentity(s.identity, toState(view).identity), ...(s.adminPassword ? { admin_password: s.adminPassword } : {}) });
 
 const FIELDS = [
   { key: "name", label: "Store name", hint: "Shown across your storefront, emails and receipts." },

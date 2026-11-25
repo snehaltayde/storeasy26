@@ -6,7 +6,8 @@ import { tenantHandler } from "@/lib/tenant-request";
 
 // Integrations console API (S34 / MC20+BE24). GET = provider registry
 // (presence flags + metadata, never secret values). POST {action, provider}:
-//   test   — cheapest real credential check (settings.read: support can look)
+//   test   — cheapest real credential check (settings.read: owner and admin;
+//            a read that stores nothing, a READ_POSTS row)
 //   revoke — clears the provider's stored credentials (settings.write, audited)
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
