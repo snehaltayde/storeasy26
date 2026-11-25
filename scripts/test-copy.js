@@ -87,6 +87,7 @@ const SKIP_DIRS = new Set([
   // Not shopper surfaces: consoles, operator tools, the marketing site
   "components/admin",
   "components/console",
+  "components/kit", // console-only parts (test:console-ui keeps the storefront from importing them)
   "components/platform",
   "components/site",
   "lib/admin",
