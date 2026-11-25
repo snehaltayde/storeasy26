@@ -103,7 +103,9 @@ stage("cod", async (drill) => {
 
   const status = await open(owner, `/admin/orders/${encodeURIComponent(orderId)}`);
   drill.check(status === 200, "owner: the order page opens", status);
-  drill.check(await owner.getByText("Phone confirmed by code").isVisible(), "owner: the order says Phone confirmed by code");
+  // SMS proves the phone; email proves only the email, and the order says so
+  const proved = channel === "sms" ? "Phone confirmed by code" : "Email confirmed by code";
+  drill.check(await owner.getByText(proved).isVisible(), `owner: the order says ${proved}`);
   await drill.shoot(owner, "cod-order");
 
   // put the store back for the stages after this one

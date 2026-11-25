@@ -48,9 +48,13 @@ export interface CodRules {
   otp: "off" | "always" | "above";
   maxTotal?: number;
   otpAbove?: number; // only when otp is "above"
-  otpChannel?: "sms" | "email"; // only when otp is not "off"
+  // only when otp is not "off". "sms" confirms the phone and is refused where no
+  // SMS provider is set; "email" confirms only the email address.
+  otpChannel?: "sms" | "email";
 }
 
+// tenants.config.payment_config (Phase 8 line 2): read by lib/checkout/payment-terms.js,
+// saved by buildSettingsPatch through validatePaymentConfig. Absent sections stay absent.
 export interface PaymentConfig {
   prepaid?: PrepaidDiscount;
   cod?: CodRules;

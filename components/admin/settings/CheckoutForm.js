@@ -206,8 +206,12 @@ export function CheckoutForm({ initial, role }) {
               </Field>
             )}
             {pay.otp !== "off" && (
-              <Field id="st-cod-otp-channel" label="Send the code by" hint={smsOff ? SMS_UNAVAILABLE : null}>
-                <select id="st-cod-otp-channel" className={SELECT_CLASS} disabled={readOnly} value={pay.otpChannel} onChange={setPay("otpChannel")} aria-describedby={smsOff ? "st-cod-otp-channel-hint" : undefined}>
+              <Field
+                id="st-cod-otp-channel"
+                label="Send the code by"
+                hint={[pay.otpChannel === "email" ? "Email confirms the shopper's email address, not their phone number." : null, smsOff ? SMS_UNAVAILABLE : null].filter(Boolean).join(" ") || null}
+              >
+                <select id="st-cod-otp-channel" className={SELECT_CLASS} disabled={readOnly} value={pay.otpChannel} onChange={setPay("otpChannel")} aria-describedby="st-cod-otp-channel-hint">
                   <option value="email">Email</option>
                   <option value="sms" disabled={smsOff}>
                     SMS

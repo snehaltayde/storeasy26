@@ -396,6 +396,58 @@ await t("5 sends per phone per hour: the 6th answers exactly like a fresh phone,
   const shape = (r) => ({ status: r.status, ...r.body, challengeId: typeof r.body.challengeId, sentTo: r.body.sentTo.replace(/\d{4}$/, "####") });
   eq(shape(capped), shape(fresh), "capped phone vs fresh phone:");
   ok(/^otp_[0-9a-f]{24}$/.test(capped.body.challengeId) && /^otp_[0-9a-f]{24}$/.test(fresh.body.challengeId), "both challenge ids look the same");
+  // the capped challenge can never be verified: its hash is no code's
+  const row = await inT(() => db.selectFrom("cod_otps").selectAll().where("id", "=", capped.body.challengeId).executeTakeFirst());
+  ok(/^capped:/.test(row.code_hash) && !/^[0-9a-f]{64}$/.test(row.code_hash), `a capped challenge holds a matchable hash: ${row.code_hash}`);
+});
+
+await t("a capped phone's challenge can't be verified with any code; resends never reset tries; 10 tries per phone per hour across challenges", async () => {
+  await anHourLater();
+  await saveConfig(BASE_SHIPPING, OTP_ALWAYS);
+  const phone = "9000033333";
+  const opts = { contact: { ...CONTACT, phone } };
+  // resend keeps the tries
+  const cart1 = await freshCart();
+  const k1 = key();
+  const s1 = await sendFor(cart1, k1, opts);
+  const c1 = codeIn(await lastSms());
+  const bad = (c) => (c === "000000" ? "111111" : "000000");
+  for (let i = 0; i < 2; i++) eq((await verify(cart1, k1, s1.body.challengeId, bad(c1), opts)).body.code, "COD_OTP_WRONG", `try ${i + 1}:`);
+  await ageSends(cart1);
+  const again = await sendFor(cart1, k1, opts);
+  eq(again.body.challengeId, s1.body.challengeId, "same challenge:");
+  eq((await otpRows(cart1))[0].attempts, 2, "tries kept across the resend:");
+  // across challenges (new carts), every guess counted; past 10 the right code is locked too
+  const answers = [];
+  const right = [];
+  for (let n = 0; n < 3; n++) {
+    const cart = await freshCart();
+    const k = key();
+    const sent = await sendFor(cart, k, opts);
+    const code = codeIn(await lastSms());
+    for (let i = 0; i < 4; i++) answers.push((await verify(cart, k, sent.body.challengeId, bad(code), opts)).body.code);
+    right.push({ cart, k, id: sent.body.challengeId, code });
+  }
+  const guessed = 2 + answers.filter((a) => a === "COD_OTP_WRONG").length;
+  ok(guessed <= OTP.PHONE_TRIES.limit, `${guessed} guesses were checked for one phone in an hour`);
+  eq(answers.at(-1), "COD_OTP_LOCKED", "past the cap:");
+  const last = right.at(-1);
+  const locked = await verify(last.cart, last.k, last.id, last.code, opts);
+  eq([locked.body.code, locked.body.error], ["COD_OTP_LOCKED", PT.COD_OTP_MESSAGES.locked], "the right code past the cap:");
+  // and a capped phone (sends over 5) never verifies, whatever the code
+  await anHourLater(); // a new hour: 5 sends reach the phone, the 6th is capped
+  let lastCode = null;
+  for (let n = 0; n < 5; n++) {
+    await sendFor(await freshCart(), key(), opts);
+    lastCode = codeIn(await lastSms()); // a real code this phone just received
+  }
+  const capCart = await freshCart();
+  const capKey = key();
+  const capped = await sendFor(capCart, capKey, opts);
+  for (const guess of [lastCode, "000000", "123456"]) {
+    const r = await verify(capCart, capKey, capped.body.challengeId, guess, opts);
+    ok(r.body.code === "COD_OTP_WRONG" || r.body.code === "COD_OTP_LOCKED", `a capped challenge verified with ${guess}`);
+  }
 });
 
 await t("10 sends per IP per 15 minutes, its own sentence", async () => {
@@ -422,6 +474,12 @@ await t("bound to cart, key, phone and amount: another cart's challenge, a chang
   const crossVerify = await verify(cartB, kA, sent.body.challengeId, code);
   eq([crossVerify.status, crossVerify.body.code], [409, "COD_OTP_STALE"], "verify from cart B:");
   eq((await verify(cartA, kA, sent.body.challengeId, code)).status, 200, "verify from cart A:");
+  // the same amount with other lines is not the cart the code was sent for
+  let other = null;
+  await inT(() => OTP.requireVerified({ challengeId: sent.body.challengeId, cartId: cartA, key: kA, phone: CONTACT.phone, amount: 1348, currency: "INR", cart: { items: [{ variantId: "gid://t/V9", quantity: 1 }] } })).catch((e) => (other = e));
+  eq(other?.code, "COD_OTP_REQUIRED", "same amount, other lines:");
+  const same = await inT(() => OTP.requireVerified({ challengeId: sent.body.challengeId, cartId: cartA, key: kA, phone: CONTACT.phone, amount: 1348, currency: "INR", cart: { items: [{ variantId: "gid://t/V2", quantity: 1 }] } }));
+  eq(same.id, sent.body.challengeId, "the same lines:");
   const crossPlace = await placeCod(cartB, kA, sent.body.challengeId);
   eq([crossPlace.status, crossPlace.body.code], [409, "COD_OTP_REQUIRED"], "place from cart B:");
   eq((await ordersFor(cartB)).length, 0, "no order on cart B:");
@@ -473,6 +531,56 @@ await t("email channel: the code goes by notify to the order's email", async () 
   ok(/^\d{6} is your code/.test(row.body), "the email carries the code");
 });
 
+await t("an email code places the order as 'Email confirmed by code', never as a phone check", async () => {
+  await anHourLater();
+  await saveConfig(BASE_SHIPPING, { cod: { otp: "always", otpChannel: "email" } });
+  const cart = await freshCart();
+  const k = key();
+  const sent = await sendFor(cart, k);
+  eq((await verify(cart, k, sent.body.challengeId, codeIn(await lastSms()))).status, 200, "verified:");
+  eq((await placeCod(cart, k, sent.body.challengeId)).status, 200, "placed:");
+  const [order] = await ordersFor(cart);
+  eq(await inT(() => OTP.codCheckChannel(order.id)), "email", "channel:");
+  eq(OTP.codCheckWords(await inT(() => OTP.codCheckChannel(order.id))), "Email confirmed by code", "label:");
+});
+
+await t("SMS chosen with no provider: the send is refused with its sentence, no code is made or sent", async () => {
+  await anHourLater();
+  await saveConfig(BASE_SHIPPING, OTP_ALWAYS);
+  const cart = await freshCart();
+  const was = process.env.NODE_ENV;
+  const before = (await inT(() => db.selectFrom("notifications").select("id").execute())).length;
+  process.env.NODE_ENV = "production";
+  let r;
+  try {
+    r = await sendFor(cart, key());
+  } finally {
+    process.env.NODE_ENV = was;
+  }
+  eq([r.status, r.body.code, r.body.error], [503, "COD_OTP_UNAVAILABLE", PT.COD_OTP_MESSAGES.cantSend], "refused:");
+  eq(friendlyCheckoutError(r.body), PT.COD_OTP_MESSAGES.cantSend, "the shopper reads:");
+  eq((await otpRows(cart)).length, 0, "no challenge:");
+  eq((await inT(() => db.selectFrom("notifications").select("id").execute())).length, before, "no message:");
+});
+
+await t("a sent code leaves the notifications row: the body is redacted on the next send or check", async () => {
+  await anHourLater();
+  await saveConfig(BASE_SHIPPING, OTP_ALWAYS);
+  const cart = await freshCart();
+  const k = key();
+  const sent = await sendFor(cart, k);
+  const row = await lastSms();
+  const code = codeIn(row);
+  await verify(cart, k, sent.body.challengeId, code);
+  const after = await inT(() => db.selectFrom("notifications").select(["body"]).where("id", "=", row.id).executeTakeFirst());
+  ok(!after.body.includes(code) && !/\d{6}/.test(after.body), `the code is still in the row: ${after.body}`);
+  // an unsent one (the email queue) keeps its text until the code expires, then loses it too
+  await inT(() => db.updateTable("notifications").set({ created_at: new Date(Date.now() - 6 * 60_000).toISOString() }).where("type", "=", "cod_otp").where("status", "!=", "sent").execute());
+  await verify(cart, k, sent.body.challengeId, code);
+  const left = await inT(() => db.selectFrom("notifications").select(["body", "status"]).where("type", "=", "cod_otp").execute());
+  ok(left.length > 0 && left.every((n) => !/\d{6}/.test(n.body)), `a code is still stored: ${JSON.stringify(left.find((n) => /\d{6}/.test(n.body)))}`);
+});
+
 await t("OTP above an amount: below it no code, above it a code", async () => {
   await anHourLater();
   await saveConfig(BASE_SHIPPING, { cod: { otp: "above", otpAbove: 2000, otpChannel: "sms" } });
@@ -499,7 +607,14 @@ await t("the SMS stub never runs in production; settings refuse SMS there", asyn
     ok(threw && /never runs in production/.test(threw.message), "the stub refuses in production");
     await SMS.sendSms({ to: "+919999999999", text: "x" }).catch((e) => (threw = e));
     ok(/No SMS provider/.test(threw.message), "sendSms refuses");
-    eq(OTP.otpChannelFor("sms"), "email", "checkout sends by email instead:");
+    let refused = null;
+    try {
+      OTP.otpChannelFor("sms");
+    } catch (e) {
+      refused = e;
+    }
+    eq([refused?.code, refused?.message], ["COD_OTP_UNAVAILABLE", PT.COD_OTP_MESSAGES.cantSend], "SMS is refused, never sent by email instead:");
+    eq(OTP.otpChannelFor("email"), "email", "email stays email:");
     const r = SET.buildSettingsPatch({ payment_config: { cod: { otp: "always", otpChannel: "sms" } } }, {}, { smsAvailable: SMS.smsAvailable() });
     eq([r.ok, r.errors], [false, [SET.SMS_UNAVAILABLE]], "settings:");
   } finally {
@@ -558,7 +673,7 @@ await t("settings: payment_config is validated, saved under its key, and the wor
   eq(example, [
     "A ₹1,000 order costs ₹1,049 by cash on delivery and ₹950 paid online, so paying online saves ₹99.",
     "Cash on delivery is offered up to ₹5,000.",
-    "Cash-on-delivery orders over ₹2,000 ask for a code sent by email.",
+    "Cash-on-delivery orders over ₹2,000 ask for a code sent by email, which confirms the email address, not the phone.",
   ], "example:");
   const t1 = PT.paymentTerms({ cart: { subtotal: 1000, discountTotal: 0, total: 1000 }, shippingConfig: BASE_SHIPPING, paymentConfig: good.patch.config.payment_config });
   eq([t1.cod.total, t1.prepaid.total, t1.nudge.save], [1049, 950, 99], "the example's numbers are the checkout's:");
@@ -579,10 +694,12 @@ await t("order view: 'Phone confirmed by code' shows for support (a time, not PI
   ok(support.pii_redacted && support.phone === null, "support's view is redacted");
   eq(support.cod_verified_at, order.cod_verified_at, "support sees the check:");
   for (const role of ["staff", "admin", "owner"]) eq(redactOrderForRole(order, role).cod_verified_at, order.cod_verified_at, `${role}:`);
+  eq([OTP.codCheckWords("sms"), OTP.codCheckWords("email"), OTP.codCheckWords(null)], ["Phone confirmed by code", "Email confirmed by code", null], "the label says what the code proved:");
+  eq(await inT(() => OTP.codCheckChannel(order.id)), "sms", "this order's code went by SMS:");
   const src = await readFile(join(ROOT, "components/admin/orders/OrderTimeline.js"), "utf8");
-  ok(src.includes("Phone confirmed by code"), "the timeline shows it");
+  ok(src.includes("{codCheck}") && !/>\s*Phone confirmed by code/.test(src), "the timeline shows the channel's words, never a fixed phone claim");
   const page = await readFile(join(ROOT, "app/(console)/admin/(authed)/orders/[id]/page.js"), "utf8");
-  ok(/codVerifiedAt=\{order\.cod_verified_at/.test(page) && /payment_discount: order\.payment_discount/.test(page), "the order page passes the check and the prepaid discount");
+  ok(/codCheck=\{codCheckWords\(codChannel\)\}/.test(page) && /codVerifiedAt=\{order\.cod_verified_at/.test(page) && /payment_discount: order\.payment_discount/.test(page), "the order page passes the check, its words and the prepaid discount");
 });
 
 await t("Shopify draft: the prepaid discount rides in the order-level discount as 'Prepaid discount'", () => {

@@ -259,7 +259,7 @@ export const POST = tenantHandler(async (request) => {
       if (!validate(contact, address)) return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
       const terms = termsFor(cart, address);
       if (!terms.cod.available) return codUnavailable(terms);
-      const bind = { cartId, key: String(idempotencyKey), phone: contact.phone, amount: terms.cod.total, currency: cart.currency || "INR" };
+      const bind = { cartId, key: String(idempotencyKey), phone: contact.phone, amount: terms.cod.total, currency: cart.currency || "INR", cart };
       try {
         if (action === "cod_otp_verify") return NextResponse.json({ ok: true, ...(await verifyCodOtp({ ...bind, challengeId: body.challengeId, code: body.code })) });
         if (!terms.cod.otpRequired) return NextResponse.json({ ok: true, required: false });
@@ -318,7 +318,7 @@ export const POST = tenantHandler(async (request) => {
       let challenge = null;
       if (terms.cod.otpRequired) {
         try {
-          challenge = await requireVerified({ challengeId: body.challengeId, cartId, key: String(idempotencyKey), phone: contact.phone, amount: terms.cod.total, currency: cart.currency || "INR" });
+          challenge = await requireVerified({ challengeId: body.challengeId, cartId, key: String(idempotencyKey), phone: contact.phone, amount: terms.cod.total, currency: cart.currency || "INR", cart });
         } catch (e) {
           if (e instanceof CodOtpError) return otpError(e);
           throw e;

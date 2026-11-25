@@ -1,5 +1,6 @@
 -- Phase 8 line 2: the prepaid nudge and the cash-on-delivery OTP (additive).
--- cod_otps holds one challenge per cart, idempotency key, phone and amount;
+-- cod_otps holds one challenge per cart, idempotency key, phone, amount and
+-- cart lines;
 -- the code is stored only as sha256(code|challengeId|store link secret) and the
 -- phone only as sha256(e164|secret). orders gain the prepaid discount they were
 -- charged with and when a COD order's phone was confirmed by code.
@@ -8,6 +9,7 @@ CREATE TABLE IF NOT EXISTS cod_otps (
   cart_id TEXT NOT NULL, idempotency_key TEXT NOT NULL,
   phone_hash TEXT NOT NULL,       -- sha256(e164|secret)
   amount_minor INTEGER NOT NULL, currency TEXT NOT NULL,
+  cart_hash TEXT NOT NULL DEFAULT '', -- sha256 of the cart's variant ids and quantities
   channel TEXT NOT NULL,          -- sms | email
   code_hash TEXT NOT NULL, expires_at TEXT NOT NULL,
   attempts INTEGER NOT NULL DEFAULT 0, sends INTEGER NOT NULL DEFAULT 1, last_sent_at TEXT NOT NULL,
