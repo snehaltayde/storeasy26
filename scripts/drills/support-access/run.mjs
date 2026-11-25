@@ -47,7 +47,10 @@ async function context(drill, label) {
   page.on("console", (msg) => {
     // the editor's document reads answer 404 for a document the roles store
     // doesn't have yet (the same for every member): an answer, not an error
-    const documentsMiss = /status of 404/.test(msg.text()) && /\/api\/admin\/documents$/.test(msg.location()?.url || "");
+    // and the fixture catalog's product images live on a Shopify CDN path the
+    // drill's blocked network never serves (next/image answers 404)
+    const at = msg.location()?.url || "";
+    const documentsMiss = /status of 404/.test(msg.text()) && (/\/api\/admin\/documents$/.test(at) || /\/_next\/image\?url=https%3A%2F%2Fcdn\.shopify\.com%2Ffixture%2F/.test(at));
     if (msg.type() === "error" && !documentsMiss && !/eval\(\) is not supported/.test(msg.text())) browserErrors.push(`${label}: ${msg.text().slice(0, 300)} (${msg.location()?.url || ""})`);
   });
   page.on("pageerror", (e) => browserErrors.push(`${label}: ${String(e?.message || e).slice(0, 300)}`));
