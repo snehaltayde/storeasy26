@@ -51,7 +51,11 @@ Date: 2026-11-25. Audited on `main` at `f6646dec` (end of Phase 5 lines 1–3; `
 ## Not checked
 
 - The Next incremental data cache in a real server (suites read directly).
-- Browser markup and the RSC payload of preview versus anonymous pages (covered by the Phase 5 `drill:all`).
+- The RSC payload of preview versus anonymous pages.
+
+## Phase 5 browser suite
+
+`drill:all` at `68a05347` (2026-11-25, 3,222 s): 28 of 29 passed. `shell` failed on one real finding: support saw the themes draft bar's Preview button unmarked. It is a read (the founder preview, `storefront.read`), so it now carries `data-read-control` with reasoned rows, and the shell drill checks the full-screen studio (Phase 6 contract, already on main) by its own top bar. `drill:shell` then passed alone (896 s).
 - Operator role granularity: any operator reads `/api/platform/themes`, as before.
 - `baseMemo` in `lib/brand.js` keys on package surfaces with no size bound (memory, not access).
 - Whether the tenant export includes `theme_packages` (completeness).
