@@ -92,7 +92,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 
 ## Phase 8: India and global checkout (roadmap Phase 5)
 
-- [ ] A shopper can enter a pincode and get their address filled and a delivery estimate
+- [x] A shopper can enter a pincode and get their address filled and a delivery estimate
 - [x] A shopper choosing COD is offered a prepaid nudge, and COD orders can require an OTP
 - [x] A signed-in shopper can save addresses and pick one at checkout
 - [ ] A founder can sell in more than one currency and country
