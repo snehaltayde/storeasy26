@@ -3,6 +3,13 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Dashboard details and the shell drill's role (on the owner's behalf)
+
+- **Permissions:** the dashboard shows the shop domain only with `settings.read`; "Run again" is `RoleGate`d on `sync.run` (staff and support see it disabled with the reason); "Reconnect Shopify" needs `settings.write`. Queue counts are real `COUNT`s, never a capped list; a part the server can't read says "Couldn't check".
+- **Shell drill:** it counts every non-GET request in the browser context (pages, workers, popups) while support is on a page, with the harness's own request log as a second check; Next's `/__nextjs_*` dev posts are skipped only when the HMR socket is open; Radix's empty focus guards are not controls. Three rarer escapes (a `pushState` round trip, a request still in flight when the window closes, `sendBeacon`/keepalive on `pagehide`) and a guard against `READ_POSTS` rows naming the page itself go to a follow-up, not a merge blocker: the drill is a second line behind server-side permissions, which `test:permissions` proves for every route and role.
+- **Decided by:** Claude
+- **Slice:** Phase 2 line 1
+
 ## 2026-11-25 Self-hosted fonts (on the owner's behalf)
 
 - **Decision:** the storefront and consoles load Geist, Geist Mono and Fraunces from `app/fonts/` via `next/font/local` (latin, preloaded) plus `fonts.css` for the other subsets and Google's fallback metrics; the files are the exact ones `next/font/google` served. `test:fonts` bans `next/font/google` and Google Fonts URLs; `pnpm build` runs `check-built-fonts.js`, which fails if a built `--font-*` family isn't declared or has no face covering ₹. The CSP no longer allows Google Fonts hosts. Accepted change: the mono family is named `GeistMono` (Turbopack names a local family after its binding); same file and glyphs. The drill runner's font retry is gone.
