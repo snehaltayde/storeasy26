@@ -41,7 +41,8 @@ export async function shopper(drill, viewport) {
   await stubImages(ctx);
   await consent(ctx);
   const page = await ctx.newPage();
-  page.on("console", (m) => (m.type() === "error" ? consoleErrors.push(`shopper: ${m.text().slice(0, 300)}`) : null));
+  // React's development build notes the CSP's missing unsafe-eval (drill:apps ignores it too)
+  page.on("console", (m) => (m.type() === "error" && !/eval\(\) is not supported/.test(m.text()) ? consoleErrors.push(`shopper: ${m.text().slice(0, 300)}`) : null));
   page.on("pageerror", (e) => consoleErrors.push(`shopper: ${String(e?.message || e).slice(0, 300)}`));
   return page;
 }

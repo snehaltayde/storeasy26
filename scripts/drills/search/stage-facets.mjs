@@ -67,11 +67,13 @@ async function seed(drill) {
   await owner.context().close();
 }
 
-const countText = (page) => page.locator("[data-search-count]").innerText();
+// The route has a loading skeleton: while a page streams, its content waits in a
+// hidden template. Only what is visible counts.
+const countText = (page) => page.locator("[data-search-count]").filter({ visible: true }).innerText();
 async function countIs(page, n) {
-  await page.waitForFunction((want) => document.querySelector("[data-search-count]")?.textContent?.trim() === want, plural(n));
+  await page.waitForFunction((want) => [...document.querySelectorAll("[data-search-count]")].some((el) => el.checkVisibility() && el.textContent.trim() === want), plural(n));
 }
-const cards = (page) => page.locator('main a[href^="/products/facet-drill-"]').evaluateAll((els) => [...new Set(els.map((a) => a.getAttribute("href").split("/products/")[1]))]);
+const cards = (page) => page.locator('a[href^="/products/facet-drill-"]').evaluateAll((els) => [...new Set(els.filter((a) => a.checkVisibility()).map((a) => a.getAttribute("href").split("/products/")[1]))]);
 const rail = (page) => page.locator("aside[aria-label='Filters']");
 async function pick(page, scope, group, value, urlRe) {
   await scope.locator(`[data-facet-group="${group}"] [data-facet-value="${value}"]`).click();
