@@ -86,7 +86,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 
 ## Phase 7: flagship themes and storefront UX (roadmap Phase 4)
 
-- [ ] A founder can choose one of five flagship themes at onboarding or later
+- [x] A founder can choose one of five flagship themes at onboarding or later
 - [x] A shopper can filter search results by several facets
 - [x] A shopper on a phone sees a sticky add-to-cart bar and a cart drawer with tiered offers
 
