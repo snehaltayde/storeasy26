@@ -212,7 +212,7 @@ export async function createStage(drill) {
   const secId = await addSection(page, "bundle_card");
   const ins = inspectorOf(page);
   await ins.getByRole("button", { name: "Create a bundle" }).click();
-  const dlg = page.locator("dialog[open]").filter({ has: page.locator("[data-bundle-create]") }).first();
+  const dlg = page.locator('[role="dialog"][data-state="open"]').filter({ has: page.locator("[data-bundle-create]") }).first();
   await dlg.locator("[data-bundle-create]").waitFor({ timeout: 30_000 });
   await dlg.locator("#bundle-name-compact").fill("Drill trio");
   const liveNow = (await dlg.locator("[data-bundle-live-now]").innerText()).trim();
@@ -224,7 +224,7 @@ export async function createStage(drill) {
   drill.check((await dlg.locator("input").count()) === 2 && (await dlg.locator("textarea").count()) === 0, "create: the Dialog asks only for a name, products and a price (two inputs, no description, no slug)", { inputs: await dlg.locator("input").count() });
   const pickProduct = async (n) => {
     await dlg.getByRole("button", { name: "Add product" }).click();
-    const vp = page.locator("dialog[open]").last();
+    const vp = page.locator('[role="dialog"][data-state="open"]').last();
     await vp.locator('input[aria-label="Search products"]').fill("PF-");
     await sleep(1500);
     await settle(page);
@@ -249,7 +249,7 @@ export async function createStage(drill) {
   drill.check(Boolean(on) && /^The products add up to ₹[\d,]+\. Shoppers save ₹[\d,]+(\.\d+)?\./.test(saving), "create: a passing price turns 'Create bundle' on and says what shoppers save", { saving });
   await drill.screenshot(page, "create-passing-price-1440");
   await createBtn.click();
-  await waitFor(async () => (await page.locator("dialog[open]").count()) === 0, 30_000);
+  await waitFor(async () => (await page.locator('[role="dialog"][data-state="open"]').count()) === 0, 30_000);
   const after = await bundleRows();
   const added = after.filter((b) => !before.some((x) => x.id === b.id));
   drill.check(added.length === 1 && added[0].slug === "drill-trio" && Number(added[0].enabled) === 1 && !after.some((b) => /-2$/.test(b.slug)), "create: exactly one new bundles row, turned on, at /bundles/drill-trio (no drill-trio-2)", { before: before.length, after: after.map((b) => [b.slug, b.enabled]) });

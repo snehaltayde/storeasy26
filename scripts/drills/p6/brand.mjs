@@ -160,7 +160,7 @@ export async function brandStage(drill) {
   drill.check(forestIn !== false && before === slate.brand.accent && (await page.locator(CHECKED_PALETTE).getAttribute("data-palette")) === "forest", "picking Forest puts the Forest --accent-500 in the preview frame within 1 s, before Save", { before, after: await frameAccent(page), ms: forestIn });
   drill.check(sameBrand((await docOf("doc_design"))?.body?.settings?.brand, slate.brand), "and nothing is written: the design draft is still Slate", (await docOf("doc_design"))?.body?.settings?.brand);
   await page.getByRole("button", { name: "Choose from your library", exact: true }).click();
-  const dlg = page.locator("dialog[open]").last();
+  const dlg = page.locator('[role="dialog"][data-state="open"]').last();
   await dlg.waitFor({ timeout: 30_000 });
   await dlg.locator('input[type="file"]').setInputFiles(logoFile);
   await page.locator("#brand-logo-alt").waitFor({ timeout: 60_000 });

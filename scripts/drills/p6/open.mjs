@@ -107,7 +107,7 @@ export async function openStage(drill) {
 
   // the brand step: Slate kept, the library logo chosen, saved
   await page.getByRole("button", { name: "Choose from your library", exact: true }).click();
-  const dlg = page.locator("dialog[open]").last();
+  const dlg = page.locator('[role="dialog"][data-state="open"]').last();
   await dlg.locator(`button:has(img[src*="${P6_LOGO_MEDIA.id}"])`).first().click();
   await page.locator("#brand-logo-alt").waitFor({ timeout: 30_000 });
   await page.locator("#brand-logo-alt").fill("");
