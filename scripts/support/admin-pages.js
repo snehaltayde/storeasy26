@@ -42,6 +42,8 @@ export const ADMIN_PAGES = Object.freeze([
   { page: "quizzes", action: "storefront.read" },
   { page: "quizzes/[slug]", action: "storefront.read", params: { slug: "$quiz" }, note: "the fixture quiz; an unknown slug is a not-found; \"new\" is the create form, writers only (Phase 2 line 10)" },
   { page: "releases", action: "storefront.read" },
+  // Phase 6 step 0: the studio (every role reads; controls follow storefront.write / storefront.publish)
+  { page: "studio", action: "storefront.read", note: "product and collection content redirect to /admin/editor; a writer's store with no home page goes to /admin/editor first" },
   { page: "settings/team", action: "team.manage", note: "staff and support get the no-access page; the team is never read for them (Phase 2 line 8)" },
   { page: "settings", action: "settings.read", note: "Details; every settings tab renders the no-access words for a role without settings.read (Phase 2 line 7)" },
   { page: "settings/audit", action: "audit.read" },

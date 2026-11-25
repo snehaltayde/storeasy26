@@ -412,40 +412,41 @@ const hrefs = (html) => [...html.matchAll(/<a [^>]*href="([^"]*)"/g)].map((m) =>
 const navHrefs = (html) => [...html.matchAll(/<a [^>]*href="([^"]*)"[^>]*data-nav-item=/g)].map((m) => m[1]);
 const LEGACY_STOREFRONT = ["/admin/storefront", "/admin/storefront/home", "/admin/storefront/designer", "/admin/storefront/pages", "/admin/storefront/navigation", "/admin/storefront/product-pages", "/admin/theme", "/admin/brand", "/admin/media", "/admin/releases"];
 
-await t("rendered: the shell's nav links the storefront to /admin/editor; Media and Publishing stay; Editor is current on /admin/editor/templates", () => {
-  const html = shell({}, "/admin/editor/templates");
+// Phase 6 step 0: the nav's editor item is "Studio" at /admin/studio
+await t("rendered: the shell's nav links the storefront to /admin/studio; Media and Publishing stay; Studio is current on /admin/studio", () => {
+  const html = shell({}, "/admin/studio");
   const links = navHrefs(html);
-  ok(links.includes("/admin/editor"), `no editor link: ${links}`);
+  ok(links.includes("/admin/studio") && !links.includes("/admin/editor"), `no studio link: ${links}`);
   for (const old of LEGACY_STOREFRONT.slice(0, 8)) ok(!links.includes(old), `still links to ${old}`);
   ok(links.includes("/admin/media") && links.includes("/admin/releases"), "Media or Publishing gone");
-  ok(/<a [^>]*href="\/admin\/editor"[^>]*aria-current="page"/.test(html), "the Editor link isn't marked current on /admin/editor/templates");
+  ok(/<a [^>]*href="\/admin\/studio"[^>]*aria-current="page"/.test(html), "the Studio link isn't marked current on /admin/studio");
   eq((html.match(/aria-current="page"/g) || []).length, 1, "exactly one current item:");
-  ok(html.includes(">Editor<") && /data-badge="publish"/.test(html), "label or Publishing badge missing");
-  eq(links.filter((h) => h === "/admin/editor").length, 1, "one sidebar (the phone sheet renders nothing on the server):");
+  ok(html.includes(">Studio<") && /data-badge="publish"/.test(html), "label or Publishing badge missing");
+  eq(links.filter((h) => h === "/admin/studio").length, 1, "one sidebar (the phone sheet renders nothing on the server):");
   // the page sits straight in main (every page is new UI since Phase 2 line 11)
   ok(/<main[^>]*>(<div[^>]*>)?<p>page<\/p>/.test(html), "the page renders straight in main:");
 });
 
 await t("rendered: /admin/editor keeps the shell's sidebar and top bar (no route steps the shell aside since the Designer went)", () => {
   const ed = shell({}, "/admin/editor");
-  ok(navHrefs(ed).includes("/admin/editor") && ed.includes('data-shell="topbar"') && ed.includes("<p>page</p>"), "the sidebar, the top bar and the page:");
+  ok(navHrefs(ed).includes("/admin/studio") && ed.includes('data-shell="topbar"') && ed.includes("<p>page</p>"), "the sidebar, the top bar and the page:");
   // Phase 2 line 6 (6a): isEditorRoute only makes main full-bleed; nothing steps the sidebar or the top bar aside
   ok(!/SheetContent|ConsoleNavContext/.test(read("components/admin/shell/AdminShell.js")), "the editor-route branch is gone from AdminShell.js");
 });
 
 await t("rendered: staff see no Settings; Setup is gone for everyone and Onboarding is there for staff", () => {
   const staff = navHrefs(shell({ role: "staff" }));
-  ok(staff.includes("/admin/editor") && !staff.includes("/admin/settings") && !staff.includes("/admin/setup") && staff.includes("/admin/onboarding"), `staff: ${staff}`);
+  ok(staff.includes("/admin/studio") && !staff.includes("/admin/settings") && !staff.includes("/admin/setup") && staff.includes("/admin/onboarding"), `staff: ${staff}`);
   ok(!navHrefs(shell({})).includes("/admin/setup"), "owner: no Setup");
 });
 
 // Phase 1 line 3: the logo and colours moved into onboarding's Brand step,
 // so the Storefront group has no "Logo and colours" item.
-await t("Phase 1 line 3 rendered: the Storefront group is Editor, Media, Publishing (no 'Logo and colours'); Onboarding is in Overview for owners and staff (its own page has no sidebar)", () => {
+await t("Phase 1 line 3 rendered: the Storefront group is Studio (Phase 6; was Editor), Media, Publishing (no 'Logo and colours'); Onboarding is in Overview for owners and staff (its own page has no sidebar)", () => {
   const html = shell({ badges: {} }, "/admin/media");
   const links = navHrefs(html);
-  const at = links.indexOf("/admin/editor");
-  eq(links.slice(at, at + 3), ["/admin/editor", "/admin/media", "/admin/releases"], "the storefront group in order:");
+  const at = links.indexOf("/admin/studio");
+  eq(links.slice(at, at + 3), ["/admin/studio", "/admin/media", "/admin/releases"], "the storefront group in order:");
   ok(!links.includes("/admin/start") && !html.includes("Logo and colours"), "no /admin/start link");
   ok(/<a [^>]*href="\/admin\/onboarding"[^>]*>[\s\S]*?Onboarding/.test(html), "the link:");
   eq(navHrefs(shell({ badges: {} }, "/admin/onboarding")), [], "on /admin/onboarding itself the shell shows no sidebar:");

@@ -91,6 +91,10 @@ export const READ_CONTROLS = [
   { path: "components/admin/settings/AuditTable.js", reason: "the who and what selects, the two dates, Try again, Clear filters and Load more only ask GET /api/admin/audit for another page", marks: 7 },
   { path: "components/admin/settings/HelpPanel.js", reason: "Copy diagnostics (the clipboard) and the mailto link to Storeasy's team send nothing from the page", marks: 2 },
   { path: "components/admin/integrations/IntegrationsList.js", reason: "Test asks POST /api/admin/integrations { action: \"test\" } (settings.read): the cheapest provider check, it stores nothing", marks: 1 },
+  // Phase 6 step 0: the studio shell
+  { path: "components/admin/studio/Studio.js", reason: "the Sections and Design tab buttons only switch the shown rail", marks: 1 },
+  { path: "components/admin/studio/DesignRail.js", reason: "Open the design opens doc_design in the studio (getDocument, a read)", marks: 1 },
+  { path: "app/(console)/admin/(authed)/studio/error.js", reason: "Try again re-renders the page (a re-read, no write)", marks: 1 },
   // Phase 2 line 6 (6a): the editor frame, the page list, the tree, templates
   { path: "components/admin/editor/DocumentEditor.js", reason: "the page-list toggle, the phone tabs (Sections, Edit, Preview, and their group, which Radix makes focusable), the tablet preview toggle, the writing view's preview toggle, Earlier versions (listHistory, a document read), \"Edit the page's details\" (a selection) and Try again (getDocument) only show, select or read", marks: 8 },
   { path: "components/admin/editor/Switcher.js", reason: "the search box, Show archived pages (listDocuments with includeArchived, a read), the product filters, Show more products (listProductContent) and each page, product and collection row (opens it in the editor, a GET) only read", marks: 7 },

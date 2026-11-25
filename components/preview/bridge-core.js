@@ -60,6 +60,28 @@
 //              description  text (at most 160 characters, set as text) in
 //                           [data-store-tagline]; null: the page's own
 //            All three null: the page as it rendered.
+//
+// Studio (Phase 6 step 0), in the editor's frame (v2 without look): the
+// founder's unsaved structure and tokens drawn at once, before the save. Each
+// is taken only in a working preview (ok true), only from this origin and from
+// window.parent; the next storeasy:refresh reload clears it (the reload is the
+// truth).
+//   parent → {type:"storeasy:order", doc, ids:[sectionId…], hidden:[sectionId…]}
+//            ids and doc match ID_RE, at most ORDER_MAX of each, else the
+//            message is ignored. For the top-level [data-section-id]
+//            elements inside each [data-doc="<doc>"], their parent gets
+//            ORDERING_CLASS (flex column) and the listed ones take the slots
+//            the listed ones held, in the message's order (style.order);
+//            every other child keeps its own place. Hidden ids get
+//            data-studio-hidden and display:none; a section no longer listed
+//            as hidden is shown again. Unknown ids are ignored. No node is
+//            ever created, removed or moved.
+//   parent → {type:"storeasy:tokens", brand}
+//            tokensCss(brand) (PreviewBridge.js: validateBrand, then the
+//            layout's brandCssVars with the page's own kit and package
+//            surfaces) into <style id="brand-vars-draft"> after #brand-vars;
+//            an invalid brand (tokensCss gives null) is ignored; brand null
+//            removes the draft style. Raw CSS is never taken.
 
 export const SELECTED_CLASS = "storeasy-selected";
 export const DESIGNING_CLASS = "storeasy-designing";
@@ -69,6 +91,11 @@ export const LOOK_CLASS = "storeasy-look";
 export const DRAFT_STYLE_ID = "brand-vars-draft";
 export const LOGO_RE = /^\/api\/media\/[A-Za-z0-9_-]{1,120}$/;
 export const TAGLINE_MAX = 160;
+export const ORDERING_CLASS = "storeasy-ordering";
+export const STUDIO_HIDDEN_ATTR = "data-studio-hidden";
+export const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+export const ORDER_MAX = 200;
+const idList = (v) => (Array.isArray(v) && v.length <= ORDER_MAX && v.every((x) => typeof x === "string" && ID_RE.test(x)) ? v : null);
 
 // The document a route shows, for data-doc on <main> and the offline line.
 // routes: { "<path>": "<document id>" } from the layout (lib/content/resolve.js
@@ -146,7 +173,8 @@ export function pickOf(target) {
 //   state, ok, reason  what the layout says this frame shows (see above)
 //   css                the outline styles (PreviewBridge.js holds them)
 //   brandFor(id)       a palette's {css, kit}, or null (PreviewBridge.js)
-export function createBridge({ window: win, document: doc, state = null, ok = false, reason = null, css = "", brandFor = () => null } = {}) {
+//   tokensCss(brand)   a brand's CSS variables, or null (PreviewBridge.js)
+export function createBridge({ window: win, document: doc, state = null, ok = false, reason = null, css = "", brandFor = () => null, tokensCss = () => null } = {}) {
   if (!win || !doc || !win.parent || win.parent === win) return () => {}; // not embedded: inert
   const origin = win.location?.origin;
   let v1 = false;
@@ -269,6 +297,17 @@ export function createBridge({ window: win, document: doc, state = null, ok = fa
   };
   const byId = (id) => (typeof doc.getElementById === "function" ? doc.getElementById(id) : null);
   let kitBefore;
+  function drawDraft(text) {
+    let el = byId(DRAFT_STYLE_ID);
+    if (!el) {
+      el = doc.createElement("style");
+      el.setAttribute("id", DRAFT_STYLE_ID);
+      const after = byId("brand-vars");
+      if (after && typeof after.insertAdjacentElement === "function") after.insertAdjacentElement("afterend", el);
+      else doc.head.appendChild(el);
+    }
+    el.textContent = text;
+  }
   function applyPalette(id) {
     if (id === null) {
       byId(DRAFT_STYLE_ID)?.remove();
@@ -282,15 +321,7 @@ export function createBridge({ window: win, document: doc, state = null, ok = fa
       b = null;
     }
     if (!b || typeof b.css !== "string") return; // unknown: ignored
-    let el = byId(DRAFT_STYLE_ID);
-    if (!el) {
-      el = doc.createElement("style");
-      el.setAttribute("id", DRAFT_STYLE_ID);
-      const after = byId("brand-vars");
-      if (after && typeof after.insertAdjacentElement === "function") after.insertAdjacentElement("afterend", el);
-      else doc.head.appendChild(el);
-    }
-    el.textContent = b.css;
+    drawDraft(b.css);
     if (html && typeof b.kit === "string" && b.kit) {
       if (kitBefore === undefined) kitBefore = attrOf(html, "data-kit");
       html.setAttribute("data-kit", b.kit);
@@ -338,6 +369,53 @@ export function createBridge({ window: win, document: doc, state = null, ok = fa
     if (msg.description !== undefined) applyDescription(msg.description);
   }
 
+  // ---- studio: unsaved order, hiding and tokens ------------------------------
+  function applyOrder(msg) {
+    const ids = idList(msg.ids);
+    const hiddenIds = idList(msg.hidden ?? []);
+    if (typeof msg.doc !== "string" || !ID_RE.test(msg.doc) || !ids || !hiddenIds) return;
+    const roots = doc.querySelectorAll(`[data-doc="${escapeAttr(win, msg.doc)}"]`) || [];
+    for (const root of roots) {
+      const inRoot = (el) => typeof root.contains === "function" && root.contains(el);
+      const secs = [...(doc.querySelectorAll("[data-section-id]") || [])].filter((el) => el !== root && inRoot(el) && !inRoot(closest(el.parentElement, "[data-section-id]")));
+      for (const el of secs) {
+        if (!el.style) continue;
+        const id = attrOf(el, "data-section-id");
+        if (hiddenIds.includes(id)) {
+          el.setAttribute(STUDIO_HIDDEN_ATTR, "");
+          el.style.display = "none";
+        } else if (attrOf(el, STUDIO_HIDDEN_ATTR) !== null) {
+          el.removeAttribute(STUDIO_HIDDEN_ATTR);
+          el.style.display = "";
+        }
+      }
+      const parents = [...new Set(secs.map((el) => el.parentElement).filter(Boolean))];
+      for (const parent of parents) {
+        const kids = [...(parent.children || [])];
+        const listed = kids.filter((el) => secs.includes(el) && ids.includes(attrOf(el, "data-section-id")));
+        if (!listed.length) continue;
+        const slots = listed.map((el) => kids.indexOf(el));
+        const wanted = [...listed].sort((a, b) => ids.indexOf(attrOf(a, "data-section-id")) - ids.indexOf(attrOf(b, "data-section-id")));
+        parent.classList.add(ORDERING_CLASS);
+        kids.forEach((el, i) => el.style && (el.style.order = String(i)));
+        wanted.forEach((el, i) => el.style && (el.style.order = String(slots[i])));
+      }
+    }
+  }
+  function applyTokens(brand) {
+    if (brand === null) {
+      byId(DRAFT_STYLE_ID)?.remove();
+      return;
+    }
+    let text = null;
+    try {
+      text = tokensCss(brand);
+    } catch {
+      text = null;
+    }
+    if (typeof text === "string") drawDraft(text); // invalid: ignored
+  }
+
   const onMessage = (e) => {
     if (e.origin !== origin) return; // same-origin console only
     const msg = e.data;
@@ -361,6 +439,12 @@ export function createBridge({ window: win, document: doc, state = null, ok = fa
     if (v2) {
       if (msg.type === "storeasy:brand") {
         if (look && ok === true && e.source === win.parent) applyBrand(msg);
+        return;
+      }
+      if (msg.type === "storeasy:order" || msg.type === "storeasy:tokens") {
+        if (look || ok !== true || e.source !== win.parent) return;
+        if (msg.type === "storeasy:order") applyOrder(msg);
+        else if (Object.hasOwn(msg, "brand")) applyTokens(msg.brand);
         return;
       }
       if (msg.type === "storeasy:select" && !look) selectSection(msg.sectionId);

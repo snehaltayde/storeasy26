@@ -3,6 +3,16 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Phase 6 step 0: the studio contract (on the owner's behalf)
+
+- **Schema and permissions:** none, as planned. The studio page gives `can = { write: storefront.write, publish: storefront.publish }`; without write the shell uses `readOnlyApi` and a read-only store, so support and operator support send no documents write. Publish shows only with write and publish (staff read "Ask an admin to publish.").
+- **Slots are files, not props:** `Studio.js` renders `SectionsRail.js` (line 1), `StudioTopBar.js` (line 1) and `DesignRail.js` (line 2), each with one `studio` prop. The two lines replace their own files and rarely touch `Studio.js`, so their branches don't collide.
+- **`tokensCss` is its own plain module** (`components/preview/tokens-css.js`, relative imports) so node suites import the exact function the frame runs; `PreviewBridge.js` passes it to the bridge with the layout's `look`.
+- **Order keeps non-section nodes in place:** the listed sections take the slots the listed sections held (`style.order` on every child of their parent), so a wrapper or form between sections never jumps to the top; nested sections and other documents are untouched.
+- **A writer's store with no home page goes to `/admin/editor`** (which runs the first-run generator) instead of the studio copying the generator; support still opens the studio.
+- **The nav's Studio item lights only on `/admin/studio`:** the editor's own addresses (product and collection content, templates) no longer mark a nav item current; `activeItem` was left as it is rather than given an alias list.
+- **Every token has a CSS variable** (`--accent-*`, `--background`, `--foreground`, `--brand-radius`, `--type-scale`, `--btn-radius`, `--section-pad-y`), so all seven draw instantly. The accent is `--accent-<step>` (no `--c-accent`).
+
 ## 2026-11-25 Phase 6 studio editor plan (on the owner's behalf)
 
 - **Schema:** none. Studio state (which documents this session changed, the undo history) lives in the browser; tokens stay in `doc_design.settings.brand`.

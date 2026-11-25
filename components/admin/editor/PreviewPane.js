@@ -21,6 +21,12 @@ import { applyDesignToggle, createPreviewController, showDesignFor, WORDS } from
 //   adding       a newly added section isn't in the frame yet
 //   hidden       the writing view keeps the frame (and its session) but hides it
 //   onPick(pick), onView(view)
+//   fill         (Phase 6 studio) the pane takes its parent's full height
+//                instead of 70vh
+//   onFrame(post) (Phase 6 studio) called once on mount with a poster bound
+//                to this frame and this origin: post(msg) → true when it was
+//                handed to the frame, false when there is no frame (or it is
+//                navigating); called with null on unmount
 // The frame is minted with startDocumentsPreview, re-minted when the bridge
 // reports ok:false (the session ended, or "See the live store" left it on the
 // live store) or when no ready arrives within 3 seconds of a load, and shows
@@ -41,7 +47,7 @@ export const DEVICES = Object.freeze([
   { id: "desktop", width: 1280, words: "Desktop", icon: Monitor },
 ]);
 
-export default function PreviewPane({ api, documentId, path, ack = null, problem = null, select = null, adding = false, hidden = false, label = "", retry = 0, onPick, onView }) {
+export default function PreviewPane({ api, documentId, path, ack = null, problem = null, select = null, adding = false, hidden = false, label = "", retry = 0, fill = false, onPick, onView, onFrame }) {
   const frameRef = useRef(null);
   const ctlRef = useRef(null);
   const pathRef = useRef(path);
@@ -64,6 +70,23 @@ export default function PreviewPane({ api, documentId, path, ack = null, problem
   pathRef.current = path;
   pickRef.current = onPick;
   viewRef.current = onView;
+  const frameCbRef = useRef(onFrame);
+  frameCbRef.current = onFrame;
+  useEffect(() => {
+    const origin = window.location.origin;
+    const post = (msg) => {
+      const w = frameRef.current?.contentWindow;
+      if (!w) return false;
+      try {
+        w.postMessage(msg, origin);
+        return true;
+      } catch {
+        return false; // the frame is navigating
+      }
+    };
+    frameCbRef.current?.(post);
+    return () => frameCbRef.current?.(null);
+  }, []);
 
   useEffect(() => {
     const origin = window.location.origin;
@@ -186,7 +209,7 @@ export default function PreviewPane({ api, documentId, path, ack = null, problem
   return (
     <section
       aria-label={label ? `Preview of ${label}` : "Preview"}
-      className={hidden ? "hidden" : "@container min-w-0 space-y-2"}
+      className={hidden ? "hidden" : fill ? "@container flex h-full min-h-0 min-w-0 flex-col gap-2" : "@container min-w-0 space-y-2"}
       data-preview-pane=""
       data-preview-label={view?.label || ""}
       data-preview-phase={view?.phase || ""}
@@ -238,12 +261,12 @@ export default function PreviewPane({ api, documentId, path, ack = null, problem
           {WORDS.adding}
         </p>
       )}
-      <div ref={stageRef} className="h-[70vh] overflow-hidden rounded-lg border border-border bg-muted" data-preview-stage="">
+      <div ref={stageRef} className={cn("overflow-hidden rounded-lg border border-border bg-muted", fill ? "min-h-0 flex-1" : "h-[70vh]")} data-preview-stage="">
         <iframe
           ref={frameRef}
           title={label ? `Your store: ${label}` : "Your store"}
-          className={cn("block h-[70vh] bg-white", device === "desktop" ? "w-full" : "mx-auto max-w-none shrink-0")}
-          style={device === "desktop" ? undefined : scale < 1 ? { width: `${width}px`, height: `calc(70vh / ${scale})`, transform: `scale(${scale})`, transformOrigin: "top left" } : { width: `${width}px` }}
+          className={cn("block bg-white", fill ? "h-full" : "h-[70vh]", device === "desktop" ? "w-full" : "mx-auto max-w-none shrink-0")}
+          style={device === "desktop" ? undefined : scale < 1 ? { width: `${width}px`, height: `calc(${fill ? "100%" : "70vh"} / ${scale})`, transform: `scale(${scale})`, transformOrigin: "top left" } : { width: `${width}px` }}
           onLoad={() => ctlRef.current?.frameLoad()}
           data-preview-frame=""
         />

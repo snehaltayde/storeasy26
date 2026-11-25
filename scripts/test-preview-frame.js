@@ -123,6 +123,7 @@ class El {
     this.parentElement = null;
     this.classes = new Set();
     this.scrolled = 0;
+    this.style = {};
     for (const c of children) this.append(c);
     const self = this;
     this.classList = {
@@ -651,6 +652,170 @@ await t("line 6, brand overlay inputs: an unknown palette id, a javascript: or h
   b.s.message({ type: "storeasy:brand", paletteId: null, logo: null, description: 7 });
   eq(b.page.tagline.textContent.length, 160, "a description that isn't text: ignored:");
   b.stop();
+});
+
+// ---- Phase 6 step 0: the studio's storeasy:order and storeasy:tokens -------------
+const { tokensCss } = RECORD ? {} : await import("../components/preview/tokens-css.js");
+const BrandLib = await import("../lib/brand.js");
+const AURORA6 = JSON.parse(await readFile(join(ROOT, "scripts/fixtures/themes/aurora.theme.json"), "utf8"));
+const EDIT = { type: "storeasy:editor:hello", v: 2 };
+function studioPage() {
+  const a = h("section", { "data-section-id": "sec_a", "data-section-kind": "hero" }, h("div", { "data-section-id": "sec_inner" }));
+  const b = h("section", { "data-section-id": "sec_b", "data-section-kind": "rich_text" });
+  const note = h("p", {});
+  const c = h("section", { "data-section-id": "sec_c", "data-section-kind": "faq" });
+  const main = h("main", { "data-doc": "doc_home" }, a, b, note, c);
+  const other = h("section", { "data-section-id": "sec_f", "data-section-kind": "text" });
+  const footer = h("footer", { "data-doc": "doc_footer" }, other);
+  const vars = h("style", { id: "brand-vars" });
+  vars.textContent = ":root{--accent-500:#334155;}";
+  return { a, b, c, note, inner: a.children[0], main, other, footer, vars, nodes: [main, footer] };
+}
+const studioStand = ({ ok = true, reason = null, look = { kit: "pulse-1", surfaces: null } } = {}) => {
+  const page = studioPage();
+  const s = standIn(page.nodes, { headChildren: [page.vars], kit: "pulse-1" });
+  const stop = Bridge.createBridge({ window: s.window, document: s.document, state: docState, ok, reason, css: "x", brandFor, tokensCss: (b) => tokensCss(b, look) });
+  return { page, s, stop };
+};
+const nodeCount = (s) => [...s.document.documentElement.walk()].length;
+const orderOf = (els) => els.map((el) => el.style.order);
+const ORDER = { type: "storeasy:order", doc: "doc_home", ids: ["sec_c", "sec_a", "sec_b"], hidden: ["sec_b"] };
+const GOOD = { accent: "#166534", background: "#ffffff", foreground: "#111111", radius: "lg", type_scale: "large", button_shape: "square", section_spacing: "airy" };
+
+await t("Phase 6 order: in the editor frame the listed sections take the listed sections' slots in the message's order (style.order), their parent gets storeasy-ordering, other children keep their place, hidden ids get data-studio-hidden + display:none and come back when no longer hidden; no node is created, removed or moved; nested sections and other documents are left alone", () => {
+  const { page, s, stop } = studioStand();
+  s.message(EDIT);
+  const before = nodeCount(s);
+  const kids = [...page.main.children];
+  s.message(ORDER);
+  ok(page.main.classList.contains(Bridge.ORDERING_CLASS), "the parent orders:");
+  same(orderOf([page.a, page.b, page.note, page.c]), ["1", "3", "2", "0"], "orders (c, a, note, b):");
+  ok(page.b.getAttribute(Bridge.STUDIO_HIDDEN_ATTR) === "" && page.b.style.display === "none", "b hidden:");
+  eq(page.inner.style.order, undefined, "a nested section is not ordered:");
+  eq(page.other.style.order, undefined, "another document's section is not ordered:");
+  eq(nodeCount(s), before, "no node created or removed:");
+  ok(page.main.children.length === kids.length && page.main.children.every((c, i) => c === kids[i]), "no node moved:");
+  s.message({ ...ORDER, ids: ["sec_a", "sec_b", "sec_c"], hidden: [] });
+  same(orderOf([page.a, page.b, page.note, page.c]), ["0", "1", "2", "3"], "back in place:");
+  ok(page.b.getAttribute(Bridge.STUDIO_HIDDEN_ATTR) === null && page.b.style.display === "", "b shown again:");
+  // unknown ids are ignored; a doc with no section changes nothing
+  s.message({ ...ORDER, ids: ["sec_zz", "sec_c", "sec_a"], hidden: ["sec_yy"] });
+  same(orderOf([page.a, page.b, page.note, page.c]), ["3", "1", "2", "0"], "unknown id ignored (c and a swap slots):");
+  eq(nodeCount(s), before, "still no node created:");
+  eq(s.sent.filter((x) => x.msg?.type !== "storeasy:ready").length, 0, "order sends nothing back:");
+  stop();
+});
+
+await t("Phase 6 order refusals: before a hello, in look mode, in a frame that isn't a working preview (ok:false), from another origin, from a window that isn't the parent, with a bad doc id, bad section ids (pattern, type, more than 200) or a bad hidden list, the message changes nothing", () => {
+  const untouched = (b, label) => {
+    ok(!b.page.main.classList.contains(Bridge.ORDERING_CLASS), `${label}: no ordering class`);
+    same(orderOf([b.page.a, b.page.b, b.page.c]), [undefined, undefined, undefined], `${label}: orders`);
+    eq(b.page.b.getAttribute(Bridge.STUDIO_HIDDEN_ATTR), null, `${label}: hidden`);
+  };
+  let b = studioStand();
+  b.s.message(ORDER);
+  untouched(b, "no hello");
+  b.stop();
+  b = studioStand();
+  b.s.message(LOOK);
+  b.s.message(ORDER);
+  untouched(b, "look mode");
+  b.stop();
+  for (const reason of ["revoked", "expired", "not_found", "live"]) {
+    b = studioStand({ ok: false, reason });
+    b.s.message(EDIT);
+    b.s.message(ORDER);
+    untouched(b, reason);
+    b.stop();
+  }
+  b = studioStand();
+  b.s.message(EDIT);
+  b.s.message(ORDER, "https://evil.test");
+  untouched(b, "another origin");
+  b.s.message(ORDER, "https://fv.test", { postMessage() {} });
+  untouched(b, "not the parent");
+  const bad = [
+    { ...ORDER, doc: 'doc_home"]' },
+    { ...ORDER, doc: 7 },
+    { ...ORDER, ids: ["sec_a", "x y"] },
+    { ...ORDER, ids: ["sec_a", 3] },
+    { ...ORDER, ids: "sec_a" },
+    { ...ORDER, ids: ["a".repeat(65)] },
+    { ...ORDER, ids: Array.from({ length: 201 }, (_, i) => `s${i}`) },
+    { ...ORDER, hidden: ["<b>"] },
+    { ...ORDER, hidden: "sec_b" },
+  ];
+  for (const m of bad) {
+    b.s.message(m);
+    untouched(b, `bad ${JSON.stringify(m).slice(0, 60)}`);
+  }
+  b.stop();
+});
+
+await t("Phase 6 tokens: a valid brand draws tokensCss(brand) in <style id=brand-vars-draft> right after #brand-vars, equal to the layout's brandCssVars(resolveBrand(brand), {kit, surfaces}) for the page's own kit and package surfaces; a new brand replaces it; brand null removes it; invalid brands, raw CSS and extra keys are ignored or dropped", () => {
+  const look = { kit: AURORA6.kit, surfaces: AURORA6.surfaces };
+  const { page, s, stop } = studioStand({ look });
+  s.message(EDIT);
+  s.message({ type: "storeasy:tokens", brand: GOOD });
+  const st = draftStyle(s);
+  ok(st, "the draft style exists:");
+  eq(st.textContent, BrandLib.brandCssVars(BrandLib.resolveBrand(GOOD), { kit: look.kit, surfaces: look.surfaces }), "the layout's CSS for the same brand, kit and surfaces:");
+  ok(st.textContent.includes(":root[data-theme]{"), "the package's surfaces are in it:");
+  eq(s.document.head.children.indexOf(st), s.document.head.children.indexOf(page.vars) + 1, "right after #brand-vars:");
+  for (const v of ["--accent-500:", "--background:#ffffff", "--foreground:#111111", "--brand-radius:", "--type-scale:", "--btn-radius:", "--section-pad-y:"]) ok(st.textContent.includes(v), `token variable ${v}`);
+  const first = st.textContent;
+  s.message({ type: "storeasy:tokens", brand: { ...GOOD, accent: "#1d4ed8", evil: "}body{display:none" } });
+  eq(s.document.head.children.filter((c) => c.attrs.id === Bridge.DRAFT_STYLE_ID).length, 1, "one draft style:");
+  ok(draftStyle(s).textContent !== first && !draftStyle(s).textContent.includes("display:none"), "replaced; the extra key dropped:");
+  const kept = draftStyle(s).textContent;
+  for (const brand of [{ accent: "red;}body{" }, { ...GOOD, radius: "huge" }, ":root{--accent-500:red}", ["#ffffff"], 7, { css: "body{display:none}", accent: "nope" }]) {
+    s.message({ type: "storeasy:tokens", brand });
+    eq(draftStyle(s).textContent, kept, `ignored: ${JSON.stringify(brand)}`);
+  }
+  s.message({ type: "storeasy:tokens" });
+  eq(draftStyle(s).textContent, kept, "no brand key: ignored:");
+  s.message({ type: "storeasy:tokens", brand: null });
+  eq(draftStyle(s), null, "brand null removes the draft:");
+  eq(s.document.getElementById("brand-vars").textContent, ":root{--accent-500:#334155;}", "#brand-vars untouched:");
+  eq(s.sent.filter((x) => x.msg?.type !== "storeasy:ready").length, 0, "tokens send nothing back:");
+  stop();
+  // the same brand on a built-in look: no surfaces block, the kit's own corrections
+  eq(tokensCss(GOOD, { kit: "pulse-1", surfaces: null }), BrandLib.brandCssVars(BrandLib.resolveBrand(GOOD), { kit: "pulse-1" }), "built-in look:");
+  eq(tokensCss(GOOD), BrandLib.brandCssVars(BrandLib.resolveBrand(GOOD)), "no look: the default kit:");
+  eq(tokensCss({ accent: "red;}body{" }, look), null, "tokensCss refuses a bad hex:");
+});
+
+await t("Phase 6 tokens refusals: before a hello, in look mode, with ok:false, from another origin or a window that isn't the parent, nothing is drawn; and the layout hands the editing frame look={kit, surfaces} from the same kit and package it drew #brand-vars with", async () => {
+  const msg = { type: "storeasy:tokens", brand: GOOD };
+  let b = studioStand();
+  b.s.message(msg);
+  eq(draftStyle(b.s), null, "no hello:");
+  b.stop();
+  b = studioStand();
+  b.s.message(LOOK);
+  b.s.message(msg);
+  eq(draftStyle(b.s), null, "look mode:");
+  b.stop();
+  for (const reason of ["revoked", "expired", "not_found", "live"]) {
+    b = studioStand({ ok: false, reason });
+    b.s.message(EDIT);
+    b.s.message(msg);
+    eq(draftStyle(b.s), null, `${reason}:`);
+    b.stop();
+  }
+  b = studioStand();
+  b.s.message(EDIT);
+  b.s.message(msg, "https://evil.test");
+  eq(draftStyle(b.s), null, "another origin:");
+  b.s.message(msg, "https://fv.test", { postMessage() {} });
+  eq(draftStyle(b.s), null, "not the parent:");
+  b.stop();
+  const layout = await readFile(join(ROOT, "app/(storefront)/layout.js"), "utf8");
+  ok(/brandCssVars\(brand \? resolveBrand\(brand\) : null, \{ kit, surfaces: pkg\?\.surfaces \?\? null \}\)/.test(layout), "the layout draws #brand-vars with kit and pkg surfaces");
+  ok(layout.includes("look: { kit, surfaces: pkg?.surfaces ?? null }"), "chrome.look is the same kit and surfaces");
+  ok(/chrome\.preview && editing && <PreviewBridgeMount state=\{frame\.state\} ok look=\{chrome\.look \?\? null\} \/>/.test(layout), "only the editing frame gets look");
+  const bridge = await readFile(join(ROOT, "components/preview/PreviewBridge.js"), "utf8");
+  ok(bridge.includes("tokensCss: (b) => tokensCss(b, l)"), "PreviewBridge hands the bridge tokensCss with the layout's look");
 });
 
 await t("routeDocFor: exact addresses from the layout, product and collection pages to their layout documents, others none", () => {

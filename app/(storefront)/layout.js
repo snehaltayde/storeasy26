@@ -144,6 +144,9 @@ async function chromeData() {
         // styles (every selector and value written by lib/themes/styles.js)
         brandCss: [brandCssVars(brand ? resolveBrand(brand) : null, { kit, surfaces: pkg?.surfaces ?? null }), pkg ? compileStyles(pkg.styles, pkg.slug) : ""].filter(Boolean).join("\n"),
         kitAttr: kit,
+        // Phase 6 (studio): what the brand above was drawn with, for the
+        // editor frame's storeasy:tokens (PreviewBridge tokensCss)
+        look: { kit, surfaces: pkg?.surfaces ?? null },
         themeAttr: pkg?.slug ?? null,
         preview: src.preview,
         // P2-PREVIEW: what a documents preview shows
@@ -391,7 +394,7 @@ export default async function RootLayout({ children }) {
             never ship it. P3-FRAME: also for a preview that ended, and for a
             console-signed-in browser on the live store (reason "live"), so
             the editor knows what its frame shows. Never for a shopper. */}
-        {chrome.preview && editing && <PreviewBridgeMount state={frame.state} ok />}
+        {chrome.preview && editing && <PreviewBridgeMount state={frame.state} ok look={chrome.look ?? null} />}
         {frame?.kind === "refused" && <PreviewBridgeMount ok={false} reason={frame.reason} />}
         {liveConsole && <PreviewBridgeMount ok={false} reason="live" />}
         <CartProvider initialCart={cart}>

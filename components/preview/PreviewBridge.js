@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { createBridge } from "./bridge-core";
 import { paletteById } from "@/lib/themes/palettes";
 import { brandCssVars } from "@/lib/brand";
+import { tokensCss } from "./tokens-css";
 
 // Designer and editor ⇄ preview bridge (S54; P3-FRAME). The storefront layout
 // mounts it only for a founder: in a preview, when a preview has just ended,
@@ -19,6 +20,8 @@ import { brandCssVars } from "@/lib/brand";
 //   state   documents preview: {kind, sid, docs, offline, skipped, designShown}
 //   ok      true for a working documents preview
 //   reason  why not ("revoked", "expired", "not_found", "live")
+//   look    {kit, surfaces} the layout drew this page's brand with (the
+//           editing branch only), for the studio's storeasy:tokens
 const STYLES = `
   [data-sec].storeasy-selected { outline: 2px solid #0ea5e9; outline-offset: 4px; border-radius: 4px; }
   body.storeasy-designing [data-sec] { cursor: pointer; }
@@ -27,6 +30,8 @@ const STYLES = `
   body.storeasy-editing [data-field]:hover { outline: 1px dotted #0ea5e9; outline-offset: 2px; }
   body.storeasy-editing [data-section-id].storeasy-selected { outline: 2px solid #0ea5e9; outline-offset: 4px; border-radius: 4px; }
   body.storeasy-look [data-preview-bar] { display: none !important; }
+  .storeasy-ordering { display: flex; flex-direction: column; }
+  [data-studio-hidden] { display: none !important; }
 `;
 
 // Phase 1 line 6 (look mode): a palette's colours, worked out inside the
@@ -37,11 +42,11 @@ export function brandFor(id) {
   return p ? { css: brandCssVars(p.brand, { kit: p.kit }), kit: p.kit } : null;
 }
 
-export default function PreviewBridge({ state = null, ok = false, reason = null }) {
-  const key = JSON.stringify([state, ok, reason]);
+export default function PreviewBridge({ state = null, ok = false, reason = null, look = null }) {
+  const key = JSON.stringify([state, ok, reason, look]);
   useEffect(() => {
-    const [s, o, r] = JSON.parse(key);
-    return createBridge({ window, document, state: s, ok: o, reason: r, css: STYLES, brandFor });
+    const [s, o, r, l] = JSON.parse(key);
+    return createBridge({ window, document, state: s, ok: o, reason: r, css: STYLES, brandFor, tokensCss: (b) => tokensCss(b, l) });
   }, [key]);
   return null;
 }

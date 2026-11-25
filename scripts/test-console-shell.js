@@ -109,7 +109,8 @@ await t("activeItem: longest path prefix at a '/', never a partial segment", () 
   const items = Nav.navItems(Nav.NAV);
   const at = (p) => Nav.activeItem(p, items)?.id ?? null;
   eq(at("/admin/orders/ord_1"), "orders", "an order:");
-  eq(at("/admin/editor/templates"), "editor", "editor templates:");
+  eq(at("/admin/studio"), "editor", "the studio (Phase 6: the editor item is Studio):");
+  eq(at("/admin/editor/templates"), null, "the editor's own pages no longer light the Studio item:");
   eq(at("/admin/dashboard"), "dashboard", "exact:");
   eq(at("/admin/settingsx"), null, "a partial segment:");
   eq(at("/admin"), null, "the root:");
