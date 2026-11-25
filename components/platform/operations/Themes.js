@@ -43,11 +43,11 @@ export default function Themes() {
     { key: "version", header: "Pinned version", cell: (t) => (t.pinned ? <span className="font-mono tabular-nums">v{t.version}</span> : <span className="text-muted-foreground">Platform default</span>) },
     {
       key: "package",
-      header: "Uploaded theme",
+      header: "Theme package",
       cell: (t) =>
         t.package ? (
-          <span data-ops-theme-package={t.package.id}>
-            {t.package.name || t.package.slug || "Uploaded theme"} {t.package.version ? <span className="font-mono tabular-nums">{t.package.version}</span> : null} <span className="font-mono text-xs text-muted-foreground">{t.package.id}</span>
+          <span data-ops-theme-package={t.package.id} data-ops-theme-source={t.package.source}>
+            {t.package.name || t.package.slug || "Theme package"} {t.package.version ? <span className="font-mono tabular-nums">{t.package.version}</span> : null} ({t.package.source === "storeasy" ? "Storeasy" : "uploaded"}) <span className="font-mono text-xs text-muted-foreground">{t.package.id}</span>
           </span>
         ) : (
           "—"
@@ -64,7 +64,7 @@ export default function Themes() {
           <h2 id="ops-themes-title" className="text-base font-semibold">
             Themes
           </h2>
-          <p className="text-sm text-muted-foreground">Which look each store has live, and the uploaded theme it uses, if any. Only the store&apos;s own team changes it, by publishing a design.</p>
+          <p className="text-sm text-muted-foreground">Which look each store has live, and the Storeasy or uploaded theme it uses, if any. Only the store&apos;s own team changes it, by publishing a design.</p>
         </div>
         <Button size="sm" variant="outline" disabled={state.loading} onClick={load}>
           <RefreshCw aria-hidden /> Refresh

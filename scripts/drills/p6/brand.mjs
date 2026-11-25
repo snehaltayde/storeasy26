@@ -10,11 +10,19 @@
 // frame's header, both before Save; Skip resets the preview; at 390px the
 // Preview sheet opens and shows the frame. The editor stays open in a second
 // tab while onboarding mints its own preview (one cookie per browser).
+// Phase 7 line 1: a flagship theme. On its own fresh store (the stage h seed:
+// checkout on, founder policy pages, so the store can open) the founder picks
+// Harvest and the Forest colours: the preview shows Harvest's header and
+// Forest's accent before Save; Save writes drafts only; Open your store lists
+// the theme's layout drafts with home; once open, the anonymous shopper (consent
+// cookie set, pictures stubbed) sees Harvest with the Forest colours.
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { CONSENT_COOKIE, serializeConsent } from "../../../lib/track/names.js";
 import {
   LIME,
+  liveRelease,
   LOGO_FACTS,
   P6_STORE,
   docOf,
@@ -282,5 +290,69 @@ export async function brandStage(drill) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   drill.check(!overflow, "at 390 nothing scrolls sideways", null);
   drill.check(errors.length === 0, "no page errors (390 run)", errors);
+  await ctx.close();
+
+  await harvestRun(drill, forest);
+}
+
+// ---- Phase 7 line 1: Harvest with the Forest colours, then open the store ----
+const GIF = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
+async function harvestRun(drill, forest) {
+  const { latestFlagship } = await import("../../../lib/themes/flagships.js");
+  const harvest = latestFlagship("harvest");
+  await reseedP6(drill, "h");
+  const ctx = await p6Context(drill, { width: 1280 });
+  const errors = watchErrors(ctx);
+  const page = await loginP6(drill, ctx);
+  await openStart(drill, page);
+  await page.locator('[data-brand-themes] [data-theme-pick="harvest"]').waitFor({ timeout: 60_000 });
+  drill.check((await page.locator("[data-brand-themes] [data-theme-pick]").count()) === 6, "the Brand step offers 'Keep the simple look' and five themes before Colours", await page.locator("[data-brand-themes] [data-theme-pick]").count());
+  await previewShown(page);
+  await page.locator('[data-brand-themes] [data-theme-pick="harvest"]').click();
+  await page.locator('[data-brand-step] [data-palette="theme"]').waitFor({ timeout: 10_000 });
+  drill.check(true, "with a theme, the colours start with 'Theme's colours'");
+  await page.locator('[data-brand-step] [data-palette="forest"]').click();
+  const shown = await waitFor(async () => {
+    const theme = await frameEval(page, () => document.documentElement.getAttribute("data-theme"));
+    return theme === "harvest" && (await frameAccent(page)) === forest.brand.accent ? theme : false;
+  }, 5_000, 100);
+  drill.check(Boolean(shown), "before Save the preview shows Harvest (data-theme) with the Forest accent", { theme: await frameEval(page, () => document.documentElement.getAttribute("data-theme")), accent: await frameAccent(page) });
+  drill.check(!(await docOf("doc_design"))?.body?.settings?.theme?.package, "and nothing is written: the design draft names no theme yet", null);
+  await drill.screenshot(page, "b-harvest-forest-unsaved-1280");
+  await page.locator("[data-brand-step]").getByRole("button", { name: "Save", exact: true }).click();
+  await page.locator('[data-brand-done="saved"]').waitFor({ timeout: 60_000 });
+  const design = await docOf("doc_design");
+  drill.check(/^thm_[0-9a-f]{16}$/.test(String(design?.body?.settings?.theme?.package)) && design?.body?.settings?.brand?.accent === forest.brand.accent && design?.body?.settings?.brand?.heading_font === "serif", "Save: the design draft names Harvest with the Forest accent and serif headings", design?.body?.settings);
+  drill.check((await liveRelease()) == null, "Save publishes nothing: the store is still closed", null);
+
+  await page.goto(p6Url(drill, "/admin/onboarding?step=open"), { waitUntil: "load", timeout: 120_000 });
+  await settle(page);
+  await page.locator('[data-onboarding="open-store"]').getByRole("button", { name: "Open your store", exact: true }).click();
+  const dialog = page.locator('[data-onboarding="open-dialog"]');
+  await dialog.waitFor({ timeout: 30_000 });
+  const confirm = dialog.locator('[data-onboarding="confirm-open"]');
+  await waitFor(async () => (await confirm.isEnabled().catch(() => false)) && (await dialog.locator("[data-going-live]").count()) > 0, 60_000, 300);
+  const listed = await dialog.locator("[data-going-live]").evaluateAll((els) => els.map((e) => e.getAttribute("data-going-live")));
+  drill.check(listed.includes("doc_home") && listed.includes("doc_design") && listed.includes("doc_collection_layout"), "Open your store lists home, the design and Harvest's layout drafts", listed);
+  await drill.screenshot(page, "b-harvest-open-dialog-1280");
+  await confirm.click();
+  const opened = await waitFor(async () => ((await liveRelease()) != null ? true : false), 90_000, 300);
+  drill.check(Boolean(opened), "the store opens (a live release)", null);
+
+  const anonCtx = await p6Context(drill, { width: 1280 });
+  await anonCtx.route("**/_next/image**", (route) => route.fulfill({ status: 200, contentType: "image/gif", body: GIF }));
+  await anonCtx.addCookies([{ name: CONSENT_COOKIE, value: encodeURIComponent(serializeConsent({ analytics: false, marketing: false })), url: p6Url(drill, "/") }]);
+  const anon = await anonCtx.newPage();
+  await anon.goto(p6Url(drill, "/"), { waitUntil: "load", timeout: 120_000 });
+  const seen = await anon.evaluate(() => {
+    const css = getComputedStyle(document.documentElement);
+    const header = document.querySelector('header[data-part="header"]');
+    return { theme: document.documentElement.getAttribute("data-theme"), accent: css.getPropertyValue("--accent-500").trim().toLowerCase(), font: css.getPropertyValue("--display-font"), headerBg: header ? getComputedStyle(header).backgroundColor : null };
+  });
+  drill.check(seen.theme === "harvest" && seen.accent === forest.brand.accent && /fraunces/i.test(seen.font), "the anonymous shopper sees Harvest with the Forest accent and serif headings", seen);
+  drill.check(seen.headerBg === "rgb(54, 83, 20)", `the header shows Harvest's header colour (${harvest.surfaces.header.bg})`, seen.headerBg);
+  await drill.screenshot(anon, "b-harvest-live-1280");
+  await anonCtx.close();
+  drill.check(errors.length === 0, "no page errors (Harvest run)", errors);
   await ctx.close();
 }

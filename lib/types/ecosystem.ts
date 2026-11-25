@@ -153,6 +153,7 @@ export interface ThemeTokens {
   type_scale?: "compact" | "regular" | "large";
   button_shape?: "pill" | "rounded" | "square";
   section_spacing?: "compact" | "regular" | "airy";
+  heading_font?: "sans" | "serif"; // Phase 7: absent = the kit decides
 }
 
 /** A dark surface's colours; fg and muted need 4.5:1 against bg. */
@@ -234,7 +235,7 @@ export interface ThemePackage {
 
 export type ThemePackageStatus = "installed" | "archived";
 
-/** A theme_packages row (migrations/tenant/0034_theme_packages.sql). */
+/** A theme_packages row (migrations/tenant/0034_theme_packages.sql, 0035 source). */
 export interface ThemePackageRow {
   id: string; // "thm_" + 16 hex, immutable
   slug: string; // ThemePackage.id
@@ -251,6 +252,7 @@ export interface ThemePackageRow {
   uploaded_at: string; // ISO 8601 UTC
   archived_by: string | null;
   archived_at: string | null;
+  source: "upload" | "storeasy"; // 0035: a founder's upload or a Storeasy flagship
 }
 
 /** doc_design.body.settings.theme (lib/registry/settings.js). */

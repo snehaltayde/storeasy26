@@ -1,4 +1,4 @@
-import { Geist, GeistMono } from "@/app/fonts/fonts";
+import { Geist, GeistMono, Fraunces } from "@/app/fonts/fonts";
 import { ToastProvider } from "@/components/kit/toast";
 import "../globals.css";
 
@@ -28,7 +28,7 @@ export const viewport = {
 
 export default function ConsoleRootLayout({ children }) {
   return (
-    <html lang="en" data-console className={`${Geist.variable} ${GeistMono.variable} h-full`}>
+    <html lang="en" data-console className={`${Geist.variable} ${GeistMono.variable} ${Fraunces.variable} h-full`}>
       <body className="console min-h-full bg-background font-sans text-foreground antialiased">
         <ToastProvider>{children}</ToastProvider>
       </body>

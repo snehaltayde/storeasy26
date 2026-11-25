@@ -5,11 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { StatusBadge } from "@/components/kit/status-badge";
 import { Swatch } from "@/components/admin/themes/Swatch";
 import { ArchiveThemeDialog } from "@/components/admin/themes/ArchiveThemeDialog";
-import { TEMPLATE_WORDS, shortDate } from "@/components/admin/themes/theme-words";
+import { FLAGSHIP_WORDS, TEMPLATE_WORDS, shortDate } from "@/components/admin/themes/theme-words";
 import { ApplyThemeDialog } from "@/components/admin/themes/ApplyThemeDialog";
 import { ThemeDraftBar } from "@/components/admin/themes/ThemeDraftBar";
 
-const TOKEN_WORDS = { accent: "Accent", background: "Background", foreground: "Text", radius: "Corners", type_scale: "Type size", button_shape: "Buttons", section_spacing: "Section spacing" };
+const TOKEN_WORDS = { accent: "Accent", background: "Background", foreground: "Text", radius: "Corners", type_scale: "Type size", button_shape: "Buttons", section_spacing: "Section spacing", heading_font: "Heading font" };
 const SURFACE_WORDS = { bg: "background", fg: "text", muted: "soft text" };
 const words = (v) => String(v).replace(/[-_]/g, " ");
 
@@ -33,7 +33,13 @@ const Colour = ({ hex }) => (
 // Archive (themes.manage, hidden for other roles).
 //   pkg, content: GET /api/admin/themes/[id]; role: the actor's role
 //   state, names (line 3): the switch state and the live/draft look names
+// Phase 7 line 1: a Storeasy flagship (pkg.source "storeasy", opened by its
+// slug) says who made it and what it is for, downloads by slug, offers
+// "Use this theme" or "Update to …" and never Archive.
 export function ThemeDetail({ pkg, content, role, state = null, names = null }) {
+  const flagship = pkg.source === "storeasy";
+  const key = flagship ? pkg.slug : pkg.id;
+  const inDraft = pkg.inUse === "draft" || state?.draft?.package === pkg.id;
   const tokens = content?.tokens || {};
   const surfaces = content?.surfaces || {};
   const templates = content?.templates || {};
@@ -47,19 +53,20 @@ export function ThemeDetail({ pkg, content, role, state = null, names = null }) 
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <span className="text-sm text-muted-foreground">
             Version <span className="font-mono text-xs tabular-nums">{pkg.version}</span>, based on {pkg.baseLabel}
-            {pkg.author ? `, by ${pkg.author}` : ""}. Uploaded by {pkg.uploadedByName} on {shortDate(pkg.uploadedAt)}.
+            {flagship ? `. Made by ${FLAGSHIP_WORDS.author} for ${String(pkg.vertical || "").toLowerCase()}.` : <>{pkg.author ? `, by ${pkg.author}` : ""}. Uploaded by {pkg.uploadedByName} on {shortDate(pkg.uploadedAt)}.</>}
           </span>
           {pkg.inUse ? <StatusBadge kind="theme" status={pkg.inUse} data-theme-use={pkg.inUse} /> : null}
           {pkg.status === "archived" ? <Badge variant="muted">Archived{pkg.archivedAt ? ` ${shortDate(pkg.archivedAt)}` : ""}</Badge> : null}
         </div>
         <span className="flex flex-wrap gap-2 sm:ml-auto">
           <Button asChild variant="outline" data-read-control>
-            <a href={`/api/admin/themes/${encodeURIComponent(pkg.id)}?download=1`} download data-themes-action="download">
+            <a href={`/api/admin/themes/${encodeURIComponent(key)}?download=1`} download data-themes-action="download">
               <Download aria-hidden /> Download package
             </a>
           </Button>
-          {pkg.status === "installed" && pkg.inUse !== "draft" && state?.draft?.package !== pkg.id ? <ApplyThemeDialog look={{ kind: "package", id: pkg.id, label: `${pkg.name} ${pkg.version}`, sections: pkg.summary?.sections ?? 0 }} role={role} revision={state?.design?.revision ?? null} size="default" /> : null}
-          <ArchiveThemeDialog pkg={pkg} role={role} />
+          {pkg.update ? <ApplyThemeDialog look={{ kind: "flagship", id: key, label: `${pkg.name} ${pkg.update.to}`, sections: pkg.summary?.sections ?? 0 }} trigger={pkg.update.words} role={role} revision={state?.design?.revision ?? null} size="default" /> : null}
+          {pkg.status === "installed" && !inDraft && !pkg.update ? <ApplyThemeDialog look={{ kind: flagship ? "flagship" : "package", id: key, label: `${pkg.name} ${pkg.version}`, sections: pkg.summary?.sections ?? 0 }} role={role} revision={state?.design?.revision ?? null} size="default" /> : null}
+          {flagship ? null : <ArchiveThemeDialog pkg={pkg} role={role} />}
         </span>
       </div>
       {pkg.description ? <p className="text-sm">{pkg.description}</p> : null}

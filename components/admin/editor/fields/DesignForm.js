@@ -40,6 +40,9 @@ import {
   blocks,
   design,
   BRAND_FIELDS,
+  HEADING_FONT_FIELD,
+  HEADING_FONT_WORDS,
+  headingFontOf,
   stepWords,
   lookChoices,
   lookIdOf,
@@ -131,6 +134,28 @@ export function BrandStepSelect({ token: b, anchor: bid, value: v, issues, readO
   );
 }
 
+// Phase 7 line 1: "Heading font: Sans / Serif / Theme's" (value: headingFontOf
+// the brand; onValue gets "theme", "sans" or "serif"). Shared with the studio.
+export function HeadingFontSelect({ anchor: bid, value: v, issues, readOnly, onValue: onChange }) {
+  const b = HEADING_FONT_FIELD;
+  const bnotes = notesAt(issues, bid);
+  return (
+    <div className="min-w-0" data-token={b.key}>
+      <label htmlFor={bid} className="mb-1 block text-xs font-medium text-muted-foreground">
+        {b.label}
+      </label>
+      <Select id={bid} value={b.options.includes(v) ? v : "theme"} disabled={readOnly} invalid={blocks(bnotes)} aria-describedby={described(bid, bnotes)} onChange={(e) => onChange(e.target.value)}>
+        {b.options.map((o) => (
+          <option key={o} value={o}>
+            {HEADING_FONT_WORDS[o]}
+          </option>
+        ))}
+      </Select>
+      <Notes anchor={bid} notes={bnotes} />
+    </div>
+  );
+}
+
 export function BrandControl({ field, value, onChange, issues, owner = null, readOnly, context = null }) {
   const id = idOf(owner, field.path);
   const notes = notesAt(issues, id);
@@ -153,6 +178,7 @@ export function BrandControl({ field, value, onChange, issues, owner = null, rea
         {BRAND_FIELDS.filter((b) => b.kind === "step").map((b) => (
           <Fragment key={b.key}>{BrandStepSelect({ token: b, anchor: idOf(owner, `${field.path}.${b.key}`), value: values[b.key], issues, readOnly, onValue: (v) => onChange(design.setToken(value, b.key, v, start.brand)) })}</Fragment>
         ))}
+        {HeadingFontSelect({ anchor: idOf(owner, `${field.path}.heading_font`), value: headingFontOf(value), issues, readOnly, onValue: (v) => onChange(design.setHeadingFont(value, v, start.brand)) })}
       </div>
       {!atStart && (
         <Button size="sm" variant="ghost" disabled={readOnly} data-design-reset="" onClick={() => onChange(design.reset(start.brand))}>

@@ -310,6 +310,14 @@ Each Phase 3 line fills only its own sub-heading.
 - **Theme page:** the facts as one sentence (no middle dots), the version and colour codes in mono, the actions wrap and sit right from 640px; "Use this theme" matches the other actions' size there.
 - **Loading:** both pages have a `loading.js` shaped like the page. Section titles are 1.125rem semibold.
 
+### Themes: Storeasy themes (Phase 7 line 1)
+
+- `/admin/themes` opens with "Storeasy themes": five cards (`FlagshipCards`). Each card has a colour band, the name and version, a "Live" or "In your draft" badge, the vertical, a heading sample in the theme's own face (Fraunces or Geist), a "Serif headings" / "Sans headings" note and the description. Actions: "Use this theme" (or "Update to Volt 1.1.0"), "Preview" while the theme is in the draft, and "Details". Built-in looks and uploads come after. Flagships never show Archive.
+- `/admin/themes/<slug>` reuses `ThemeDetail`: "Made by Storeasy for <vertical>", Download package, and Use or Update. Archive is not shown.
+- Onboarding Brand step: a "Theme" picker (`ThemePicker`) comes before Colours, with "Keep the simple look" plus five mini storefronts. Once a theme is picked, the colours row starts with "Theme's colours".
+- Studio Design rail (Type group) and DesignForm: "Heading font", with the choices Theme's / Sans / Serif.
+- Screens for the ui-designer pass: the flagship cards, the theme detail for a flagship, the onboarding Theme picker, and the heading-font control.
+
 ## Merchant screens: Studio (Phase 6)
 
 ### Studio (line 1)

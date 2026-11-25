@@ -347,7 +347,7 @@ async function mount(props, table) {
       el.props.onChange({ target: { value } });
       await flush();
     },
-    group: () => nodes.find((n) => n.props?.["data-slot"] === "radio-group"),
+    group: () => nodes.find((n) => n.props?.["data-slot"] === "radio-group" && n.props?.["aria-label"] === "Colours"), // Phase 7: the Theme picker is a radio group too
     radios: () => nodes.filter((n) => n.props?.["data-palette"]),
     async choose(id) {
       ok(!v.group().props.disabled, "palettes disabled");

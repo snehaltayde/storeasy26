@@ -19,8 +19,8 @@ const DOC = (op, arg) => ({ path: "documents", method: "PUT", variant: op, name:
 
 export const SUPPORT_PROBES = Object.freeze([
   // Phase 5 line 1: uploaded themes (list, archived list, a package, its file; store B's package is not on A)
-  { name: "themes", path: "themes", method: "GET", keys: ["ok", "builtins", "packages", "archived", "state"], inner: { state: ["live", "liveBrand", "liveTheme", "liveArchived", "draft", "design", "publishSet"] } },
-  { name: "themes ?status=archived", path: "themes", method: "GET", req: () => ({ query: "status=archived" }), keys: ["ok", "builtins", "packages", "archived", "state"], inner: { state: ["live", "liveBrand", "liveTheme", "liveArchived", "draft", "design", "publishSet"] } },
+  { name: "themes", path: "themes", method: "GET", keys: ["ok", "builtins", "flagships", "packages", "archived", "state"], inner: { state: ["live", "liveBrand", "liveTheme", "liveArchived", "draft", "design", "publishSet"] } },
+  { name: "themes ?status=archived", path: "themes", method: "GET", req: () => ({ query: "status=archived" }), keys: ["ok", "builtins", "flagships", "packages", "archived", "state"], inner: { state: ["live", "liveBrand", "liveTheme", "liveArchived", "draft", "design", "publishSet"] } },
   { name: "themes/[id]", path: "themes/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.themeId } }), keys: ["ok", "package", "content", "tokens"], note: "tokens: Phase 6 line 2, the studio's Reset to the theme's" },
   { name: "themes/[id] ?download", path: "themes/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.themeId }, query: "download=1" }), keys: ["format", "id", "name", "version", "author", "description", "base", "tokens", "surfaces", "templates", "styles"], note: "the stored package file itself" },
   { name: "themes/[id] (store B's theme)", path: "themes/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.bThemeId } }), status: 404, keys: ["error", "code"], note: "another store's theme is not on this store" },
@@ -36,7 +36,7 @@ export const SUPPORT_PROBES = Object.freeze([
   // Phase 4 line 4: an app's API access (never a token's secret or hash; calls are audit.read only)
   { name: "apps/[id]/tokens", path: "apps/[id]/tokens", method: "GET", req: (ctx) => ({ params: { id: ctx.webhookAppId } }), keys: ["ok", "scopes", "offered", "tokens", "maxActive", "expiryDays", "defaultExpiryDays"] },
   { name: "apps/[id]/tokens (store B's app)", path: "apps/[id]/tokens", method: "GET", req: (ctx) => ({ params: { id: ctx.bWebhookAppId } }), status: 404, keys: ["error", "code"], note: "another store's app is not on this store" },
-  { name: "brand-step", path: "brand-step", method: "GET", keys: ["ok", "brandStep", "palettes", "current", "design", "storeOpen", "canEditDescription", "descriptionMax"] },
+  { name: "brand-step", path: "brand-step", method: "GET", keys: ["ok", "brandStep", "palettes", "themes", "current", "themeLayouts", "design", "storeOpen", "canEditDescription", "descriptionMax"], inner: { current: ["themeId", "paletteId", "logo", "description"] }, note: "themes, current.themeId, themeLayouts: Phase 7 line 1, the onboarding theme picker" },
   // Phase 4 line 2: an app's placements (ctx.installId: Trust badges, which test-support-reads installs)
   { name: "apps/[id]/blocks", path: "apps/[id]/blocks", method: "GET", req: (ctx) => ({ params: { id: ctx.installId } }), keys: ["ok", "installStatus", "blocks", "previewPaths"] },
   { name: "bundles", path: "bundles", method: "GET", keys: ["ok", "bundles", "currency"] },
@@ -95,4 +95,7 @@ export const SUPPORT_PROBES = Object.freeze([
   { name: "releases preview", path: "releases", method: "POST", variant: "preview", req: () => ({ body: { action: "preview" } }), status: 409, keys: ["error", "code"], note: "a documents store previews from the editor (STORE_USES_DOCUMENTS)" },
   { name: "returns", path: "returns", method: "GET", keys: ["ok", "returns"] },
   { name: "stores", path: "stores", method: "GET", keys: ["ok", "stores", "current"] },
+  // Phase 7 line 1: a Storeasy flagship by its slug (first-party data, the same on every store) and its file
+  { name: "themes/[id] (a flagship slug)", path: "themes/[id]", method: "GET", req: () => ({ params: { id: "bloom" } }), keys: ["ok", "package", "content", "tokens"] },
+  { name: "themes/[id] (a flagship slug) ?download", path: "themes/[id]", method: "GET", req: () => ({ params: { id: "bloom" }, query: "download=1" }), keys: ["format", "id", "name", "version", "author", "description", "base", "tokens", "surfaces", "templates", "styles"], note: "the flagship package file itself" },
 ]);

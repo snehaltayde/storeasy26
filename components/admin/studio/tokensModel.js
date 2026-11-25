@@ -9,6 +9,8 @@
 //                                          draws (lib/registry's kitOf)
 //   packageIdOf(theme) → "thm_…" | null    the uploaded theme it names
 //   setToken(brand, key, value, start)     one token changed, only to a value
+//                                          (heading_font: "theme" | "sans" |
+//                                          "serif", "theme" takes it away)
 //                                          validateBrand takes (a colour may be
 //                                          half typed: kept, not posted); an
 //                                          unknown key or step: brand as it was
@@ -36,11 +38,12 @@
 //                                          change made since (another key, or
 //                                          the same store's other edits) stays
 import { checkBrand, validateBrand, KIT_SURFACES, DEFAULT_KIT } from "../../../lib/brand.js";
-import { BRAND_FIELDS, design } from "../editor/fields/inspectorModel.js";
+import { BRAND_FIELDS, HEADING_FONT_FIELD, design } from "../editor/fields/inspectorModel.js";
 import { paletteById, DEFAULT_PALETTE_ID } from "../../../lib/themes/palettes.js";
 
 export const DESIGN_DOC = "doc_design";
-export const TOKEN_KEYS = Object.freeze(BRAND_FIELDS.map((f) => f.key));
+// Phase 7 line 1: heading_font too ("theme" in the rail = the key taken away)
+export const TOKEN_KEYS = Object.freeze([...BRAND_FIELDS.map((f) => f.key), HEADING_FONT_FIELD.key]);
 export const DESIGN_WORDS = Object.freeze({
   intro: "Your colours, type and spacing, for every page. Shoppers see them after you publish.",
   builtIn: "Your colours, type and spacing go on top of your look.",
@@ -58,7 +61,7 @@ export const DESIGN_WORDS = Object.freeze({
 // the groups the rail shows, in its order
 export const TOKEN_GROUPS = Object.freeze([
   { id: "colours", words: DESIGN_WORDS.colours, keys: ["accent", "background", "foreground"] },
-  { id: "type", words: DESIGN_WORDS.type, keys: ["type_scale"] },
+  { id: "type", words: DESIGN_WORDS.type, keys: ["type_scale", "heading_font"] },
   { id: "spacing", words: DESIGN_WORDS.spacing, keys: ["section_spacing", "radius", "button_shape"] },
 ]);
 
@@ -78,6 +81,7 @@ export const packageIdOf = (theme) => (isObj(theme) && typeof theme.package === 
 const startOf = (startingBrand) => (isObj(startingBrand) ? startingBrand : paletteById(DEFAULT_PALETTE_ID).brand);
 
 export function setToken(brand, key, value, startingBrand = null) {
+  if (key === HEADING_FONT_FIELD.key) return design.setHeadingFont(brand, value, startOf(startingBrand));
   const f = FIELD.get(key);
   if (!f) return brand;
   const v = typeof value === "string" ? value.trim() : value;

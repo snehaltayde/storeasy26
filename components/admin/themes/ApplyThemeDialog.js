@@ -13,14 +13,17 @@ import { NO_WRITE, postTheme } from "@/components/admin/themes/theme-words";
 
 // "Use this theme" (Phase 5 line 3, storefront.write): writes a DRAFT of your
 // design only; nothing changes for shoppers until Publish.
-//   look: { kind: "package" | "builtin", id, label, sections } (sections: the
-//         package's home sections count, 0 for a built-in look)
+//   look: { kind: "package" | "flagship" | "builtin", id, label, sections }
+//         (sections: the package's home sections count, 0 for a built-in
+//         look; a flagship's id is its slug: the route installs it on first
+//         use, Phase 7 line 1)
+//   trigger: the button's words ("Use this theme", or "Update to Volt 1.1.0")
 //   revision: the design's revision this page read (409 if someone else saved)
 // A package: POST /api/admin/themes/[id] { apply }. A built-in look: the
 // existing POST /api/admin/theme { action: "apply" } (it clears the package).
 // size: the trigger's button size (sm in the library, default beside the
 // theme page's other actions)
-export function ApplyThemeDialog({ look, role, revision = null, size = "sm" }) {
+export function ApplyThemeDialog({ look, role, revision = null, size = "sm", trigger = "Use this theme", variant = "default" }) {
   const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -29,7 +32,7 @@ export function ApplyThemeDialog({ look, role, revision = null, size = "sm" }) {
   const [withBrand, setWithBrand] = useState(true);
   const [withHome, setWithHome] = useState(false);
   const [confirmHome, setConfirmHome] = useState(false);
-  const pkg = look.kind === "package";
+  const pkg = look.kind === "package" || look.kind === "flagship";
 
   async function go() {
     setBusy(true);
@@ -55,7 +58,8 @@ export function ApplyThemeDialog({ look, role, revision = null, size = "sm" }) {
         <Button
           type="button"
           size={size}
-          data-themes-action="use"
+          variant={variant}
+          data-themes-action={trigger === "Use this theme" ? "use" : "update"}
           data-themes-look={look.id}
           onClick={() => {
             setError(null);
@@ -65,7 +69,7 @@ export function ApplyThemeDialog({ look, role, revision = null, size = "sm" }) {
             setOpen(true);
           }}
         >
-          Use this theme
+          {trigger}
         </Button>
       </RoleGate>
       <Dialog open={open} onOpenChange={(o) => !busy && setOpen(o)}>

@@ -32,6 +32,18 @@ without asking the owner are marked so they are easy to review.
 - **The old free-shipping line under the drawer's totals moved** into the progress block (same GEN-03 rule: only with rates the store chose).
 - **Page room for the bar** is the body's bottom padding below `lg` while a product page is open (set by `ProductPurchase`), not a CSS rule, so `app/globals.css` (line 1's) is untouched.
 
+## 2026-11-26 Phase 7 line 1: flagship themes (on the owner's behalf)
+
+- **Schema:** 0035 `theme_packages.source` as planned. Flagship rows are written with `uploaded_by = 'system:storeasy'` and show "Storeasy" as their maker. The storefront read and the theme pin probe the column with `hasColumns`, so a store one migration behind still renders (its packages count as uploads).
+- **Permissions:** as planned, with no new action. A flagship is addressed by its slug on the existing `/api/admin/themes/[id]` route: GET (`storefront.read`) returns the newest version's data without installing anything; apply (`storefront.write`) runs `ensureFlagship` then `applyPackage`; archiving by slug or by row id answers 409 `STOREASY_THEME`. An upload whose id is a flagship slug answers 422 `RESERVED_ID`. A store B row id is still 404 on store A, because B never installed it.
+- **Kill switch:** `ff_theme-packages` is now checked after the row read and only for `source = 'upload'`, so a live flagship keeps rendering and can still be applied.
+- **Update:** a card offers "Update to <name> <version>" when the version in the draft (or live, when none is in the draft) is older than the newest data. Clicking it applies the newest version as a new draft row through the same dialog.
+- **Heading font:** `heading_font` lives in `BRAND_TOKEN_KEYS` and stays out of `DEFAULT_BRAND`, so `validateBrand` returns it only when it was given and existing brands produce byte-identical CSS. `brandCssVars` adds `:root[data-kit]{--display-font:…}` after the `:root` block. "Theme's" in the studio and in DesignForm removes the key. It is part of `TOKEN_KEYS`, so the font alone can make "Reset" show.
+- **Console fonts:** the console root layout now also loads `Fraunces.variable` (the file was already self-hosted), so the theme cards and the onboarding picker can show a real serif heading sample. Importing next/font in a client component would have broken the node render suites.
+- **Onboarding:** `themeId` is sent only when a flagship is picked, or as null when the founder moves off a saved flagship ("Keep the simple look", which brings back the palette's built-in kit). A design on an uploaded theme is therefore never touched by a palette save. When a palette is chosen over a theme, only its three colours replace the theme's: the theme's shapes and heading font stay. The theme's layouts go into their drafts, but its home layout is not used. Open Store reads `themeLayouts` (layout docs with pending drafts while the draft names a flagship) and adds them to the first publish set, so they are listed with home.
+- **Preview on a card** shows only while that theme is in the draft (the draft preview). A theme that isn't applied yet has no draft to preview, so "Use this theme" comes first.
+- **Flagship content:** written in `lib/themes/flagships.js` by the line 1 builder, not split out to a separate Sonnet pass, because the shape and the readability checks had to be settled together.
+
 ## 2026-11-26 Phase 7 flagship themes and storefront UX plan (on the owner's behalf)
 
 - **Schema:** tenant 0035 adds `theme_packages.source` (`upload` | `storeasy`). Only uploads count toward the 30 limit and obey the uploaded-themes kill switch.

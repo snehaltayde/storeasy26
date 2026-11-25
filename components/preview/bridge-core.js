@@ -59,7 +59,14 @@
 //                           any other address: ignored
 //              description  text (at most 160 characters, set as text) in
 //                           [data-store-tagline]; null: the page's own
-//            All three null: the page as it rendered.
+//              themeId      (Phase 7 line 1) a Storeasy flagship's slug:
+//                           brandFor(paletteId, themeId) draws the theme
+//                           (its tokens, surfaces, heading font and style
+//                           rules, the palette's colours over them when one
+//                           is given) and sets data-kit and data-theme on
+//                           <html>; null or left out: no theme (paletteId
+//                           alone, as before); an unknown slug: ignored
+//            All null: the page as it rendered.
 //
 // Studio (Phase 6 step 0), in the editor's frame (v2 without look): the
 // founder's unsaved structure and tokens drawn at once, before the save. Each
@@ -297,6 +304,7 @@ export function createBridge({ window: win, document: doc, state = null, ok = fa
   };
   const byId = (id) => (typeof doc.getElementById === "function" ? doc.getElementById(id) : null);
   let kitBefore;
+  let themeBefore;
   function drawDraft(text) {
     let el = byId(DRAFT_STYLE_ID);
     if (!el) {
@@ -308,15 +316,18 @@ export function createBridge({ window: win, document: doc, state = null, ok = fa
     }
     el.textContent = text;
   }
-  function applyPalette(id) {
-    if (id === null) {
+  // themeId: a slug (that theme), null (no theme: the page's own taken off),
+  // undefined (a message without one: the page's own theme kept)
+  function applyPalette(id, themeId) {
+    if (id === null && themeId == null) {
       byId(DRAFT_STYLE_ID)?.remove();
       if (html && kitBefore !== undefined) setAttr(html, "data-kit", kitBefore);
+      if (html && themeBefore !== undefined) setAttr(html, "data-theme", themeBefore);
       return;
     }
     let b = null;
     try {
-      b = typeof id === "string" ? brandFor(id) : null;
+      b = (id === null || typeof id === "string") && (themeId == null || typeof themeId === "string") ? brandFor(id, themeId ?? null) : null;
     } catch {
       b = null;
     }
@@ -325,6 +336,12 @@ export function createBridge({ window: win, document: doc, state = null, ok = fa
     if (html && typeof b.kit === "string" && b.kit) {
       if (kitBefore === undefined) kitBefore = attrOf(html, "data-kit");
       html.setAttribute("data-kit", b.kit);
+    }
+    if (html) {
+      if (themeBefore === undefined) themeBefore = attrOf(html, "data-theme");
+      if (typeof b.theme === "string" && b.theme) html.setAttribute("data-theme", b.theme);
+      else if (themeId === null) html.removeAttribute("data-theme"); // the simple look: the page's own theme off
+      else setAttr(html, "data-theme", themeBefore);
     }
   }
   function applyLogo(logo) {
@@ -364,7 +381,7 @@ export function createBridge({ window: win, document: doc, state = null, ok = fa
     }
   }
   function applyBrand(msg) {
-    if (msg.paletteId !== undefined) applyPalette(msg.paletteId);
+    if (msg.paletteId !== undefined || msg.themeId !== undefined) applyPalette(msg.paletteId ?? null, msg.themeId);
     if (msg.logo !== undefined) applyLogo(msg.logo);
     if (msg.description !== undefined) applyDescription(msg.description);
   }

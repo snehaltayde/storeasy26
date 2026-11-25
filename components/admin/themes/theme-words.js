@@ -42,7 +42,43 @@ export async function putDocuments(body) {
 // the name of a { kit, package } look: a built-in label or the package's name
 export function lookName(look, builtins, packages) {
   if (!look) return "Pulse";
-  if (look.package) return packages.find((p) => p.id === look.package)?.name ?? "an uploaded theme";
+  if (look.package) return packages.find((p) => p.id === look.package)?.name ?? "a theme";
   return builtins.find((k) => k.id === look.kit)?.label ?? "Pulse";
 }
+// The design draft in a preview tab (a preview session with the design shown,
+// reused while the page stays open): { ok, session, error }. Opened from a
+// click, so the new tab is allowed.
+export async function openDesignPreview(session = null) {
+  const tab = window.open("", "_blank");
+  let s = session;
+  if (!s) {
+    const r = await postTheme("preview-session", { create: true });
+    if (!r.ok) {
+      tab?.close();
+      return { ok: false, session: null, error: r.error };
+    }
+    s = { sid: r.sid, url: r.previewUrl };
+  }
+  const on = await postTheme("preview-session", { showDesign: { sid: s.sid, on: true } });
+  if (!on.ok) {
+    tab?.close();
+    return { ok: false, session: null, error: on.error };
+  }
+  if (tab) tab.location.href = s.url;
+  else window.open(s.url, "_blank", "noopener");
+  return { ok: true, session: s, error: null };
+}
+
+// Phase 7 line 1: Storeasy's flagship themes
+export const FLAGSHIP_WORDS = Object.freeze({
+  title: "Storeasy themes",
+  lead: "Five complete looks made by Storeasy, each with its own colours, fonts and layouts. Choosing one puts it in your draft; shoppers see it after you publish.",
+  details: "Details",
+  preview: "Preview",
+  author: "Storeasy",
+  serif: "Serif headings",
+  sans: "Sans headings",
+});
+// the heading face a card's sample is drawn in (the console loads both)
+export const headingFamily = (font) => (font === "serif" ? "var(--font-fraunces), Georgia, serif" : "var(--font-geist-sans), system-ui, sans-serif");
 export const LIVE_ARCHIVED = "Your live theme was archived. Choose another before you publish design changes.";

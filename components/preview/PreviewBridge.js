@@ -5,6 +5,7 @@ import { createBridge } from "./bridge-core";
 import { paletteById } from "@/lib/themes/palettes";
 import { brandCssVars } from "@/lib/brand";
 import { tokensCss } from "./tokens-css";
+import { flagshipLook } from "@/lib/themes/flagship-look";
 
 // Designer and editor ⇄ preview bridge (S54; P3-FRAME). The storefront layout
 // mounts it only for a founder: in a preview, when a preview has just ended,
@@ -37,7 +38,11 @@ const STYLES = `
 // Phase 1 line 6 (look mode): a palette's colours, worked out inside the
 // frame from its id, the way the layout draws a saved one (brandCssVars on
 // the palette's own kit). Unknown id: null. Both imports are Edge-safe.
-export function brandFor(id) {
+// Phase 7 line 1: with a flagship slug, that theme's look (flagshipLook: its
+// tokens, surfaces and style rules, the palette's colours over them); an
+// unknown slug or palette: null.
+export function brandFor(id, themeId = null) {
+  if (themeId != null) return flagshipLook(themeId, id ?? null);
   const p = paletteById(id);
   return p ? { css: brandCssVars(p.brand, { kit: p.kit }), kit: p.kit } : null;
 }

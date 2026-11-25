@@ -13,6 +13,7 @@ import { MediaPicker } from "@/components/admin/shared/MediaPicker";
 import { uploadImage } from "@/lib/media-upload";
 import { PALETTES } from "@/lib/themes/palettes";
 import BrandPreview from "./BrandPreview";
+import ThemePicker from "./ThemePicker";
 import useStarterStore, { call } from "./useStarterStore";
 import {
   ALT_MAX,
@@ -253,6 +254,9 @@ const REASON_TEXT = (reason) => REASON_WORDS[reason] || REASON_WORDS.cannot_edit
 
 // ---- the brand form ---------------------------------------------------------------
 
+// Phase 7 line 1: with a theme chosen, "Theme's colours" comes first (value
+// THEME_COLOURS, the form's paletteId null)
+const THEME_COLOURS = "theme";
 function Swatch({ palette, disabled }) {
   const style = paletteStyle(palette.brand);
   return (
@@ -440,7 +444,7 @@ export default function BrandStepPanel({ canEdit = false, canSync = false, reaso
     setBusy(false);
   }
 
-  const save = () => send(saveBody({ ...form, canEditDescription: describeOk, revision }));
+  const save = () => send(saveBody({ ...form, savedThemeId: saved?.themeId ?? null, canEditDescription: describeOk, revision }));
   const skip = () => send({ skip: true }, { skip: true });
   const undo = () => {
     setDone(null);
@@ -506,10 +510,13 @@ export default function BrandStepPanel({ canEdit = false, canSync = false, reaso
           </Notice>
         )}
 
+        <ThemePicker themes={info?.themes || []} value={form.themeId ?? null} onChange={(themeId) => change(themeId ? { themeId, paletteId: form.themeId ? form.paletteId : null } : { themeId: null, paletteId: form.paletteId ?? saved?.paletteId ?? null })} disabled={locked} {...why} />
+
         <fieldset className="space-y-2">
           <legend className="mb-2 text-sm font-medium">{BRAND_WORDS.colours}</legend>
-          {form.paletteId == null && <p className="text-[0.8125rem] text-muted-foreground">{BRAND_WORDS.ownColours}</p>}
-          <RadioGroup value={form.paletteId ?? ""} onValueChange={(id) => change({ paletteId: id })} disabled={locked} aria-label={BRAND_WORDS.colours} className="grid-cols-2 sm:grid-cols-3" {...why}>
+          {form.paletteId == null && !form.themeId && <p className="text-[0.8125rem] text-muted-foreground">{BRAND_WORDS.ownColours}</p>}
+          <RadioGroup value={form.themeId && form.paletteId == null ? THEME_COLOURS : (form.paletteId ?? "")} onValueChange={(id) => change({ paletteId: id === THEME_COLOURS ? null : id })} disabled={locked} aria-label={BRAND_WORDS.colours} className="grid-cols-2 sm:grid-cols-3" {...why}>
+            {form.themeId && info?.themes?.find((t) => t.slug === form.themeId) ? <Swatch palette={{ id: THEME_COLOURS, label: BRAND_WORDS.themeColours, brand: info.themes.find((t) => t.slug === form.themeId).brand }} disabled={locked} /> : null}
             {PALETTES.map((p) => (
               <Swatch key={p.id} palette={p} disabled={locked} />
             ))}
@@ -628,7 +635,7 @@ export default function BrandStepPanel({ canEdit = false, canSync = false, reaso
         )}
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button disabled={locked || form.paletteId == null} onClick={() => save()} {...why}>
+          <Button disabled={locked || (form.paletteId == null && !form.themeId)} onClick={() => save()} {...why}>
             {busy ? `${BRAND_WORDS.save}…` : BRAND_WORDS.save}
           </Button>
           <Button variant="outline" disabled={locked} onClick={skip} {...why}>

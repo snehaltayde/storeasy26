@@ -755,6 +755,11 @@ export const BRAND_FIELDS = Object.freeze([
   { key: "button_shape", label: "Button shape", kind: "step", options: Object.keys(BUTTON_SHAPES) },
   { key: "section_spacing", label: "Space between sections", kind: "step", options: Object.keys(SECTION_SPACING) },
 ]);
+// Phase 7 line 1: the heading face. Not a BRAND_FIELDS step: "theme" is no
+// stored value, it takes the key away (the theme or kit decides).
+export const HEADING_FONT_FIELD = Object.freeze({ key: "heading_font", label: "Heading font", kind: "font", options: ["theme", "sans", "serif"] });
+export const HEADING_FONT_WORDS = Object.freeze({ theme: "Theme's", sans: "Sans", serif: "Serif" });
+export const headingFontOf = (brand) => (isObj(brand) && (brand.heading_font === "sans" || brand.heading_font === "serif") ? brand.heading_font : "theme");
 const STEP_WORDS = { sm: "Small", md: "Medium", lg: "Large", xl: "Extra large", compact: "Compact", regular: "Regular", large: "Large", airy: "Airy", pill: "Pill", rounded: "Rounded", square: "Square" };
 export const stepWords = (v) => own(STEP_WORDS, v) ?? cap(String(v));
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -790,6 +795,14 @@ export const design = {
     const { accent_label: _old, ...rest } = base;
     const checked = validateBrand(rest);
     return checked.ok ? { ...rest, accent_label: checked.value.accent_label } : rest;
+  },
+  // Phase 7 line 1: "theme" takes heading_font away; sans or serif sets it
+  setHeadingFont(brand, choice, start = DEFAULT_BRAND) {
+    if (!HEADING_FONT_FIELD.options.includes(choice)) return brand;
+    if (choice !== "theme") return this.setToken(brand, "heading_font", choice, start);
+    if (!isObj(brand)) return brand;
+    const { heading_font: _gone, ...rest } = brand;
+    return rest;
   },
   // P6-NAV (owner answer OQ-P6-8): back to the store's starting colours. With
   // a brand object (DesignForm gives the store's starting palette brand) a

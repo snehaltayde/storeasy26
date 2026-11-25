@@ -13,10 +13,13 @@ import { readBrandStep, saveBrandStep } from "@/lib/first-run/brand-step";
 //                           current: { paletteId, logo, description },
 //                           design: { id, revision } | null, storeOpen,
 //                           canEditDescription, descriptionMax }
-//   POST  storefront.write  { paletteId, logo?: { media, alt? } | null,
+//   POST  storefront.write  { themeId?, paletteId, logo?: { media, alt? } | null,
 //                           description?, revision? } or { skip: true }
 //                           -> { ok, skipped, design, liveNow, afterPublish,
-//                           storeOpen, brandStep }
+//                           storeOpen, brandStep, layouts }
+// Phase 7 line 1: themeId a flagship slug (paletteId null = the theme's own
+// colours) or null ("Keep the simple look"); GET adds themes, current.themeId
+// and themeLayouts. Drafts only: the theme and its layouts go live with Publish.
 // A changed description also needs settings.write (lib/first-run/brand-step.js).
 // Never publishes. Refusals keep their status and plain words; a stale
 // revision is 409 DOCUMENT_CHANGED with the current document, as the
@@ -48,12 +51,12 @@ export const POST = tenantHandler(async (request) => {
     if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
     const body = await request.json().catch(() => undefined);
     const r = await saveBrandStep(body, auth.actor);
-    slog("brand_step_saved", { skipped: r.skipped, palette: r.brandStep?.paletteId ?? null, design: r.design?.revision ?? null, live_now: r.liveNow, after_publish: r.afterPublish });
+    slog("brand_step_saved", { skipped: r.skipped, theme: r.brandStep?.themeId ?? null, palette: r.brandStep?.paletteId ?? null, design: r.design?.revision ?? null, live_now: r.liveNow, after_publish: r.afterPublish });
     await audit({
       actor: auth.actor,
       action: r.liveNow.length ? "settings.write" : "storefront.write",
       resource: "brand-step",
-      diff: { skipped: r.skipped, paletteId: r.brandStep?.paletteId ?? null, design: r.design, liveNow: r.liveNow, afterPublish: r.afterPublish },
+      diff: { skipped: r.skipped, themeId: r.brandStep?.themeId ?? null, paletteId: r.brandStep?.paletteId ?? null, layouts: r.layouts ?? [], design: r.design, liveNow: r.liveNow, afterPublish: r.afterPublish },
     }); // best-effort, never throws
     return NextResponse.json(r);
   } catch (e) {

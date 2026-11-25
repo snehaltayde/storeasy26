@@ -658,6 +658,31 @@ await t("no node:* import reachable from app/(storefront)/layout.js (tenant-cont
   eq([...hits], ["lib/tenant-context.js: node:async_hooks"], "node imports reached:");
 });
 
+// ---- Phase 7 line 1: the heading font -------------------------------------------------
+await t("heading font: Sans / Serif / Theme's in the Type group; serif posts a tokens message whose CSS sets Fraunces; Theme's takes the key away; support's control is disabled", () => {
+  const serif = T.setToken(GOOD, "heading_font", "serif", GOOD);
+  eq(serif.heading_font, "serif", "serif:");
+  const msg = T.tokensMessage(serif);
+  eq(msg.brand.heading_font, "serif", "posted:");
+  ok(tokensCss(msg.brand, { kit: "pulse-1" }).includes(":root[data-kit]{--display-font:var(--font-fraunces), Georgia, serif;}"), "the frame's CSS");
+  ok(!("heading_font" in T.setToken(serif, "heading_font", "theme", GOOD)), "Theme's: the key is gone");
+  eq(T.setToken(serif, "heading_font", "comic", GOOD), serif, "comic: unchanged");
+  ok(!tokensCss(GOOD, { kit: "pulse-1" }).includes("--display-font"), "no token, no heading CSS");
+  ok(T.TOKEN_GROUPS.find((g) => g.id === "type").keys.includes("heading_font"), "in the Type group");
+  ok(!T.sameTokens(serif, GOOD), "a font change is a change (Reset shows)");
+  const html = railHtml(studioOf("owner"), { body: T.withBrand({ type: "design", settings: { theme: { kit: "pulse", version: 1 } } }, serif) });
+  ok(/<select[^>]*id="studio-design-heading_font"/.test(html) && html.includes(">Theme&#x27;s</option>") && html.includes(">Serif</option>"), "the control");
+  ok(/<option value="serif" selected="">/.test(html), "serif selected");
+  const ro = railHtml(studioOf("support"));
+  ok(/<select[^>]*id="studio-design-heading_font"[^>]*disabled=""|<select[^>]*disabled=""[^>]*id="studio-design-heading_font"/.test(ro), "support: disabled");
+});
+
+await t("heading font Reset: a flagship's Reset goes back to the theme's heading font", () => {
+  const tokens = { ...KITS.pulse.brand, ...AURORA.tokens, heading_font: "serif" };
+  const target = T.resetTarget({ theme: PKG_THEME, packageTokens: tokens, startingBrand: GOOD });
+  eq(target.heading_font, "serif", "reset target:");
+});
+
 await F.removeFixtureFiles("sttokens");
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

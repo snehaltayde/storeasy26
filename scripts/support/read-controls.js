@@ -111,6 +111,8 @@ export const READ_CONTROLS = [
   { path: "components/admin/releases/PublishingPage.js", reason: "Try again reads the pages waiting to publish again (listDocuments, a document read)", marks: 1 },
   // Phase 2 line 11: the console's own error page
   { path: "app/(console)/admin/(authed)/error.js", reason: "Try again re-renders the failed page's segment (reset(), a re-read, no write)", marks: 1 },
+  // Phase 7 line 1: the Storeasy themes cards
+  { path: "components/admin/themes/FlagshipCards.js", reason: "Details is a link to /admin/themes/<slug> (a GET); Preview opens the founder preview of the draft (POST /api/admin/preview-session create + showDesign, storefront.read, which writes no store content), as the draft bar's Preview", marks: 2 },
 ];
 
 // Reads sent as a non-GET request: { page, method, path, reason, body? }. page

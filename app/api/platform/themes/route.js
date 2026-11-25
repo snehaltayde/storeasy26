@@ -29,8 +29,10 @@ export async function GET(request) {
       pinned: Boolean(theme),
       applied_at: theme?.applied_at || null,
       upgradeAvailable: kitUpgradeAvailable(theme),
-      // Phase 5 line 3: the uploaded theme the store has live, if any
-      package: theme?.package ? { id: theme.package, slug: theme.slug ?? null, version: theme.package_version ?? null, name: theme.package_name ?? null } : null,
+      // Phase 5 line 3: the theme package the store has live, if any; Phase 7
+      // line 1: source "storeasy" (a flagship) or "upload" (a pin from before
+      // 0035 named an upload: there were no flagships then)
+      package: theme?.package ? { id: theme.package, slug: theme.slug ?? null, version: theme.package_version ?? null, name: theme.package_name ?? null, source: theme.source === "storeasy" ? "storeasy" : "upload" } : null,
     });
   }
   return NextResponse.json({

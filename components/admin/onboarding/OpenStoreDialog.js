@@ -10,6 +10,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { call } from "@/components/admin/editor/documentsApi";
 import { createPublishFlow, openingWarns, WORDS as PUBLISH_WORDS } from "@/components/admin/editor/publish/publishModel";
 import { EDITOR_PUBLISH_HREF } from "@/lib/admin/editor-entry";
+import { BRAND_STEP_URL } from "./brandModel";
+
+const LAYOUT_IDS = ["doc_header", "doc_footer", "doc_product_layout", "doc_collection_layout"];
 
 // "Open your store" from onboarding step 4 (Phase 1 line 7). It runs the
 // editor's own publish flow (createPublishFlow through documentsApi: the
@@ -120,9 +123,20 @@ export default function OpenStoreDialog({ open, onOpenChange, onOpened, onSendin
   const [sent, setSent] = useState(false);
   useEffect(() => flow.subscribe(setState), [flow]);
 
-  const start = () => {
+  // Phase 7 line 1: a flagship chosen in the Brand step wrote layout drafts
+  // (header, footer, product, collection); they go live with the first
+  // publish, so they are in the set and listed. A failed read opens with home only.
+  const start = async () => {
     setSent(false);
-    flow.open([{ id: "doc_home" }]);
+    let layouts = [];
+    try {
+      const r = await fetch(BRAND_STEP_URL, { headers: { Accept: "application/json" } });
+      const j = r.ok ? await r.json() : null;
+      layouts = Array.isArray(j?.themeLayouts) ? j.themeLayouts.filter((id) => LAYOUT_IDS.includes(id)) : [];
+    } catch {
+      layouts = [];
+    }
+    flow.open([{ id: "doc_home" }, ...layouts.map((id) => ({ id }))]);
   };
   useEffect(() => {
     if (open) start();

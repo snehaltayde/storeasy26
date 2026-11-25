@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { tenantHandler } from "@/lib/tenant-request";
-import { applyPackage, archivePackage, getPackage, packageFile, themeErrorAnswer } from "@/lib/themes/packages";
+import { applyFlagship, applyPackage, archivePackage, getPackage, packageFile, themeErrorAnswer } from "@/lib/themes/packages";
+import { isFlagshipSlug } from "@/lib/themes/flagships";
 import { validationBody } from "@/lib/cms/issues";
 
-// One uploaded theme (Phase 5 line 1). [id] is thm_ + 16 hex.
+// One uploaded theme (Phase 5 line 1). [id] is thm_ + 16 hex, or (Phase 7
+// line 1) a Storeasy flagship's slug (volt, bloom, loom, harvest, haven):
+// GET gives its newest version, apply installs it on first use (source
+// 'storeasy', never counted toward the upload limit, never archived) and
+// applies it with the same options; storefront.write, as choosing a theme.
 //   GET            storefront.read → { package, content }
 //   GET ?download  storefront.read → the stored normalised JSON, as a file
 //   POST { archive: true }  themes.manage → { package }
@@ -61,7 +66,9 @@ export const POST = tenantHandler(async (request, { params }) => {
     const { id } = await params;
     try {
       const Docs = await import("@/lib/documents/service");
-      return NextResponse.json({ ok: true, applied: await applyPackage(String(id || ""), { ...apply, actor: auth.actor, documents: Docs }) });
+      const key = String(id || "");
+      const opts = { ...apply, actor: auth.actor, documents: Docs };
+      return NextResponse.json({ ok: true, applied: isFlagshipSlug(key) ? await applyFlagship(key, opts) : await applyPackage(key, opts) });
     } catch (e) {
       if (e?.issues) return NextResponse.json(validationBody(e.issues), { status: 422 });
       if (e?.expose && e.status >= 400 && e.status < 500) return NextResponse.json({ error: e.message, code: e.code }, { status: e.status });

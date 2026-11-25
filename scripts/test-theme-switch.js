@@ -357,9 +357,9 @@ await t("the Live badge; the operator's themes view shows the uploaded theme per
   const res = await route.GET(new NextRequest("https://operator.console.test/api/platform/themes", { headers: { cookie: `_platform=${store.cookies["operator-support"]._platform}` } }));
   eq(res.status, 200, "operator GET:");
   const row = (await res.json()).tenants.find((x) => x.id === a.id);
-  eq(JSON.stringify(row.package), JSON.stringify({ id: PKG, slug: "aurora", version: "1.2.0", name: "Aurora" }), "operator row:");
+  eq(JSON.stringify(row.package), JSON.stringify({ id: PKG, slug: "aurora", version: "1.2.0", name: "Aurora", source: "upload" }), "operator row:");
   const src = await readFile(join(ROOT, "components/platform/operations/Themes.js"), "utf8");
-  ok(src.includes('header: "Uploaded theme"') && src.includes("data-ops-theme-package"), "the operator column");
+  ok(src.includes('header: "Theme package"') && src.includes("data-ops-theme-package"), "the operator column");
 });
 
 await t("DesignForm: a package design reads 'Theme: Aurora 1.2.0 (uploaded). Change it on Themes', read-only", async () => {

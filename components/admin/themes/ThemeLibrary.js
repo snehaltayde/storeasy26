@@ -12,6 +12,7 @@ import { Swatch } from "@/components/admin/themes/Swatch";
 import { LIVE_ARCHIVED, lookName, sameLook, shortDate } from "@/components/admin/themes/theme-words";
 import { ApplyThemeDialog } from "@/components/admin/themes/ApplyThemeDialog";
 import { ThemeDraftBar } from "@/components/admin/themes/ThemeDraftBar";
+import { FlagshipCards } from "@/components/admin/themes/FlagshipCards";
 
 // /admin/themes (Phase 5 line 1): the built-in looks (Pulse, Glow) and the
 // store's uploaded themes, with an Installed / Archived filter (a link, so it
@@ -19,8 +20,13 @@ import { ThemeDraftBar } from "@/components/admin/themes/ThemeDraftBar";
 //   builtins, packages, archived, state: GET /api/admin/themes
 // Line 3: "Use this theme" on every look (storefront.write), the badges "Live"
 // and "In your draft", and the draft bar (Preview, Publish).
-export function ThemeLibrary({ builtins, packages, archived, state = null, role = null }) {
-  const names = { live: lookName(state?.live, builtins, packages), draft: lookName(state?.draft, builtins, packages) };
+// Phase 7 line 1: "Storeasy themes" (flagships) come first; the table lists
+// uploads only (packages also holds installed flagship rows, for the names).
+//   installed: on the Archived view, the installed rows (for the look names)
+export function ThemeLibrary({ builtins, flagships = [], packages, installed = null, archived, state = null, role = null }) {
+  const named = [...packages, ...(installed || [])];
+  const names = { live: lookName(state?.live, builtins, named), draft: lookName(state?.draft, builtins, named) };
+  const uploads = packages.filter((p) => p.source !== "storeasy");
   const builtinUse = (id) => {
     const look = { kit: id, package: null };
     if (sameLook(state?.live, look)) return "live";
@@ -52,6 +58,7 @@ export function ThemeLibrary({ builtins, packages, archived, state = null, role 
         </Alert>
       ) : null}
       <ThemeDraftBar state={state} names={names} role={role} />
+      {archived ? null : <FlagshipCards flagships={flagships} role={role} revision={state?.design?.revision ?? null} />}
       <section className="space-y-3" aria-labelledby="builtin-looks">
         <h2 id="builtin-looks" className="text-lg font-semibold">
           Built-in looks
@@ -99,7 +106,7 @@ export function ThemeLibrary({ builtins, packages, archived, state = null, role 
         <DataTable
           label={archived ? "Archived themes" : "Uploaded themes"}
           columns={columns}
-          rows={packages}
+          rows={uploads}
           rowHref={(r) => `/admin/themes/${encodeURIComponent(r.id)}`}
           rowActions={archived ? null : (r) => (r.inUse === "draft" || sameLook(state?.draft, { kit: r.base, package: r.id }) ? null : <ApplyThemeDialog look={{ kind: "package", id: r.id, label: `${r.name} ${r.version}`, sections: r.summary?.sections ?? 0 }} role={role} revision={state?.design?.revision ?? null} />)}
           empty={

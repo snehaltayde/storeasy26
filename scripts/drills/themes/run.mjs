@@ -12,8 +12,8 @@ import { runDrill } from "../p3/lib.mjs";
 import { STAGES, consoleErrors, port } from "./lib.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-// line 1 upload, line 2 render, line 3 switch
-const STAGE_FILES = ["stage-upload.mjs", "stage-render.mjs", "stage-switch.mjs"];
+// line 1 upload, line 2 render, line 3 switch; Phase 7 line 1 flagship
+const STAGE_FILES = ["stage-upload.mjs", "stage-render.mjs", "stage-switch.mjs", "stage-flagship.mjs"];
 for (const file of STAGE_FILES) {
   const path = join(HERE, file);
   if (existsSync(path)) await import(pathToFileURL(path).href);

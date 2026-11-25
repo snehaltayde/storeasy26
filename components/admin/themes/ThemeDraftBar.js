@@ -11,7 +11,7 @@ import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescript
 import { RoleGate } from "@/components/kit/role-gate";
 import { roleAllows } from "@/lib/platform/authz";
 import { useToast } from "@/components/kit/toast";
-import { NO_PUBLISH, PREVIEW_NOTE, postTheme, putDocuments } from "@/components/admin/themes/theme-words";
+import { NO_PUBLISH, PREVIEW_NOTE, openDesignPreview, postTheme, putDocuments } from "@/components/admin/themes/theme-words";
 
 // The design draft vs the live store (Phase 5 line 3). Shown while the design
 // draft has unpublished changes:
@@ -46,27 +46,10 @@ export function ThemeDraftBar({ state, names, role }) {
   async function preview() {
     setBusy("preview");
     setError(null);
-    const tab = window.open("", "_blank");
-    let s = session;
-    if (!s) {
-      const r = await postTheme("preview-session", { create: true });
-      if (!r.ok) {
-        tab?.close();
-        setBusy(null);
-        return setError(r.error);
-      }
-      s = { sid: r.sid, url: r.previewUrl };
-    }
-    const on = await postTheme("preview-session", { showDesign: { sid: s.sid, on: true } });
+    const r = await openDesignPreview(session);
     setBusy(null);
-    if (!on.ok) {
-      tab?.close();
-      setSession(null);
-      return setError(on.error);
-    }
-    setSession(s);
-    if (tab) tab.location.href = s.url;
-    else window.open(s.url, "_blank", "noopener");
+    setSession(r.session);
+    if (!r.ok) setError(r.error);
   }
 
   async function publish() {

@@ -4,8 +4,8 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { createDocumentStore } from "../editor/store";
 import StatusLine from "../editor/StatusLine";
-import { BrandColourInput, BrandStepSelect } from "../editor/fields/DesignForm";
-import { BRAND_FIELDS, design } from "../editor/fields/inspectorModel";
+import { BrandColourInput, BrandStepSelect, HeadingFontSelect } from "../editor/fields/DesignForm";
+import { BRAND_FIELDS, design, headingFontOf } from "../editor/fields/inspectorModel";
 import * as T from "./tokensModel";
 
 // Phase 6 line 2 (docs/plans/phase-6.md "Line 2"): the studio's Design tab.
@@ -298,6 +298,7 @@ export function DesignRailView({ status = "idle", state = null, look = null, rea
             {g.words}
           </h3>
           {g.keys.map((k) => {
+            if (k === "heading_font") return <HeadingFontSelect key={k} anchor={idFor(k)} value={headingFontOf(brand)} issues={issues} readOnly={readOnly} onValue={(v) => setToken(k, v)} />;
             const f = field(k);
             return f.kind === "colour" ? (
               <BrandColourInput key={k} token={f} anchor={idFor(k)} value={shown[k]} issues={issues} readOnly={readOnly} placeholder={String(target.accent ?? values.accent)} onValue={(v) => setToken(k, v)} />

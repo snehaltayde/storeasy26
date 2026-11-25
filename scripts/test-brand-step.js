@@ -506,7 +506,7 @@ async function renderedTests() {
       input: (pred) => nodes.find((n) => n.type === "input" && pred(n.props)),
       // Phase 1 line 6: the palettes are a Radix RadioGroup
       radios: () => nodes.filter((n) => n.props?.["data-palette"] && n.props.value),
-      group: () => nodes.find((n) => n.props?.["data-slot"] === "radio-group"),
+      group: () => nodes.find((n) => n.props?.["data-slot"] === "radio-group" && n.props?.["aria-label"] === "Colours"), // Phase 7: the Theme picker is a radio group too
       async choose(id) {
         const g = v.group();
         ok(g, "no palette group");

@@ -29,6 +29,7 @@
 // THAT revision, and the answer still says the colours show after Publish.
 // Founder words only: never a command, a status code or a raw error.
 import { paletteById } from "@/lib/themes/palettes";
+import { isFlagshipSlug } from "@/lib/themes/flagships";
 import { brandCssVars } from "@/lib/brand";
 
 export const FIRST_RUN_URL = "/api/admin/first-run";
@@ -103,6 +104,11 @@ export const BRAND_WORDS = Object.freeze({
   loading: "Loading your colours and logo…",
   loadFailed: "We couldn't load your colours and logo just now. Reload the page to try again.",
   colours: "Colours",
+  theme: "Theme",
+  themeHint: "A complete look by Storeasy: colours, fonts and layouts. You can change it any time in Themes.",
+  simpleLook: "Keep the simple look",
+  simpleLookHint: "Your colours on Storeasy's plain layout.",
+  themeColours: "Theme's colours",
   ownColours: "Your store uses colours you chose yourself. Choose a colour set here to replace them, or skip to keep yours.",
   logo: "Logo",
   noLogo: "No logo yet. Your store name shows instead.",
@@ -133,6 +139,7 @@ export const BRAND_WORDS = Object.freeze({
   descriptionLiveNow: "Your description shows now.",
   descriptionWaits: "Your description is saved. Shoppers see it once you open your store.",
   afterPublish: "Your colours and logo are saved. They show after you publish.",
+  afterPublishTheme: "Your theme, colours and logo are saved. They show after you publish.",
   preview: "See it in the preview",
   reviewOpen: "Review and open your store",
   reviewPublish: "Review and publish",
@@ -251,8 +258,14 @@ export function paletteStyle(brand) {
 // alt is left out when empty (the store name is used). The description goes
 // only to a role that may change it. `revision` is the design's: the one GET
 // gave, or the one a partial save answered with.
-export function saveBody({ paletteId, logo, alt, description, canEditDescription, revision }) {
-  const body = { paletteId };
+// Phase 7 line 1: themeId (a flagship slug) goes whenever one is chosen, and
+// null only when the founder left a saved flagship ("Keep the simple look"),
+// so a design on an uploaded theme is never touched by a palette save.
+// With a theme, paletteId null is "Theme's colours".
+export function saveBody({ themeId = null, savedThemeId = null, paletteId, logo, alt, description, canEditDescription, revision }) {
+  const body = { paletteId: paletteId ?? null };
+  if (isFlagshipSlug(themeId)) body.themeId = themeId;
+  else if (isFlagshipSlug(savedThemeId)) body.themeId = null;
   body.logo = logo ? { media: logo.media, ...(typeof alt === "string" && alt.trim() ? { alt: alt.trim() } : {}) } : null;
   if (canEditDescription) body.description = typeof description === "string" ? description : "";
   if (Number.isInteger(revision)) body.revision = revision;
@@ -266,7 +279,7 @@ export function savedLines(answer, { carried = false } = {}) {
   if (answer?.skipped) return [BRAND_WORDS.skipped];
   const lines = [BRAND_WORDS.saved];
   if (Array.isArray(answer?.liveNow) && answer.liveNow.includes("description")) lines.push(answer.storeOpen ? BRAND_WORDS.descriptionLiveNow : BRAND_WORDS.descriptionWaits);
-  if ((Array.isArray(answer?.afterPublish) && answer.afterPublish.length > 0) || carried) lines.push(BRAND_WORDS.afterPublish);
+  if ((Array.isArray(answer?.afterPublish) && answer.afterPublish.length > 0) || carried) lines.push(answer?.brandStep?.themeId ? BRAND_WORDS.afterPublishTheme : BRAND_WORDS.afterPublish);
   return lines;
 }
 
@@ -285,6 +298,8 @@ export function formOf(current) {
   const c = isObj(current) ? current : {};
   const logo = isObj(c.logo) && typeof c.logo.media === "string" ? { media: c.logo.media } : null;
   return {
+    // Phase 7 line 1: present only when a flagship is chosen
+    ...(isFlagshipSlug(c.themeId) ? { themeId: c.themeId } : {}),
     paletteId: typeof c.paletteId === "string" ? c.paletteId : null,
     logo,
     alt: logo && typeof c.logo.alt === "string" ? c.logo.alt : "",
@@ -294,7 +309,7 @@ export function formOf(current) {
 
 export function isDirty(form, saved) {
   if (!form || !saved) return false;
-  return (form.paletteId ?? null) !== (saved.paletteId ?? null) || (form.logo?.media ?? null) !== (saved.logo?.media ?? null) || (form.logo ? (form.alt || "").trim() : "") !== (saved.logo ? (saved.alt || "").trim() : "") || (form.description ?? "") !== (saved.description ?? "");
+  return (form.themeId ?? null) !== (saved.themeId ?? null) || (form.paletteId ?? null) !== (saved.paletteId ?? null) || (form.logo?.media ?? null) !== (saved.logo?.media ?? null) || (form.logo ? (form.alt || "").trim() : "") !== (saved.logo ? (saved.alt || "").trim() : "") || (form.description ?? "") !== (saved.description ?? "");
 }
 
 // The message the preview frame draws (components/preview/bridge-core.js
@@ -303,11 +318,16 @@ export function isDirty(form, saved) {
 // form's: the palette id (null keeps the page's own colours, the founder's
 // own), the logo (false: no picture, the store name shows; the alt falls back
 // to the store name) and the description.
+// Phase 7 line 1: themeId, the flagship the frame draws (its surfaces,
+// heading font and style rules) with the palette's colours over it; null
+// with a saved flagship: the palette alone, with the page's theme taken off.
 export const CLEAR_MESSAGE = Object.freeze({ type: "storeasy:brand", paletteId: null, logo: null, description: null });
 export function overlayMessage(form, saved, { storeName = "" } = {}) {
   if (!form || !isDirty(form, saved)) return { ...CLEAR_MESSAGE };
+  const themeId = isFlagshipSlug(form.themeId) ? form.themeId : null;
   return {
     type: "storeasy:brand",
+    ...(themeId || isFlagshipSlug(saved?.themeId) ? { themeId } : {}),
     paletteId: paletteById(form.paletteId) ? form.paletteId : null,
     logo: form.logo && LIBRARY_RE.test(form.logo.media) ? { media: form.logo.media, alt: (form.alt || "").trim() || storeName || "" } : false,
     description: typeof form.description === "string" ? form.description.slice(0, DESCRIPTION_MAX) : null,
@@ -320,6 +340,7 @@ export function overlayMessage(form, saved, { storeName = "" } = {}) {
 export function mergeOnLatest(form, before, latest) {
   if (!form || !before) return latest;
   const out = { ...latest };
+  if ((form.themeId ?? null) !== (before.themeId ?? null)) out.themeId = form.themeId ?? null;
   if ((form.paletteId ?? null) !== (before.paletteId ?? null)) out.paletteId = form.paletteId ?? null;
   if ((form.logo?.media ?? null) !== (before.logo?.media ?? null) || (form.alt || "").trim() !== (before.alt || "").trim()) {
     out.logo = form.logo ? { media: form.logo.media } : null;
@@ -347,8 +368,10 @@ export function readDraft(raw) {
   if (!isObj(d) || d.v !== 1 || !isObj(d.form)) return null;
   const f = d.form;
   if (f.paletteId != null && !paletteById(f.paletteId)) return null;
+  if (f.themeId != null && !isFlagshipSlug(f.themeId)) return null;
   if (f.logo != null && !(isObj(f.logo) && typeof f.logo.media === "string" && LIBRARY_RE.test(f.logo.media))) return null;
   return {
+    ...(f.themeId ? { themeId: f.themeId } : {}),
     paletteId: f.paletteId ?? null,
     logo: f.logo ? { media: f.logo.media } : null,
     alt: f.logo && typeof f.alt === "string" ? f.alt.slice(0, ALT_MAX) : "",
