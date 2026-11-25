@@ -348,7 +348,7 @@ await t("revoked, expired, switched-off and uninstalled apps' tokens: 401 (attri
 });
 
 await t("the harness app-token caller: v1 answers it; every admin route ignores Bearer (test:permissions expects 401 on every row)", async () => {
-  eq((await v1("me", { token: store.appToken.secret })).status, 200);
+  eq((await v1("me", { token: (await store.appToken()).secret })).status, 200);
   eq((await call("app-token", "orders", "GET")).status, 401);
 });
 
@@ -365,9 +365,9 @@ await t("v1 routes: GET only, through appApiRoute (tenantHandler, runtime nodejs
   const gate = await src("lib/plugins/api-auth.js");
   ok(gate.includes("tenantHandler(") && !/\.cookies\b/.test(gate) && !/access-control/i.test(gate), "api-auth");
   ok(!/headers\.get\(\s*["']authorization/i.test(await src("lib/admin-auth.js")), "admin-auth reads no Authorization header");
-  const r = await v1("me", { token: store.appToken.secret });
+  const r = await v1("me", { token: (await store.appToken()).secret });
   ok(![...r.headers.keys()].some((k) => k.startsWith("access-control")), "no CORS header on an answer");
-  eq((await v1("me", { token: store.appToken.secret, method: "POST" })).status, 405);
+  eq((await v1("me", { token: (await store.appToken()).secret, method: "POST" })).status, 405);
 });
 
 await t("no diff key named like a secret in the token and call rows; the token secret is never logged in lib", async () => {

@@ -95,7 +95,8 @@ export const CONSOLE_ORIGIN = "https://operator.console.test";
 // cookie (same host); operator-support-entry (Phase 3 line 5): the same
 // operator's support session from the cross-host entry, in a __Host-support cookie.
 // app-token (Phase 4 line 4): a live API token of a custom app on store A with
-// every scope, sent as Authorization: Bearer and no cookies (admin routes ignore it).
+// every scope (minted on first use; appToken() gives it), sent as
+// Authorization: Bearer and no cookies (admin routes ignore it).
 export const CALLERS = Object.freeze([...CALLER_ROLES, "signed-out", "owner-b", "operator-support", "operator-support-entry", "app-token"]);
 
 // Store A (owner, admin, staff and support members, a legacy admin_password
@@ -153,8 +154,10 @@ export async function makeRoleStore({ name = "perm", a: aOpts = {}, b: bOpts = {
   const cookies = { "signed-out": {}, "operator-support": { _platform: await session("operator", "operator") }, "operator-support-entry": { "__Host-support": supportSession.token } };
   for (const role of [...CALLER_ROLES, "owner-b"]) cookies[role] = { _admin: await session(role) };
   cookies["app-token"] = {};
-  const appToken = await mintHarnessToken(a, users.owner.id);
-  const callerHeaders = { "app-token": { authorization: `Bearer ${appToken.secret}` } };
+  // minted on first use, so suites that never call as app-token see no extra install
+  let minted = null;
+  const appToken = async () => (minted ??= await mintHarnessToken(a, users.owner.id));
+  const headersFor = async (caller) => (caller === "app-token" ? { authorization: `Bearer ${(await appToken()).secret}` } : {});
   const ids = Object.fromEntries(Object.entries(users).map(([k, u]) => [`$${k}`, u.id]));
   const swap = (v) => JSON.parse(JSON.stringify(v), (_, x) => (typeof x === "string" && Object.hasOwn(ids, x) ? ids[x] : x));
 
@@ -166,7 +169,7 @@ export async function makeRoleStore({ name = "perm", a: aOpts = {}, b: bOpts = {
     const handler = route[method];
     if (typeof handler !== "function") throw new Error(`route-harness: ${path} has no ${method}`);
     const concrete = path.replace(/\[(\w+)\]/g, (_, k) => encodeURIComponent(params?.[k] ?? k));
-    const headers = { host, ...(callerHeaders[caller] ?? {}), ...(extra ?? {}) };
+    const headers = { host, ...(await headersFor(caller)), ...(extra ?? {}) };
     const o = origin === undefined ? (method === "GET" ? null : `http://${host}`) : origin;
     if (o) headers.origin = o;
     const jarFor = jar ?? cookies[caller] ?? {};
