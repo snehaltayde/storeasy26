@@ -17,4 +17,6 @@ export const ALLOWLIST = [
   // Phase 2 line 4: the offers page no longer imports these (components/admin/offers/ replaces them)
   { path: "components/admin/OffersAdmin.js", reason: "removed by Phase 2 line 10" },
   { path: "components/admin/OfferForm.js", reason: "removed by Phase 2 line 10" },
+  // Phase 2 line 5: the media page stopped importing these
+  { path: "components/admin/MediaAdmin.js", reason: "removed by Phase 2 line 10" },
 ];

@@ -18,6 +18,11 @@ export const READ_CONTROLS = [
   { path: "components/admin/offers/OfferEditor.js", reason: "Cancel / Back to offers is a link to the offers list", marks: 1 },
   { path: "components/admin/offers/SimulatePanel.js", reason: "\"Try it\" asks POST /api/admin/offers/simulate (offers.read, it writes nothing: lib/offers/simulate.js) for example carts", marks: 1 },
   { path: "components/admin/bundles/BundleEditor.js", reason: "Cancel / Back to bundles is a link to the bundles list", marks: 1 },
+  // Phase 2 line 5: the media screen
+  { path: "components/admin/media/MediaToolbar.js", reason: "the Active / Archived tabs, the search box, the tab list itself (focusable), the type and sort selects and the grid / list toggle only ask GET /api/admin/media?view=library for another page", marks: 7 },
+  { path: "components/admin/media/MediaGrid.js", reason: "a file's card (and its name in the list) opens the details sheet; nothing is sent", marks: 2 },
+  { path: "components/admin/media/MediaLibrary.js", reason: "Clear search, Try again and Load more ask GET /api/admin/media?view=library again", marks: 3 },
+  { path: "components/admin/media/MediaSheet.js", reason: "Close, Copy URL (the clipboard) and Open full size send nothing; Where it's used is PUT /api/admin/media, a read gated on storefront.read (scripts/support/admin-routes.js) that writes nothing", marks: 4 },
 ];
 
 // Reads sent as a non-GET request: { page, method, path, reason }, an exact

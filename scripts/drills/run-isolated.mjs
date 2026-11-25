@@ -419,6 +419,8 @@ export const DRILLS = {
   // offers and bundles on the new console UI (Phase 2 line 4 §5 item 7), on the roles store
   offers: { id: "OFFERS", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/offers/run.mjs", ...c.headed])) },
   "agency-gone": { id: null, warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/agency-gone.mjs"])) },
+  // Phase 2 line 5: the media screen on the roles store (staff, support); evidence in docs/cms-reviews/drills/MEDIA/
+  media: { id: "MEDIA", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/media/run.mjs", ...c.headed])) },
   // the old console screens inside the new shell (Phase 0 line 8 §3), on the
   // roles store; SF_STYLES_BASELINE and SF_STYLES_BITE pass through. A tool, not in drill:all.
   "console-styles": { id: "CONSOLE-STYLES", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/sf-styles/run.mjs", ...c.headed], { env: { ...c.env, SF_STYLES_SET: "console" } })) },

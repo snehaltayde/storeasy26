@@ -137,6 +137,8 @@
     "test:product-content": "node scripts/test-product-content.js",
     "test:search-effective": "node scripts/test-search-effective.js",
     "test:media-picker": "node scripts/test-media-picker.js",
+    "test:media-library": "node scripts/test-media-library.js",
+    "drill:media": "node scripts/drills/run-isolated.mjs media",
     "test:product-editor": "node scripts/test-product-editor.js",
     "test:commerce-blocks": "node scripts/test-commerce-blocks.js",
     "test:bundle-form": "node scripts/test-bundle-form.js",

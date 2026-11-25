@@ -5,8 +5,13 @@ import { saveMedia, listMedia, setMediaAlt, deleteMedia, mediaUsage, mediaUrl, a
 import { audit } from "@/lib/platform/audit";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
+import { listLibrary } from "@/lib/admin/media-library";
 
 // Media library API (S38 / BE15 + MC12).
+//   GET ?view=library&q&type&archived&sort&cursor
+//                            → Phase 2 line 5: one page (50) of originals for
+//                              the media screen, { items, nextCursor, counts }
+//                              (lib/admin/media-library.js); 400 INVALID_QUERY
 //   GET                      → library listing (originals + their variants);
 //                              P4-MEDIA: archived files are left out unless
 //                              ?archived=include
@@ -25,7 +30,18 @@ const shape = (m) => ({ ...m, url: mediaUrl(m.id) });
 export const GET = tenantHandler(async (request) => {
   const auth = await requireAdmin(request, "storefront.read");
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
-  const includeArchived = new URL(request.url, "http://local").searchParams.get("archived") === "include";
+  const params = new URL(request.url, "http://local").searchParams;
+  if (params.get("view") === "library") {
+    try {
+      return NextResponse.json({ ok: true, ...(await listLibrary(params)) });
+    } catch (e) {
+      if (e?.name === "LibraryQueryError") return NextResponse.json({ error: e.message, code: e.code }, { status: e.status });
+      const infra = infraResponse(e, { route: "admin/media", doing: "load" });
+      if (infra) return NextResponse.json(infra.body, { status: infra.status });
+      throw e;
+    }
+  }
+  const includeArchived = params.get("archived") === "include";
   const media = (await listMedia({ includeArchived })).map(shape);
   return NextResponse.json({ ok: true, media, limits: Object.fromEntries(Object.entries(MEDIA_MIME).map(([k, v]) => [k, v.max])) });
 });
