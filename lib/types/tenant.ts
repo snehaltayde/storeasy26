@@ -50,6 +50,12 @@ export interface ThemePin {
   applied_at?: string | null;
   published_at?: string | null;
   release?: string | null;
+  /** Phase 5 line 3: the uploaded theme package live on the store (thm_ + 16 hex), or null for a built-in look */
+  package?: string | null;
+  /** the package's own id (its slug), version and name, read when the pin is written */
+  slug?: string | null;
+  package_version?: string | null;
+  package_name?: string | null;
 }
 
 export interface TenantConfig {

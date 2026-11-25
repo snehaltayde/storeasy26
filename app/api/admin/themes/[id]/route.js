@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { tenantHandler } from "@/lib/tenant-request";
-import { archivePackage, getPackage, packageFile, themeErrorAnswer } from "@/lib/themes/packages";
+import { applyPackage, archivePackage, getPackage, packageFile, themeErrorAnswer } from "@/lib/themes/packages";
+import { validationBody } from "@/lib/cms/issues";
 
 // One uploaded theme (Phase 5 line 1). [id] is thm_ + 16 hex.
 //   GET            storefront.read → { package, content }
 //   GET ?download  storefront.read → the stored normalised JSON, as a file
 //   POST { archive: true }  themes.manage → { package }
+//   POST { apply: { withBrand?, withHome?, confirmHome?, revision? } }
+//        storefront.write → { applied } (Phase 5 line 3): a doc_design draft
+//        naming this theme, plus its layouts (and home, if asked) as drafts.
+//        409 DESIGN_CHANGED / HOME_CONFIRM_NEEDED / ARCHIVED. Publish is the
+//        documents publish (storefront.publish).
 // Archive is 409 while the theme is live or in the design draft.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,11 +42,35 @@ export const GET = tenantHandler(async (request, { params }) => {
   }
 });
 
+const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+const APPLY_KEYS = ["withBrand", "withHome", "confirmHome", "revision"];
+function parseApply(a) {
+  if (!isObj(a) || Object.keys(a).some((k) => !APPLY_KEYS.includes(k))) return null;
+  if (["withBrand", "withHome", "confirmHome"].some((k) => a[k] !== undefined && typeof a[k] !== "boolean")) return null;
+  if (a.revision !== undefined && !Number.isInteger(a.revision)) return null;
+  return { withBrand: a.withBrand !== false, withHome: a.withHome === true, confirmHome: a.confirmHome === true, revision: a.revision };
+}
+
 export const POST = tenantHandler(async (request, { params }) => {
+  const body = await request.json().catch(() => ({}));
+  const apply = isObj(body) && Object.keys(body).length === 1 && body.apply !== undefined ? parseApply(body.apply) : null;
+  if (isObj(body) && Object.hasOwn(body, "apply") && !apply) return NextResponse.json({ error: "Choose how to use this theme.", code: "BAD_REQUEST" }, { status: 400 });
+  if (apply) {
+    const auth = await requireAdmin(request, "storefront.write");
+    if (!auth.ok) return deny(auth);
+    const { id } = await params;
+    try {
+      const Docs = await import("@/lib/documents/service");
+      return NextResponse.json({ ok: true, applied: await applyPackage(String(id || ""), { ...apply, actor: auth.actor, documents: Docs }) });
+    } catch (e) {
+      if (e?.issues) return NextResponse.json(validationBody(e.issues), { status: 422 });
+      if (e?.expose && e.status >= 400 && e.status < 500) return NextResponse.json({ error: e.message, code: e.code }, { status: e.status });
+      return failure(e);
+    }
+  }
   const auth = await requireAdmin(request, "themes.manage");
   if (!auth.ok) return deny(auth);
   const { id } = await params;
-  const body = await request.json().catch(() => ({}));
   if (!body || body.archive !== true) return NextResponse.json({ error: "Choose what to do with this theme.", code: "BAD_REQUEST" }, { status: 400 });
   try {
     return NextResponse.json({ ok: true, package: await archivePackage(String(id || ""), { actor: auth.actor }) });

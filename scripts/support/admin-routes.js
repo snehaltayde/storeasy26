@@ -34,7 +34,9 @@ export const ADMIN_ROUTES = Object.freeze([
   { path: "themes", method: "GET", action: "storefront.read" },
   { path: "themes", method: "POST", action: "themes.manage", probe: { body: {} } },
   { path: "themes/[id]", method: "GET", action: "storefront.read", probe: { params: { id: "thm_0000000000000000" } } },
-  { path: "themes/[id]", method: "POST", action: "themes.manage", probe: { params: { id: "thm_0000000000000000" }, body: { archive: true } } },
+  { path: "themes/[id]", method: "POST", variant: "archive", action: "themes.manage", probe: { params: { id: "thm_0000000000000000" }, body: { archive: true } } },
+  // Phase 5 line 3: "Use this theme" writes a design draft (the probe finds no theme)
+  { path: "themes/[id]", method: "POST", variant: "apply", action: "storefront.write", probe: { params: { id: "thm_0000000000000000" }, body: { apply: {} } } },
   { path: "apps", method: "GET", action: "apps.read" },
   { path: "apps", method: "POST", action: "apps.manage", probe: { body: { install: { pluginId: "no-such-app", scopes: [] } } } },
   { path: "apps/[id]", method: "GET", action: "apps.read", probe: { params: { id: "pin_0000000000000000" } } },

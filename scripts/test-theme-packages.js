@@ -459,7 +459,7 @@ await t("support (least trusted) and operator support: reads carry only listed k
   const bId = (await call("owner-b", "themes", "GET", { host: hostB })).body.packages[0].id;
   for (const caller of ["support", ...OPS]) {
     const list = await call(caller, "themes", "GET");
-    eq(Object.keys(list.body).sort().join(","), "archived,builtins,ok,packages", `${caller} keys:`);
+    eq(Object.keys(list.body).sort().join(","), "archived,builtins,ok,packages,state", `${caller} keys:`);
     const want = "author,base,baseLabel,description,id,inUse,name,sizeBytes,slug,status,summary,swatch,uploadedAt,uploadedByName,version,archivedAt,archivedByName".split(",").sort().join(",");
     for (const p of list.body.packages) eq(Object.keys(p).sort().join(","), want, `${caller} package keys:`);
     ok(!list.text.includes(B_CANARY), `${caller}: no B canary in the list`);

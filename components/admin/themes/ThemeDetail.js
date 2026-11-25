@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Swatch } from "@/components/admin/themes/Swatch";
 import { ArchiveThemeDialog } from "@/components/admin/themes/ArchiveThemeDialog";
 import { TEMPLATE_WORDS, USE_WORDS, shortDate } from "@/components/admin/themes/theme-words";
+import { ApplyThemeDialog } from "@/components/admin/themes/ApplyThemeDialog";
+import { ThemeDraftBar } from "@/components/admin/themes/ThemeDraftBar";
 
 const TOKEN_WORDS = { accent: "Accent", background: "Background", foreground: "Text", radius: "Corners", type_scale: "Type size", button_shape: "Buttons", section_spacing: "Section spacing" };
 const SURFACE_WORDS = { bg: "background", fg: "text", muted: "soft text" };
@@ -29,7 +31,8 @@ const Colour = ({ hex }) => (
 // home sections and style rules; Download package (storefront.read) and
 // Archive (themes.manage, hidden for other roles).
 //   pkg, content: GET /api/admin/themes/[id]; role: the actor's role
-export function ThemeDetail({ pkg, content, role }) {
+//   state, names (line 3): the switch state and the live/draft look names
+export function ThemeDetail({ pkg, content, role, state = null, names = null }) {
   const tokens = content?.tokens || {};
   const surfaces = content?.surfaces || {};
   const templates = content?.templates || {};
@@ -37,6 +40,7 @@ export function ThemeDetail({ pkg, content, role }) {
   const styles = content?.styles || [];
   return (
     <div className="space-y-4" data-themes="detail">
+      {names ? <ThemeDraftBar state={state} names={names} role={role} /> : null}
       <div className="flex flex-wrap items-center gap-2">
         <Swatch colors={pkg.swatch} label={`${pkg.name} colours`} />
         <span className="text-sm text-muted-foreground">
@@ -51,6 +55,7 @@ export function ThemeDetail({ pkg, content, role }) {
               <Download aria-hidden /> Download package
             </a>
           </Button>
+          {pkg.status === "installed" && pkg.inUse !== "draft" && state?.draft?.package !== pkg.id ? <ApplyThemeDialog look={{ kind: "package", id: pkg.id, label: `${pkg.name} ${pkg.version}`, sections: pkg.summary?.sections ?? 0 }} role={role} revision={state?.design?.revision ?? null} /> : null}
           <ArchiveThemeDialog pkg={pkg} role={role} />
         </span>
       </div>

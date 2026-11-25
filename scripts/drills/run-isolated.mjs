@@ -563,7 +563,9 @@ export const ALL = ["smoke", "p5", "p6", "agency-gone", "shell", "signup", "conn
   // Phase 3 line 7 (phase end): every operator console screen's drill joins it too (line 5's support-access included)
   "platform-shell", "platform-stores", "store-lifecycle", "platform-billing", "flags-incidents", "support-access", "platform-ops",
   // Phase 4
-  "apps"];
+  "apps",
+  // Phase 5
+  "themes"];
 
 const git = (root, args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
 

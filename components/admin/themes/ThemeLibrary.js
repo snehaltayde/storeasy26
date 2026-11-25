@@ -8,13 +8,23 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/kit/data-table";
 import { EmptyState } from "@/components/kit/empty-state";
 import { Swatch } from "@/components/admin/themes/Swatch";
-import { USE_WORDS, shortDate } from "@/components/admin/themes/theme-words";
+import { USE_WORDS, lookName, sameLook, shortDate } from "@/components/admin/themes/theme-words";
+import { ApplyThemeDialog } from "@/components/admin/themes/ApplyThemeDialog";
+import { ThemeDraftBar } from "@/components/admin/themes/ThemeDraftBar";
 
 // /admin/themes (Phase 5 line 1): the built-in looks (Pulse, Glow) and the
 // store's uploaded themes, with an Installed / Archived filter (a link, so it
 // is a read). Rows open the theme's page.
-//   builtins, packages, archived: GET /api/admin/themes
-export function ThemeLibrary({ builtins, packages, archived }) {
+//   builtins, packages, archived, state: GET /api/admin/themes
+// Line 3: "Use this theme" on every look (storefront.write), the badges "Live"
+// and "In your draft", and the draft bar (Preview, Publish).
+export function ThemeLibrary({ builtins, packages, archived, state = null, role = null }) {
+  const names = { live: lookName(state?.live, builtins, packages), draft: lookName(state?.draft, builtins, packages) };
+  const builtinUse = (id) => {
+    const look = { kit: id, package: null };
+    if (sameLook(state?.live, look)) return "live";
+    return sameLook(state?.draft, look) ? "draft" : null;
+  };
   const columns = [
     {
       key: "name",
@@ -38,6 +48,7 @@ export function ThemeLibrary({ builtins, packages, archived }) {
   ];
   return (
     <div className="space-y-8">
+      <ThemeDraftBar state={state} names={names} role={role} />
       <section className="space-y-3" aria-labelledby="builtin-looks">
         <h2 id="builtin-looks" className="text-sm font-medium">
           Built-in looks
@@ -48,8 +59,18 @@ export function ThemeLibrary({ builtins, packages, archived }) {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Swatch colors={k.swatch} label={`${k.label} colours`} /> {k.label}
+                  {builtinUse(k.id) ? (
+                    <Badge variant="secondary" data-theme-use={builtinUse(k.id)}>
+                      {USE_WORDS[builtinUse(k.id)]}
+                    </Badge>
+                  ) : null}
                 </CardTitle>
                 <CardDescription>{k.description}</CardDescription>
+                {sameLook(state?.draft, { kit: k.id, package: null }) ? null : (
+                  <div className="pt-2">
+                    <ApplyThemeDialog look={{ kind: "builtin", id: k.id, label: k.label, sections: 0 }} role={role} revision={state?.design?.revision ?? null} />
+                  </div>
+                )}
               </CardHeader>
             </Card>
           ))}
@@ -78,6 +99,7 @@ export function ThemeLibrary({ builtins, packages, archived }) {
           columns={columns}
           rows={packages}
           rowHref={(r) => `/admin/themes/${encodeURIComponent(r.id)}`}
+          rowActions={archived ? null : (r) => (r.inUse === "draft" || sameLook(state?.draft, { kit: r.base, package: r.id }) ? null : <ApplyThemeDialog look={{ kind: "package", id: r.id, label: `${r.name} ${r.version}`, sections: r.summary?.sections ?? 0 }} role={role} revision={state?.design?.revision ?? null} />)}
           empty={
             <EmptyState
               icon={Palette}

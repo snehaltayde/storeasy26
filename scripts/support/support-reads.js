@@ -18,8 +18,8 @@ const DOC = (op, arg) => ({ path: "documents", method: "PUT", variant: op, name:
 
 export const SUPPORT_PROBES = Object.freeze([
   // Phase 5 line 1: uploaded themes (list, archived list, a package, its file; store B's package is not on A)
-  { name: "themes", path: "themes", method: "GET", keys: ["ok", "builtins", "packages", "archived"] },
-  { name: "themes ?status=archived", path: "themes", method: "GET", req: () => ({ query: "status=archived" }), keys: ["ok", "builtins", "packages", "archived"] },
+  { name: "themes", path: "themes", method: "GET", keys: ["ok", "builtins", "packages", "archived", "state"] },
+  { name: "themes ?status=archived", path: "themes", method: "GET", req: () => ({ query: "status=archived" }), keys: ["ok", "builtins", "packages", "archived", "state"] },
   { name: "themes/[id]", path: "themes/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.themeId } }), keys: ["ok", "package", "content"] },
   { name: "themes/[id] ?download", path: "themes/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.themeId }, query: "download=1" }), keys: ["format", "id", "name", "version", "author", "description", "base", "tokens", "surfaces", "templates", "styles"], note: "the stored package file itself" },
   { name: "themes/[id] (store B's theme)", path: "themes/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.bThemeId } }), status: 404, keys: ["error", "code"], note: "another store's theme is not on this store" },

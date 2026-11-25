@@ -149,8 +149,37 @@ async function setDesign(tn, theme, { publish = true } = {}) {
     d = await Docs.getDocument("doc_design");
     const ids = [{ id: d.id, revision: d.revision, draftHash: d.draftHash }];
     if (!home.publishedVersionId) ids.push({ id: home.id, revision: home.revision, draftHash: home.draftHash });
-    await Pub.publish({ ids, actor: ACTOR });
+    await publishPast(tn, theme?.package, () => Pub.publish({ ids, actor: ACTOR }));
   });
+}
+// Line 3's publish gate refuses a design naming a missing, archived or
+// unreadable package. A missing or tampered row is what a store can meet AFTER
+// a publish (a row lost or hand-edited later), so such a design is published
+// over a clean stand-in row that is then put back as it was.
+async function publishPast(tn, id, publish) {
+  const c = tn.client();
+  try {
+    const was = id ? (await c.execute({ sql: "SELECT * FROM theme_packages WHERE id = ?", args: [id] })).rows[0] ?? null : null;
+    const clean = !id || (was && String(was.status) === "installed" && LP.renderablePackage({ id: String(was.id), slug: String(was.slug), base_kit: String(was.base_kit), package: String(was.package) }));
+    if (clean) return await publish();
+    const text = JSON.stringify(AURORA);
+    await c.execute({ sql: "DELETE FROM theme_packages WHERE id = ?", args: [id] });
+    await c.execute({
+      sql: "INSERT INTO theme_packages (id, slug, version, name, author, description, base_kit, package, sha256, size_bytes, status, uploaded_by, uploaded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'installed', ?, ?)",
+      args: [id, `standin-${id.slice(-6)}`, "0.0.0", "Stand-in", null, "", "pulse", text, "0".repeat(64), text.length, ACTOR.id, new Date().toISOString()],
+    });
+    try {
+      return await publish();
+    } finally {
+      await c.execute({ sql: "DELETE FROM theme_packages WHERE id = ?", args: [id] });
+      if (was) {
+        const cols = Object.keys(was);
+        await c.execute({ sql: `INSERT INTO theme_packages (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`, args: cols.map((k) => was[k]) });
+      }
+    }
+  } finally {
+    c.close();
+  }
 }
 const THEME = (pkg) => ({ kit: "pulse", version: 1, ...(pkg ? { package: pkg } : {}) });
 

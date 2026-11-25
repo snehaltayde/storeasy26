@@ -29,6 +29,8 @@ export async function GET(request) {
       pinned: Boolean(theme),
       applied_at: theme?.applied_at || null,
       upgradeAvailable: kitUpgradeAvailable(theme),
+      // Phase 5 line 3: the uploaded theme the store has live, if any
+      package: theme?.package ? { id: theme.package, slug: theme.slug ?? null, version: theme.package_version ?? null, name: theme.package_name ?? null } : null,
     });
   }
   return NextResponse.json({

@@ -3,10 +3,11 @@ import { notFound, redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE, SUPPORT_COOKIE } from "@/lib/admin-auth";
 import { roleAllows } from "@/lib/platform/authz";
 import { tfetch } from "@/lib/console-request";
-import { getPackage } from "@/lib/themes/packages";
+import { builtinLooks, getPackage, listPackages, themeState } from "@/lib/themes/packages";
 import { NoAccess } from "@/components/admin/settings/NoAccess";
 import { PageHeader } from "@/components/kit/page-header";
 import { ThemeDetail } from "@/components/admin/themes/ThemeDetail";
+import { lookName } from "@/components/admin/themes/theme-words";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Theme · Admin", robots: { index: false } };
@@ -21,10 +22,12 @@ export default async function AdminThemePage({ params }) {
   if (!roleAllows(actor.role, "storefront.read")) return <NoAccess role={actor.role} page />;
   const found = await tfetch(() => getPackage(String(id || "")));
   if (!found) notFound();
+  const [state, packages] = await tfetch(() => Promise.all([themeState(), listPackages()]));
+  const names = { live: lookName(state.live, builtinLooks(), packages), draft: lookName(state.draft, builtinLooks(), packages) };
   return (
     <>
       <PageHeader title={found.package.name} breadcrumb={[{ label: "Themes", href: "/admin/themes" }, { label: found.package.name }]} />
-      <ThemeDetail pkg={found.package} content={found.content} role={actor.role} />
+      <ThemeDetail pkg={found.package} content={found.content} role={actor.role} state={state} names={names} />
     </>
   );
 }

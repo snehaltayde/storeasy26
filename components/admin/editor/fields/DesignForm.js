@@ -30,7 +30,7 @@
 // issues on the brand field and show under the brand group. Choosing a look
 // here changes only the look; applying a kit with its starter brand and
 // words stays with "Apply" on the theme screen (P3-DESIGN).
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Input, Select, Button } from "./parts.js";
 import { Notes } from "./controls.js";
 import {
@@ -152,9 +152,42 @@ export function BrandControl({ field, value, onChange, issues, owner = null, rea
   );
 }
 
+// Phase 5 line 3: a design naming an uploaded theme shows it in words and is
+// changed on the Themes page only (its name and version are read from
+// GET /api/admin/themes/[id], storefront.read).
+export const packageLookWords = (name, version) => `Theme: ${name}${version ? ` ${version}` : ""} (uploaded). Change it on Themes`;
+function PackageLook({ id: anchor, field, packageId, notes }) {
+  const [pkg, setPkg] = useState(null);
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/admin/themes/${encodeURIComponent(packageId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => live && j?.package && setPkg(j.package))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [packageId]);
+  return (
+    <div className="min-w-0" data-design-package={packageId}>
+      <p id={anchor} className="mb-1 block text-xs font-medium text-muted-foreground">
+        {field.label}
+      </p>
+      <p className="text-sm">
+        {packageLookWords(pkg?.name ?? "an uploaded theme", pkg?.version ?? null).replace(/ Change it on Themes$/, " ")}
+        <a href="/admin/themes" className="font-medium underline underline-offset-2">
+          Change it on Themes
+        </a>
+      </p>
+      <Notes anchor={anchor} notes={notes} />
+    </div>
+  );
+}
+
 export function ThemeControl({ field, value, onChange, issues, owner = null, readOnly }) {
   const id = idOf(owner, field.path);
   const notes = notesAt(issues, id);
+  if (isObj(value) && typeof value.package === "string") return <PackageLook id={id} field={field} packageId={value.package} notes={notes} />;
   const looks = lookChoices();
   const current = value == null ? "" : lookIdOf(value);
   const known = looks.some((l) => l.id === current);
