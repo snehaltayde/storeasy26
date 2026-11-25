@@ -575,7 +575,9 @@ export const ALL = ["smoke", "p5", "p6", "agency-gone", "shell", "signup", "conn
   // Phase 5
   "themes",
   // Phase 6
-  "studio"];
+  "studio",
+  // Phase 7 (phase end) and Phase 8 step 0
+  "search", "mobile-cart", "checkout"];
 
 const git = (root, args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
 
