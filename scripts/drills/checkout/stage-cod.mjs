@@ -7,7 +7,7 @@
 // on delivery, Place order opens the code dialog; a wrong code shows its
 // sentence; the code read from the notifications row places the order; the
 // owner's order page says "Phone confirmed by code". The rules are put back.
-import { ADDRESS, CONTACT, ORIGIN, flow, money, orderRow, rolesSql, seedStore, shopper, stage } from "./lib.mjs";
+import { ADDRESS, CONTACT, ORIGIN, flow, money, orderRow, rolesSql, seedStore, shopper, shopperErrors, stage } from "./lib.mjs";
 import { open, signIn } from "../apps/lib.mjs";
 
 const putSettings = (page, body) =>
@@ -85,6 +85,10 @@ stage("cod", async (drill) => {
   await dialog.getByRole("button", { name: "Confirm and place order" }).click();
   await dialog.getByRole("alert").waitFor();
   drill.check((await dialog.getByRole("alert").innerText()) === "That code isn't right. Check it and try again.", "a wrong code shows its sentence");
+  // the wrong code's 409 is the answer this check asked for: the browser logs it, drop that one line
+  const expected = shopperErrors.findIndex((e) => /status of 409 \(Conflict\)/.test(e));
+  drill.check(expected >= 0, "the browser saw the wrong code's 409");
+  if (expected >= 0) shopperErrors.splice(expected, 1);
 
   await codeField.fill(code);
   const placed = page.waitForResponse((x) => x.url().endsWith("/api/checkout") && x.request().postDataJSON()?.action === "cod");

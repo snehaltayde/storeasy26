@@ -542,6 +542,8 @@ const SUPPORT_ORDER_KEYS = [
   "coupon_code", "applied_offers", "appliedOffers", "razorpay_order_id", "razorpay_payment_id", "shopify_order_id",
   "sync_attempts", "sync_error", "created_at", "updated_at", "paid_at", "synced_at", "items", "events", "pii_redacted",
   "financial_status", "fulfillment_status", "refunded_total", "provider_updated_at", "redacted_at",
+  // Phase 8 line 2 (0036): the prepaid discount and when the COD phone was confirmed (a time, not PII)
+  "payment_discount", "cod_verified_at",
   // nulled for support (lib/admin/order-view.js PII_FIELDS, snapshot)
   "email", "phone", "name", "address_line1", "address_line2", "city", "state", "pincode", "country", "customer_id", "snapshot",
 ];
