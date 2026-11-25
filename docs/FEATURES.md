@@ -76,7 +76,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 ## Phase 5: uploadable themes (roadmap Phase 2B)
 
 - [x] An admin can upload a theme package; anything with scripts, event handlers or external imports is refused with plain words
-- [ ] A shopper sees a store rendered by an uploaded theme, with cart, buy box and checkout still Storeasy's own protected parts
+- [x] A shopper sees a store rendered by an uploaded theme, with cart, buy box and checkout still Storeasy's own protected parts
 - [ ] An admin can switch between installed themes with a preview before publishing
 
 ## Phase 6: studio editor (roadmap Phase 3)
