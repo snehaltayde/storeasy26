@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CircleAlert } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -89,31 +90,44 @@ export function QuizTry({ quiz }) {
             {error}
           </p>
         )}
-        {result && (
-          <div className="space-y-2 border-t border-border pt-3" data-quiz-try-result aria-live="polite">
-            <p className="text-xs text-muted-foreground">
+        {quiz && result && (
+          <div className="space-y-3 border-t border-border pt-4" data-quiz-try-result aria-live="polite">
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium text-foreground">
+                {result.products.length ? `A shopper with these answers gets ${result.products.length === 1 ? "1 pick" : `${result.products.length} picks`}` : "A shopper with these answers gets no picks"}
+              </p>
               {result.topTags.length ? (
-                <>
-                  Winning tags: <span className="font-mono text-foreground">{result.topTags.join(", ")}</span>
-                </>
+                <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                  Winning {result.topTags.length === 1 ? "tag" : "tags"}
+                  {result.topTags.map((t) => (
+                    <Badge key={t} variant="secondary" className="font-mono">
+                      {t}
+                    </Badge>
+                  ))}
+                </p>
               ) : (
-                "No answer picked a tag, so there is nothing to match."
+                <p className="text-xs text-muted-foreground">No answer picked a tag, so there is nothing to match.</p>
               )}
-            </p>
+            </div>
             {result.products.length === 0 ? (
               <p className="text-sm text-foreground">{result.topTags.length ? "No product in stock has these tags. Shoppers would see no picks." : "Pick answers with tags, then try again."}</p>
             ) : (
-              <ul className="divide-y divide-border rounded-md border border-border" data-quiz-try-products>
-                {result.products.map((p) => (
+              <ol className="divide-y divide-border rounded-md border border-border bg-card" data-quiz-try-products>
+                {result.products.map((p, n) => (
                   <li key={p.handle} className="flex items-center gap-3 px-3 py-2 text-sm">
-                    <span className="min-w-0 flex-1 truncate text-foreground">{p.title}</span>
+                    <span className="w-4 shrink-0 text-right font-mono text-xs text-muted-foreground tabular-nums" aria-hidden>
+                      {n + 1}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-foreground" title={p.title}>
+                      {p.title}
+                    </span>
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {p.matches} {p.matches === 1 ? "tag" : "tags"}
                     </span>
                     <MoneyCell amount={p.price} currency={p.currency} className="w-24 shrink-0" />
                   </li>
                 ))}
-              </ul>
+              </ol>
             )}
           </div>
         )}

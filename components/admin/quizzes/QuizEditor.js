@@ -19,7 +19,7 @@ import { validateQuiz } from "@/lib/quiz-rules";
 import { QuestionList, blankQuestion } from "./QuestionList";
 import { QuizTry } from "./QuizTry";
 import { DeleteQuizDialog } from "./DeleteQuizDialog";
-import { QUIZ_WORDS, pageLine } from "./quiz-words";
+import { QUIZ_WORDS, READ_ONLY_FIELD, pageLine } from "./quiz-words";
 
 // Create or edit one quiz (Phase 2 line 10) on POST /api/admin/quiz: a title,
 // an intro, the address (/quiz/<slug>, set at create and locked after), and
@@ -65,6 +65,9 @@ export function QuizEditor({ initial = null, pages = [], tags = [], role, canWri
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [askDelete, setAskDelete] = useState(false);
+  const root = useRef(null);
+  // after a refused Save or On/Off, the keyboard lands on the first marked field
+  const focusFirstProblem = () => requestAnimationFrame(() => root.current?.querySelector('[aria-invalid="true"]')?.focus());
 
   const locked = enabled && !canPublish; // staff on a quiz that is On
   const ro = !canWrite || locked;
@@ -89,7 +92,10 @@ export function QuizEditor({ initial = null, pages = [], tags = [], role, canWri
       setEnabled(Boolean(data.quiz?.enabled));
       await done(data);
     } catch (e) {
-      if (e.status === 422 && e.body?.problems) setServerProblems(e.body.problems);
+      if (e.status === 422 && e.body?.problems) {
+        setServerProblems(e.body.problems);
+        focusFirstProblem();
+      }
       setError(e.status === 422 ? "The quiz didn't save. Fix the problems marked below." : e.message);
     } finally {
       setBusy(false);
@@ -100,6 +106,7 @@ export function QuizEditor({ initial = null, pages = [], tags = [], role, canWri
     setTried(true);
     if (!v.ok) {
       setError("The quiz didn't save. Fix the problems marked below.");
+      focusFirstProblem();
       return;
     }
     const body = initial ? { quiz: input } : { quiz: input, create: true, ...(canPublish && turnOn ? { enabled: true } : {}) };
@@ -121,6 +128,7 @@ export function QuizEditor({ initial = null, pages = [], tags = [], role, canWri
     setTried(true);
     if (!v.ok) {
       setError(`The quiz can't be turned ${on ? "on" : "off"} until the problems marked below are fixed.`);
+      focusFirstProblem();
       return Promise.resolve();
     }
     return send({ quiz: input, enabled: on }, () => {
@@ -158,7 +166,7 @@ export function QuizEditor({ initial = null, pages = [], tags = [], role, canWri
   const listWords = said("questions");
 
   return (
-    <div data-quiz-editor={initial ? "edit" : "new"}>
+    <div ref={root} data-quiz-editor={initial ? "edit" : "new"}>
       <PageHeader
         breadcrumb={[{ label: "Quizzes", href: "/admin/quizzes" }, { label: initial ? "Edit" : "New" }]}
         title={initial ? initial.title : "New quiz"}
@@ -168,7 +176,10 @@ export function QuizEditor({ initial = null, pages = [], tags = [], role, canWri
               <Badge variant={enabled ? "success" : "muted"} data-quiz-state={enabled ? "on" : "off"}>
                 {enabled ? "On" : "Off"}
               </Badge>
-              <span>{enabled ? "Shoppers can take this quiz." : "Shoppers can't see this quiz while it is off."}</span>
+              <span>
+                {enabled ? "Shoppers can take this quiz." : "Shoppers can't see this quiz while it is off."}
+                {canWrite && !canPublish && !enabled ? " An owner or admin turns it on." : ""}
+              </span>
             </span>
           ) : (
             "A few questions; each answer points to catalog tags. It is saved turned off unless you turn it on."
@@ -196,13 +207,15 @@ export function QuizEditor({ initial = null, pages = [], tags = [], role, canWri
                 <Input
                   id="quiz-title"
                   disabled={ro}
+                  className={READ_ONLY_FIELD}
                   maxLength={120}
                   placeholder="Find your perfect stack"
                   value={form.title}
                   aria-invalid={titleWords ? true : undefined}
+                  aria-describedby={titleWords ? "quiz-title-problem" : undefined}
                   onChange={(e) => set({ title: e.target.value, ...(!initial && !slugTouched ? { slug: slugFrom(e.target.value) } : {}) })}
                 />
-                {titleWords && <p className="text-xs text-destructive" data-quiz-problem>{titleWords}</p>}
+                {titleWords && <p id="quiz-title-problem" className="text-xs text-destructive" data-quiz-problem>{titleWords}</p>}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="quiz-slug">Address</Label>
@@ -212,13 +225,16 @@ export function QuizEditor({ initial = null, pages = [], tags = [], role, canWri
                     <span className="font-mono text-foreground">/quiz/{initial.slug}</span>
                   </p>
                 ) : (
-                  <div className="flex items-center gap-1">
-                    <span className="font-mono text-sm text-muted-foreground">/quiz/</span>
+                  <div className="flex items-stretch">
+                    <span className="flex items-center rounded-l-md border border-r-0 border-input bg-card px-2.5 font-mono text-sm text-muted-foreground" aria-hidden>
+                      /quiz/
+                    </span>
                     <Input
                       id="quiz-slug"
                       disabled={ro}
                       maxLength={61}
-                      className="font-mono"
+                      className="rounded-l-none font-mono"
+                      aria-describedby={slugWords ? "quiz-slug-problem quiz-slug-hint" : "quiz-slug-hint"}
                       placeholder="find-your-stack"
                       value={form.slug}
                       aria-invalid={slugWords ? true : undefined}
@@ -229,12 +245,12 @@ export function QuizEditor({ initial = null, pages = [], tags = [], role, canWri
                     />
                   </div>
                 )}
-                {slugWords && <p className="text-xs text-destructive" data-quiz-problem>{slugWords}</p>}
-                <p className="text-xs text-muted-foreground">{QUIZ_WORDS.slugLocked}</p>
+                {slugWords && <p id="quiz-slug-problem" className="text-xs text-destructive" data-quiz-problem>{slugWords}</p>}
+                <p id="quiz-slug-hint" className="text-xs text-muted-foreground">{QUIZ_WORDS.slugLocked}</p>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="quiz-intro">Intro</Label>
-                <Textarea id="quiz-intro" disabled={ro} rows={2} maxLength={500} placeholder="Answer three questions and we'll pick for you." value={form.intro} onChange={(e) => set({ intro: e.target.value })} />
+                <Textarea id="quiz-intro" disabled={ro} className={READ_ONLY_FIELD} rows={2} maxLength={500} placeholder="Answer three questions and we'll pick for you." value={form.intro} onChange={(e) => set({ intro: e.target.value })} />
                 <p className="text-xs text-muted-foreground">Shown under the title, before the first question.</p>
               </div>
             </CardContent>

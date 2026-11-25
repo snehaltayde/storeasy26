@@ -33,7 +33,7 @@ export function TagPicker({ value, tags, onChange, label, readOnly = false }) {
       {value.map((tag) => (
         <Badge key={tag} variant={byTag.has(tag) ? "secondary" : "warning"} className="gap-1 font-mono" title={countWords(byTag.get(tag))}>
           {tag}
-          <span className="font-sans text-[0.7rem] opacity-70">· {countWords(byTag.get(tag))}</span>
+          <span className="border-l border-current/25 pl-1 font-sans text-[0.7rem] opacity-80">{countWords(byTag.get(tag))}</span>
           {!readOnly && (
             <button type="button" aria-label={`Remove tag ${tag} from ${label}`} className="-mr-1 rounded-sm opacity-70 hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none" onClick={() => toggle(tag)}>
               <X aria-hidden className="size-3" />

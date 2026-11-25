@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { QUIZ_LIMITS } from "@/lib/quiz-rules";
 import { TagPicker } from "./TagPicker";
+import { READ_ONLY_FIELD } from "./quiz-words";
 
 // A quiz's questions and their answers (Phase 2 line 10): add, move up or
 // down, and delete either; each answer's tags through TagPicker. validateQuiz
@@ -67,7 +68,7 @@ export function QuestionList({ questions, onChange, tags, problems = [], readOnl
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor={`quiz-${q.key}`}>The question</Label>
-                <Input id={`quiz-${q.key}`} disabled={readOnly} maxLength={300} placeholder="What are you shopping for?" value={q.prompt} aria-invalid={qWords ? true : undefined} aria-describedby={qWords ? `quiz-${q.key}-problem` : undefined} onChange={(e) => setQ(i, { prompt: e.target.value })} />
+                <Input id={`quiz-${q.key}`} disabled={readOnly} className={READ_ONLY_FIELD} maxLength={300} placeholder="What are you shopping for?" value={q.prompt} aria-invalid={qWords ? true : undefined} aria-describedby={qWords ? `quiz-${q.key}-problem` : undefined} onChange={(e) => setQ(i, { prompt: e.target.value })} />
                 <Problem id={`quiz-${q.key}-problem`} words={qWords} />
               </div>
               <fieldset className="space-y-2">
@@ -83,7 +84,7 @@ export function QuestionList({ questions, onChange, tags, problems = [], readOnl
                           <span className="w-5 shrink-0 text-center font-mono text-xs text-muted-foreground tabular-nums" aria-hidden>
                             {k + 1}
                           </span>
-                          <Input disabled={readOnly} maxLength={120} placeholder="An answer" aria-label={`The words for ${name}`} value={o.label} aria-invalid={oWords ? true : undefined} onChange={(e) => setO(i, k, { label: e.target.value })} />
+                          <Input disabled={readOnly} className={READ_ONLY_FIELD} maxLength={120} placeholder="An answer" aria-label={`The words for ${name}`} value={o.label} aria-invalid={oWords ? true : undefined} aria-describedby={oWords ? `quiz-${o.key}-problem` : undefined} onChange={(e) => setO(i, k, { label: e.target.value })} />
                           {!readOnly && (
                             <>
                               <Button type="button" size="icon-sm" variant="ghost" aria-label={`Move ${name} up`} disabled={k === 0} onClick={() => setQ(i, { options: move(q.options, k, -1) })}>
@@ -98,9 +99,9 @@ export function QuestionList({ questions, onChange, tags, problems = [], readOnl
                             </>
                           )}
                         </div>
-                        <div className="pl-6">
+                        <div className="space-y-1.5 pl-6">
+                          <Problem id={`quiz-${o.key}-problem`} words={oWords} />
                           <TagPicker value={o.tags} tags={tags} label={name} readOnly={readOnly} onChange={(next) => setO(i, k, { tags: next })} />
-                          <Problem words={oWords} />
                         </div>
                       </li>
                     );

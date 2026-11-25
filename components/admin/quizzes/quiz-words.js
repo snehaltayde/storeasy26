@@ -21,3 +21,7 @@ export function pageLine(p) {
   const where = p.live && p.draft ? "live and draft" : p.live ? "live" : "draft";
   return `${p.name || "A page"} (${where})`;
 }
+
+// a field the role can't change still reads at full strength: support and
+// staff read the quiz, so its words are not faded like an unusable control
+export const READ_ONLY_FIELD = "disabled:cursor-default disabled:opacity-100";
