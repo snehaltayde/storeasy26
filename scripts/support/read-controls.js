@@ -16,6 +16,9 @@ export function routeMatches(pattern, path) {
 // fails until its row says why and the count is raised). Phase 2 lines
 // append rows; when appends conflict, keep both sides.
 export const READ_CONTROLS = [
+  // Phase 4 line 1: Apps
+  { path: "components/admin/apps/AppsList.js", reason: "the Installed / Browse tabs (and their list, which Radix makes focusable) only switch the shown tab, and Browse apps switches to the Browse tab; no write", marks: 4 },
+  { path: "components/admin/apps/AppCatalog.js", reason: "Open is a link to an installed app's page (a GET)", marks: 1 },
   // Phase 3 line 1: the operator Stores list and store page
   { path: "components/platform/stores/StoresTable.js", reason: "Refresh, Try again and Clear filters only re-ask GET /api/platform/tenants (or change the list's address); nothing is sent", marks: 3 },
   { path: "components/platform/stores/FleetStrip.js", reason: "Try again re-asks GET /api/platform/overview", marks: 1 },

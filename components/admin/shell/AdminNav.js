@@ -16,6 +16,7 @@ import {
   MessageCircleQuestionMark,
   Package,
   Plug,
+  Puzzle,
   Rocket,
   Settings,
   ShoppingCart,
@@ -54,6 +55,7 @@ const ICONS = {
   experiments: FlaskConical,
   insights: Lightbulb,
   automations: Workflow,
+  apps: Puzzle, // Phase 4 line 1
   integrations: Plug,
   billing: CreditCard,
   settings: Settings,

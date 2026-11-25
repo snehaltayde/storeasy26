@@ -29,6 +29,11 @@ const RELEASES = "lib/admin/releases-api.js";
 const SID = "ps_0000000000000000";
 
 export const ADMIN_ROUTES = Object.freeze([
+  // Phase 4 line 1
+  { path: "apps", method: "GET", action: "apps.read" },
+  { path: "apps", method: "POST", action: "apps.manage", probe: { body: { install: { pluginId: "no-such-app", scopes: [] } } } },
+  { path: "apps/[id]", method: "GET", action: "apps.read", probe: { params: { id: "pin_0000000000000000" } } },
+  { path: "apps/[id]", method: "POST", action: "apps.manage", probe: { params: { id: "pin_0000000000000000" }, body: { disable: true } } },
   { path: "audit", method: "GET", action: "audit.read" },
   { path: "automations", method: "GET", action: "settings.read" },
   { path: "automations", method: "POST", action: "settings.write", probe: { body: {} } },

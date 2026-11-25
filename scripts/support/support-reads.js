@@ -17,6 +17,10 @@
 const DOC = (op, arg) => ({ path: "documents", method: "PUT", variant: op, name: `documents ${op}`, req: (ctx) => ({ body: { [op]: typeof arg === "function" ? arg(ctx) : arg } }) });
 
 export const SUPPORT_PROBES = Object.freeze([
+  // Phase 4 line 1: the apps list and an install's page (support gets no activity)
+  { name: "apps", path: "apps", method: "GET", keys: ["ok", "installs", "catalog"] },
+  { name: "apps/[id]", path: "apps/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.appId } }), keys: ["ok", "install", "plugin"] },
+  { name: "apps/[id] (secret app)", path: "apps/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.secretAppId } }), keys: ["ok", "install", "plugin"] },
   { name: "brand-step", path: "brand-step", method: "GET", keys: ["ok", "brandStep", "palettes", "current", "design", "storeOpen", "canEditDescription", "descriptionMax"] },
   { name: "bundles", path: "bundles", method: "GET", keys: ["ok", "bundles", "currency"] },
   { name: "catalog", path: "catalog", method: "GET", keys: ["ok", "products", "overrides", "collections", "shopify_admin"] },

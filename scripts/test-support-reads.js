@@ -66,11 +66,14 @@ const CNY = {
   bDocument: "cnybdoc0",
   bOrderLinkSecret: "cnybolsecret0",
   bShopifyAdminToken: "cnybshoptok0",
+  // Phase 4 line 1: an app's secret setting in A (no one reads it back) and store B's install
+  appSecret: "cnyappsecret0",
+  bApp: "cnybapp0",
 };
 const SECRET_KEYS = [
   "platformSecret", "orderLinkSecret", "adminPassword", "shopifyAdminToken", "shopifyClientSecret", "storefrontToken", "storefrontPrivateToken",
   "shopifyWebhookSecret", "razorpayKeySecret", "razorpayWebhookSecret", "ga4ApiSecret", "metaCapiToken", "dbToken", "cartId", "idempotencyKey",
-  "bOrderLinkSecret", "bShopifyAdminToken",
+  "bOrderLinkSecret", "bShopifyAdminToken", "appSecret",
 ];
 // member emails (…@sup-a.test … @sup-d.test) and the operator's (operator@sup.test)
 const MEMBER_EMAIL = /[\w.+-]+@sup(-[a-d])?\.test/i;
@@ -237,7 +240,32 @@ const bundleA = await call("owner", "bundles", "POST", { body: { create: { title
 const experimentA = await call("owner", "experiments", "POST", { body: { experiment: { slug: "sup-exp", name: "Support experiment", hypothesis: "A shorter hero title sells more", target_kind: "hero", min_sample: 50, variants: [{ key: "control", weight: 50 }, { key: "b", weight: 50, payload: { title: "Shorter", highlight: "", subtitle: "" } }] } } });
 const quizA = await call("owner", "quiz", "POST", { body: { quiz: { slug: "sup-quiz", title: "Support quiz", intro: "", questions: [{ prompt: "Your goal?", options: [{ label: "Muscle", tags: ["muscle"] }, { label: "Energy", tags: ["energy"] }] }] } } });
 
+// Phase 4 line 1: Trust badges and a fixture app with a secret setting in A,
+// the fixture app in B (its greeting a canary)
+const { registerPlugin } = await import("../lib/plugins/catalog.js");
+registerPlugin({
+  id: "sup-secret-app",
+  name: "Support fixture app",
+  version: "1.0.0",
+  summary: "A fixture app.",
+  description: "A fixture app with a secret setting.",
+  icon: "Puzzle",
+  author: { name: "Tests" },
+  scopes: ["orders.read"],
+  settings: [
+    { key: "api_key", kind: "secret", label: "API key" },
+    { key: "greeting", kind: "text", label: "Greeting", max: 40 },
+  ],
+});
+const appA = await call("owner", "apps", "POST", { body: { install: { pluginId: "trust-badges", scopes: [] } } });
+const secretApp = await call("owner", "apps", "POST", { body: { install: { pluginId: "sup-secret-app", scopes: ["orders.read"] } } });
+const secretSaved = await call("owner", "apps/[id]", "POST", { params: { id: secretApp.body?.install?.id }, body: { settings: { api_key: CNY.appSecret, greeting: "Hello" } } });
+const appB = await call("owner-b", "apps", "POST", { body: { install: { pluginId: "sup-secret-app", scopes: ["orders.read"] } }, host: b.tenant.domains[0] });
+await call("owner-b", "apps/[id]", "POST", { params: { id: appB.body?.install?.id }, body: { settings: { greeting: CNY.bApp } }, host: b.tenant.domains[0] });
+
 const CTX = {
+  appId: appA.body?.install?.id ?? null,
+  secretAppId: secretApp.body?.install?.id ?? null,
   docId: pageA.doc.id,
   bundleId: bundleA.body?.bundle?.id ?? null,
   experimentSlug: experimentA.body?.experiment?.slug ?? null,
@@ -299,7 +327,9 @@ const OWN_TOKEN = { owner: "ownerAdmin", admin: "adminAdmin", staff: "staffAdmin
 const skipFor = (caller) => [...(REDACTED(caller) ? [] : ORDER_PII), OWN_TOKEN[caller]];
 
 await t("setup: outside services blank, only file: databases, the fixture planted", () => {
-  for (const [k, v] of Object.entries({ bundleId: CTX.bundleId, experimentSlug: CTX.experimentSlug, quizSlug: CTX.quizSlug, collectionGid: CTX.collectionGid })) ok(v, `fixture ${k} (${bundleA.text?.slice(0, 120)} | ${experimentA.text?.slice(0, 120)} | ${quizA.text?.slice(0, 120)})`);
+  eq(secretSaved.status, 200, `the app secret saved: ${secretSaved.text?.slice(0, 200)}`);
+  eq(appB.status, 200, `store B's app: ${appB.text?.slice(0, 200)}`);
+  for (const [k, v] of Object.entries({ appId: CTX.appId, secretAppId: CTX.secretAppId, bundleId: CTX.bundleId, experimentSlug: CTX.experimentSlug, quizSlug: CTX.quizSlug, collectionGid: CTX.collectionGid })) ok(v, `fixture ${k} (${bundleA.text?.slice(0, 120)} | ${experimentA.text?.slice(0, 120)} | ${quizA.text?.slice(0, 120)})`);
   for (const k of H.OUTSIDE_SERVICE_ENV) eq(process.env[k], "", k);
   for (const tn of [a, b, c, d]) F.assertLocalDbUrl(tn.tenant.dbUrl);
   eq(CALLERS.join(","), "staff,support,operator-support,operator-support-entry", "least-trusted callers, derived from roleAllows:");
@@ -616,7 +646,7 @@ await t("P2-F analytics: a role without orders.read gets NoAccess (page words) a
 const pageRuns = {};
 for (const r of ADMIN_PAGES) {
   // "$order", "$offer", "$bundle", "$experiment" and "$quiz" are the fixture's rows (P2-D)
-  const FIXTURE = { $order: ORDER_ID, $offer: CTX.offerId, $bundle: CTX.bundleId, $experiment: CTX.experimentSlug, $quiz: CTX.quizSlug };
+  const FIXTURE = { $order: ORDER_ID, $offer: CTX.offerId, $bundle: CTX.bundleId, $experiment: CTX.experimentSlug, $quiz: CTX.quizSlug, $app: CTX.appId };
   const params = Object.fromEntries(Object.entries(r.params ?? {}).map(([k, v]) => [k, v in FIXTURE ? FIXTURE[v] : v]));
   pageRuns[r.page] = await pages.run(pageRel(r.page), { cookies: cookies.support, params });
 }
@@ -633,7 +663,7 @@ await t("page sweep: every console page runs as support (a page, a redirect or a
   ok(rendered.length >= 15, `most pages rendered props: ${rendered.length}; not: ${other.join(", ")}`);
   // P2-D: the dynamic pages read the fixture's rows, so support gets the page itself
   const dynamic = ADMIN_PAGES.filter((r) => Object.values(r.params ?? {}).some((v) => String(v).startsWith("$"))).map((r) => r.page);
-  eq(dynamic.sort().join(","), "bundles/[id],experiments/[slug],offers/[id],orders/[id],quizzes/[slug]", "dynamic rows on fixture ids:");
+  eq(dynamic.sort().join(","), "apps/[id],bundles/[id],experiments/[slug],offers/[id],orders/[id],quizzes/[slug]", "dynamic rows on fixture ids:");
   eq(dynamic.filter((p) => pageRuns[p].notFound || pageRuns[p].redirect || !pageRuns[p].props.length).join(","), "", "dynamic pages that did not render:");
 });
 
@@ -654,7 +684,7 @@ await t("page sweep (line 5): every console page runs as operator-support-entry,
   const bad = [];
   let rendered = 0;
   for (const r of ADMIN_PAGES) {
-    const params = Object.fromEntries(Object.entries(r.params ?? {}).map(([k, v]) => [k, v === "$order" ? ORDER_ID : v]));
+    const params = Object.fromEntries(Object.entries(r.params ?? {}).map(([k, v]) => [k, v === "$order" ? ORDER_ID : v === "$app" ? CTX.appId : v]));
     const run = await pages.run(pageRel(r.page), { cookies: cookies["operator-support-entry"], params });
     if (run.error) bad.push(`${r.page}: ${String(run.error?.message || run.error).split("\n")[0].slice(0, 200)}`);
     if (run.redirect === "/admin/login") bad.push(`${r.page}: sent to the sign-in (the __Host-support session was not accepted)`);
