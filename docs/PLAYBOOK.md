@@ -28,6 +28,10 @@ orchestrating a phase. Keep it under about 80 lines: merge, reword or delete bef
 - A migration number reserved in the plan goes to whichever branch merges first: Phase 3 reserved 0016
   for line 5, line 3 needed one sooner and took it, line 5 moved to 0017. Never merge a lower number after
   a higher one has run.
+- A contract or line that adds a page, nav item or full-screen route runs `drill:shell` before it merges: it
+  sweeps every nav page per role and width, and Phase 6's studio contract broke it on main unseen.
+- Parallel lines that share client state (one store, one document) get one named owner in the plan and the
+  other line reuses it: both Phase 6 reviews found two live `doc_design` stores, once per line.
 - Merge only on the verdict: chain `git merge` on `steelthread-verify`'s own exit, never after a `tail` or
   `grep` of its output (Phase 5's contract merged before its one failed suite was read).
 - "Drafts only" covers every document a button publishes: a publish that takes more than one document lists
@@ -45,9 +49,9 @@ orchestrating a phase. Keep it under about 80 lines: merge, reword or delete bef
 - Drills use ids, `data-*` hooks or `exact: true`, and wait for the row they read, not the table: after
   design passes, Phase 2 and 3 drills failed six times at merge on two "Open an incident" buttons, a
   label matching two fields, an old 404 wording, a sign split from its amount, and rows still loading.
-- Storefront drill stages set the consent cookie and stub `/_next/image` (the roles store's fixture pictures
-  404), and each stage filters only the refusal statuses it causes on purpose (Phase 5: the banner covered
-  Checkout, missing pictures and the evil upload's 422 each failed the console check).
+- Storefront drill stages set the consent cookie and stub `/_next/image` (fixture pictures 404), filter only
+  the refusal statuses they cause on purpose, and set up their own starting state, never the previous
+  stage's (Phase 5's banner, pictures and 422; Phase 6's open stage changed the accent the design stage read).
 - A route with a `loading.js` streams, so `notFound()` arrives with status 200: drills check the not-found
   page's words, not the status (the offers and apps drills both failed on this).
 - A new credential or cross-host path runs its browser drill in the builder's own check: the support-access
