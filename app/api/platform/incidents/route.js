@@ -7,7 +7,7 @@ import { listIncidents, openIncident, postIncidentUpdate, editInternalNote, reso
 // merchants see in their console while the incident is open. tenant_id NULL =
 // platform-wide. The history is audit_log (incident.open | update | resolve),
 // and no audit row holds the internal note's text.
-//   GET ?scope=all|platform|<store id>&page=n → { incidents, page, pageSize, total, openCount, stores }
+//   GET with params scope=all|platform|<store id>&page=n → { incidents, page, pageSize, total, openCount, stores }
 //   GET ?timeline=<id>                        → { timeline }
 //   POST {action:"open", title, tenant?, publicMessage?, internalNote?}
 //   POST {action:"update", id, publicMessage}  → a new public message

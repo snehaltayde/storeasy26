@@ -18,6 +18,8 @@ export function routeMatches(pattern, path) {
 export const READ_CONTROLS = [
   // Phase 3 line 6: the operator Operations tabs
   { path: "components/platform/operations/OperationsTabs.js", reason: "the tab triggers only switch the shown tab (and ?tab=), no write", marks: 1 },
+  // Phase 3 line 4: the operator Incidents list
+  { path: "components/platform/incidents/IncidentsScreen.js", reason: "each incident row only opens its detail sheet (a client view, no write)", marks: 1 },
   // Phase 2 line 1: the dashboard
   { path: "components/admin/dashboard/RangeSwitch.js", reason: "the 7/30/90-day links only change ?days= on the dashboard (a GET)", marks: 1 },
   { path: "components/admin/dashboard/SalesSummary.js", reason: "a link to the onboarding page on a store with no orders (a GET)", marks: 1 },

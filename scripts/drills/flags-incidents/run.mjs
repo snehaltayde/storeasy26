@@ -87,7 +87,7 @@ const posted = (page, path) => page.waitForResponse((r) => r.url().includes(`/ap
 async function incidents(drill, op, member, tenant) {
   await open(op, "/platform/incidents");
   drill.check(await op.getByRole("heading", { name: "Incidents" }).isVisible(), "the incidents page opens in the operator shell");
-  await op.getByRole("button", { name: "Open an incident" }).click();
+  await op.getByRole("button", { name: "Open an incident" }).first().click();
   await op.locator("#incident-title").fill(TITLE);
   await op.locator("#incident-store").selectOption(tenant.id);
   await op.locator("#incident-public").fill("Payouts are delayed by about an hour.");
