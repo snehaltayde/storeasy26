@@ -84,57 +84,140 @@ function strayControls([allowed, newUi]) {
     .filter((el) => (newUi || !el.closest("[data-legacy]")) && !el.closest("[data-nav-item]") && !allowed.some((c) => el.closest(`[data-shell-control="${c}"]`)) && !passes(el))
     .map((el) => `${el.tagName.toLowerCase()}${el.getAttribute("aria-label") ? `[${el.getAttribute("aria-label")}]` : ""} "${(el.innerText || "").trim().slice(0, 40)}"`);
 }
-// In the page (a new-UI route): marked reads that could still write: a submit
-// button, or one inside a form that is not method="get".
+// In the page (a new-UI route): marked reads that could still write: a
+// submit or image button, a form= or formaction override, or one inside a
+// form without an explicit method="get".
 function unsafeReads() {
-  return [...document.querySelectorAll("main [data-read-control]")]
-    .filter((el) => el.getAttribute("type") === "submit" || (el.tagName === "BUTTON" && el.closest("form") && !el.hasAttribute("type")) || (el.closest("form") && (el.closest("form").getAttribute("method") || "get").toLowerCase() !== "get"))
-    .map((el) => `${el.tagName.toLowerCase()} "${(el.innerText || "").trim().slice(0, 40)}"`);
+  const formOk = (f) => !f || (f.getAttribute("method") || "").toLowerCase() === "get";
+  return [...document.querySelectorAll("[data-read-control]")]
+    .filter((el) => {
+      const type = (el.getAttribute("type") || "").toLowerCase();
+      return type === "submit" || type === "image" || el.hasAttribute("form") || el.hasAttribute("formaction") || (el.tagName === "BUTTON" && el.closest("form") && !el.hasAttribute("type")) || !formOk(el.closest("form"));
+    })
+    .map((el) => `${el.tagName.toLowerCase()} "${(el.innerText || el.getAttribute("aria-label") || el.getAttribute("alt") || "").trim().slice(0, 40)}"`);
+}
+// In the page: forms a support user could submit with Enter. A form with a
+// text field submits implicitly unless its default (first) submit button is
+// natively disabled or RoleGate's; an explicit method="get" form only
+// navigates (a search), so it passes.
+function implicitSubmits() {
+  const TEXT = new Set(["", "text", "search", "email", "number", "password", "tel", "url", "date", "datetime-local", "month", "time", "week"]);
+  const gated = (b) => b.disabled || (b.getAttribute("aria-disabled") === "true" && b.getAttribute("data-role-gate") === "disabled");
+  return [...document.querySelectorAll("form")]
+    .filter((f) => (f.getAttribute("method") || "").toLowerCase() !== "get")
+    .filter((f) => [...f.elements].some((e) => e.tagName === "INPUT" && TEXT.has((e.getAttribute("type") || "").toLowerCase()) && !e.disabled && !e.readOnly))
+    .filter((f) => {
+      const submit = [...f.elements].find((e) => (e.tagName === "BUTTON" && (e.getAttribute("type") || "submit").toLowerCase() === "submit") || (e.tagName === "INPUT" && ["submit", "image"].includes((e.getAttribute("type") || "").toLowerCase())));
+      return !submit || !gated(submit);
+    })
+    .map((f) => `form${f.id ? `#${f.id}` : ""} (${f.elements.length} fields)`);
 }
 
-// Support on a new-UI route: click each marked read control, then press Enter
-// and Space on each RoleGate-disabled control; none may send a non-GET request,
-// and a gated control may not navigate.
-async function supportNewUiControls(drill, page, href) {
+// Support on a new-UI route (and the drill's self-test pages):
+//   - each marked read: click it, then the whole document (portals, menus,
+//     popovers included) may hold no stray control, and no non-GET request
+//   - each RoleGate-disabled control: mouse-click it and press Enter and Space
+//     on it: no non-GET request, no navigation
+//   - each enabled text field: press Enter in it: no non-GET request
+// Returns what it found; the caller checks.
+async function supportNewUiControls(page, href) {
   const writes = [];
   const onRequest = (req) => {
     if (req.method() !== "GET" && req.method() !== "HEAD") writes.push(`${req.method()} ${new URL(req.url()).pathname}`);
   };
-  page.on("request", onRequest);
-  try {
-    const reads = await page.locator("main [data-read-control]").count();
-    for (let i = 0; i < reads; i++) {
-      await page.goto(ORIGIN + href, { waitUntil: "load" });
-      await settle(page);
-      const el = page.locator("main [data-read-control]").nth(i);
-      if (!(await el.isVisible().catch(() => false)) || (await el.isDisabled().catch(() => true))) continue;
-      await el.click({ timeout: 5000 }).catch(() => {});
-      await page.waitForTimeout(500);
-    }
+  const fresh = async () => {
     await page.goto(ORIGIN + href, { waitUntil: "load" });
     await settle(page);
-    const gated = await page.locator('main [data-role-gate="disabled"]').count();
-    const moved = [];
-    for (let i = 0; i < gated; i++) {
-      const el = page.locator('main [data-role-gate="disabled"]').nth(i);
-      for (const key of ["Enter", " "]) {
+  };
+  const found = { unsafe: [], implicit: [], revealed: [], moved: [], writes, reads: 0, gated: 0, fields: 0 };
+  page.on("request", onRequest);
+  try {
+    await fresh();
+    found.unsafe = await page.evaluate(unsafeReads);
+    found.implicit = await page.evaluate(implicitSubmits);
+    found.reads = await page.locator("main [data-read-control]").count();
+    for (let i = 0; i < found.reads; i++) {
+      await fresh();
+      const el = page.locator("main [data-read-control]").nth(i);
+      if (!(await el.isVisible().catch(() => false)) || (await el.isDisabled().catch(() => true))) continue;
+      const url = page.url();
+      await el.click({ timeout: 5000 }).catch(() => {});
+      await page.waitForTimeout(500);
+      // a link went to another page: that page gets its own pass; a menu or popover opened here
+      if (page.url() === url) for (const x of await page.evaluate(strayControls, [CONTROLS, true])) found.revealed.push(`after read #${i}: ${x}`);
+    }
+    await fresh();
+    found.gated = await page.locator('main [data-role-gate="disabled"]').count();
+    for (let i = 0; i < found.gated; i++) {
+      for (const how of ["click", "Enter", "Space"]) {
+        const el = page.locator('main [data-role-gate="disabled"]').nth(i);
         const before = page.url();
-        await el.focus().catch(() => {});
-        await page.keyboard.press(key === " " ? "Space" : key);
+        if (how === "click") await el.click({ timeout: 5000, force: true }).catch(() => {});
+        else {
+          await el.focus().catch(() => {});
+          await page.keyboard.press(how);
+        }
         await page.waitForTimeout(300);
         if (page.url() !== before) {
-          moved.push(`${key === " " ? "Space" : key} on #${i} → ${page.url()}`);
-          await page.goto(ORIGIN + href, { waitUntil: "load" });
-          await settle(page);
+          found.moved.push(`${how} on gated #${i} → ${page.url()}`);
+          await fresh();
         }
       }
     }
-    drill.check(writes.length === 0, `${href}: support's ${reads} marked read control(s) and ${gated} gated control(s) send no non-GET request`, writes);
-    drill.check(moved.length === 0, `${href}: Enter and Space on support's ${gated} gated control(s) do nothing`, moved);
+    await fresh();
+    const fieldSel = 'main input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([disabled]):not([readonly])';
+    found.fields = await page.locator(fieldSel).count();
+    for (let i = 0; i < found.fields; i++) {
+      await fresh();
+      const el = page.locator(fieldSel).nth(i);
+      if (!(await el.isVisible().catch(() => false))) continue;
+      await el.focus().catch(() => {});
+      await page.keyboard.press("Enter");
+      await page.waitForTimeout(500);
+    }
   } finally {
     page.off("request", onRequest);
   }
+  return found;
 }
+const checkNewUi = (check, href, f) => {
+  check(f.unsafe.length === 0, `${href}: no marked read control submits a form (submit, image, form=, formaction, a non-GET form)`, f.unsafe);
+  check(f.implicit.length === 0, `${href}: no form support can submit with Enter (a text field needs a gated or disabled default submit, or method="get")`, f.implicit);
+  check(f.revealed.length === 0, `${href}: clicking support's ${f.reads} marked read(s) reveals no write control anywhere (menus and popovers included)`, f.revealed);
+  check(f.writes.length === 0, `${href}: support's reads, ${f.gated} gated control(s) (click, Enter, Space) and ${f.fields} field(s) (Enter) send no non-GET request`, f.writes);
+  check(f.moved.length === 0, `${href}: support's gated controls do not navigate`, f.moved);
+};
+
+// The support check's own self-test: one page per escape, served by the drill
+// (page.route), each of which must be caught.
+const SELFTEST = "/__shell-drill-selftest";
+const SELFTEST_PAGES = {
+  menu: `<main><button type="button" data-read-control onclick="document.body.insertAdjacentHTML('beforeend','<div role=menu><button>Delete store</button></div>')">More</button></main>`,
+  "fake-gate": `<main><button aria-disabled="true" data-role-gate="disabled" onclick="fetch('${SELFTEST}/w',{method:'POST'})">Push</button></main>`,
+  "submit-escapes": `<main><form id="f" method="post"></form><button type="button" form="f" data-read-control>A</button><button type="button" formaction="/x" data-read-control>B</button><input type="image" alt="C" data-read-control><form><button type="button" data-read-control>D</button></form></main>`,
+  implicit: `<main><form id="q" onsubmit="event.preventDefault();fetch('${SELFTEST}/w',{method:'POST'})"><input name="q"></form></main>`,
+  clean: `<main><form method="get"><input name="q" data-read-control><button type="button" data-read-control>Search</button></form><form><input name="n"><button aria-disabled="true" data-role-gate="disabled" onclick="event.preventDefault()">Save</button></form></main>`,
+};
+async function supportSelfTest(drill, ctx) {
+  const page = await ctx.newPage();
+  await page.route(`${ORIGIN}${SELFTEST}/**`, (route) => {
+    const name = new URL(route.request().url()).pathname.split("/").pop();
+    return route.fulfill(SELFTEST_PAGES[name] ? { status: 200, contentType: "text/html", body: `<!doctype html><html><body>${SELFTEST_PAGES[name]}</body></html>` } : { status: 204, body: "" });
+  });
+  const run = (name) => supportNewUiControls(page, `${SELFTEST}/${name}`);
+  const menu = await run("menu");
+  drill.check(menu.revealed.some((x) => x.includes("Delete store")), "self-test: a write item a marked read reveals in a menu is caught", menu);
+  const fake = await run("fake-gate");
+  drill.check(fake.writes.some((x) => x.startsWith("POST")), "self-test: a fake gate's mouse click that POSTs is caught", fake);
+  const esc = await run("submit-escapes");
+  drill.check(["A", "B", "C", "D"].every((n) => esc.unsafe.some((x) => x.includes(`"${n}"`))), "self-test: form=, formaction, type=image and a form without method=get are caught", esc.unsafe);
+  const imp = await run("implicit");
+  drill.check(imp.implicit.length === 1 && imp.writes.some((x) => x.startsWith("POST")), "self-test: a form that submits on Enter is caught (statically and by pressing Enter)", imp);
+  const clean = await run("clean");
+  drill.check(!clean.unsafe.length && !clean.implicit.length && !clean.revealed.length && !clean.writes.length && !clean.moved.length, "self-test: a GET search and a gated save pass", clean);
+  await page.close();
+}
+
 // In the page: an old route's content sits in main > [data-legacy]; a new-UI
 // route's sits in main directly, and the only [data-legacy] regions left are
 // the notices' own.
@@ -275,9 +358,7 @@ async function roleAtWidth(drill, page, role, width, out) {
       const stray = await page.evaluate(strayControls, [CONTROLS, newUi]);
       check(stray.length === 0, `${href}: ${newUi ? "anywhere" : "outside [data-legacy]"} only nav links and shell controls`, stray);
       if (newUi) {
-        const unsafe = await page.evaluate(unsafeReads);
-        check(unsafe.length === 0, `${href}: no marked read control submits a form`, unsafe);
-        await supportNewUiControls(drill, page, href);
+        checkNewUi(check, href, await supportNewUiControls(page, href));
         await page.goto(ORIGIN + href, { waitUntil: "load" });
         await settle(page);
       }
@@ -462,6 +543,7 @@ async function shell(drill) {
     pages[role] = role === "owner" ? await signInForm(drill, ctx, m) : await signInApi(ctx, m);
   }
   for (const role of ROLES) for (const w of WIDTHS) await roleAtWidth(drill, pages[role], role, w, out);
+  await supportSelfTest(drill, pages.support.context());
   await supportMenus(drill, pages.support);
   await supportDeepLinks(drill, pages.support);
   const annexCtx = await drill.browser.newContext({ viewport: { width: 1280, height: HEIGHT }, deviceScaleFactor: 1 });

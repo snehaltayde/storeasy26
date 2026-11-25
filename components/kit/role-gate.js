@@ -36,8 +36,16 @@ export function RoleGate({ role, action, reason, mode = "disable", children }) {
     },
     className: cn(child.props.className, "cursor-not-allowed opacity-50"),
   };
-  // a link (<a> or Link) becomes a plain <a> with no href: nothing to follow
-  const gated = child.props.href != null ? createElement("a", { ...props, role: "link", tabIndex: 0 }, child.props.children) : cloneElement(child, props);
+  // a link (<a> or Link) becomes a plain <a> with no href: nothing to follow.
+  // It keeps the child's other props (aria-label, id, data-*); it drops href,
+  // onClick and next/link's own options, which an <a> doesn't take.
+  let gated;
+  if (child.props.href != null) {
+    const { href, onClick, children: kids, prefetch, replace, scroll, shallow, passHref, legacyBehavior, locale, onNavigate, ...rest } = child.props;
+    gated = createElement("a", { ...rest, ...props, role: "link", tabIndex: 0 }, kids);
+  } else {
+    gated = cloneElement(child, props);
+  }
   return (
     <Tooltip>
       <TooltipTrigger asChild>{gated}</TooltipTrigger>

@@ -23,8 +23,12 @@
 //   8. data-read-control: never on a submit button or inside a form that is
 //      not method="get"; outside components/kit/ only in a file with a reasoned
 //      row in scripts/support/read-controls.js
+//      (a submit or image type, a dynamic type, a spread, form=/formAction
+//      are unsafe too)
 //   9. every <RoleGate> in app/ and components/ wraps a child that forwards
-//      onClick and aria-disabled (<button>, <a>, Button, Link)
+//      onClick and aria-disabled (<button>, <a>, Button, Link); the string
+//      data-role-gate appears nowhere but components/kit/role-gate.js (a fake
+//      gate would pass support's stray-control rule)
 import { createRequire } from "node:module";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -199,9 +203,16 @@ await t("RoleGate, support (least-trusted): a write control is aria-disabled wit
   const link = html(h(RG.RoleGate, { role: "support", action: "offers.write", reason: "Support access is read-only." }, h("a", { href: "/admin/offers/new", className: "x" }, "New offer")));
   const a = tag(link, 'data-role-gate="disabled"');
   ok(a.startsWith("<a") && !a.includes("href=") && a.includes('role="link"') && a.includes('tabindex="0"') && a.includes('aria-disabled="true"') && link.includes(">New offer</a>"), "a gated link loses its href, keeps role=link and a tab stop:");
+  const kept = html(h(RG.RoleGate, { role: "support", action: "offers.write", reason: "x" }, h("a", { href: "/admin/offers/new", id: "new-offer", "aria-label": "Create an offer", "data-track": "new", onClick: () => {} }, "New")));
+  const ka = tag(kept, 'data-role-gate="disabled"');
+  ok(ka.includes('id="new-offer"') && ka.includes('aria-label="Create an offer"') && ka.includes('data-track="new"') && !ka.includes("href="), "a gated link keeps id, aria-label and data-*, drops href:");
   const { default: Link } = require("next/link");
   const nl = html(h(RG.RoleGate, { role: "support", action: "offers.write", reason: "Support access is read-only." }, h(Link, { href: "/admin/offers/new" }, "New offer")));
   ok(!nl.includes("href=") && nl.includes('role="link"'), "a gated next/link too:");
+  const nlp = html(h(RG.RoleGate, { role: "support", action: "offers.write", reason: "x" }, h(Link, { href: "/admin/offers/new", prefetch: false, replace: true, id: "l1" }, "New")));
+  ok(nlp.includes('id="l1"') && !/prefetch|replace=/.test(nlp), "next/link's own options are dropped, other props kept:");
+  const own = RG.RoleGate({ role: "support", action: "offers.write", reason: "x", children: h("a", { href: "/x", onClick: () => { throw new Error("ran"); } }, "x") }).props.children[0].props.children;
+  own.props.onClick({ preventDefault() {}, stopPropagation() {} });
 });
 
 await t("RoleGate swallows a gated control's click and Enter/Space before its own handler", () => {
@@ -334,9 +345,15 @@ function readMarks(src) {
     const formOpen = src.lastIndexOf("<form", start);
     const inForm = formOpen >= 0 && src.lastIndexOf("</form>", start) < formOpen;
     const formTag = inForm ? src.slice(formOpen, src.indexOf(">", formOpen) + 1) : "";
+    const literalType = (open.match(/\btype=(?:"([^"]*)"|'([^']*)'|\{"([^"]*)"\})/) || []).slice(1).find((x) => x != null);
     out.push({
       open,
-      submits: /\btype=(?:"submit"|\{"submit"\}|'submit')/.test(open) || (inForm && /^(button|Button)$/.test(name) && !/\btype=/.test(open)),
+      submits:
+        ["submit", "image"].includes(literalType) ||
+        (/\btype=/.test(open) && literalType == null) || // a dynamic type={x}
+        /\{\s*\.\.\./.test(open) || // a spread may carry type, form or formAction
+        /\b(?:form|formAction|formaction)=/.test(open) ||
+        (inForm && /^(button|Button)$/.test(name) && literalType == null),
       postForm: inForm && !/\bmethod=(?:"get"|\{"get"\}|'get')/i.test(formTag),
     });
   }
@@ -351,7 +368,15 @@ await t("data-read-control: never on a submit button or in a non-GET form; outsi
     bad('<form action={save}><Button data-read-control>Go</Button></form>'),
     bad('<form onSubmit={save}><input data-read-control /></form>'),
     bad('<form method="get"><Button data-read-control>Search</Button></form>'),
-  ], [0, 1, 0, 1, 1, 1], "the rule bites (submit, a default-submit button, a non-GET form):");
+    bad('<button type="button" form="save-form" data-read-control>Go</button>'),
+    bad('<Button type="button" formAction={save} data-read-control>Go</Button>'),
+    bad('<input type="image" alt="Go" data-read-control />'),
+    bad('<Button type={kind} data-read-control>Go</Button>'),
+    bad('<Button {...props} data-read-control>Go</Button>'),
+    bad('<form method="post"><input name="q" data-read-control /></form>'),
+    bad('<form method={m}><input name="q" data-read-control /></form>'),
+    bad('<Link href="/admin/orders" data-read-control>Orders</Link>'),
+  ], [0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0], "the rule bites (submit, default submit, non-GET form, form=, formAction, type=image, dynamic type, spread, method post, dynamic method):");
   for (const r of READ_CONTROLS) ok(r && typeof r.path === "string" && typeof r.reason === "string" && r.reason.trim().length >= 10, `read-controls row ${JSON.stringify(r)} needs a path and a reason:`);
   const problems = [];
   const files = [...walk("app"), ...walk("components")];
@@ -372,7 +397,16 @@ await t("data-read-control: never on a submit button or in a non-GET form; outsi
   eq(problems, [], "found:");
 });
 
-// ---------- 9. RoleGate's child forwards the props ----------
+// ---------- 9. RoleGate's child forwards the props; no fake gates ----------
+const GATE_FILE = `${KIT}/role-gate.js`;
+const fakeGates = (files) => files.filter((f) => f !== GATE_FILE && read(f).includes("data-role-gate"));
+await t("data-role-gate appears only in components/kit/role-gate.js (no hand-made gate)", () => {
+  const files = [...walk("app"), ...walk("components"), ...walk("lib")];
+  ok(files.includes(GATE_FILE) && read(GATE_FILE).includes("data-role-gate"), "RoleGate sets it:");
+  eq(fakeGates([...files, "scripts/test-console-kit.js"]), ["scripts/test-console-kit.js"], "the ban bites (a file that names it is caught):");
+  eq(fakeGates(files), [], "files outside role-gate.js that name data-role-gate:");
+});
+
 const FORWARDS = new Set(["button", "a", "Button", "Link"]);
 const gateChildren = (src) => [...src.matchAll(/<RoleGate\b[^>]*?(?<!=)>\s*<([\w.]+)/g)].map((m) => m[1]);
 await t("every <RoleGate> wraps a child that forwards onClick and aria-disabled (<button>, <a>, Button, Link)", () => {
