@@ -39,6 +39,13 @@ orchestrating a phase. Keep it under about 80 lines: merge, reword or delete bef
 - Drills use ids, `data-*` hooks or `exact: true`, and wait for the row they read, not the table: after
   design passes, Phase 2 and 3 drills failed six times at merge on two "Open an incident" buttons, a
   label matching two fields, an old 404 wording, a sign split from its amount, and rows still loading.
+- A route with a `loading.js` streams, so `notFound()` arrives with status 200: drills check the not-found
+  page's words, not the status (the offers and apps drills both failed on this).
+- A new credential or cross-host path runs its browser drill in the builder's own check: the support-access
+  entry passed every unit test while real Chromium never posted the form (`rel=noreferrer` sent
+  `Origin: null`, and the CSP's `form-action 'self'` blocked the store host).
+- While a full verify runs in a worktree, reviewers there run nothing: suites share file databases in the
+  worktree root, and a reviewer's `test-copy` run moved them mid-verify (`SQLITE_READONLY_DBMOVED`).
 - History reads order by time, then insertion order (`rowid`), never a random id: flag history came back
   in either order for same-millisecond rows, and only under the full suite's load.
 
