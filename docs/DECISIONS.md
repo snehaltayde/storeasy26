@@ -3,6 +3,14 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Quizzes on the new UI (on the owner's behalf)
+
+- **Permissions:** every quiz write needs `storefront.write`; turning a quiz on, or saving or deleting one that is on, also needs `storefront.publish` (checked before validation, and enforced in the write itself: without publish a save or delete only changes a quiz that is still off). New quizzes start off, and `upsertQuiz` defaults to off. An off quiz, or another store's slug, is 404 to shoppers.
+- **Integrity:** delete is one guarded statement that refuses while a published page or an unarchived draft links `/quiz/<slug>` (409 `QUIZ_IN_USE` with page names); the slug is locked after create. Known limit: an Undo or restore of an older page version can bring back a link to a deleted quiz, since usage reads only the live version and current draft.
+- **Shared rules:** `validateQuiz` and `scoreQuiz` live in `lib/quiz-rules.js` (Edge-safe), used by the editor, the API and the store. The catalog page's quiz tray is gone.
+- **Decided by:** Claude
+- **Slice:** Phase 2 line 10
+
 ## 2026-11-25 Analytics, experiments, insights and automations on the new UI (on the owner's behalf)
 
 - **Permissions:** starting or resuming an experiment needs `storefront.publish` (staff lose this; drafting, pausing and completing stay `storefront.write`); a start that changes nothing isn't audited again. Automations are owner/admin only; retries, the kill switch and insights dismiss/restore now write audit rows; a dry run with automations off stores nothing. Support's analytics carry aggregates only.
