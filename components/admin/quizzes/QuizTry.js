@@ -21,6 +21,12 @@ export function QuizTry({ quiz }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
+  // a new answer clears the last picks
+  function pick(id, v) {
+    setAnswers({ ...answers, [id]: v });
+    setResult(null);
+  }
+
   async function run() {
     setBusy(true);
     setError(null);
@@ -53,7 +59,7 @@ export function QuizTry({ quiz }) {
                 <p className="text-sm font-medium text-foreground" id={`try-${q.id}`}>
                   {i + 1}. {q.prompt}
                 </p>
-                <RadioGroup data-read-control aria-labelledby={`try-${q.id}`} value={answers[q.id] || ""} onValueChange={(v) => (setAnswers({ ...answers, [q.id]: v }), setResult(null))}>
+                <RadioGroup data-read-control aria-labelledby={`try-${q.id}`} value={answers[q.id] || ""} onValueChange={(v) => pick(q.id, v)}>
                   {q.options.map((o) => (
                     <div key={o.id} className="flex items-center gap-2 pointer-coarse:min-h-10">
                       <RadioGroupItem value={o.id} id={`try-${o.id}`} data-read-control />
