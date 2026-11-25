@@ -347,6 +347,10 @@ await t("unit: 409 stops autosave; the choice is offered with the other person's
   const s = St.createDocumentStore({ api, document: fakeDoc(), timers: clock, now: clock.now });
   s.setField(T1, "Mine");
   await clock.advance(P);
+  // the 409 path awaits hashOf (store.js, documentHash is crypto work), which a
+  // fixed number of setImmediate ticks doesn't always cover: wait until the
+  // save has settled (no longer saving) instead
+  await until(() => s.getState().status !== "saving" && s.getState().status !== "pending", "the 409 to settle");
   const st = s.getState();
   eq(st.status, "conflict", "status:");
   eq(st.conflict.words, "This page was changed in another tab or by Asha.", "words:");

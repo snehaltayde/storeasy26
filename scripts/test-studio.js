@@ -383,6 +383,7 @@ await t("unit: two stores saving at once with a slow save: Publish flushes both,
       }
       if (op === "listDocuments") return { ok: true, data: { documents: [{ id: "doc_home", label: "Home page", unpublishedChanges: true }, { id: "doc_design", label: "Brand", unpublishedChanges: true }, { id: "doc_about", label: "About us", unpublishedChanges: true }] } };
       if (op === "publishSet") return (sent.push({ publishSet: args }), { ok: true, data: { published: args.map((x) => ({ id: x.id })) } });
+      if (op === "getDocument") return { ok: true, data: { document: { id: args, revision: 9, draftHash: "h_about" } } };
       return { ok: true, data: {} };
     },
     sendKeepalive() {},

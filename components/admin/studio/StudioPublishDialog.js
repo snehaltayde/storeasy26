@@ -13,8 +13,8 @@ import { outcomeOf } from "../editor/publish/publishModel";
 // Pending saves of every open document are flushed first, then one
 // publishSet goes out with each ticked document's revision and draftHash
 // (an open document's from its own store, after the flush; any other's read
-// fresh). A refusal (blockers, a 409) is said in plain words with
-// "Go to the fix". Only storefront.publish opens it (StudioTopBar).
+// when the dialog opened, so a colleague's later edit is a 409). A refusal
+// (blockers, a 409) is said in plain words with "Go to the fix". Only storefront.publish opens it (StudioTopBar).
 //
 // The logic is plain functions (node suites drive them):
 //   publishRows(documents, { touched })  → { ticked: [...], other: [...] }
@@ -35,6 +35,7 @@ export const PUBLISH_WORDS = Object.freeze({
   cancel: "Cancel",
   fix: "Go to the fix",
   noneTicked: "Tick at least one page to publish.",
+  notListed: "That page wasn't in the list when it opened. Close this and publish again.",
 });
 
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
@@ -51,6 +52,7 @@ export function publishRows(documents, { touched = [] } = {}) {
 
 export function createPublishRun({ api, stores = () => [], current = () => null }) {
   const open = () => (typeof stores === "function" ? stores() : stores).filter(Boolean);
+  const shown = new Map(); // id → { revision, draftHash } read by prepare()
   async function prepare() {
     for (const s of open()) {
       const f = await s.beforeNavigate();
@@ -58,6 +60,17 @@ export function createPublishRun({ api, stores = () => [], current = () => null 
     }
     const r = await api.call("listDocuments", true);
     if (!r?.ok || !Array.isArray(r.data?.documents)) return { ok: false, message: r?.message || PUBLISH_WORDS.notSaved };
+    // the version of every draft that isn't open here, as the dialog shows
+    // it: Publish sends exactly this, so an edit made after the dialog
+    // opened is a 409, never published unseen
+    shown.clear();
+    const mine = new Set(open().map((s) => s.getState().id));
+    for (const d of r.data.documents) {
+      if (!isObj(d) || d.unpublishedChanges !== true || d.archivedAt || mine.has(d.id)) continue;
+      const g = await api.call("getDocument", d.id);
+      if (!g?.ok || !isObj(g.data?.document)) return { ok: false, message: g?.message || PUBLISH_WORDS.notSaved, id: d.id };
+      shown.set(d.id, { revision: g.data.document.revision, draftHash: g.data.document.draftHash });
+    }
     return { ok: true, documents: r.data.documents };
   }
   async function publish(ids, labels = {}) {
@@ -74,9 +87,9 @@ export function createPublishRun({ api, stores = () => [], current = () => null 
         items.push({ id, revision: st.revision, draftHash: st.draftHash, label: labels[id] });
         continue;
       }
-      const d = await api.call("getDocument", id);
-      if (!d?.ok || !isObj(d.data?.document)) return { outcome: outcomeOf(d, { labels }), id };
-      items.push({ id, revision: d.data.document.revision, draftHash: d.data.document.draftHash, label: labels[id] });
+      const v = shown.get(id);
+      if (!v) return { outcome: { phase: "error", title: PUBLISH_WORDS.notListed, words: PUBLISH_WORDS.notListed }, id };
+      items.push({ id, revision: v.revision, draftHash: v.draftHash, label: labels[id] });
     }
     // an open store in the set sends it (it flushes and holds its own
     // autosave, and marks itself published); otherwise the api does

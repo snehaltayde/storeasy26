@@ -222,14 +222,202 @@ await t("rendered: SectionsRail has one aria-live=\"assertive\" region; drag on 
   ok(/<button[^>]*disabled=""[^>]*data-tree-handle=/.test(conflict), "409: handles disabled");
 });
 
-await t("source: the tree's keyboard hold stops the row-focus keys, keeps focus on the held handle, and the pointer drag captures the pointer after the 4px threshold", async () => {
-  const src = await readFile(join(ROOT, "components/admin/editor/tree/SectionTree.js"), "utf8");
-  ok(src.includes("e.stopPropagation()") && src.includes("holdKey(hold, e.key)"), "keys while held are the hold's");
-  ok(src.includes("el.focus()") && src.includes("keep.current"), "focus stays on the handle");
-  ok(src.includes("setPointerCapture") && src.includes("DRAG_THRESHOLD_PX"), "pointer capture and threshold");
-  ok(src.includes('window.addEventListener("keydown", onKey, true)') && src.includes('e.key !== "Escape"'), "Escape cancels a pointer drag");
-  const rail = await readFile(join(ROOT, "components/admin/studio/SectionsRail.js"), "utf8");
-  ok(rail.includes("orderMessage(st.id") && rail.includes('"storeasy:select"'), "the rail posts the order and outlines the held section");
+// ---- 2b. driven: the tree's real handlers with a hook shim -----------------------------
+// SectionTree compiled with React's hooks replaced by a small driver: each
+// render calls the component, effects run after it, and the handle's own
+// onPointerDown / onPointerMove / onKeyDown props are called with events.
+console.log("— driven");
+function driver() {
+  const box = {};
+  let cursor = 0;
+  let dirty = false;
+  let effects = [];
+  const hooks = {
+    useState(init) {
+      const k = cursor++;
+      if (!(k in box)) box[k] = typeof init === "function" ? init() : init;
+      return [
+        box[k],
+        (v) => {
+          const nv = typeof v === "function" ? v(box[k]) : v;
+          if (!Object.is(nv, box[k])) {
+            box[k] = nv;
+            dirty = true;
+          }
+        },
+      ];
+    },
+    useRef(init) {
+      const k = cursor++;
+      if (!(k in box)) box[k] = { current: init };
+      return box[k];
+    },
+    useEffect(fn, deps) {
+      const k = cursor++;
+      const prev = box[k];
+      if (prev && deps && prev.deps && deps.length === prev.deps.length && deps.every((d, i) => Object.is(d, prev.deps[i]))) return;
+      const slot = { deps, cleanup: null };
+      box[k] = slot;
+      effects.push(() => {
+        prev?.cleanup?.();
+        const c = fn();
+        slot.cleanup = typeof c === "function" ? c : null;
+      });
+    },
+  };
+  return {
+    hooks,
+    render(fn, after) {
+      let tree = null;
+      for (let i = 0; i < 20; i++) {
+        dirty = false;
+        cursor = 0;
+        effects = [];
+        tree = fn();
+        after(tree);
+        for (const e of effects) e();
+        if (!dirty) return tree;
+      }
+      throw new Error("render did not settle");
+    },
+  };
+}
+const jsxRt = require("react/jsx-runtime");
+async function loadShim(file, hooks) {
+  const shimReact = { ...React, ...hooks, default: { ...React, ...hooks } };
+  const code = await compile(file);
+  const local = new Map();
+  for (const [, id] of code.matchAll(/require\("([^"]+)"\)/g)) {
+    const target = id.startsWith("@/") ? join(ROOT, id.slice(2)) : id.startsWith(".") ? resolve(dirname(file), id) : null;
+    if (target) local.set(id, await load(target.endsWith(".js") ? target : `${target}.js`));
+  }
+  const mod = { exports: {} };
+  new Function("require", "module", "exports", code)((id) => (id === "react" ? shimReact : id === "react/jsx-runtime" ? jsxRt : local.has(id) ? local.get(id) : require(id)), mod, mod.exports);
+  return mod.exports.default;
+}
+const winListeners = [];
+globalThis.window ??= { location: { host: "drag.test", origin: "http://drag.test" }, addEventListener: (t, fn) => winListeners.push([t, fn]), removeEventListener: (t, fn) => winListeners.splice(winListeners.findIndex((x) => x[1] === fn), 1) };
+async function mount(props = {}) {
+  const drv = driver();
+  const Driven = await loadShim(join(ROOT, "components/admin/editor/tree/SectionTree.js"), drv.hooks);
+  const log = { changes: [], previews: [], said: [], focused: null, captured: [], released: [] };
+  const doc = { activeElement: null };
+  const rows = SIX.map((x, i) => ({ id: x.id, getBoundingClientRect: () => ({ top: 100 + i * 40, height: 40 }) }));
+  const selectEl = (id) => ({ focus: () => ((log.focused = `select:${id}`), (doc.activeElement = null)) });
+  const list = { querySelectorAll: () => rows, querySelector: (sel) => selectEl(/data-section-row="([^"]+)"/.exec(sel)?.[1]), closest: () => null };
+  const handleEls = {};
+  const handleEl = (id) =>
+    (handleEls[id] ??= {
+      ownerDocument: doc,
+      focus() {
+        doc.activeElement = this;
+        log.focused = `handle:${id}`;
+      },
+      setPointerCapture: (p) => log.captured.push(p),
+      releasePointerCapture: (p) => log.released.push(p),
+    });
+  let current = { type: "home", sections: SIX, role: "owner", draggable: true, onChange: (n, m) => log.changes.push({ ids: ids(n), op: m.op }), onPreview: (n, m) => log.previews.push({ ids: ids(n), id: m.id }), onAnnounce: (t) => log.said.push(t), ...props };
+  let tree = null;
+  const walk = (n, f) => {
+    if (!n || typeof n !== "object") return;
+    if (Array.isArray(n)) return n.forEach((c) => walk(c, f));
+    if (n.props) {
+      f(n);
+      walk(n.props.children, f);
+    }
+  };
+  const attach = (t) =>
+    walk(t, (n) => {
+      if (n.type === "ol" && n.props.ref && typeof n.props.ref === "object") n.props.ref.current = list;
+      const r = n.props.ref;
+      if (typeof r === "function" && n.props["data-tree-handle"]) r(handleEl(n.props["data-tree-handle"]));
+    });
+  const render = () => (tree = drv.render(() => Driven(current), attach));
+  render();
+  const handle = (id) => {
+    let hit = null;
+    walk(tree, (n) => n.props["data-tree-handle"] === id && (hit = n));
+    return hit;
+  };
+  const ev = (o) => ({ preventDefault() {}, stopPropagation() {}, button: 0, pointerId: 7, ...o });
+  return {
+    log,
+    handle,
+    rerender: (p = {}) => ((current = { ...current, ...p }), render()),
+    down: (id, y) => (handle(id).props.onPointerDown(ev({ clientY: y, currentTarget: handleEl(id) })), render()),
+    move: (id, y) => (handle(id).props.onPointerMove(ev({ clientY: y })), render()),
+    up: (id) => (handle(id).props.onPointerUp(ev({})), render()),
+    key: (id, key) => (handle(id).props.onKeyDown(ev({ key })), render()),
+    winKey: (key) => {
+      for (const [, fn] of winListeners.filter((x) => x[0] === "keydown")) fn(ev({ key }));
+      return render();
+    },
+    dragging: () => {
+      let on = false;
+      walk(tree, (n) => n.props["data-tree-dragging"] === "" && (on = true));
+      return on;
+    },
+  };
+}
+
+await t("driven: a pointer drag starts only after 4px (setPointerCapture on down), reorders the frame while moving, drops with one move; Escape on the window cancels with the original order and sends nothing; a refused spot sends nothing", async () => {
+  const m = await mount();
+  m.down("sec_a", 150);
+  eq(m.log.captured, [7], "captured:");
+  m.move("sec_a", 153);
+  ok(!m.dragging() && m.log.previews.length === 0 && m.log.said.length === 0, "3px: not a drag yet");
+  m.move("sec_a", 155);
+  ok(m.dragging(), "5px: dragging");
+  eq(m.log.said[0], "Picked up Rich text, position 2 of 6. Arrow keys move it, Space drops it, Escape cancels.", "pick-up words:");
+  m.move("sec_a", 100 + 3 * 40 + 25);
+  eq(m.log.previews.at(-1), { ids: ["sec_hero", "sec_b", "sec_c", "sec_a", "sec_d", "sec_e"], id: "sec_a" }, "the frame's order while dragging:");
+  m.up("sec_a");
+  eq(m.log.changes, [{ ids: ["sec_hero", "sec_b", "sec_c", "sec_a", "sec_d", "sec_e"], op: "move" }], "one move:");
+  eq(m.log.said.at(-1), "Rich text dropped at position 4 of 6.", "drop words:");
+  eq(m.log.released, [7], "released:");
+  ok(!m.dragging(), "ended");
+  const e = await mount();
+  e.down("sec_b", 190);
+  e.move("sec_b", 250);
+  ok(e.dragging(), "dragging");
+  e.winKey("Escape");
+  ok(!e.dragging(), "Escape ended it");
+  eq(e.log.changes, [], "nothing sent:");
+  eq(e.log.previews.at(-1), { ids: ids(SIX), id: null }, "the original order back in the frame:");
+  eq(e.log.said.at(-1), "Move cancelled. Rich text is back at position 3.", "cancel words:");
+  const r = await mount();
+  r.down("sec_c", 230);
+  r.move("sec_c", 60);
+  r.up("sec_c");
+  eq(r.log.changes, [], "refused: nothing sent:");
+  eq(r.log.said.at(-1), "Can't go there: The hero can only go at the top of the home page.", "refused words:");
+});
+
+await t("driven: the keyboard hold keeps focus on the handle; a 409 (dragBlocked) mid-hold ends it with the saved order and moves focus to the row's select button; a drag in flight is cancelled; nothing is sent while blocked", async () => {
+  const BLOCK = "Choose which version to keep before moving sections.";
+  const m = await mount();
+  m.key("sec_a", " ");
+  m.key("sec_a", "ArrowDown");
+  eq(m.log.focused, "handle:sec_a", "focus on the handle while held:");
+  eq(m.log.previews.at(-1).ids, ["sec_hero", "sec_b", "sec_a", "sec_c", "sec_d", "sec_e"], "the hold's order:");
+  m.rerender({ dragBlocked: BLOCK });
+  eq(m.log.previews.at(-1), { ids: ids(SIX), id: null }, "the saved order back:");
+  eq(m.log.said.at(-1), "Move cancelled. Rich text is back at position 2.", "announced:");
+  eq(m.log.focused, "select:sec_a", "focus on the row:");
+  eq(m.handle("sec_a").props.disabled, true, "handles disabled:");
+  m.key("sec_a", " ");
+  m.key("sec_a", " ");
+  eq(m.log.changes, [], "keys while blocked send nothing:");
+  const p = await mount();
+  p.down("sec_b", 190);
+  p.move("sec_b", 280);
+  ok(p.dragging(), "dragging");
+  p.rerender({ dragBlocked: BLOCK });
+  ok(!p.dragging(), "the drag ended");
+  p.up("sec_b");
+  eq(p.log.changes, [], "nothing sent:");
+  eq(p.log.previews.at(-1), { ids: ids(SIX), id: null }, "the saved order back:");
+  eq(p.log.focused, "select:sec_b", "focus on the row:");
 });
 
 // ---- 3. publish plan and undo keys -------------------------------------------------
@@ -250,7 +438,7 @@ await t("unit: publishRows ticks only touched documents that still differ from l
   eq(P.publishRows(docs, { touched: [] }).ticked, [], "nothing touched: nothing ticked:");
 });
 
-await t("unit: createPublishRun flushes every open store first, sends each ticked document's fresh revision and draftHash (an open one's from its store, another's read fresh), through the open store in the set", async () => {
+await t("unit: createPublishRun flushes every open store first; an open document's revision comes from its store, an Other draft's is the one the dialog showed: a colleague's save after the dialog opened answers 409 and nothing goes live unseen", async () => {
   const calls = [];
   const mk = (id, rev, hash) => {
     const st = { id, revision: rev, draftHash: hash, unacknowledged: true };
@@ -265,37 +453,56 @@ await t("unit: createPublishRun flushes every open store first, sends each ticke
       },
       async publishSet(list) {
         calls.push(`publishSet:${id}`);
-        return { ok: true, data: { published: list.map((x) => ({ id: x.id })) }, sent: list };
+        return server.publishSet(list);
       },
     };
+  };
+  // the server: doc_about at revision 11 until a colleague saves it
+  const server = {
+    about: { revision: 11, draftHash: "h_about" },
+    publishSet(list) {
+      const stale = list.find((x) => x.id === "doc_about" && x.revision !== server.about.revision);
+      if (stale) return { ok: false, conflict: true, code: "DOCUMENT_CHANGED", message: "This page was changed in another tab or by Asha.", current: { id: "doc_about", updatedByName: "Asha" }, sent: list };
+      return { ok: true, data: { published: list.map((x) => ({ id: x.id })) }, sent: list };
+    },
   };
   const home = mk("doc_home", 3, "h_home");
   const design = mk("doc_design", 7, "h_design");
   const api = {
     async call(op, arg) {
       calls.push(`${op}:${typeof arg === "string" ? arg : ""}`);
-      if (op === "listDocuments") return { ok: true, data: { documents: [{ id: "doc_home", unpublishedChanges: true }, { id: "doc_about", unpublishedChanges: true }] } };
-      if (op === "getDocument") return { ok: true, data: { document: { id: arg, revision: 11, draftHash: "h_about" } } };
+      if (op === "listDocuments") return { ok: true, data: { documents: [{ id: "doc_home", unpublishedChanges: true }, { id: "doc_design", unpublishedChanges: true }, { id: "doc_about", unpublishedChanges: true }] } };
+      if (op === "getDocument") return { ok: true, data: { document: { id: arg, ...server.about } } };
+      if (op === "publishSet") return server.publishSet(arg);
       return { ok: true, data: {} };
     },
   };
   const run = P.createPublishRun({ api, stores: () => [home, design], current: () => home });
   const prep = await run.prepare();
   ok(prep.ok, "prepared");
-  eq(calls.slice(0, 3), ["flush:doc_home", "flush:doc_design", "listDocuments:"], "flushed before listing:");
+  eq(calls, ["flush:doc_home", "flush:doc_design", "listDocuments:", "getDocument:doc_about"], "flushed, listed, the other draft read once (not the open ones):");
   calls.length = 0;
-  const r = await run.publish(["doc_home", "doc_design", "doc_about"], { doc_home: "Home page" });
+  const r = await run.publish(["doc_home", "doc_design", "doc_about"], { doc_home: "Home page", doc_about: "About us" });
   eq(r.result.sent, [
     { id: "doc_home", revision: 5, draftHash: "h_home++" },
     { id: "doc_design", revision: 9, draftHash: "h_design++" },
     { id: "doc_about", revision: 11, draftHash: "h_about" },
-  ], "fresh revisions:");
-  eq(calls, ["flush:doc_home", "flush:doc_design", "getDocument:doc_about", "publishSet:doc_home"], "calls:");
+  ], "revisions:");
+  eq(calls, ["flush:doc_home", "flush:doc_design", "publishSet:doc_home"], "no re-read at click time:");
   eq(r.outcome.phase, "done", "outcome:");
-  // no open store in the set: the api sends it
+  // a colleague saves About after the dialog opened: the shown revision is sent and refused
+  const run2 = P.createPublishRun({ api, stores: () => [home], current: () => home });
+  ok((await run2.prepare()).ok, "prepared again");
+  server.about = { revision: 12, draftHash: "h_about_asha" };
   calls.length = 0;
-  await P.createPublishRun({ api, stores: () => [home], current: () => home }).publish(["doc_about"]);
-  eq(calls, ["getDocument:doc_about", "publishSet:"], "api publishSet:");
+  const late = await run2.publish(["doc_about"], { doc_about: "About us" });
+  eq(late.result.sent, [{ id: "doc_about", revision: 11, draftHash: "h_about" }], "the shown revision is what is sent:");
+  eq(calls, ["publishSet:"], "nothing re-read:");
+  eq([late.result.conflict, late.outcome.phase], [true, "conflict"], "409:");
+  eq(P.fixesOf(late.outcome).map((f) => f.id), ["doc_about"], "Go to the fix opens About:");
+  // a document the dialog never listed isn't published
+  const odd = await run2.publish(["doc_never"]);
+  eq([odd.result, odd.outcome.phase], [undefined, "error"], "unlisted:");
 });
 
 await t("unit: a save that fails stops the publish with plain words and sends nothing; blockers and 409s give \"Go to the fix\" targets", async () => {
@@ -336,6 +543,74 @@ await t("unit: studioStores lists each open document's store once (the open one,
   eq(Top.studioStores({ store: home }).map((s) => s.getState().id), ["doc_home"], "only the open one:");
   const src = await readFile(join(ROOT, "components/admin/studio/StudioTopBar.js"), "utf8");
   ok(src.includes("designStoreFor(studio)") && src.includes("createPublishRun({ api: studio?.api, stores,"), "the design store is in the publish run's stores");
+});
+
+await t("unit: the switcher after the Design tab: opening Design reuses the tab's doc_design store (one store, one getDocument); Publish and Exit flush it; without a tab store the studio makes one", async () => {
+  const St = await import("../components/admin/editor/store.js");
+  const M = await import("../components/admin/studio/studioModel.js");
+  const Rail = await load(join(ROOT, "components/admin/studio/DesignRail.js"));
+  const StudioMod = await load(join(ROOT, "components/admin/studio/Studio.js"));
+  const reads = [];
+  const saves = [];
+  const timers = { setTimeout: () => 0, clearTimeout() {} };
+  const design = { id: "doc_design", type: "design", body: { schema: 1, type: "design", meta: {}, settings: { brand: null } }, revision: 2, draftHash: "d0" };
+  const api = {
+    async call(op, args) {
+      if (op === "getDocument") return (reads.push(args), { ok: true, data: { document: args === "doc_design" ? design : null } });
+      if (op === "saveDraft") return (saves.push(args.id), { ok: true, data: { document: { ...design, body: args.body, revision: 3, draftHash: "d1" }, issues: [] } });
+      return { ok: true, data: {} };
+    },
+    sendKeepalive() {},
+  };
+  const model = M.createStudioModel();
+  const home = St.createDocumentStore({ api, document: { id: "doc_home", type: "home", body: { sections: SIX }, revision: 1, draftHash: "h" }, timers, now: () => 0 });
+  const at = (store) => ({ api, model, store, state: store.getState(), readOnly: false, can: { write: true }, post: () => true, stores: () => [home] });
+  // 1. the Design tab opens first: its own doc_design store
+  const sess = Rail.sessionFor(at(home), { fetchJson: async () => null });
+  await Rail.syncDesign(sess, at(home));
+  const tabStore = Rail.designStoreFor(at(home));
+  ok(tabStore && tabStore.getState().id === "doc_design", "the tab has its store");
+  eq(reads, ["doc_design"], "one read:");
+  // 2. the switcher opens Design: the studio reuses that store
+  const reused = StudioMod.storeToOpen("doc_design", { kept: new Map([["doc_home", home]]), design: Rail.designStoreFor(at(home)) });
+  ok(reused === tabStore, "the same store");
+  await Rail.syncDesign(sess, at(reused));
+  ok(Rail.designStoreFor(at(reused)) === tabStore, "the tab keeps it while the studio shows it");
+  // 3. back to home: still that one store
+  await Rail.syncDesign(sess, at(home));
+  ok(Rail.designStoreFor(at(home)) === tabStore, "and after the studio moves on");
+  eq(reads, ["doc_design"], "never a second getDocument:");
+  // Publish and Exit see it once and flush it
+  tabStore.setField("settings", { brand: { accent: "#224466" } });
+  const listed = Top.studioStores(at(home));
+  eq(listed.map((x) => x.getState().id), ["doc_home", "doc_design"], "studioStores:");
+  ok(listed.includes(tabStore), "the tab's store is the one listed");
+  ok((await Top.allStores(listed).beforeNavigate()).ok, "Exit's flush");
+  eq(saves, ["doc_design"], "the design was saved by the flush:");
+  // no tab store yet: the studio makes doc_design's store itself
+  eq(StudioMod.storeToOpen("doc_design", { kept: new Map(), design: null }), null, "no tab store:");
+  eq(StudioMod.storeToOpen("doc_home", { kept: new Map([["doc_home", home]]) }), home, "a kept document:");
+  Rail.closeSession(sess);
+});
+
+await t("unit: undo on a document that isn't open writes that document's store and switches the studio to it; doc_design steps are the Design tab's; a step on the open document stays put", async () => {
+  const StudioMod = await load(join(ROOT, "components/admin/studio/Studio.js"));
+  const st = (id, body) => {
+    const state = { id, body };
+    return { getState: () => state };
+  };
+  const about = st("doc_about", { sections: [{ id: "s1" }, { id: "s2" }] });
+  const home = st("doc_home", { sections: [] });
+  const kept = new Map([["doc_about", about], ["doc_home", home]]);
+  const step = { docId: "doc_about", before: { sections: [{ id: "s2" }, { id: "s1" }] }, after: { sections: [{ id: "s1" }, { id: "s2" }] } };
+  const p = StudioMod.undoPlan(step, { dir: "undo", kept, open: home });
+  ok(p.store === about, "the step's own store");
+  eq(p.ops, [{ path: "sections", value: [{ id: "s2" }, { id: "s1" }] }], "ops:");
+  eq(p.switchTo, "doc_about", "switches to it:");
+  eq(StudioMod.undoPlan(step, { dir: "undo", kept, open: about }).switchTo, null, "already open:");
+  eq(StudioMod.undoPlan(step, { dir: "redo", kept, open: about }).ops, [], "redo to the current body: nothing to write:");
+  eq(StudioMod.undoPlan({ ...step, docId: "doc_design" }, { kept, handles: (id) => id === "doc_design" }), null, "doc_design is the tab's:");
+  eq(StudioMod.undoPlan({ ...step, docId: "doc_gone" }, { kept }), null, "not held:");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

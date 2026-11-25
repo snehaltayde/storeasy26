@@ -51,6 +51,18 @@ export function storeToOpen(id, { kept = new Map(), design = null } = {}) {
   return kept.get(id) || null;
 }
 
+// what an undo or redo step does: null (doc_design: the Design tab's
+// applier wrote it; or a document no longer held), else the store to write,
+// the setField ops (restoreOps toward the step's side) and switchTo, the
+// document to switch to when the step isn't on the open one
+export function undoPlan(step, { kept = new Map(), open = null, handles = () => false, dir = step?.dir } = {}) {
+  if (!step || handles(step.docId)) return null;
+  const store = kept.get(step.docId);
+  if (!store) return null;
+  const ops = restoreOps(store.getState().body, (dir ?? "undo") === "undo" ? step.before : step.after);
+  return { store, ops, switchTo: store === open ? null : step.docId };
+}
+
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const noSub = () => () => {};
 const noState = () => null;
@@ -229,7 +241,8 @@ export default function Studio({ document: entry, note = null, can = {}, role = 
     if (s && ["moveUp", "moveDown", "move", "hide", "show"].includes(meta?.op)) post(orderMessage(s.getState().id, s.getState().body));
   };
   // an undo or redo is a normal draft save on that step's document's own
-  // store (any document this session opened); never a publish
+  // store (any document this session opened); never a publish. Undoing a
+  // step on a document that isn't open switches the studio to it.
   const step = (dir) => {
     if (!canWrite) return;
     const peek = dir === "undo" ? model.canUndo() : model.canRedo();
@@ -237,13 +250,16 @@ export default function Studio({ document: entry, note = null, can = {}, role = 
     const st = dir === "undo" ? model.undo() : model.redo();
     if (!st) return;
     if (model.handles(st.docId)) return; // doc_design: the Design tab's applier wrote it (never a whole-body snapshot here)
-    const s = storesRef.current.get(st.docId);
-    if (!s) return;
-    for (const o of restoreOps(s.getState().body, dir === "undo" ? st.before : st.after)) s.setField(o.path, o.value);
-    if (s === storeRef.current) {
-      post(orderMessage(s.getState().id, s.getState().body));
-      setSelection((sel) => (sel && (s.getState().body?.sections || []).some((x) => isObj(x) && x.id === sel) ? sel : null));
+    const plan = undoPlan(st, { dir, kept: storesRef.current, open: storeRef.current, handles: model.handles });
+    if (!plan) return;
+    for (const o of plan.ops) plan.store.setField(o.path, o.value);
+    if (plan.switchTo) {
+      openDocument(plan.switchTo);
+      return;
     }
+    const s = plan.store;
+    post(orderMessage(s.getState().id, s.getState().body));
+    setSelection((sel) => (sel && (s.getState().body?.sections || []).some((x) => isObj(x) && x.id === sel) ? sel : null));
   };
   // StudioPublishDialog sent the publishSet; this keeps its answer
   const publish = (result) => {

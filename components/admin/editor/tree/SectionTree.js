@@ -164,7 +164,7 @@ export default function SectionTree({ type, sections, selectedId = null, onChang
     setHold(step.hold);
     setHoldOrder(step.hold ? step.sections : null);
     say(step.say);
-    if (step.done) {
+    if (step.done && !blocked) {
       onChange?.(step.done, { op: "move", id: hold.id, selectedId });
     } else {
       onPreview?.(step.sections, { id: step.hold ? step.hold.id : null });
@@ -202,6 +202,25 @@ export default function SectionTree({ type, sections, selectedId = null, onChang
     }
   };
 
+  // a 409 (dragBlocked) ends any hold or drag: the saved order comes back,
+  // nothing is sent, and focus goes to the row's select button (the handle
+  // is disabled now)
+  const blockedRef = useRef(blocked);
+  blockedRef.current = blocked;
+  useEffect(() => {
+    if (!blocked) return;
+    const id = hold?.id || pointer.current?.id || null;
+    if (hold) {
+      const step = holdKey(hold, "Escape");
+      setHold(null);
+      setHoldOrder(null);
+      keep.current = null;
+      say(step.say);
+      onPreview?.(base, { id: null });
+    } else if (pointer.current) endPointer(true);
+    if (id) listRef.current?.querySelector?.(`[data-section-row="${id}"] [data-tree-select]`)?.focus?.();
+  }, [blocked]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ---- pointer drag ----
   const endPointer = (cancelled) => {
     const p = pointer.current;
@@ -217,7 +236,7 @@ export default function SectionTree({ type, sections, selectedId = null, onChang
     setDrag(null);
     const t = p.target;
     const label = labelOf(base[p.from]);
-    if (cancelled || !t) {
+    if (cancelled || !t || blockedRef.current) {
       say(SAY.cancelled(label, p.from + 1));
       onPreview?.(base, { id: null });
       return;
