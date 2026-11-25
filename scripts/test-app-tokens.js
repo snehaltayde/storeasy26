@@ -22,6 +22,7 @@ process.env.DATABASE_URL = "file:.test-apptok-default.db";
 process.env.PLATFORM_SECRET = "test-apptok-platform-secret";
 process.env.PLATFORM_CACHE_MS = "50";
 process.env.STOREASY_PLUGIN_EGRESS_LOCAL = "1";
+process.env.NODE_ENV = "test"; // the local flag works only under test or development (line 3)
 const network = H.blockNetwork();
 
 let pass = 0;
