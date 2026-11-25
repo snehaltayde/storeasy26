@@ -876,7 +876,8 @@ await t("the order page's Shopify-title line uses the console's muted text, 4.5:
   const css = await readFile(join(ROOT, "app/console.css"), "utf8");
   const token = (name) => new RegExp(`--c-${name}:\\s*(#[0-9a-fA-F]{6})`).exec(css)?.[1];
   eq(OV.SHOPIFY_LINE_CLASS, "text-xs text-fg-muted", "the class:");
-  const page = await readFile(join(ROOT, "app/(console)/admin/(authed)/orders/[id]/page.js"), "utf8");
+  // Phase 2 line 2: the order's lines moved into components/admin/orders/OrderLines.js
+  const page = await readFile(join(ROOT, "components/admin/orders/OrderLines.js"), "utf8");
   ok(/\{shopifyLines\[i\] && <p className=\{SHOPIFY_LINE_CLASS\}>\{shopifyLines\[i\]\}<\/p>\}/.test(page), "the page draws the line with that class");
   ok(!/text-fg-subtle">\{shopifyLines/.test(page), "no longer the subtle text");
   const ratio = contrastRatio(token("fg-muted"), token("surface"));
