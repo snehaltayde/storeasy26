@@ -3,6 +3,17 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Phase 6 studio editor plan (on the owner's behalf)
+
+- **Schema:** none. Studio state (which documents this session changed, the undo history) lives in the browser; tokens stay in `doc_design.settings.brand`.
+- **Permissions:** no new action. The studio reuses `storefront.read`, `storefront.write` and `storefront.publish`, and writes only through `/api/admin/documents`. Operator support is read-only like support.
+- **Uploaded themes: override, not fork.** A founder's tokens sit on top of the package's immutable surfaces, styles and templates; "Reset to the theme's" restores the package tokens. A fork would add a package row per tweak.
+- **No new token keys:** "type" is `type_scale`, "spacing" is `section_spacing` plus radius and button shape. A heading-font choice is left to Phase 7 (flagship themes), because it changes `validateBrand` and every storefront render.
+- **Native drag, no `@dnd-kit`:** one flat list, composition rules already in `treeModel.move`, and `@dnd-kit/react` is pre-1.0. Keyboard pick-up/move/drop and a live region are part of the line.
+- **Instant preview:** reorder uses CSS `order` and tokens are computed inside the frame from a validated brand (never sent as CSS); the reload after each save is the truth.
+- **The studio is a new route** (`/admin/studio`) composing the editor's parts; `/admin/editor` stays for product and collection content. The nav's `editor` item is relabelled "Studio" and keeps its id.
+- **Publish** is one dialog over `publishSet` that pre-ticks only this session's changed documents (the Phase 5 rule).
+
 ## 2026-11-25 Phase 5 line 3: switching themes (on the owner's behalf)
 
 - **Permissions:** "Use this theme" is `POST /api/admin/themes/[id] { apply }` on `storefront.write` (staff may draft; support and operator support 403); the same POST's `{ archive }` keeps `themes.manage`. The operation is parsed before the role check (400 for a malformed or double operation). Publish adds no route: the Themes page calls the existing documents `publishSet` (`storefront.publish`, release + `publish_log` + audit in one batch); staff see "Ask an admin to publish". A built-in look keeps using `POST /api/admin/theme` (it rebuilds `settings.theme`, so `package` is cleared).
