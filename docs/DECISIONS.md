@@ -3,6 +3,18 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-26 Phase 7 flagship themes and storefront UX plan (on the owner's behalf)
+
+- **Schema:** tenant 0035 adds `theme_packages.source` (`upload` | `storeasy`). Only uploads count toward the 30 limit and obey the uploaded-themes kill switch.
+- **Permissions:** no new action. Installing and applying a Storeasy theme needs `storefront.write` (not `themes.manage`); publish stays `storefront.publish`; Storeasy themes can't be archived and their slugs are reserved.
+- **Search facets are anonymous reads** of this store's active products and their published values only; counts use the same filters as results; tags are never a facet (they are offer logic tags).
+- **Offer nudges are server-only** inside the cart read, and each is checked against the offer engine before it shows; checkout still recomputes totals.
+- **Five flagship themes** (Volt, Bloom, Loom, Harvest, Haven) are first-party `storeasy-theme/1` packages installed on first use with a deterministic id; a new version is a new row.
+- **Heading font token** `heading_font: sans | serif` (Geist | Fraunces, already self-hosted); absent means the kit decides, so existing stores are unchanged. This is the font choice Phase 6 deferred.
+- **Facets:** OR within a group, AND across; disjunctive counts; URL state with hard caps; the SQL fallback computes facets live with no new table.
+- **No new offer type:** nudges cover quantity tiers, gift and free-shipping thresholds and coupon minimums. Spend-percent tiers would be a later line.
+- **Sticky phone buy bar** is a Storeasy protected part (`data-protected="buy-bar"`), never themed.
+
 ## 2026-11-25 Owner decision: usage-saving build mode (from Phase 6 on)
 
 - **Low-severity review findings** are fixed without a second reviewer pass; medium, high and security fixes are still re-read.
