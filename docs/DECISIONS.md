@@ -3,6 +3,16 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Installing first-party plugins (on the owner's behalf)
+
+- **Schema:** tenant migration `0030_plugin_installs.sql`; uninstall archives the row and clears its encrypted secrets; one live install per plugin (partial unique index).
+- **Permissions:** `apps.read` (every role), `apps.manage` (owner, admin); `APP_PERMISSIONS` in `authz.js` (named so the Shopify boundary's `*_SCOPES` rule stays intact). The admin approves exactly what the plugin asks for; if its permissions changed since the dialog opened, install is refused.
+- **Secrets:** encrypted; responses show only "Saved"/"Not set"; audit rows count changed secret fields without naming them; errors never repeat a value. The set-secret names sit under a reserved settings key a client can't write.
+- **Kill switch:** `ff_plugin-<id>`; install and turn-on fail closed when the flag can't be read ("Storeasy can't check this app right now"); a killed plugin shows "Not available right now" in Browse.
+- **Catalog:** code (`lib/plugins/first-party/`), one real plugin (Trust badges); plugins get their own list setting kind. A save whose cache refresh fails still answers 200 (logged).
+- **Decided by:** Claude
+- **Slice:** Phase 4 line 1
+
 ## 2026-11-25 Phase 3 least-trusted audit fixes (on the owner's behalf)
 
 - **Schema:** platform migration `0018_export_links.sql` (additive): one row per export link.

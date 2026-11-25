@@ -68,7 +68,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 
 ## Phase 4: plugin system (roadmap Phase 2A)
 
-- [ ] An admin can install a first-party plugin from `/admin/apps` and turn it off again; staff and support cannot
+- [x] An admin can install a first-party plugin from `/admin/apps` and turn it off again; staff and support cannot
 - [ ] A plugin can add a block to a named storefront slot, rendered without running the plugin's own JavaScript
 - [ ] A plugin can receive store webhooks (order created, fulfilled) through an outbox with retries and signed deliveries
 - [ ] An external plugin gets a scoped token limited to the permissions the admin approved, and every call with it is audited
