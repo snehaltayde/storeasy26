@@ -3,6 +3,7 @@
 import { buttonVariants } from "@/components/ui/button";
 import { Badge, Banner, Button } from "../fields/parts";
 import { useMemo, useSyncExternalStore } from "react";
+import { cn } from "@/components/ui/utils";
 import UndoNotice from "./UndoNotice";
 import { WORDS, LEVEL_WORDS, actionLabel, allLoaded, createPublishFlow, openingActionLabel, openingBlocks, openingWarns } from "./publishModel";
 
@@ -198,7 +199,13 @@ function Lists({ state, canKeep, onKeepLive }) {
   );
 }
 
-export function PublishPanelView({ state, canConfirm = false, access = null, mode = "one", label = null, disabled = false, call, on = {}, createHomeHref = "/admin/editor?path=%2F" }) {
+// the floating panel takes focus when it opens (a stable ref callback, so it
+// runs once per opening, not on every render), so Tab and Esc work in it
+const focusOnOpen = (el) => el?.focus({ preventScroll: true });
+
+// floating: the editor bar's panel opens over the panes (below the bar's
+// right edge) instead of pushing them down; Esc closes it when not busy
+export function PublishPanelView({ state, canConfirm = false, access = null, mode = "one", label = null, disabled = false, call, on = {}, createHomeHref = "/admin/editor?path=%2F", floating = false }) {
   const s = state || { phase: "closed", order: [], lists: {}, items: [] };
   const noop = () => {};
   const h = { open: noop, confirm: noop, close: noop, act: noop, keepLive: noop, retry: noop, focus: noop, openDocument: null, conflict: null, createHome: null, openEarlierVersions: null, document: noop, ...on };
@@ -475,7 +482,17 @@ export function PublishPanelView({ state, canConfirm = false, access = null, mod
   }
 
   return (
-    <section className="w-full max-w-md space-y-3 rounded-lg border border-border bg-card p-4 text-foreground shadow-md" aria-label={s.phase === "opening" || s.phase === "cannotOpen" ? WORDS.openingTitle : WORDS.reviewTitle} data-publish="" data-phase={s.phase}>
+    <section
+      className={cn(
+        "space-y-3 rounded-lg border border-border bg-card p-4 text-foreground outline-none",
+        floating ? "absolute top-full right-0 z-30 mt-2 max-h-[min(70svh,40rem)] w-[min(28rem,calc(100vw-2rem))] overflow-y-auto shadow-overlay" : "w-full max-w-md shadow-card",
+      )}
+      ref={floating ? focusOnOpen : undefined}
+      tabIndex={floating ? -1 : undefined}
+      onKeyDown={(e) => {
+        if (floating && e.key === "Escape" && !s.busy) h.close?.();
+      }}
+      aria-label={s.phase === "opening" || s.phase === "cannotOpen" ? WORDS.openingTitle : WORDS.reviewTitle} data-publish="" data-phase={s.phase}>
       {s.notice && (
         <p className="text-[13px] text-muted-foreground" role="status">
           {s.notice}

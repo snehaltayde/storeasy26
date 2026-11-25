@@ -282,8 +282,8 @@ export function EditorView({
   const loading = load.status === "loading" || (!state && load.status === "ready");
 
   const actions = state && (
-    <div className="flex flex-wrap items-start gap-2" data-editor-actions="">
-      {publish && <PublishPanelView state={publish.state} canConfirm={publish.canConfirm} access={publishAccess} call={call} on={publish.on} />}
+    <div className="relative flex flex-wrap items-start gap-2" data-editor-actions="">
+      {publish && <PublishPanelView floating state={publish.state} canConfirm={publish.canConfirm} access={publishAccess} call={call} on={publish.on} />}
       {changed && !goBack?.confirming && (
         <RoleGate role={role} action="storefront.write" mode="hide">
           <Button size="sm" variant="outline" onClick={on.goBack} disabled={Boolean(state.busy)} data-go-back="">
@@ -475,7 +475,7 @@ export function EditorView({
           </Notice>
         )}
         {ready && versions && (
-          <section aria-label="Earlier versions" className="rounded-md border border-border bg-card p-3" data-earlier-versions-panel="">
+          <section aria-label="Earlier versions" className="max-h-72 overflow-y-auto rounded-lg border border-border bg-card p-3" data-earlier-versions-panel="">
             {versions.status === "loading" ? <p className="text-[13px] text-muted-foreground">Loading earlier versions…</p> : <EarlierVersions versions={versions.rows} onRestore={canWrite ? on.restore : undefined} message={versions.message} />}
           </section>
         )}
@@ -498,7 +498,7 @@ export function EditorView({
       </header>
 
       <div
-        className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[16rem_minmax(0,1fr)] lg:grid-cols-[16rem_minmax(20rem,26rem)_minmax(0,1fr)]"
+        className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[15rem_minmax(0,1fr)] lg:grid-cols-[13rem_minmax(17rem,21rem)_minmax(0,1fr)] 2xl:grid-cols-[15rem_minmax(20rem,24rem)_minmax(0,1fr)]"
         data-editor-frame=""
         data-editor-layout={!writing && ready ? "" : undefined}
         data-entity-layout={entityDoc && ready && !writing ? "" : undefined}

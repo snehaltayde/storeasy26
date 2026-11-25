@@ -60,7 +60,7 @@ export default function TakeOfflineConfirm({ open = true, view, busy = false, on
   if (!open) return null;
   const title = view?.title || WORDS.offlineConfirm;
   return (
-    <section role="group" aria-label={title} className="max-w-md space-y-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-[13px]" data-take-offline-confirm="">
+    <section role="group" aria-label={title} className="max-w-md space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-[13px]" data-take-offline-confirm="">
       <p className="font-semibold text-foreground">{title}</p>
       <TakeOfflineBody view={view} />
       <TakeOfflineFooter busy={busy} onConfirm={onConfirm} onCancel={onCancel} />

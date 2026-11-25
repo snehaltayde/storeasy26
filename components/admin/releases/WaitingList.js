@@ -24,7 +24,7 @@ export function WaitingListView({ rows, access = null, selected = [], onToggle, 
   if (!rows.length) return <EmptyState title="Nothing is waiting to publish" body="Every page's draft is live. Changes you make in the editor show up here until they are published." />;
   return (
     <div className="space-y-3" data-waiting-list="">
-      <ul className="divide-y divide-border rounded-lg border border-border" aria-label="Waiting to publish">
+      <ul className="divide-y divide-border rounded-lg border border-border bg-card" aria-label="Waiting to publish">
         {rows.map((r) => {
           const id = `waiting-${r.id}`;
           return (
@@ -32,7 +32,7 @@ export function WaitingListView({ rows, access = null, selected = [], onToggle, 
               {canPublish && <Checkbox id={id} checked={selected.includes(r.id)} onCheckedChange={() => onToggle?.(r.id)} aria-label={`Select ${r.label}`} data-waiting-select="" />}
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium text-foreground">{r.label}</p>
-                {r.typeLabel && <p className="text-xs text-muted-foreground">{r.typeLabel}</p>}
+                {r.typeLabel && r.typeLabel !== r.label && <p className="text-xs text-muted-foreground">{r.typeLabel}</p>}
               </div>
               <Badge tone={r.state === "Not published yet" ? "neutral" : "warning"}>{r.state}</Badge>
               <a href={editorHref(r.id)} className="shrink-0 rounded-sm text-sm underline outline-none focus-visible:ring-2 focus-visible:ring-ring" data-read-control="">

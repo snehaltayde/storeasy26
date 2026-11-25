@@ -121,7 +121,7 @@ function TemplateRow({ template, pages, role, api }) {
               {n}
             </p>
           ))}
-          <a href={result.href} className="font-medium underline underline-offset-2" data-read-control="">
+          <a href={result.href} className="rounded-sm font-medium underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring" data-read-control="">
             Open it in the editor
           </a>
         </div>

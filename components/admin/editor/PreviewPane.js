@@ -52,6 +52,15 @@ export default function PreviewPane({ api, documentId, path, ack = null, problem
   const [device, setDevice] = useState("desktop");
   const [design, setDesign] = useState(false);
   const designRef = useRef(false);
+  const stageRef = useRef(null);
+  const [stageWidth, setStageWidth] = useState(0);
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([e]) => setStageWidth(Math.floor(e.contentRect.width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   pathRef.current = path;
   pickRef.current = onPick;
   viewRef.current = onView;
@@ -169,11 +178,15 @@ export default function PreviewPane({ api, documentId, path, ack = null, problem
     return path || "/";
   };
   const width = DEVICES.find((d) => d.id === device)?.width || 1280;
+  // a phone or tablet wider than the pane is drawn at that width and scaled
+  // down to fit, so the frame never scrolls sideways; the store still lays
+  // itself out at the device's own width
+  const scale = device !== "desktop" && stageWidth > 0 && stageWidth < width ? stageWidth / width : 1;
 
   return (
     <section
       aria-label={label ? `Preview of ${label}` : "Preview"}
-      className={hidden ? "hidden" : "min-w-0 space-y-1.5"}
+      className={hidden ? "hidden" : "@container min-w-0 space-y-2"}
       data-preview-pane=""
       data-preview-label={view?.label || ""}
       data-preview-phase={view?.phase || ""}
@@ -191,6 +204,11 @@ export default function PreviewPane({ api, documentId, path, ack = null, problem
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
+        {scale < 1 && (
+          <span className="font-mono text-xs text-muted-foreground tabular-nums" title={`Drawn ${width}px wide and shown at ${Math.round(scale * 100)}% to fit`} data-preview-scale="">
+            {Math.round(scale * 100)}%
+          </span>
+        )}
         <div className="flex items-center gap-1.5">
           <Switch id="preview-show-design" size="sm" checked={designDoc || design} disabled={designDoc} onCheckedChange={toggleDesign} data-show-design="" data-read-control="" />
           <Label htmlFor="preview-show-design" className="text-xs font-normal text-muted-foreground" data-read-control="">
@@ -211,7 +229,7 @@ export default function PreviewPane({ api, documentId, path, ack = null, problem
             data-read-control=""
           >
             <ExternalLink aria-hidden />
-            Open in a new tab
+            <span className="sr-only @lg:not-sr-only">Open in a new tab</span>
           </a>
         </div>
       </div>
@@ -220,12 +238,12 @@ export default function PreviewPane({ api, documentId, path, ack = null, problem
           {WORDS.adding}
         </p>
       )}
-      <div className="overflow-x-auto rounded-lg border border-border bg-muted">
+      <div ref={stageRef} className="h-[70vh] overflow-hidden rounded-lg border border-border bg-muted" data-preview-stage="">
         <iframe
           ref={frameRef}
           title={label ? `Your store: ${label}` : "Your store"}
-          className={cn("mx-auto block h-[70vh] bg-white", device === "desktop" ? "w-full" : "max-w-none shrink-0")}
-          style={device === "desktop" ? undefined : { width: `${width}px` }}
+          className={cn("block h-[70vh] bg-white", device === "desktop" ? "w-full" : "mx-auto max-w-none shrink-0")}
+          style={device === "desktop" ? undefined : scale < 1 ? { width: `${width}px`, height: `calc(70vh / ${scale})`, transform: `scale(${scale})`, transformOrigin: "top left" } : { width: `${width}px` }}
           onLoad={() => ctlRef.current?.frameLoad()}
           data-preview-frame=""
         />

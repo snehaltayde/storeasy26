@@ -106,7 +106,7 @@ export default function SectionTree({ type, sections, selectedId = null, onChang
       {list.length === 0 ? (
         <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">No sections yet. Add one to start.</p>
       ) : (
-        <ol aria-label="Sections" className="space-y-1" onKeyDown={moveRowFocus}>
+        <ol aria-label="Sections" className="space-y-0.5" onKeyDown={moveRowFocus}>
           {list.map((s, i) => {
             const id = s && typeof s.id === "string" ? s.id : null;
             const row = rowState(s, id ? issuesBySection?.[id] : []);
@@ -132,7 +132,7 @@ export default function SectionTree({ type, sections, selectedId = null, onChang
                 data-section-row={id ?? ""}
                 data-selected={selected ? "" : undefined}
                 data-unfinished={row.unfinished ? "" : undefined}
-                className={cn("group relative rounded-md border px-2 py-1.5", selected ? "border-foreground/20 bg-muted" : "border-border bg-card", row.hidden && "opacity-70")}
+                className={cn("group relative rounded-md px-2 py-1.5 transition-colors motion-reduce:transition-none", selected ? "bg-muted" : "hover:bg-muted/60", row.hidden && "text-muted-foreground")}
               >
                 {selected && <span aria-hidden className="absolute inset-y-1 left-0 w-0.5 rounded-full bg-primary" />}
                 <div className="flex items-center gap-1.5">
@@ -145,7 +145,7 @@ export default function SectionTree({ type, sections, selectedId = null, onChang
                     data-read-control=""
                     className="flex min-w-0 flex-1 flex-col items-start rounded-md px-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <span className={cn("max-w-full truncate text-sm text-foreground", selected ? "font-semibold" : "font-medium")}>{row.label}</span>
+                    <span className={cn("max-w-full truncate text-sm", row.hidden ? "text-muted-foreground" : "text-foreground", selected ? "font-semibold" : "font-medium")}>{row.label}</span>
                     {row.title && <span className="max-w-full truncate text-xs text-muted-foreground">{row.title}</span>}
                   </button>
                   <span className="flex shrink-0 items-center gap-1">
@@ -169,7 +169,7 @@ export default function SectionTree({ type, sections, selectedId = null, onChang
                 {blocks.length > 0 && <BlockRows blocks={blocks} label={row.label} />}
                 {can && confirmId !== id && (
                   <>
-                    <div className="mt-1 flex items-center gap-0.5" role="group" aria-label={`Change ${name}`}>
+                    <div className={cn("mt-1 flex items-center gap-0.5", !selected && "opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 motion-reduce:transition-none pointer-coarse:opacity-100")} role="group" aria-label={`Change ${name}`}>
                       {buttons.map((b) => (
                         <RoleGate key={b.op} role={role} action={WRITE} mode="hide">
                           <Button variant="ghost" size="icon-xs" aria-label={b.label} title={b.reason || b.label} disabled={!b.ok} aria-describedby={b.whyId} onClick={b.onClick} data-op={b.op}>
@@ -179,9 +179,9 @@ export default function SectionTree({ type, sections, selectedId = null, onChang
                       ))}
                     </div>
                     {why.length > 0 && (
-                      <ul className="mt-0.5 space-y-0.5 px-1 text-[11px] text-muted-foreground" data-why="">
+                      <ul className="mt-1 space-y-0.5 px-1 text-xs text-muted-foreground" data-why="">
                         {why.map((b) => (
-                          <li key={b.op} id={b.whyId} className={OBVIOUS.has(b.code) ? "sr-only" : undefined}>
+                          <li key={b.op} id={b.whyId} className={OBVIOUS.has(b.code) || !selected ? "sr-only" : undefined}>
                             {b.reason}
                           </li>
                         ))}

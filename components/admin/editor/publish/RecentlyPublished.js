@@ -2,7 +2,7 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 import { UndoNoticeView } from "./UndoNotice";
-import { WORDS, createUndoFlow, recentGroupsOf } from "./publishModel";
+import { WORDS, createUndoFlow, recentGroupsOf, undoDenied, undoDeniedReason } from "./publishModel";
 
 // P3-PUBLISHUI (PUB-04, PUB-05): the Recently published list, from
 // listRecentlyPublished. Each row: what happened, the page's name, who and
@@ -25,10 +25,19 @@ export function RecentlyPublishedView({ groups, state, access = null, onUndo, on
   const active = state?.target || null;
   const undoBlock = (target) => <UndoNoticeView state={active === target ? state : { phase: "idle" }} target={target} access={access} onStart={() => onUndo(target)} onConfirm={onConfirm} onCancel={onCancel} onOpenEarlierVersions={onOpenEarlierVersions} />;
   if (!groups.length) return <p className="text-[13px] text-muted-foreground">{WORDS.recentEmpty}</p>;
+  // without the right to undo, the reason is said once above the list, not
+  // on every row (no Undo button anywhere)
+  const denied = undoDenied(access);
   return (
+    <div className="space-y-3">
+      {denied && (
+        <p className="text-[13px] text-muted-foreground" data-undo-reason="">
+          {undoDeniedReason(access)}
+        </p>
+      )}
     <ul className="space-y-3" aria-label="Recently published" data-recently-published="">
       {groups.map((g, gi) => (
-        <li key={gi} className="rounded-md border border-border p-3" data-set={g.rows.length > 1 ? "" : undefined}>
+        <li key={gi} className="rounded-lg border border-border bg-card px-4 py-2" data-set={g.rows.length > 1 ? "" : undefined}>
           <ul className="divide-y divide-border">
             {g.rows.map((r) => (
               <li key={r.logId} className="space-y-1 py-2 text-[13px]" data-row="">
@@ -45,7 +54,7 @@ export function RecentlyPublishedView({ groups, state, access = null, onUndo, on
                 )}
                 {r.note && <p className="text-muted-foreground">{r.note}</p>}
                 <div className="flex flex-wrap items-center gap-3">
-                  {r.canUndo && r.target && undoBlock(r.target)}
+                  {!denied && r.canUndo && r.target && undoBlock(r.target)}
                   {editorHref && (
                     <a href={editorHref(r.documentId)} data-read-control="" className="underline rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
                       {WORDS.openInEditor}
@@ -55,10 +64,11 @@ export function RecentlyPublishedView({ groups, state, access = null, onUndo, on
               </li>
             ))}
           </ul>
-          {g.undoSet && <div className="border-t border-border pt-2">{undoBlock(g.undoSet)}</div>}
+          {!denied && g.undoSet && <div className="border-t border-border pt-2">{undoBlock(g.undoSet)}</div>}
         </li>
       ))}
     </ul>
+    </div>
   );
 }
 
