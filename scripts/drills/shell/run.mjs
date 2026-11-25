@@ -132,18 +132,17 @@ function implicitSubmits() {
 //     popups and new tabs included; no Referer is trusted) while the tab's
 //     document is the page under test: from that document's first request
 //     until the next document's first request. A same-document pushState or
-//     replaceState never ends it. While such a move has the tab on another
-//     path, writes are held: coming back to the page in the same document
-//     counts them (a control that pushStates away, POSTs and pushStates back
-//     is caught); a new document loading, or the pass ending, while the tab
-//     is still away hands them to the destination (a Next <Link> soft
-//     navigation: /admin/onboarding writes when it opens, its pass is its
-//     own), listed in found.softNav. The tab is away from Next's RSC request
-//     for the other path (Chromium reports the history change only after the
-//     destination's first requests) or from the history change itself. The
-//     limit: a raw pushState (or a hand-made RSC request) that stays away
-//     looks the same as a soft navigation, so its writes go to that path
-//     too. Each
+//     replaceState never ends it. When a click (or Enter) leaves the tab, once
+//     it settles, on another path in the same document, it was a soft
+//     navigation (a Next <Link>: /admin/onboarding and /admin/releases write
+//     when they open, and those pages' passes are their own): the writes sent
+//     since that click, and until the next document, go to the destination
+//     (found.softNav), not this page. A control that pushStates away, POSTs
+//     and pushStates back is still on the page when it settles, so its write
+//     counts. (The event order can't decide this: Chromium reports a soft
+//     navigation's history change after the destination's first requests.)
+//     The limit: a raw pushState that stays away looks the same as a soft
+//     navigation, so its writes go to that path too. Each
 //     document's first request is the drill's sentinel (an init script's GET
 //     /__shell-drill-doc?p=<path>, answered by page.route, never by Next), so a
 //     write the old document sends while it unloads still counts. A read link
@@ -239,11 +238,14 @@ async function supportNewUiControls(page, href) {
   const seen = []; // every non-GET request the browser reported during the pass: { method, path }
   const pending = new Set();
   const passFrom = serverMark();
-  let away = false; // the target document has moved (same document) to another path
-  let held = [];
-  const release = () => {
-    found.softNav.push(...held);
-    held = [];
+  let away = false; // a click moved the target document (same document) to another path
+  let docs = 0; // documents started in the tab during the pass
+  // after a click or Enter has settled (mark: taken just before it)
+  const mark = () => ({ writes: writes.length, docs });
+  const softNavCheck = (m) => {
+    if (!counting || docs !== m.docs || new URL(page.url()).pathname === target) return;
+    found.softNav.push(...writes.splice(m.writes));
+    away = true;
   };
   // a new document: the old one's requests will never report finishing (a keepalive)
   const newDocument = () => {
@@ -251,14 +253,6 @@ async function supportNewUiControls(page, href) {
       try {
         if (r.frame() === page.mainFrame()) pending.delete(r);
       } catch {}
-    }
-  };
-  const onNavigated = (frame) => {
-    if (frame !== page.mainFrame() || !counting) return;
-    away = new URL(frame.url()).pathname !== target;
-    if (!away) {
-      writes.push(...held);
-      held = [];
     }
   };
   const skip = (method, path) => (devServer && path.startsWith("/__nextjs")) || readPost(target, method, path);
@@ -273,28 +267,18 @@ async function supportNewUiControls(page, href) {
         main = req.frame() === page.mainFrame();
       } catch {}
       if (main) {
-        release();
+        docs++;
+        away = false;
         newDocument();
         counting = url.searchParams.get("p") === target;
-        away = false;
       }
       return;
     }
     pending.add(req);
-    // a Next soft navigation's own RSC request for another path (not a
-    // prefetch) comes before the destination's requests; Chromium reports
-    // the history change itself only after them
-    if (counting && req.method() === "GET" && url.pathname !== target && req.headers().rsc === "1" && !req.headers()["next-router-prefetch"]) {
-      let main = false;
-      try {
-        main = req.frame() === page.mainFrame();
-      } catch {}
-      if (main) away = true;
-    }
     if (req.method() === "GET" || req.method() === "HEAD") return;
     seen.push({ method: req.method(), path: url.pathname });
     if (!counting || skip(req.method(), url.pathname)) return;
-    (away ? held : writes).push(`${req.method()} ${url.pathname}`);
+    (away ? found.softNav : writes).push(`${req.method()} ${url.pathname}`);
   };
   const onDone = (req) => pending.delete(req);
   const onPage = (p) => {
@@ -306,7 +290,6 @@ async function supportNewUiControls(page, href) {
     await settle(page);
     if (page.url() !== ORIGIN + href) found.at.push(page.url());
   };
-  page.on("framenavigated", onNavigated);
   page.on("websocket", onSocket);
   ctx.on("request", onRequest);
   ctx.on("requestfinished", onDone);
@@ -321,9 +304,11 @@ async function supportNewUiControls(page, href) {
       await fresh();
       const el = page.locator("main [data-read-control]").nth(i);
       if (!(await el.isVisible().catch(() => false)) || (await el.isDisabled().catch(() => true))) continue;
+      const m = mark();
       await el.click({ timeout: 5000 }).catch(() => {});
       await page.waitForTimeout(500);
       await settle(page);
+      softNavCheck(m);
       // a link to another path: that page gets its own pass; the same path
       // (a menu, a popover, or a new ?query) is checked again here
       if (new URL(page.url()).pathname === target) for (const x of await page.evaluate(strayControls, [CONTROLS, true])) found.revealed.push(`after read #${i} (${page.url().slice(ORIGIN.length)}): ${x}`);
@@ -337,9 +322,11 @@ async function supportNewUiControls(page, href) {
         await page.locator('[role="dialog"]').first().waitFor({ timeout: 5000 }).catch(() => {});
         const inner = page.locator('[role="dialog"] [data-read-control]').nth(j);
         if (!(await inner.isVisible().catch(() => false)) || (await inner.isDisabled().catch(() => true))) continue;
+        const mi = mark();
         await inner.click({ timeout: 5000 }).catch(() => {});
         await page.waitForTimeout(500);
         await settle(page);
+        softNavCheck(mi);
         found.dialogReads++;
         if (new URL(page.url()).pathname === target) for (const x of await page.evaluate(strayControls, [CONTROLS, true])) found.revealed.push(`after read #${i}, dialog read #${j} (${page.url().slice(ORIGIN.length)}): ${x}`);
       }
@@ -370,15 +357,18 @@ async function supportNewUiControls(page, href) {
       const el = page.locator(fieldSel).nth(i);
       if (!(await el.isVisible().catch(() => false))) continue;
       await el.focus().catch(() => {});
+      const mf = mark();
       await page.keyboard.press("Enter");
       await page.waitForTimeout(500);
+      await settle(page);
+      softNavCheck(mf);
     }
     // the pass's window closes once nothing is in flight and the log is still;
     // leaving for about:blank first lets the page's own pagehide writes land
     // in this pass, not the next one's
     await untilQuiet(page, pending);
     await page.goto("about:blank");
-    release();
+    away = false;
     newDocument();
     await untilQuiet(page, pending);
     found.pending = [...pending].map((r) => `${r.method()} ${new URL(r.url()).pathname}`);
@@ -394,7 +384,6 @@ async function supportNewUiControls(page, href) {
       else if (!skip(l.method, l.path)) writes.push(`${l.method} ${l.path} (server log, not seen by the browser)`);
     }
   } finally {
-    page.off("framenavigated", onNavigated);
     page.off("websocket", onSocket);
     ctx.off("request", onRequest);
     ctx.off("requestfinished", onDone);
