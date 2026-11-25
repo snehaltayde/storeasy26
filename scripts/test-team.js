@@ -219,6 +219,41 @@ await t("atomic guard: concurrent demote and remove of two owners in identity.js
   await I.addMembership(p.user.id, b.id, "staff");
   await I.removeMembership(p.user.id, b.id);
 });
+await t("owner-target guard: a non-owner's demote or remove never lands on a member promoted to owner (identity, the forced order)", async () => {
+  const x = await member("staff");
+  await I.setMemberRole(x.user.id, a.id, "owner"); // the owner's promotion lands first
+  for (const write of [() => I.setMemberRole(x.user.id, a.id, "support", { ownerTargets: false }), () => I.removeMembership(x.user.id, a.id, { ownerTargets: false })]) {
+    let threw = null;
+    await write().catch((e) => (threw = e));
+    eq(threw?.code, "OWNER_TARGET", "refused in the statement:");
+    eq(await roleOf(x.user.id), "owner", "X stays owner:");
+  }
+  eq(await I.setMemberRole(x.user.id, a.id, "staff", { ownerTargets: false }).catch((e) => e.code), "OWNER_TARGET");
+  await I.setMemberRole(x.user.id, a.id, "staff");
+  eq(await I.setMemberRole(x.user.id, a.id, "support", { ownerTargets: false }), "support", "a non-owner row still changes:");
+  await I.removeMembership(x.user.id, a.id);
+});
+for (const [label, adminBody] of [
+  ["demotes", (x) => ({ action: "role", userId: x.user.id, role: "support" })],
+  ["removes", (x) => ({ action: "remove", userId: x.user.id })],
+]) {
+  await t(`race: the owner promotes X while an admin ${label} X; X never ends up changed by the admin after becoming owner (route, 8 rounds)`, async () => {
+    for (let i = 0; i < 8; i++) {
+      const x = await member("staff");
+      const [promote, adminRes] = await Promise.all([post("owner", { action: "role", userId: x.user.id, role: "owner" }), post("admin", adminBody(x))]);
+      const now = await roleOf(x.user.id);
+      if (promote.status === 200 && now === "owner") ok([403].includes(adminRes.status) || adminRes.status === 200, `round ${i}: admin ${adminRes.status}`);
+      // the admin's write may only have landed before the promotion: then the owner's promote follows (X owner) or found no member (404)
+      ok(now === "owner" || (label === "removes" && now === null && promote.status === 404 && adminRes.status === 200), `round ${i}: X is ${now} (promote ${promote.status}, admin ${adminRes.status})`);
+      if (adminRes.status === 200 && now === "owner") ok(promote.status === 200, `round ${i}: the admin went first, then the promotion:`);
+      if (now) {
+        await I.setMemberRole(x.user.id, a.id, "staff");
+        await I.removeMembership(x.user.id, a.id);
+      }
+    }
+    eq(await roleOf(users.owner.id), "owner");
+  });
+}
 await t("setMemberRole: a non-member is null and no row; a member's role changes; the last owner is refused", async () => {
   const stranger = await I.createUser({ email: "stranger2@team.test", password: "stranger-pass-2" });
   eq(await I.setMemberRole(stranger.id, a.id, "owner"), null);
@@ -320,6 +355,48 @@ await t("transfer by the owner: the target is owner, the caller admin; the calle
   eq(await roleOf(users.owner.id), "owner");
 });
 
+await t("race: a transfer to X while an admin removes X: either X owns the store and stays, or the transfer is refused and the owner keeps it (8 rounds)", async () => {
+  for (let i = 0; i < 8; i++) {
+    const x = await member("admin");
+    const [tr, rm] = await Promise.all([post("owner", { action: "transfer", userId: x.user.id, confirm: a.tenant.name }), post("admin", { action: "remove", userId: x.user.id })]);
+    const [xr, or] = [await roleOf(x.user.id), await roleOf(users.owner.id)];
+    if (tr.status === 200) eq([xr, or, rm.status], ["owner", "admin", 403], `round ${i}: transfer won:`);
+    else {
+      ok([404, 409].includes(tr.status) && rm.status === 200, `round ${i}: removal won (${tr.status}, ${rm.status}):`);
+      eq([xr, or], [null, "owner"], `round ${i}:`);
+    }
+    eq(await I.countOwners(a.id), 1, `round ${i}: one owner:`);
+    if (tr.status === 200) eq((await as(x, { action: "transfer", userId: users.owner.id, confirm: a.tenant.name })).status, 200, "back:");
+    if (await roleOf(x.user.id)) await I.removeMembership(x.user.id, a.id);
+  }
+});
+await t("transfer: the store name check folds case and inner spaces; a store with no name asks for its id, never 'null'", async () => {
+  const m = await member("admin");
+  const rename = async (name) => {
+    await db().execute({ sql: "UPDATE tenants SET name = ? WHERE id = ?", args: [name, a.id] });
+    await new Promise((r) => setTimeout(r, 80)); // PLATFORM_CACHE_MS
+  };
+  try {
+    await rename("Team  Demo Co");
+    eq((await post("owner", { action: "transfer", userId: m.user.id, confirm: "Team Demo" })).status, 422, "a part of the name:");
+    eq((await post("owner", { action: "transfer", userId: m.user.id, confirm: "  team   demo\tco " })).status, 200, "case and inner spaces folded:");
+    eq((await as(m, { action: "transfer", userId: users.owner.id, confirm: "TEAM DEMO CO" })).status, 200, "back:");
+    await rename("");
+    const r = await post("owner", { action: "transfer", userId: m.user.id, confirm: "x" });
+    eq(r.status, 422);
+    ok(r.body.error.includes(a.id) && !/null|undefined/.test(r.body.error), `the id in the words: ${r.body.error}`);
+  } finally {
+    await rename(a.tenant.name);
+    await I.removeMembership(m.user.id, a.id);
+  }
+  eq(await roleOf(users.owner.id), "owner");
+});
+await t("revoke: an admin sending another store's owner invite id is 404 and that invite stays live", async () => {
+  const theirs = await I.createInvite({ email: "b-owner@team.test", tenantId: b.id, role: "owner" });
+  eq((await post("admin", { action: "revoke-invite", inviteId: theirs.id })).status, 404);
+  ok(live(await inviteRow(theirs.id)));
+});
+
 console.log("— 4. the invite mail");
 await t("mail not set up: nothing is sent, no platform_mail row, the answer says to send the link yourself", async () => {
   const r = await post("owner", { action: "invite", email: "nomail@team.test", role: "staff" });
@@ -331,7 +408,19 @@ await t("mail set up but the send fails (network blocked): the link is still sho
   process.env.RESEND_API_KEY = "re_test_blocked";
   const callsBefore = netCalls.length;
   try {
-    const r = await post("owner", { action: "invite", email: "mailfail@team.test", role: "support" });
+    const logged = [];
+    const orig = [console.log, console.error, console.warn];
+    console.log = console.error = console.warn = (...x) => logged.push(x.map(String).join(" "));
+    let r;
+    try {
+      r = await post("owner", { action: "invite", email: "mailfail@team.test", role: "support" });
+    } finally {
+      [console.log, console.error, console.warn] = orig;
+    }
+    const token = tokenOf(r.body.inviteUrl);
+    ok(logged.some((l) => /team_invite_mail_failed/.test(l)), "the failure is logged:");
+    ok(token && logged.every((l) => !l.includes(token)), "no log line holds the token:");
+    ok(!String((await one("SELECT error FROM platform_mail WHERE recipient = 'mailfail@team.test'"))?.error || "").includes(token), "nor the mail row's error:");
     eq(r.status, 200);
     ok(r.body.inviteUrl, "the link:");
     eq(r.body.mail?.status, "failed");

@@ -86,6 +86,10 @@ export const POST = tenantHandler(async (request) => {
     // (not membershipRole, which reads a failure as "no role"): a failed lookup
     // is a 5xx below, never a pass. Owner changes are audited as team.owner.
     let targetWasOwner = false;
+    // the early check below is for the answer and the audit label; the write
+    // itself refuses an owner target for a non-owner in the same statement
+    // (ownerTargets), so a promotion at the same moment can't slip through
+    const canOwner = roleAllows(auth.actor.role, "team.owner");
     const userId = String(body.userId || "");
     if (body.action === "role" || body.action === "remove") {
       const target = await platformDb().execute({ sql: "SELECT role FROM memberships WHERE user_id = ? AND tenant_id = ?", args: [userId, tenant.id] });
@@ -131,7 +135,8 @@ export const POST = tenantHandler(async (request) => {
     }
     if (body.action === "role") {
       if (!ROLES.includes(body.role)) return fail(`Pick a role: ${ROLES.join(", ")}.`, 422);
-      const set = await setMemberRole(userId, tenant.id, body.role); // final-owner guard inside, never adds a member
+      // final-owner and owner-target guards inside the one UPDATE; never adds a member
+      const set = await setMemberRole(userId, tenant.id, body.role, { ownerTargets: canOwner });
       if (!set) return fail(NOT_MEMBER_WORDS, 404);
       await expirePendingInvites(userId, tenant.id); // Phase 1 audit (P1-A)
       slog("team_role_set", { user: userId, role: body.role });
@@ -140,7 +145,7 @@ export const POST = tenantHandler(async (request) => {
     }
     if (body.action === "remove") {
       if (userId === auth.actor.id) return fail("You can't remove yourself. Ask another admin or the owner to do it.", 422);
-      if (!(await removeMembership(userId, tenant.id))) return fail(NOT_MEMBER_WORDS, 404); // final-owner guard inside
+      if (!(await removeMembership(userId, tenant.id, { ownerTargets: canOwner }))) return fail(NOT_MEMBER_WORDS, 404); // both guards inside the DELETE
       await expirePendingInvites(userId, tenant.id); // Phase 1 audit (P1-A)
       slog("team_removed", { user: userId });
       await audit({ actor: auth.actor, action: auditAction, resource: `member:${userId}`, diff: { removed: true, targetWasOwner } });
@@ -151,17 +156,18 @@ export const POST = tenantHandler(async (request) => {
       if (userId === auth.actor.id) return fail("You already own this store. Pick another member.", 422);
       const target = await platformDb().execute({ sql: "SELECT role FROM memberships WHERE user_id = ? AND tenant_id = ?", args: [userId, tenant.id] });
       if (!target.rows[0]) return fail(NOT_MEMBER_WORDS, 404);
-      const norm = (v) => String(v ?? "").trim().toLowerCase();
-      if (!norm(body.confirm) || norm(body.confirm) !== norm(tenant.name)) return fail(`Type the store name, ${tenant.name}, to confirm.`, 422);
+      const norm = (v) => String(v ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+      const storeName = tenant.name || tenant.id; // never "null" in the words
+      if (!norm(body.confirm) || norm(body.confirm) !== norm(storeName)) return fail(`Type the store name, ${storeName}, to confirm.`, 422);
+      // both people's pending invites expire in the same batch (Phase 1 audit, P1-A)
       if (!(await transferOwnership(auth.actor.id, userId, tenant.id))) return fail("Ownership didn't move: you're no longer an owner here, or that member left. Reload the page.", 409);
-      await expirePendingInvites(userId, tenant.id); // Phase 1 audit (P1-A): nothing pending can undo it
-      await expirePendingInvites(auth.actor.id, tenant.id);
       slog("team_ownership_transferred", { from: auth.actor.id, to: userId });
       await audit({ actor: auth.actor, action: "team.owner", resource: `ownership:${auth.actor.id}→${userId}`, diff: { from: auth.actor.id, to: userId, fromRole: "admin" } });
       return NextResponse.json({ ok: true, ...(await view(tenant.id, auth.actor)) });
     }
     return NextResponse.json({ error: "unknown action" }, { status: 400 });
   } catch (e) {
+    if (e?.code === "OWNER_TARGET") return fail("Only an owner can change or remove an owner.", 403);
     const infra = infraResponse(e, { route: "admin/team" }); // DOC-04: a database failure is never a 4xx
     if (infra) return NextResponse.json(infra.body, { status: infra.status });
     if (/last owner/.test(String(e?.message))) return fail(LAST_OWNER_WORDS, 422);

@@ -31,7 +31,7 @@ const consoleErrors = [];
 function watch(page, label) {
   page.on("console", (msg) => {
     // the new staff member's GET /api/admin/team 403 is the answer the drill asks for
-    if (msg.type() === "error" && !/eval\(\) is not supported/.test(msg.text()) && !(label === "new staff" && /status of 403 \(Forbidden\)/.test(msg.text()))) consoleErrors.push(`${label}: ${msg.text().slice(0, 300)}`);
+    if (msg.type() === "error" && !/eval\(\) is not supported/.test(msg.text()) && !(label === "new staff" && /status of 403 \(Forbidden\)/.test(msg.text()) && /\/api\/admin\/team$/.test(msg.location()?.url || ""))) consoleErrors.push(`${label}: ${msg.text().slice(0, 300)}`);
   });
   page.on("pageerror", (e) => consoleErrors.push(`${label}: ${String(e?.message || e).slice(0, 300)}`));
 }
