@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { addressValid } from "./checkoutModel";
+import { addressValid, addressStarted } from "./checkoutModel";
 import { cartFingerprint, forgetShopper, knownShopper, memoKey, readMemo, rememberShopper, savedIdFor, startMemo, writeMemo } from "./savedAddressMemo";
 
 // Phase 8 line 3: saved addresses at checkout, at AddressStep's
@@ -22,8 +22,6 @@ import { cartFingerprint, forgetShopper, knownShopper, memoKey, readMemo, rememb
 //   (./savedAddressMemo: never across carts or orders, never an address list).
 const PICK = ["name", "phone", "line1", "line2", "city", "state", "pincode"];
 const ADDRESS_ONLY = ["line1", "line2", "city", "state", "pincode"];
-// a pincode alone (line 1's prefill) still counts as an empty address
-const ADDRESS_TYPED = ["line1", "line2", "city", "state"];
 const norm = (v) => String(v ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 const matches = (a, form) => PICK.every((k) => norm(a[k]) === norm(form[k]));
 
@@ -73,7 +71,7 @@ export default function SavedAddressPicker({ form, onAddress }) {
       const list = r?.addresses || [];
       setState({ loaded: true, signedIn: true, email: r?.email || "", list });
       const f = latest.current.form;
-      const empty = ADDRESS_TYPED.every((k) => !String(f[k] || "").trim());
+      const empty = !addressStarted(f); // a PIN and its looked-up city/state are not an address yet
       const patch = {};
       if (!String(f.email || "").trim() && r?.email) patch.email = r.email;
       if (empty && list[0]) for (const k of PICK) patch[k] = list[0][k];

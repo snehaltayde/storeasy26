@@ -53,3 +53,11 @@ export function pincodePatch(form, place, filled = {}) {
   }
   return patch;
 }
+
+// Has the shopper started an address of their own? Judged on the street lines
+// only: a PIN, and the city and state its lookup filled (an sf_pin prefill can
+// land before the saved-address picker loads), are not an address yet, so the
+// picker may still fill the saved default (Phase 8 lines 1 and 3).
+export function addressStarted(form) {
+  return ["line1", "line2"].some((k) => String(form?.[k] ?? "").trim() !== "");
+}
