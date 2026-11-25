@@ -75,7 +75,7 @@ export default function PincodeField({ form, onAddress, children }) {
   );
   const message = badFormat
     ? BAD_PIN
-    : current?.error || (current && !current.found ? NOT_FOUND : "");
+    : current?.error || (current?.found === false ? NOT_FOUND : "");
 
   return (
     <>

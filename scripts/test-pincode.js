@@ -22,9 +22,9 @@ const H = await import("./support/route-harness.js");
 H.blankOutsideServices();
 const fetchCalls = H.blockNetwork();
 
-const { offlineProvider, dataFile, DATA_FILE } = await import("../lib/pincode/offline.js");
+const { offlineProvider, dataFile, DATA_FILE, UNAVAILABLE } = await import("../lib/pincode/offline.js");
 const { pincodeAnswer, setPincodeProvider } = await import("../lib/pincode/index.js");
-const { estimateDays, deliveryWindow, deliveryLine, expectedLine, dayLabel } = await import("../lib/delivery-estimate.js");
+const { estimateDays, deliveryWindow, deliveryLine, expectedLine, expectedPassed, dayLabel } = await import("../lib/delivery-estimate.js");
 const { computeShipping } = await import("../lib/shipping.js");
 const { validateShippingConfig, shippingExample } = await import("../lib/admin/settings.js");
 const { pincodePatch, applyAddress, emptyForm } = await import("../components/checkout/checkoutModel.js");
@@ -73,16 +73,24 @@ await t("unknown and bad pins", async () => {
     eq([r.ok, r.error], [false, "Enter a 6-digit PIN code."], `${JSON.stringify(bad)}:`);
   }
   eq((await pincodeAnswer(" 560001 ", { provider: fixture })).city, "Bengaluru", "trimmed:");
-  const broken = { lookup: async () => { throw new Error("boom"); } };
-  eq((await pincodeAnswer("560001", { provider: broken })).found, false, "a provider that throws is not found:");
 });
 
-await t("with no dataset file every pin is not found", async () => {
+await t("file present: a pin it lacks is found: false (the not-found message shows)", async () => {
+  eq(await fixture.lookup("999999"), null);
+  const a = await pincodeAnswer("999999", { provider: fixture });
+  eq([a.found, a.city, a.state], [false, null, null]);
+});
+
+await t("file missing: every pin is found: null (unknown, so no not-found message)", async () => {
   ok(!existsSync(DATA_FILE), "data/in-pincodes.json is committed; this check expects the owner step not done yet — update the test");
-  for (const pin of ["560001", "411001", "110001"]) {
-    eq(await nowhere.lookup(pin), null, `${pin}:`);
-    eq(await offlineProvider({ path: DATA_FILE }).lookup(pin), null, `${pin} (default path):`);
+  for (const pin of ["560001", "411001", "999999"]) {
+    eq(await nowhere.lookup(pin), UNAVAILABLE, `${pin}:`);
+    eq(await offlineProvider({ path: DATA_FILE }).lookup(pin), UNAVAILABLE, `${pin} (default path):`);
+    const a = await pincodeAnswer(pin, { provider: nowhere });
+    eq([a.ok, a.found, a.city, a.state], [true, null, null, null], `${pin} answer:`);
   }
+  const broken = { lookup: async () => { throw new Error("boom"); } };
+  eq((await pincodeAnswer("560001", { provider: broken })).found, null, "a provider that throws is unknown:");
 });
 
 await t("PINCODE_DATA_FILE is read only outside production", () => {
@@ -184,6 +192,42 @@ await t("brute force: every zone/default configuration × pins × times around I
   ok(n > 20_000, `only ${n} cases`);
 });
 
+// America/New_York, written out from the US rule (EDT −4 from the second
+// Sunday of March 02:00 local to the first Sunday of November 02:00 local, else EST −5).
+function nyOffsetMin(ms) {
+  const y = new Date(ms).getUTCFullYear();
+  const nthSunday = (month, n) => {
+    const first = new Date(Date.UTC(y, month, 1)).getUTCDay();
+    return 1 + ((7 - first) % 7) + 7 * (n - 1);
+  };
+  const start = Date.UTC(y, 2, nthSunday(2, 2), 7); // 02:00 EST = 07:00Z
+  const end = Date.UTC(y, 10, nthSunday(10, 1), 6); // 02:00 EDT = 06:00Z
+  return ms >= start && ms < end ? -240 : -300;
+}
+const nyDay = (ms, add) => {
+  const local = ms + nyOffsetMin(ms) * 60_000;
+  return new Date(Math.floor(local / 86_400_000) * 86_400_000 + add * 86_400_000).toISOString().slice(0, 10);
+};
+
+await t("brute force, America/New_York: estimates × times around its midnight (EST and EDT, both DST switches) equal the rule", () => {
+  const estimates = [{ minDays: 1, maxDays: 1 }, { minDays: 3, maxDays: 5 }, { minDays: 0, maxDays: 40 }];
+  const days = ["2026-01-15", "2026-03-07", "2026-03-08", "2026-03-09", "2026-07-04", "2026-10-31", "2026-11-01", "2026-11-02", "2026-12-31", "2028-02-29"];
+  let n = 0;
+  for (const day of days) {
+    const base = Date.parse(`${day}T00:00:00Z`);
+    for (let m = -6 * 60; m <= 36 * 60; m += 15) {
+      for (const jitter of [-1, 0, 1]) {
+        const ms = base + m * 60_000 + jitter;
+        for (const est of estimates) {
+          eq(deliveryWindow(est, { from: new Date(ms), timeZone: "America/New_York" }), { from: nyDay(ms, est.minDays), to: nyDay(ms, est.maxDays) }, `${new Date(ms).toISOString()}:`);
+          n++;
+        }
+      }
+    }
+  }
+  ok(n > 10_000, `only ${n} cases`);
+});
+
 await t("no settings → estimate null, and no line anywhere", async () => {
   const plain = computeShipping({ subtotal: 500, pincode: "560001" });
   ok(!("estimate" in plain) && !("zoneCod" in plain), "a store without the settings keeps the old shape");
@@ -201,6 +245,15 @@ await t("lines: a range, one day, and 'Expected by' the last day; a bad time zon
   eq(deliveryLine({ minDays: 3, maxDays: 5 }, { from, timeZone: "UTC" }), "Delivery by Mon 30 Nov – Wed 2 Dec", "the store's zone decides:");
   eq(deliveryLine({ minDays: 3, maxDays: 5 }, { from, timeZone: "Not/AZone" }), "Delivery by Tue 1 Dec – Thu 3 Dec");
   eq(dayLabel("2028-02-29"), "Tue 29 Feb");
+});
+
+await t("expectedPassed: false through the last expected day, true the day after (store's zone)", () => {
+  const from = "2026-11-27T18:30:00Z"; // Sat 28 Nov IST; 3–5 days → by Thu 3 Dec
+  const est = { minDays: 3, maxDays: 5 };
+  const at = (iso) => expectedPassed(est, { from, timeZone: "Asia/Kolkata", now: new Date(iso) });
+  eq(at("2026-12-03T18:29:59Z"), false, "23:59 IST on Thu 3 Dec:");
+  eq(at("2026-12-03T18:30:00Z"), true, "00:00 IST on Fri 4 Dec:");
+  eq(expectedPassed(null, { from, now: new Date("2030-01-01T00:00:00Z") }), false, "no estimate:");
 });
 
 await t("computeShipping: the zone's COD flag, and the money unchanged by the new fields", () => {
@@ -277,6 +330,16 @@ await t("route: runtime nodejs, and only this store's rates shape the answer", a
   eq((await get(sA.tenant.domains[0], "560001")).body, a.body, "A after B:");
   eq((await get(sA.tenant.domains[0], "999999")).body.found, false, "unknown pin on A:");
   eq((await get(sA.tenant.domains[0], "56000")).status, 400, "bad pin:");
+});
+
+await t("route: with no dataset file the answer is found: null, and the store's estimate still comes", async () => {
+  setPincodeProvider(nowhere);
+  try {
+    const r = await get(sA.tenant.domains[0], "560001");
+    eq([r.status, r.body.found, r.body.city, r.body.estimate], [200, null, null, { minDays: 3, maxDays: 5 }]);
+  } finally {
+    setPincodeProvider(fixture);
+  }
 });
 
 await t("route: the log line says found or not, never the pin", async () => {

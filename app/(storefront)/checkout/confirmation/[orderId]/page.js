@@ -129,7 +129,7 @@ export default async function ConfirmationPage({ params, searchParams }) {
               {order.pincode}
             </p>
             <p className="text-sf-text-muted">{order.phone}</p>
-            <DeliveryEstimate kind="expected" estimate={order.snapshot?.shipping?.estimate} from={order.created_at} timeZone={timeZone} className="mt-1 font-medium" />
+            {order.status !== "cancelled" && <DeliveryEstimate kind="expected" estimate={order.snapshot?.shipping?.estimate} from={order.created_at} timeZone={timeZone} className="mt-1 font-medium" />}
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-sf-text-faint">Payment</p>

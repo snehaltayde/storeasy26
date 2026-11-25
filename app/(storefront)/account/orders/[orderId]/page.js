@@ -9,7 +9,7 @@ import { returnForOrder, returnEligibility, returnsWindowDays } from "@/lib/retu
 import { db } from "@/lib/db";
 import { tfetch } from "@/lib/storefront-request";
 import { tenantCfg } from "@/lib/tenant-context";
-import { DEFAULT_TIME_ZONE } from "@/lib/delivery-estimate";
+import { DEFAULT_TIME_ZONE, expectedPassed } from "@/lib/delivery-estimate";
 import DeliveryEstimate from "@/components/checkout/DeliveryEstimate";
 import PluginSlot from "@/components/plugins/PluginSlot";
 
@@ -63,8 +63,8 @@ export default async function AccountOrderPage({ params }) {
         Placed {new Date(o.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} ·{" "}
         {o.payment_method === "cod" ? "Cash on delivery" : "Paid online"}
       </p>
-      {/* Phase 8 line 1: until it ships, the estimate the order was placed with */}
-      {data.fulfillments.length === 0 && o.status !== "cancelled" && (
+      {/* Phase 8 line 1: until it ships, the estimate the order was placed with (not once that date has passed) */}
+      {data.fulfillments.length === 0 && o.status !== "cancelled" && !expectedPassed(snap.shipping?.estimate, { from: o.created_at, timeZone: data.timeZone }) && (
         <DeliveryEstimate kind="expected" estimate={snap.shipping?.estimate} from={o.created_at} timeZone={data.timeZone} className="mt-1" />
       )}
 

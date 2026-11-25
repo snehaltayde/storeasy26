@@ -80,7 +80,8 @@ export default function DeliveryCheck({ currency = "INR" }) {
         {error && <p className="text-xs text-sf-danger">{error}</p>}
         {answer && (
           <>
-            {answer.found ? <p className="text-sf-text-body">{answer.city}, {answer.state}</p> : <p className="text-xs text-sf-text-subtle">{NOT_FOUND}</p>}
+            {answer.found === true && <p className="text-sf-text-body">{answer.city}, {answer.state}</p>}
+            {answer.found === false && <p className="text-xs text-sf-text-subtle">{NOT_FOUND}</p>}
             <DeliveryEstimate estimate={answer.estimate} timeZone={answer.timeZone} />
             <p data-delivery-cod={answer.cod ? "yes" : "no"} className="text-sf-text-muted">
               {answer.cod ? "Cash on delivery available" : "Cash on delivery isn't available for this PIN code"}
