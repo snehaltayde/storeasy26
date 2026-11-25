@@ -75,8 +75,14 @@ stage("cod", async (drill) => {
   const told = await dialog.innerText();
   drill.check(channel === "sms" ? told.includes("We sent a code to +91 ••••••9999") : told.includes("We sent a code to s•••@mediastic.in"), "the dialog says where the code went, masked", told.slice(0, 120));
   drill.check((await dialog.locator('input[autocomplete="one-time-code"]').count()) === 1, "the code field is one-time-code");
-  const [[row]] = await rolesSql(["SELECT body FROM notifications WHERE type = 'cod_otp' ORDER BY created_at DESC LIMIT 1"]);
-  const code = String(row?.body || "").match(/^(\d{6}) /)?.[1];
+  // the message is written just after the answer (after()), so wait for it briefly
+  let row = null;
+  let code = null;
+  for (let i = 0; i < 20 && !code; i++) {
+    [[row]] = await rolesSql(["SELECT body FROM notifications WHERE type = 'cod_otp' ORDER BY created_at DESC LIMIT 1"]);
+    code = String(row?.body || "").match(/^(\d{6}) /)?.[1] || null;
+    if (!code) await new Promise((r) => setTimeout(r, 250));
+  }
   drill.check(Boolean(code), "the code is in the notifications row", row?.body?.slice(0, 40));
   await drill.shoot(page, "cod-otp");
 

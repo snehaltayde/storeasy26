@@ -152,6 +152,10 @@ async function post(cartId, body, { ip = "10.0.0.1", contact = CONTACT, address 
   if (cartId) headers.cookie = `${CART_COOKIE}=${cartId}`;
   const req = new NextRequest(`https://${HOST}/api/checkout`, { method: "POST", headers, body: JSON.stringify({ contact, address, ...body }) });
   const res = await route.POST(req);
+  // the code's delivery runs after the answer (after()); run it here, the way Next would
+  const later = globalThis.__codAfter.filter((fn) => fn.codOtp);
+  globalThis.__codAfter = globalThis.__codAfter.filter((fn) => !fn.codOtp);
+  for (const fn of later) await fn();
   return { status: res.status, body: await res.json() };
 }
 const quoteOf = async (cartId, opts) => (await post(cartId, { action: "quote" }, opts)).body.quote;
@@ -433,7 +437,9 @@ await t("a capped phone's challenge can't be verified with any code; resends nev
   eq(answers.at(-1), "COD_OTP_LOCKED", "past the cap:");
   const last = right.at(-1);
   const locked = await verify(last.cart, last.k, last.id, last.code, opts);
-  eq([locked.body.code, locked.body.error], ["COD_OTP_LOCKED", PT.COD_OTP_MESSAGES.locked], "the right code past the cap:");
+  eq([locked.body.code, locked.body.error], ["COD_OTP_LOCKED", PT.COD_OTP_MESSAGES.phoneLocked], "the right code past the cap:");
+  eq(PT.COD_OTP_MESSAGES.phoneLocked, "We can't send a code to this number right now. You can pay online instead.", "the words say nothing about earlier tries:");
+  ok(!/recent|already|before|tried/i.test(PT.COD_OTP_MESSAGES.phoneLocked), "the lock-out words hint at earlier use");
   // and a capped phone (sends over 5) never verifies, whatever the code
   await anHourLater(); // a new hour: 5 sends reach the phone, the 6th is capped
   let lastCode = null;
@@ -544,7 +550,7 @@ await t("an email code places the order as 'Email confirmed by code', never as a
   eq(OTP.codCheckWords(await inT(() => OTP.codCheckChannel(order.id))), "Email confirmed by code", "label:");
 });
 
-await t("SMS chosen with no provider: the send is refused with its sentence, no code is made or sent", async () => {
+await t("SMS chosen with no provider: COD is hidden and the send refused with its reason, no code is made or sent", async () => {
   await anHourLater();
   await saveConfig(BASE_SHIPPING, OTP_ALWAYS);
   const cart = await freshCart();
@@ -557,8 +563,9 @@ await t("SMS chosen with no provider: the send is refused with its sentence, no 
   } finally {
     process.env.NODE_ENV = was;
   }
-  eq([r.status, r.body.code, r.body.error], [503, "COD_OTP_UNAVAILABLE", PT.COD_OTP_MESSAGES.cantSend], "refused:");
-  eq(friendlyCheckoutError(r.body), PT.COD_OTP_MESSAGES.cantSend, "the shopper reads:");
+  // the quote already hides COD, so the send is refused with that reason
+  eq([r.status, r.body.code, r.body.error], [409, "COD_UNAVAILABLE", "Cash on delivery isn't available right now"], "refused:");
+  eq(friendlyCheckoutError(r.body), "Cash on delivery isn't available right now", "the shopper reads:");
   eq((await otpRows(cart)).length, 0, "no challenge:");
   eq((await inT(() => db.selectFrom("notifications").select("id").execute())).length, before, "no message:");
 });
@@ -621,6 +628,88 @@ await t("the SMS stub never runs in production; settings refuse SMS there", asyn
     process.env.NODE_ENV = was;
     delete process.env.SMS_PROVIDER;
   }
+});
+
+await t("strict phone format: every accepted form of a number is one E.164 and one phone_hash; everything else is refused", async () => {
+  const PH = await import("../lib/checkout/phone.js");
+  const forms = ["9123456789", "+919123456789", "+91 91234 56789", "91 9123456789", "919123456789", "09123456789", "(+91) 91234-56789".replace("(+91)", "+91"), "912-345-6789", "91234.56789"];
+  for (const f of forms) eq(PH.e164(f), "+919123456789", `"${f}":`);
+  const hashes = new Set(await inT(() => Promise.all(forms.map((f) => OTP.phoneHash(f)))));
+  eq(hashes.size, 1, "one phone_hash for every form:");
+  eq([PH.e164("+14155552671"), PH.e164("+44 20 7946 0958")], ["+14155552671", "+442079460958"], "E.164:");
+  for (const bad of ["0091 9123456789", "00091 9123456789", "+0091234567", "+91 912345678", "+91 91234567890", "+910123456789", "0123456789", "123", "9123456789x", "91+23456789", "++919123456789", "+1234567", "+1234567890123456", "", null, "phone"]) eq(PH.e164(bad), "", `refused "${bad}":`);
+  // through the route: each action refuses a bad phone with its sentence, and no code is made
+  await anHourLater();
+  await saveConfig(BASE_SHIPPING, OTP_ALWAYS);
+  const cart = await freshCart();
+  for (const action of ["cod_otp_send", "cod", "razorpay_create"]) {
+    const r = await post(cart, { action, idempotencyKey: key(), expectedTotal: 1348 }, { contact: { ...CONTACT, phone: "0091 9123456789" } });
+    eq([r.status, r.body.error], [400, PH.PHONE_INVALID], `${action}:`);
+    eq(friendlyCheckoutError(r.body), PH.PHONE_INVALID, "the shopper reads:");
+  }
+  eq((await otpRows(cart)).length, 0, "no challenge for a bad phone:");
+  // two spellings of one number share the per-phone cap
+  for (let i = 0; i < 5; i++) await sendFor(await freshCart(), key(), { contact: { ...CONTACT, phone: i % 2 ? "+91 98111 22233" : "09811122233" } });
+  const before = (await inT(() => db.selectFrom("notifications").select("id").where("recipient", "=", "+919811122233").execute())).length;
+  await sendFor(await freshCart(), key(), { contact: { ...CONTACT, phone: "919811122233" } });
+  eq((await inT(() => db.selectFrom("notifications").select("id").where("recipient", "=", "+919811122233").execute())).length, before, "the 6th send, a third spelling, is capped:");
+});
+
+await t("delivery runs after the answer on both paths; a failed delivery leaves the challenge unmatchable", async () => {
+  await anHourLater();
+  await saveConfig(BASE_SHIPPING, OTP_ALWAYS);
+  const src = await readFile(join(ROOT, "app/api/checkout/route.js"), "utf8");
+  ok(/after\(later\)/.test(src) && /const \{ reply, deliver \} = await sendCodOtp/.test(src), "the route doesn't hand delivery to after()");
+  const cart = await freshCart();
+  const k = key();
+  const reply = await inT(() => OTP.sendCodOtp({ cartId: cart, key: k, phone: CONTACT.phone, email: CONTACT.email, amount: 1348, channel: "sms", cart: { items: [{ variantId: "gid://t/V2", quantity: 1 }] } }));
+  const [before] = await otpRows(cart);
+  ok(/^[0-9a-f]{64}$/.test(before.code_hash), "a matchable code before delivery");
+  const realSend = SMS.stub.send;
+  SMS.stub.send = async () => {
+    throw new Error("provider down");
+  };
+  try {
+    await inT(() => reply.deliver());
+  } finally {
+    SMS.stub.send = realSend;
+  }
+  const [after] = await otpRows(cart);
+  ok(/^capped:/.test(after.code_hash), `a failed delivery left a matchable code: ${after.code_hash}`);
+});
+
+await t("the quote hides COD when it needs an SMS code and SMS can't be sent", async () => {
+  await saveConfig(BASE_SHIPPING, OTP_ALWAYS);
+  const cart = await freshCart();
+  const was = process.env.NODE_ENV;
+  process.env.NODE_ENV = "production";
+  let q;
+  try {
+    q = await quoteOf(cart);
+  } finally {
+    process.env.NODE_ENV = was;
+  }
+  eq([q.cod.available, q.cod.reason, q.nudge.save], [false, "Cash on delivery isn't available right now", 0], "quote:");
+  eq(friendlyCheckoutError({ code: "COD_UNAVAILABLE", error: q.cod.reason }), q.cod.reason, "the shopper reads:");
+  eq((await quoteOf(cart)).cod.available, true, "with the stub (outside production) COD shows:");
+  const emailOnly = PT.paymentTerms({ cart: { subtotal: 1299, discountTotal: 0, total: 1299 }, paymentConfig: { cod: { otp: "always", otpChannel: "email" } }, smsAvailable: false });
+  eq(emailOnly.cod.available, true, "an email code doesn't need SMS:");
+});
+
+await t("the jobs tick clears codes: a cod_otp_redact job redacts sent and expired code rows", async () => {
+  const { HANDLERS } = await import("../lib/platform/worker.js");
+  ok(typeof HANDLERS.cod_otp_redact === "function", "no cod_otp_redact handler");
+  const now = new Date().toISOString();
+  await inT(() =>
+    db.insertInto("notifications").values({ id: "ntf_redacttest1", type: "cod_otp", recipient: "+919999900000", subject: "SMS", body: "654321 is your code", status: "sent", error: null, provider_id: "sms-stub", consent_class: "transactional", consent_ref: null, idempotency_key: null, created_at: now, sent_at: now }).execute(),
+  );
+  await inT(() => HANDLERS.cod_otp_redact({}));
+  const row = await inT(() => db.selectFrom("notifications").select(["body"]).where("id", "=", "ntf_redacttest1").executeTakeFirst());
+  ok(!/\d{6}/.test(row.body), `still there: ${row.body}`);
+  const jobs = await C.platformDb().execute("SELECT type, tenant_id, run_after FROM jobs WHERE type = 'cod_otp_redact'");
+  ok(jobs.rows.length > 0 && jobs.rows.every((j) => j.tenant_id === "cod" && j.run_after), "sends schedule a redaction job for the store");
+  const idx = await inT(() => libsql.execute("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_notifications_type_status'"));
+  eq(idx.rows.length, 1, "the (type, status) index:");
 });
 
 // ---- 3. rules, settings, order view, Shopify, permissions ----------------------------

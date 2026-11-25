@@ -24,11 +24,16 @@ import { isTransient } from "@/lib/db";
 import { shopperErrorMessage } from "@/lib/shopper-errors";
 import { paymentTerms, COD_OTP_MESSAGES } from "@/lib/checkout/payment-terms";
 import { sendCodOtp, verifyCodOtp, requireVerified, consumeChallenge, CodOtpError } from "@/lib/checkout/cod-otp";
+import { smsAvailable } from "@/lib/messaging/sms";
+import { e164, PHONE_INVALID } from "@/lib/checkout/phone";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const cartIdFrom = (request) => request.cookies.get(CART_COOKIE)?.value || null;
+
+// Phase 8 line 2: one strict phone format (lib/checkout/phone.js).
+const phoneInvalid = () => NextResponse.json({ error: PHONE_INVALID, code: "PHONE_INVALID" }, { status: 400 });
 
 function validate(contact, address) {
   const required = [
@@ -94,6 +99,7 @@ const termsFor = (cart, address) =>
     paymentConfig: currentTenant()?.config?.payment_config ?? null,
     pincode: address?.pincode || null,
     prepaidAvailable: razorpayConfigured(),
+    smsAvailable: smsAvailable(),
   });
 
 const codUnavailable = (terms) =>
@@ -257,6 +263,7 @@ export const POST = tenantHandler(async (request) => {
       const cart = await getCart(cartId);
       if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
       if (!validate(contact, address)) return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
+      if (!e164(contact.phone)) return phoneInvalid();
       const terms = termsFor(cart, address);
       if (!terms.cod.available) return codUnavailable(terms);
       const bind = { cartId, key: String(idempotencyKey), phone: contact.phone, amount: terms.cod.total, currency: cart.currency || "INR", cart };
@@ -267,8 +274,12 @@ export const POST = tenantHandler(async (request) => {
         const shipping = computeShipping({ subtotal: cart.subtotal || 0, discountTotal: cart.discountTotal || 0, paymentMethod: "cod", pincode: address?.pincode, config: shippingConfig });
         const changed = priceCheck(body, cart, shipping, shippingConfig, terms);
         if (changed) return changed;
-        const sent = await sendCodOtp({ ...bind, email: contact.email, channel: terms.cod.otpChannel });
-        return NextResponse.json({ ok: true, required: true, ...sent });
+        const { reply, deliver } = await sendCodOtp({ ...bind, email: contact.email, channel: terms.cod.otpChannel });
+        // the message goes after the answer, on both paths (lib/checkout/cod-otp.js)
+        const later = () => deliver();
+        later.codOtp = true;
+        after(later);
+        return NextResponse.json({ ok: true, required: true, ...reply });
       } catch (e) {
         if (e instanceof CodOtpError) return otpError(e);
         throw e;
@@ -308,6 +319,7 @@ export const POST = tenantHandler(async (request) => {
       if (!cartId) return NextResponse.json({ error: "No cart session" }, { status: 400 });
       if (!validate(contact, address))
         return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
+      if (!e164(contact.phone)) return phoneInvalid();
       if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
       // Phase 8 line 2: the quote hides COD here, so the route refuses it too.
       if (!terms.cod.available) return codUnavailable(terms);
@@ -382,6 +394,7 @@ export const POST = tenantHandler(async (request) => {
       if (!cartId) return NextResponse.json({ error: "No cart session" }, { status: 400 });
       if (!validate(contact, address))
         return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
+      if (!e164(contact.phone)) return phoneInvalid();
       if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
       // P1-RATES: the Razorpay order is minted for the amount on the Pay button,
       // or not at all.

@@ -16,5 +16,6 @@ CREATE TABLE IF NOT EXISTS cod_otps (
   verified_at TEXT, order_id TEXT, created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_cod_otps_cart ON cod_otps(cart_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_cod_otps_phone ON cod_otps(phone_hash, created_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_type_status ON notifications(type, status); -- the code redaction sweep
 ALTER TABLE orders ADD COLUMN payment_discount REAL NOT NULL DEFAULT 0;
 ALTER TABLE orders ADD COLUMN cod_verified_at TEXT;
