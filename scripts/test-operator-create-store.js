@@ -501,7 +501,7 @@ await t("an existing account accepts with its current password: a wrong one is r
   ok(/already has an owner/.test(after.body.error), "words");
 });
 
-await t("Phase 1 audit gap P1-A: an invite never lowers an existing member's role: the sole owner or an admin invited as support is refused before the token is spent, keeps the role, and the answer carries no internal words; an invite that raises a role still works", async () => {
+await t("Phase 1 audit gap P1-A: an invite never lowers an existing member's role: the sole owner or an admin invited as support gets 409 ALREADY_MEMBER, keeps the role, and the answer carries no internal words", async () => {
   const A = store.a.tenant.domains[0];
   const roleOf = async (userId) => (await one("SELECT role FROM memberships WHERE tenant_id = ? AND user_id = ?", [store.a.id, userId]))?.role;
   for (const [who, pass] of [["owner", "owner-pass-opcreate"], ["admin", "admin-pass-opcreate"]]) {
@@ -511,13 +511,92 @@ await t("Phase 1 audit gap P1-A: an invite never lowers an existing member's rol
     eq(r.body.code, "ALREADY_MEMBER", `${who} code`);
     ok(!/demote|grant owner|Error|at \w+ \(/.test(r.text), `${who}: no internal words: ${r.text}`);
     eq(await roleOf(store.users[who].id), who, `${who} keeps the role`);
-    eq((await one("SELECT accepted_at FROM invitations WHERE id = ?", [inv.id])).accepted_at, null, `${who}: the invite is not spent`);
   }
-  const up = await I.createInvite({ email: store.users.support.email, tenantId: store.a.id, role: "staff" });
-  const r = await acceptCall(A, "POST", { body: { token: up.token, password: "support-pass-opcreate" } });
-  eq(r.status, 200, r.text);
-  eq(await roleOf(store.users.support.id), "staff", "raised to staff");
-  await I.addMembership(store.users.support.id, store.a.id, "support");
+});
+
+// The grid user: an existing account whose role on store A each case sets.
+const GRID_PASS = "grid-pass-opcreate-1";
+const gridUser = await I.createUser({ email: "grid@opcreate.test", password: GRID_PASS });
+const RANKED = ["owner", "admin", "staff", "support"];
+let gridIp = 0;
+const gridAccept = async (token) => {
+  await I.clearThrottle(`login:${gridUser.email}`);
+  return I.acceptInvite({ token, password: GRID_PASS, tenantId: store.a.id, ip: `10.77.0.${++gridIp}` });
+};
+const gridRole = async () => (await one("SELECT role FROM memberships WHERE tenant_id = ? AND user_id = ?", [store.a.id, gridUser.id]))?.role ?? null;
+const setGrid = async (role) => {
+  if (role) await db.execute({ sql: "INSERT INTO memberships (user_id, tenant_id, role, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, tenant_id) DO UPDATE SET role = excluded.role", args: [gridUser.id, store.a.id, role, iso(Date.now())] });
+  else await db.execute({ sql: "DELETE FROM memberships WHERE tenant_id = ? AND user_id = ?", args: [store.a.id, gridUser.id] });
+};
+const spent = async (id) => (await one("SELECT accepted_at FROM invitations WHERE id = ?", [id])).accepted_at !== null;
+
+await t("P1-A review: every held role x invited role: the same or a higher held role is ALREADY_MEMBER with the token spent and the role kept; a raise is accepted; an account with no membership here joins", async () => {
+  for (const held of RANKED) {
+    for (const invited of RANKED) {
+      await setGrid(held);
+      const inv = await I.createInvite({ email: gridUser.email, tenantId: store.a.id, role: invited });
+      const r = await gridAccept(inv.token);
+      const raise = RANKED.indexOf(invited) < RANKED.indexOf(held);
+      const label = `held ${held}, invited ${invited}`;
+      if (raise) {
+        ok(r && !r.alreadyMember && r.id === gridUser.id, `${label}: accepted`);
+        eq(await gridRole(), invited, `${label}: raised`);
+      } else {
+        eq(r?.alreadyMember, true, `${label}: already a member`);
+        eq(await gridRole(), held, `${label}: role kept`);
+      }
+      ok(await spent(inv.id), `${label}: the token is spent`);
+    }
+  }
+  await setGrid(null);
+  const inv = await I.createInvite({ email: gridUser.email, tenantId: store.a.id, role: "staff" });
+  const r = await gridAccept(inv.token);
+  ok(r && !r.alreadyMember && r.existingAccount === true, "no membership here: joins");
+  eq(await gridRole(), "staff", "as staff");
+  const route = await I.createInvite({ email: gridUser.email, tenantId: store.a.id, role: "staff" });
+  await I.clearThrottle(`login:${gridUser.email}`);
+  const res = await acceptCall(store.a.tenant.domains[0], "POST", { body: { token: route.token, password: GRID_PASS } });
+  eq(res.status, 409, res.text);
+  eq(res.body.code, "ALREADY_MEMBER", "route code");
+  ok(await spent(route.id), "route: spent");
+});
+
+await t("P1-A review: a 409'd token can't be replayed after a demotion, and the team route's role change or removal expires that member's pending invites to the store", async () => {
+  await setGrid("admin");
+  const inv = await I.createInvite({ email: gridUser.email, tenantId: store.a.id, role: "admin" });
+  eq((await gridAccept(inv.token))?.alreadyMember, true, "admin invited as admin: 409");
+  await setGrid("support");
+  eq(await gridAccept(inv.token), null, "replayed after the demotion: refused");
+  eq(await gridRole(), "support", "still support");
+  // a pending invite (not yet tried) dies when the team route demotes or removes the member
+  for (const action of ["role", "remove"]) {
+    await setGrid("admin");
+    const pending = await I.createInvite({ email: gridUser.email, tenantId: store.a.id, role: "admin" });
+    const r = await store.call("owner", "team", "POST", { body: action === "role" ? { action, userId: gridUser.id, role: "support" } : { action, userId: gridUser.id } });
+    eq(r.status, 200, `${action}: ${r.text}`);
+    ok(Date.parse((await one("SELECT expires_at FROM invitations WHERE id = ?", [pending.id])).expires_at) <= Date.now(), `${action}: the pending invite expired`);
+    eq(await gridAccept(pending.token), null, `${action}: the pending invite no longer works`);
+    eq(await gridRole(), action === "role" ? "support" : null, `${action}: the change stands`);
+  }
+});
+
+await t("P1-A review (race): two accepts at once never lower a role: support invited as admin and as staff together ends admin; one token accepted twice at once succeeds once", async () => {
+  for (let round = 0; round < 5; round++) {
+    await setGrid("support");
+    const toAdmin = await I.createInvite({ email: gridUser.email, tenantId: store.a.id, role: "admin" });
+    const toStaff = await I.createInvite({ email: gridUser.email, tenantId: store.a.id, role: "staff" });
+    await I.clearThrottle(`login:${gridUser.email}`);
+    const order = round % 2 ? [toStaff, toAdmin] : [toAdmin, toStaff];
+    await Promise.all(order.map((x, i) => I.acceptInvite({ token: x.token, password: GRID_PASS, tenantId: store.a.id, ip: `10.78.${round}.${i}` })));
+    eq(await gridRole(), "admin", `round ${round}: admin wins`);
+  }
+  await setGrid("support");
+  const once = await I.createInvite({ email: gridUser.email, tenantId: store.a.id, role: "admin" });
+  await I.clearThrottle(`login:${gridUser.email}`);
+  const both = await Promise.all([0, 1].map((i) => I.acceptInvite({ token: once.token, password: GRID_PASS, tenantId: store.a.id, ip: `10.79.0.${i}` })));
+  eq(both.filter((x) => x && !x.alreadyMember).length, 1, `one success: ${JSON.stringify(both.map((x) => (x ? (x.alreadyMember ? "already" : "ok") : null)))}`);
+  eq(await gridRole(), "admin", "admin");
+  await setGrid(null);
 });
 
 await t("an expired invite is refused", async () => {
