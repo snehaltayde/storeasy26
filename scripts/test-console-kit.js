@@ -62,7 +62,7 @@ const ok = (v, m = "") => {
 };
 
 const KIT = "components/kit";
-const PARTS = ["page-header", "status-badge", "empty-state", "money-cell", "role-gate", "data-table"];
+const PARTS = ["page-header", "status-badge", "empty-state", "money-cell", "role-gate", "data-table", "copy-button", "storeasy-mark"];
 
 // Next's SWC compiles components/kit, components/ui and lib/ (CommonJS out);
 // packages come from node_modules
@@ -323,7 +323,7 @@ await t("DataTable footer: \"1–50 of N\" with Previous/Next, or Load more", ()
 });
 
 // ---------- 7. imports ----------
-await t("components/kit holds the six parts and imports only components/ui, lib/, its own folder and packages", () => {
+await t("components/kit holds only its listed parts and imports only components/ui, lib/, its own folder and packages", () => {
   const files = readdirSync(join(ROOT, KIT)).sort();
   eq(files, PARTS.map((p) => `${p}.js`).sort(), "the files:");
   for (const f of files) {
