@@ -211,15 +211,41 @@ await t("pages: /platform is the sign-in for every denied caller, the old consol
   }
 });
 
-await t("pages: with no PLATFORM_ADMIN_PASSWORD, /platform shows the \"not set up\" sign-in card", async () => {
+const loginProps = (r) => r.props.find((p) => p.component === "@/components/platform/PlatformLogin#default")?.props;
+async function noSetupPassword(fn) {
   const saved = process.env.PLATFORM_ADMIN_PASSWORD;
   process.env.PLATFORM_ADMIN_PASSWORD = "";
   try {
-    const r = await P.run("app/(console)/platform/page.js", { cookies: {} });
-    const login = r.props.find((p) => p.component === "@/components/platform/PlatformLogin#default");
-    eq(login?.props.configured, false, "configured=false");
+    return await fn();
   } finally {
     process.env.PLATFORM_ADMIN_PASSWORD = saved;
+  }
+}
+
+await t("pages: no setup password and no operator account -> the \"not set up\" card", async () => {
+  const r = await noSetupPassword(() => withoutOperators(() => P.run("app/(console)/platform/page.js", { cookies: {} })));
+  eq(loginProps(r)?.configured, false, "configured=false");
+});
+
+await t("pages: no setup password but an operator account exists -> the sign-in, not \"not set up\"", async () => {
+  const r = await noSetupPassword(() => P.run("app/(console)/platform/page.js", { cookies: {} }));
+  ok(loginProps(r), "the sign-in");
+  eq(loginProps(r).configured, undefined, "configured is not false");
+});
+
+await t("pages: no setup password and the operator lookup fails -> the sign-in (sign-in still fails closed)", async () => {
+  const saved = process.env.PLATFORM_DB_URL;
+  process.env.PLATFORM_DB_URL = "file:/nonexistent-dir-platshell/none.db";
+  C.__resetPlatformClient({ preserveCaches: true });
+  try {
+    ok(await S.operatorsExist().then(() => false, () => true), "the operator lookup really fails here");
+    const r = await noSetupPassword(() => P.run("app/(console)/platform/page.js", { cookies: {} }));
+    ok(!r.error, String(r.error));
+    ok(loginProps(r), "the sign-in");
+    eq(loginProps(r).configured, undefined, "configured is not false");
+  } finally {
+    process.env.PLATFORM_DB_URL = saved;
+    C.__resetPlatformClient({ preserveCaches: true });
   }
 });
 

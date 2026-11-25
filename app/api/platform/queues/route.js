@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireOperator } from "@/lib/platform/require-operator";
 import { listJobs, listInbox, queueStats, replayJob, replayInbox } from "@/lib/platform/jobs";
 import { runDueJobs, TICK_BUDGET_MS } from "@/lib/platform/worker";
+import { audit, operatorActor } from "@/lib/platform/audit";
 
 // Queue & webhook inspector API (S29 / OP05). Metadata ONLY — raw webhook
 // payloads can carry PII and are never serialized here; replay is scoped,
@@ -32,16 +33,17 @@ export async function POST(request) {
   const body = await request.json().catch(() => ({}));
   try {
     if (body.action === "replay" && body.kind === "job") {
-      const ok = await replayJob(String(body.id || ""));
+      const ok = await replayJob(String(body.id || ""), { actor: operatorActor(auth.operator) });
       return NextResponse.json({ ok }, { status: ok ? 200 : 404 });
     }
     if (body.action === "replay" && body.kind === "inbox") {
-      const ok = await replayInbox(String(body.id || ""));
+      const ok = await replayInbox(String(body.id || ""), { actor: operatorActor(auth.operator) });
       return NextResponse.json({ ok }, { status: ok ? 200 : 404 });
     }
     if (body.action === "tick") {
       // same budget as the tick route, so catalog sync slices run too (GEN-02)
       const results = await runDueJobs({ limit: 25, budgetMs: TICK_BUDGET_MS });
+      await audit({ actor: auth.operator, action: "queue.tick", resource: "queue:jobs", tenantId: null, diff: { ran: results.length, failed: results.filter((r) => r.ok === false).length } });
       return NextResponse.json({ ok: true, ran: results.length, failed: results.filter((r) => r.ok === false).length });
     }
     return NextResponse.json({ error: "action must be replay|tick" }, { status: 400 });

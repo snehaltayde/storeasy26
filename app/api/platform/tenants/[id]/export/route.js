@@ -18,7 +18,12 @@ export async function POST(request, { params }) {
   const auth = await requireOperator(request, { write: true });
   if (auth instanceof Response) return auth;
   const { id } = await params;
-  const token = await mintExportToken(id);
+  let token;
+  try {
+    token = await mintExportToken(id);
+  } catch {
+    return NextResponse.json({ error: "Exports aren't available: PLATFORM_SECRET isn't set on this server." }, { status: 503 });
+  }
   await audit({ actor: auth.operator, action: "tenant.status", tenantId: id, diff: { export_link_minted: true } });
   slog("tenant_export_link", { tenant: id });
   return NextResponse.json({ ok: true, url: `/api/platform/tenants/${id}/export?token=${token}`, expires_in: "1 hour" });
@@ -27,7 +32,14 @@ export async function POST(request, { params }) {
 export async function GET(request, { params }) {
   const { id } = await params;
   const token = new URL(request.url).searchParams.get("token");
-  if (!(await verifyExportToken(id, token))) {
+  let valid = false;
+  try {
+    valid = await verifyExportToken(id, token);
+  } catch {
+    // no PLATFORM_SECRET: no link can be checked, so none is honoured
+    return NextResponse.json({ error: "exports are not available on this server" }, { status: 503 });
+  }
+  if (!valid) {
     return NextResponse.json({ error: "invalid or expired export link" }, { status: 401 });
   }
   try {

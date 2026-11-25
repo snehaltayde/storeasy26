@@ -3,6 +3,7 @@ import { requireOperator } from "@/lib/platform/require-operator";
 import { billingOverview, ensureDefaultPlans, setOverride, clearOverride, listPlans, createPlanVersion } from "@/lib/platform/billing";
 import { billingProviderConfigured } from "@/lib/platform/razorpay-billing";
 import { slog } from "@/lib/log";
+import { audit } from "@/lib/platform/audit";
 
 // Operator billing reconciliation (S40 / OP08): fleet subscriptions, MRR,
 // gross/refunds/net by month (sums over the deduped provider-event ledger),
@@ -33,18 +34,19 @@ export async function POST(request) {
       await setOverride(String(body.tenant || ""), {
         features: body.features,
         reason: body.reason,
-        setBy: auth.operator.id,
+        setBy: auth.operator,
         expiresAt: body.expiresAt || null,
       });
       slog("billing_override_set", { tenant: body.tenant });
     } else if (body.action === "clear_override") {
-      await clearOverride(String(body.tenant || ""), { setBy: auth.operator.id });
+      await clearOverride(String(body.tenant || ""), { setBy: auth.operator });
       slog("billing_override_cleared", { tenant: body.tenant });
     } else if (body.action === "plan_version") {
       // versioned catalog: a change = a NEW version; old versions stay for
       // pinned subscribers
       const p = await createPlanVersion(String(body.plan || ""), body.spec || {});
       slog("billing_plan_version", { plan: p.id, version: p.version });
+      await audit({ actor: auth.operator, action: "billing.plan_version", resource: `plan:${p.id}`, tenantId: null, diff: { version: p.version } });
     } else {
       return NextResponse.json({ error: "unknown action" }, { status: 400 });
     }

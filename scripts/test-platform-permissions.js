@@ -239,12 +239,18 @@ await t("requireOperator: every denied caller's cookie -> 401", async () => {
 });
 
 // --- every row as every caller ------------------------------------------------------
+// Least trusted: no denied answer, on any row, holds a store id or name, a store's
+// database URL, the operator's email or a probe's own ids.
+const CANARIES = [store.a.id, store.b.id, store.a.tenant.name, store.b.tenant.name, store.a.tenant.dbUrl, store.b.tenant.dbUrl, store.users.operator.email].filter(Boolean).map(String);
+let deniedChecked = 0;
 for (const r of PLATFORM_ROUTES) {
   await t(`${rowName(r)} as each caller`, async () => {
     const wrong = [];
     for (const caller of DENIED) {
       const res = await callRow(caller, r);
       if (res.status !== 401) wrong.push(`${caller}: want 401, got ${res.status} ${res.text.slice(0, 120)}`);
+      for (const c of CANARIES) if (res.text.includes(c)) wrong.push(`${caller}: the 401 holds ${c}`);
+      deniedChecked++;
     }
     for (const caller of ALLOWED) {
       const res = await callRow(caller, r);
@@ -265,15 +271,9 @@ await t("cross-origin: every write row answers the operator and a signed-out cal
   if (wrong.length) throw new Error(wrong.join("\n"));
 });
 
-await t("least trusted: denied answers carry no store id or name", async () => {
-  const canaries = [store.a.id, store.b.id, store.a.tenant.name, store.b.tenant.name].filter(Boolean).map(String);
-  for (const caller of DENIED) {
-    for (const path of ["tenants", "overview", "themes", "onboarding"]) {
-      const res = await call(caller, path, "GET");
-      eq(res.status, 401, `${caller} ${path}`);
-      for (const c of canaries) ok(!res.text.includes(c), `${caller} ${path} holds ${c}`);
-    }
-  }
+await t("least trusted: every row's denied answers were searched for the canaries, a db_url among them", () => {
+  eq(deniedChecked, PLATFORM_ROUTES.length * DENIED.length, "denied answers checked");
+  ok(CANARIES.some((c) => /^file:/.test(c)), "a store's db_url is a canary");
 });
 
 // --- writes name the real operator --------------------------------------------------
@@ -302,14 +302,77 @@ await t("writes: a flag, a support grant and an incident record the operator's i
   }
 });
 
-await t("writes: the bootstrap caller is audited as bootstrap", async () => {
+await t("writes: plan versions, job and inbox replays and the queue tick are audited with the operator", async () => {
+  const J = await import("../lib/platform/jobs.js");
   const since = new Date().toISOString();
-  eq((await call("bootstrap-before", "incidents", "POST", { body: { action: "open", title: "bootstrap probe" } })).status, 200, "incident");
-  const rows = (await auditRows(since)).filter((x) => x.action === "tenant.status");
-  ok(rows.length, "an audit row");
-  for (const x of rows) {
-    eq(x.actor, "bootstrap", "actor");
-    eq(x.actor_kind, "bootstrap", "kind");
+  const plan = await call("operator", "billing", "POST", { body: { action: "plan_version", plan: "platperm", spec: { name: "Platperm", price: 100 } } });
+  eq(plan.status, 200, `plan_version ${plan.text.slice(0, 120)}`);
+  const job = await J.enqueueJob({ type: "platperm_probe", payload: {} });
+  await db().execute({ sql: "UPDATE jobs SET status = 'dead' WHERE id = ?", args: [job.id] });
+  eq((await call("operator", "queues", "POST", { body: { action: "replay", kind: "job", id: job.id } })).status, 200, "job replay");
+  await db().execute({ sql: "UPDATE jobs SET status = 'done' WHERE id = ?", args: [job.id] }); // so the tick leaves it alone
+  const wh = await J.recordWebhook({ source: "platperm", topic: "probe", rawBody: "{}", hmacOk: true, status: "failed" });
+  const whId = typeof wh === "string" ? wh : wh?.id;
+  eq((await call("operator", "queues", "POST", { body: { action: "replay", kind: "inbox", id: whId } })).status, 200, "inbox replay");
+  await db().execute({ sql: "UPDATE jobs SET status = 'done' WHERE status = 'pending'" });
+  eq((await call("operator", "queues", "POST", { body: { action: "tick" } })).status, 200, "tick");
+  const rows = await auditRows(since);
+  const want = { "billing.plan_version": 1, "queue.replay": 2, "queue.tick": 1 };
+  for (const [action, n] of Object.entries(want)) {
+    const mine = rows.filter((x) => x.action === action);
+    eq(mine.length, n, `${action} rows`);
+    for (const x of mine) eq(`${x.actor}/${x.actor_kind}`, `${operatorId}/operator`, action);
+  }
+});
+
+await t("writes: the bootstrap caller is audited as bootstrap (incident, flag, support grant, billing override, plan version, tick)", async () => {
+  await new Promise((r) => setTimeout(r, 5)); // rows from the test before share no millisecond with these
+  const since = new Date().toISOString();
+  const as = (path, body) => call("bootstrap-before", path, "POST", { body });
+  eq((await as("incidents", { action: "open", title: "bootstrap probe" })).status, 200, "incident");
+  eq((await as("flags", { flag: { key: "ff_boot-probe" } })).status, 200, "flag set");
+  eq((await as("flags", { disable: { key: "ff_boot-probe" } })).status, 200, "flag disable");
+  eq((await as("flags", { remove: { key: "ff_boot-probe" } })).status, 200, "flag remove");
+  const grant = await as("support", { action: "grant", tenant: store.a.id, reason: "bootstrap probe", hours: 1 });
+  eq(grant.status, 200, "grant");
+  eq((await as("support", { action: "revoke", id: grant.body.id })).status, 200, "revoke");
+  eq((await as("billing", { action: "override", tenant: store.a.id, features: { orders_per_month: 5 }, reason: "bootstrap probe" })).status, 200, "override");
+  eq((await as("billing", { action: "clear_override", tenant: store.a.id })).status, 200, "clear override");
+  eq((await as("billing", { action: "plan_version", plan: "platperm-boot", spec: { name: "Boot", price: 1 } })).status, 200, "plan version");
+  eq((await as("queues", { action: "tick" })).status, 200, "tick");
+  const rows = await auditRows(since);
+  for (const action of ["tenant.status", "flags.set", "flags.emergency_disable", "flags.delete", "support.grant_created", "support.grant_revoked", "settings.write", "billing.plan_version", "queue.tick"]) {
+    const mine = rows.filter((x) => x.action === action);
+    ok(mine.length, `an audit row for ${action}`);
+    for (const x of mine) eq(`${x.actor}/${x.actor_kind}`, "bootstrap/bootstrap", action);
+  }
+  const row = (await db().execute({ sql: "SELECT operator FROM support_grants WHERE id = ?", args: [grant.body.id] })).rows[0];
+  eq(row?.operator, "bootstrap", "the grant row names bootstrap");
+});
+
+// --- the export link (exempt GET): its signature is its only auth --------------------
+await t("export link: a link signed with \"dev-only\" is refused; with no PLATFORM_SECRET no link is honoured or minted", async () => {
+  const { createHmac } = await import("node:crypto");
+  const id = store.a.id;
+  const exp = Math.floor(Date.now() / 1000) + 600;
+  const forged = `x.${exp}.${createHmac("sha256", "dev-only|export").update(`${id}|${exp}`).digest("hex").slice(0, 32)}`;
+  const get = (token) => call("signed-out", "tenants/[id]/export", "GET", { params: { id }, query: `token=${token}` });
+  eq((await get(forged)).status, 401, "a dev-only link with the secret set");
+  const minted = await call("operator", "tenants/[id]/export", "POST", { params: { id } });
+  eq(minted.status, 200, "mint");
+  const good = new URL(minted.body.url, "http://x").searchParams.get("token");
+  eq((await get(good)).status, 200, "a real link works");
+  const saved = process.env.PLATFORM_SECRET;
+  delete process.env.PLATFORM_SECRET;
+  try {
+    for (const [label, token] of [["dev-only", forged], ["previously minted", good]]) {
+      const res = await get(token);
+      eq(res.status, 503, `no secret: the ${label} link`);
+      ok(!res.text.includes(store.a.tenant.dbUrl) && !/"manifest"/.test(res.text), `no secret: the ${label} link returns no export`);
+    }
+    eq((await call("operator", "tenants/[id]/export", "POST", { params: { id } })).status, 503, "no secret: no link is minted");
+  } finally {
+    process.env.PLATFORM_SECRET = saved;
   }
 });
 

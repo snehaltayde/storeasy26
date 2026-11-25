@@ -24,11 +24,11 @@ export async function POST(request) {
   const body = await request.json().catch(() => ({}));
   try {
     if (body.action === "grant") {
-      const grant = await createSupportGrant({ tenantId: body.tenant, reason: body.reason, hours: body.hours, operator: auth.operator.id });
+      const grant = await createSupportGrant({ tenantId: body.tenant, reason: body.reason, hours: body.hours, operator: auth.operator });
       return NextResponse.json({ ok: true, ...grant });
     }
     if (body.action === "revoke") {
-      const ok = await revokeSupportGrant(String(body.id || ""), { operator: auth.operator.id });
+      const ok = await revokeSupportGrant(String(body.id || ""), { operator: auth.operator });
       return NextResponse.json({ ok }, { status: ok ? 200 : 404 });
     }
     return NextResponse.json({ error: "action must be grant|revoke" }, { status: 400 });

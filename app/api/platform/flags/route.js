@@ -24,9 +24,9 @@ export async function POST(request) {
   if (auth instanceof Response) return auth;
   const body = await request.json().catch(() => ({}));
   try {
-    if (body.flag) return NextResponse.json({ ok: true, ...(await setFlag({ ...body.flag, actor: auth.operator.id })) });
-    if (body.disable) return NextResponse.json({ ok: true, ...(await emergencyDisable(String(body.disable.key || ""), auth.operator.id)) });
-    if (body.remove) return NextResponse.json({ ok: true, ...(await deleteFlag(String(body.remove.key || ""), auth.operator.id)) });
+    if (body.flag) return NextResponse.json({ ok: true, ...(await setFlag({ ...body.flag, actor: auth.operator })) });
+    if (body.disable) return NextResponse.json({ ok: true, ...(await emergencyDisable(String(body.disable.key || ""), auth.operator)) });
+    if (body.remove) return NextResponse.json({ ok: true, ...(await deleteFlag(String(body.remove.key || ""), auth.operator)) });
     return NextResponse.json({ error: "Nothing to do" }, { status: 400 });
   } catch (e) {
     return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
