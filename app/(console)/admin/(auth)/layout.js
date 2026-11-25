@@ -9,6 +9,7 @@ import { ConsoleNotices } from "@/components/admin/shell/ConsoleNotices";
 // tokens, app/console.css); the support-access and incident notices show
 // above it, as they did before the shell moved them.
 export default async function AdminAuthLayout({ children }) {
+  // no member on this page, so incidents only: never the support-access banner (Phase 2 line 7)
   const [name, notices] = await Promise.all([tfetch(() => siteName()).catch(() => "Store"), consoleNotices()]);
   return (
     <div data-legacy className="contents">

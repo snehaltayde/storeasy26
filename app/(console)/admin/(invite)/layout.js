@@ -9,6 +9,7 @@ import { ConsoleNotices } from "@/components/admin/shell/ConsoleNotices";
 // the store's name. The support-access and incident notices keep their old
 // Banner look, so only they sit in a data-legacy region.
 export default async function AdminInviteLayout({ children }) {
+  // no member on this page, so incidents only: never the support-access banner (Phase 2 line 7)
   const [name, notices] = await Promise.all([tfetch(() => siteName()).catch(() => null), consoleNotices()]);
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-[640px] flex-col px-4 pt-8 pb-16 text-sm text-foreground md:px-6 md:pt-16">

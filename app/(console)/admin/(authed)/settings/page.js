@@ -1,107 +1,29 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
-import { settingsView } from "@/lib/admin/settings";
-import { currentTenant } from "@/lib/tenant-context.js";
-import { siteName } from "@/lib/site";
-import { db } from "@/lib/db";
-import { catalogSyncStatus } from "@/lib/sync";
 import { roleAllows } from "@/lib/platform/authz";
-import SettingsAdmin from "@/components/admin/SettingsAdmin";
-import OpsPanels from "@/components/admin/OpsPanels";
-import { PageHeader } from "@/components/console/PageHeader";
-import { Card } from "@/components/console/Card";
-import { PermissionNote } from "@/components/console/bits";
+import { settingsView } from "@/lib/admin/settings";
+import { currentTenant } from "@/lib/tenant-context";
 import { tfetch } from "@/lib/console-request";
-import BackToOnboarding, { fromOnboarding } from "@/components/admin/onboarding/BackToOnboarding";
+import { NoAccess } from "@/components/admin/settings/NoAccess";
+import { DetailsForm } from "@/components/admin/settings/DetailsForm";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Settings · Admin", robots: { index: false } };
 
-// Anchor targets: ids on the Cards below (Card adds scroll-mt-20 for the
-// sticky chrome). Order matches the on-page order of the sections.
-const SECTIONS = [
-  { id: "store-profile", label: "Store profile" },
-  { id: "commerce", label: "Commerce" },
-  { id: "payments", label: "Payments" },
-  { id: "tracking", label: "Tracking" },
-  { id: "shipping", label: "Shipping" },
-  { id: "catalog-sync", label: "Products from Shopify" },
-  { id: "password", label: "Password" },
-  { id: "team", label: "Team" },
-  { id: "domains-seo", label: "Domains & SEO" },
-  { id: "privacy", label: "Privacy" },
-  { id: "audit-log", label: "Audit log" },
-  { id: "help", label: "Help" },
-];
-
-function SectionNav() {
-  return (
-    <nav
-      aria-label="Settings sections"
-      className="sticky top-[45px] z-10 -mx-4 mb-5 border-b border-edge bg-surface-muted/95 px-4 backdrop-blur sm:-mx-6 sm:px-6 md:top-0"
-    >
-      <div className="flex gap-1.5 overflow-x-auto py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {SECTIONS.map((s) => (
-          <a
-            key={s.id}
-            href={`#${s.id}`}
-            className="whitespace-nowrap rounded-ctl border border-edge bg-surface px-2.5 py-1 text-xs font-medium text-fg-muted focus-ring motion-safe:transition-colors hover:border-edge-strong hover:text-fg"
-          >
-            {s.label}
-          </a>
-        ))}
-      </div>
-    </nav>
-  );
-}
-
-export default async function AdminSettingsPage({ searchParams }) {
+// Settings → Details (Phase 2 line 7). Settings data is never read for a role
+// without settings.read; the form gets only its part of settingsView (presence
+// flags for secrets, never a value).
+export default async function SettingsDetailsPage() {
   const jar = await cookies();
-  const back = fromOnboarding(await searchParams) ? <BackToOnboarding /> : null;
-  // S34 (OP10): merchants sign in normally; an OPERATOR passes only under an
-  // active support grant (support role — read-only, PII-redacted).
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
-
-  // Phase 0 line 2 (S2): settings data is never fetched for a role without settings.read
-  if (!roleAllows(actor.role, "settings.read")) {
-    return (
-      <>
-        {back}
-        <PageHeader title="Settings" />
-        <Card>
-          <PermissionNote role={actor.role} need="view the store's settings" />
-        </Card>
-      </>
-    );
-  }
-
-  const [view, name, syncProgress] = await tfetch(async () => {
-    let counts = null;
-    try {
-      const [p, c] = await Promise.all([
-        db.selectFrom("products").select([(eb) => eb.fn.countAll().as("n"), (eb) => eb.fn.max("synced_at").as("last")]).executeTakeFirst(),
-        db.selectFrom("collections").select((eb) => eb.fn.countAll().as("n")).executeTakeFirst(),
-      ]);
-      counts = { products: Number(p?.n || 0), collections: Number(c?.n || 0), lastSyncedAt: p?.last || null };
-    } catch {
-      counts = null;
-    }
-    // GEN-02: the sync card reads the sync's own record
-    const sync = await catalogSyncStatus().catch(() => null);
-    return [settingsView(currentTenant(), { counts }), siteName(), sync?.view ?? null];
-  });
-
+  if (!roleAllows(actor.role, "settings.read")) return <NoAccess role={actor.role} />;
+  const v = await tfetch(() => settingsView(currentTenant()));
   return (
     <>
-      {back}
-      <PageHeader title="Settings" description="Store configuration — changes go live without a deploy." />
-      <SectionNav />
-      <SettingsAdmin initial={view} syncProgress={syncProgress} canRunSync={roleAllows(actor.role, "sync.run")} />
-      {/* S43: Team (MC23) · Domains & SEO (MC21) · Privacy
-          (MC25) · Audit (MC26) · Help (MC27) */}
-      <OpsPanels role={actor.role} />
+      <h2 className="mb-4 text-[1.125rem] font-semibold">Details</h2>
+      <DetailsForm initial={{ readOnly: v.readOnly, identity: v.identity, domains: v.domains, shopify: v.shopify }} role={actor.role} />
     </>
   );
 }

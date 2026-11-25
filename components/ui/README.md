@@ -8,7 +8,8 @@ names (`scripts/test-console-ui.js` checks both).
 In here: `button`, `input`, `progress`, `separator`, `skeleton`, `tooltip`, `sheet`, `dialog`,
 `dropdown-menu`, `avatar`, `sidebar`, `radio-group`, `label`, `alert-dialog`, `badge`, `table`
 (its `containerClassName` styles the scroll box), `textarea`, `card`, `tabs`, `select`, `switch`,
-`checkbox`, `popover` (the last six from Phase 2 line 0), the `use-mobile` hook and `utils.js`
+`checkbox`, `popover` (the last six from Phase 2 line 0), `alert` (Phase 2 line 7; with
+`warning`, `info` and `success` tones like the Badge's), the `use-mobile` hook and `utils.js`
 (`cn`). Our own parts built from these live in `components/kit/` (docs/UI.md "Components"). Their tokens live in `app/console.css` under `.console` /
 `.console.dark`. Add `.console` to the console root `<body>` to use them.
 

@@ -88,14 +88,14 @@ await t("every item is listed with its own fix: the home line first; checkout of
   const m = O.openStep(closed(), "owner");
   eq(m.facts.items.map((i) => i.id), ["home", "payment", "privacy", "returns", "test_order", "catalog", "contact", "design"], "order:");
   const pay = itemOf(m, "payment");
-  eq(pay.fixes.map((f) => [f.kind, f.label, f.href ?? null, f.allowed]), [["cod_on", "Turn on checkout", null, true], ["link", "Add Razorpay keys", "/admin/settings?from=onboarding#payments", true]], "payment:");
+  eq(pay.fixes.map((f) => [f.kind, f.label, f.href ?? null, f.allowed]), [["cod_on", "Turn on checkout", null, true], ["link", "Add Razorpay keys", "/admin/settings/checkout?from=onboarding", true]], "payment:");
   eq(pay.message, O.OPEN_WORDS.checkoutOff, "checkout-off words:");
   eq(itemOf(m, "privacy").fixes.map((f) => [f.kind, f.policyKind, f.allowed]), [["policy_start", "privacy", true]], "privacy:");
   const r = itemOf(m, "returns").fixes[0];
   eq([r.kind, r.label, r.docId, r.revision, r.editHref, r.allowed, r.markRead.label, r.markRead.allowed], ["policy_read", "Read it", "doc_ret", 3, "/admin/editor?doc=doc_ret", true, "I've read it", true], "returns starter:");
   ok(itemOf(m, "privacy").legalNote && itemOf(m, "returns").legalNote, "not legal advice on both");
   eq(itemOf(m, "test_order").fixes.map((f) => [f.kind, f.href ?? null]), [["link", "/admin/editor"], ["test_order", null]], "test order:");
-  eq(itemOf(m, "catalog").fixes.map((f) => [f.kind, f.href]), [["link", "/admin/settings?from=onboarding#catalog-sync"]], "catalog:");
+  eq(itemOf(m, "catalog").fixes.map((f) => [f.kind, f.href]), [["link", "/admin/settings/sync?from=onboarding"]], "catalog:");
   eq([itemOf(m, "contact").fixes.map((f) => f.kind), itemOf(m, "contact").message], [["contact_form"], O.OPEN_WORDS.contactMissing], "contact:");
   eq(itemOf(m, "design").fixes.map((f) => [f.kind, f.href, f.allowed]), [["link", "/admin/editor?doc=doc_design", true]], "design:");
   ok(!JSON.stringify(m).includes("razorpay_key"), "no key field anywhere");
@@ -103,7 +103,7 @@ await t("every item is listed with its own fix: the home line first; checkout of
 
 await t("payment: COD only -> the info line and the same optional Razorpay link; billing paused -> Billing with ?from=onboarding; Shopify checkout -> Storeasy's team fixes this; maintenance the same", async () => {
   const cod = O.openStep(closed({ opening: { items: [{ id: "payment", level: "info", title: "Cash on delivery only", message: "m", href: O.FIX_HREFS.payments, who: null }] } }), "owner");
-  eq(itemOf(cod, "payment").fixes.map((f) => [f.kind, f.label, f.href]), [["link", "Add Razorpay keys", "/admin/settings?from=onboarding#payments"]], "cod:");
+  eq(itemOf(cod, "payment").fixes.map((f) => [f.kind, f.label, f.href]), [["link", "Add Razorpay keys", "/admin/settings/checkout?from=onboarding"]], "cod:");
   const bill = O.openStep(closed({ opening: { items: [{ id: "payment", level: "block", title: "Payments are paused", message: "m", href: O.FIX_HREFS.billing, who: null }] } }), "owner");
   eq(itemOf(bill, "payment").fixes.map((f) => [f.kind, f.href]), [["link", "/admin/billing?from=onboarding"]], "billing:");
   const shop = O.openStep(closed({ opening: { items: [{ id: "payment", level: "block", title: "x", message: "m", href: null, who: "support" }, { id: "maintenance", level: "warn", title: "y", message: "m", href: null, who: "support" }] } }), "owner");
@@ -153,6 +153,7 @@ await t("done (open store): 'Your store is open.', the store address and the liv
   eq([viaSteps.state, viaSteps.facts.storeAddress, viaSteps.facts.liveUrl], ["done", "acme.test", "/x"], "through deriveSteps:");
   eq(S.WORDS.open, O.OPEN_WORDS, "steps.js words are open-step's:");
   eq(O.fromOnboarding("/admin/settings#payments"), "/admin/settings?from=onboarding#payments", "fromOnboarding:");
+  eq(O.fromOnboarding("/admin/settings/checkout"), "/admin/settings/checkout?from=onboarding", "fromOnboarding on a tab:");
 });
 
 // =========================================================================================

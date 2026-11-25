@@ -85,11 +85,11 @@ export async function openStepStage(drill) {
   drill.check(Boolean(cfg1) && m && m.item("payment")?.level === "info", "'Turn on checkout' sets cash on delivery and payment stops blocking", { checkout: cfg1?.checkout_mode, payment: m?.item("payment")?.level });
   await page.locator('[data-onboarding="panel"] [data-opening-item="payment"]').getByRole("link", { name: "Add Razorpay keys", exact: true }).waitFor({ timeout: 30_000 });
   await itemLi(page, "payment").getByRole("link", { name: "Add Razorpay keys", exact: true }).click();
-  await page.waitForURL((u) => new URL(u).pathname === "/admin/settings" && new URL(u).searchParams.get("from") === "onboarding", { timeout: 60_000 });
+  await page.waitForURL((u) => new URL(u).pathname === "/admin/settings/checkout" && new URL(u).searchParams.get("from") === "onboarding", { timeout: 60_000 });
   await settle(page);
   const back = page.getByRole("link", { name: "Back to onboarding", exact: true });
   await back.waitFor({ timeout: 30_000 });
-  drill.check(new URL(page.url()).hash === "#payments", "'Add Razorpay keys' opens Settings at Payments with 'Back to onboarding' (no key is taken in onboarding)", page.url());
+  drill.check(new URL(page.url()).pathname === "/admin/settings/checkout", "'Add Razorpay keys' opens Settings at Checkout and payments with 'Back to onboarding' (no key is taken in onboarding)", page.url());
   await drill.screenshot(page, "j-settings-back-1440");
   await back.click();
   await page.waitForURL((u) => new URL(u).pathname === "/admin/onboarding" && new URL(u).searchParams.get("step") === "open", { timeout: 60_000 });

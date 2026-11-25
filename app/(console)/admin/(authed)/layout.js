@@ -66,7 +66,7 @@ export default async function AdminAuthedLayout({ children }) {
     const stores = await listMyStores(actor).catch(() => []);
     return [siteName(), currentTenant()?.id || null, badges, account, stores];
   }).catch(() => ["Store", null, {}, null, []]);
-  const notices = await consoleNotices();
+  const notices = await consoleNotices({ member: actor });
 
   return (
     <AdminShell

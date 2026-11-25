@@ -269,7 +269,7 @@ export async function paymentStage(drill) {
   let p = await pressPublish(page);
   const pay = lv(p, "payment");
   const blocks = p.items.filter((i) => i.level === "block").map((i) => i.id);
-  drill.check(p.phase === "opening" && pay.level === "block" && /Checkout is turned off/.test(pay.text) && pay.link === "/admin/settings#commerce" && pay.linkText === "Open Settings", "checkout off: the panel shows the payment block with 'Open Settings' to /admin/settings#commerce", pay);
+  drill.check(p.phase === "opening" && pay.level === "block" && /Checkout is turned off/.test(pay.text) && pay.link === "/admin/settings/checkout" && pay.linkText === "Open Settings", "checkout off: the panel shows the payment block with 'Open Settings' to /admin/settings/checkout", pay);
   drill.check(blocks.length === 1 && blocks[0] === "payment" && lv(p, "privacy").level === "info" && lv(p, "returns").level === "info", "payment is the only block (the saved policy pages go live too)", levels(p));
   drill.check(p.open?.disabled === true, "Open can't be pressed while checkout is off", p.open);
   await drill.screenshot(page, "d-panel-checkout-off-1440");

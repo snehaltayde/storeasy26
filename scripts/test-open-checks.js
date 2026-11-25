@@ -173,7 +173,7 @@ function checkWords(report, label) {
 // ---- a. payment (always) ------------------------------------------------------------------
 console.log("— payment blocks, flag or not, confirm or not");
 const PAY_CASES = [
-  ["checkout_mode 'disabled'", { checkout_mode: "disabled" }, { href: "/admin/settings#commerce", who: null }],
+  ["checkout_mode 'disabled'", { checkout_mode: "disabled" }, { href: "/admin/settings/checkout", who: null }],
   ["checkout_mode 'shopify'", { checkout_mode: "shopify" }, { href: null, who: "support" }],
   ["billing degraded", { billing: { status: "halted", plan: "starter" } }, { href: "/admin/billing", who: null }],
 ];
@@ -225,7 +225,7 @@ await t("a. maintenance on PLUS checkout_mode 'disabled' is still 409 STORE_CANN
     const r = await publishSet(pay, [PAY_HOME], { checkOpening: true, confirmOpen: true });
     eq([r.status, r.body.code], [409, "STORE_CANNOT_TAKE_PAYMENT"], "maintenance + disabled:");
     const it = byId(r.body.report);
-    eq([it.payment.level, it.payment.href], ["block", "/admin/settings#commerce"], "the real cause:");
+    eq([it.payment.level, it.payment.href], ["block", "/admin/settings/checkout"], "the real cause:");
     eq([it.maintenance.level, it.maintenance.who, it.maintenance.href], ["warn", "support", null], "maintenance:");
     eq(it.maintenance.message, Open.WORDS.maintenance, "maintenance words:");
     eq(await livePointer(pay), null, "nothing is live:");
@@ -268,7 +268,7 @@ await t("e. with checkOpening, founder-saved privacy and 'terms' pages (and the 
   checkWords(r.body.report, "confirm");
   eq(byId(r.body.report).test_order.message, Onb.TEST_ORDER_CLOSED_HINT, "test order words are onboarding's:");
   eq(byId(r.body.report).test_order.href, "/admin/editor", "test order link:");
-  eq(byId(r.body.report).contact.href, "/admin/settings#store-profile", "contact link:");
+  eq(byId(r.body.report).contact.href, "/admin/settings", "contact link:");
   eq(await livePointer(h), null, "nothing is live yet:");
   const opened = await publishSet(h, set, { checkOpening: true, confirmOpen: true });
   eq(opened.status, 200, `confirmOpen opens: ${JSON.stringify(opened.body).slice(0, 300)}`);
@@ -286,13 +286,13 @@ await t("words: no item ever says 'not implemented' or 'mode reserved', and bann
     const rep = await checks(h, []);
     checkWords(rep, `words ${JSON.stringify(cfg)}`);
     eq(byId(rep).catalog.level, "warn", "no products is a warn:");
-    eq(byId(rep).catalog.href, "/admin/settings#catalog-sync", "catalog link:");
+    eq(byId(rep).catalog.href, "/admin/settings/sync", "catalog link:");
     eq(byId(rep).catalog.message, Open.WORDS.catalogEmpty, "catalog words:");
   }
   h.tenant.config = { ...base, ...{} };
   const rep = await checks(h, []);
   eq(byId(rep).payment.level, "info", "no Razorpay keys: cash on delivery only:");
-  eq([byId(rep).payment.title, byId(rep).payment.href], ["Cash on delivery only", "/admin/settings#payments"], "COD-only item:");
+  eq([byId(rep).payment.title, byId(rep).payment.href], ["Cash on delivery only", "/admin/settings/checkout"], "COD-only item:");
   h.tenant.config = { ...base, razorpay_key_id: "rzp_test_dummy" };
   h.tenant.secrets = { ...h.tenant.secrets, razorpay_key_secret: "dummy-local-secret" };
   eq(byId(await checks(h, [])).payment.level, "ok", "with both Razorpay keys the payment item is ok:");
