@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
-import { sameOrigin } from "@/lib/origin-check";
+import { requireOperator } from "@/lib/platform/require-operator";
 import { buildTenantExport, mintExportToken, verifyExportToken } from "@/lib/platform/export";
 import { audit } from "@/lib/platform/audit";
 import { slog } from "@/lib/log";
@@ -16,13 +15,11 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function POST(request, { params }) {
-  if (!sameOrigin(request)) return NextResponse.json({ error: "Cross-origin request rejected" }, { status: 403 });
-  if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireOperator(request, { write: true });
+  if (auth instanceof Response) return auth;
   const { id } = await params;
   const token = await mintExportToken(id);
-  await audit({ actor: { kind: "operator", id: "operator" }, action: "tenant.status", tenantId: id, diff: { export_link_minted: true } });
+  await audit({ actor: auth.operator, action: "tenant.status", tenantId: id, diff: { export_link_minted: true } });
   slog("tenant_export_link", { tenant: id });
   return NextResponse.json({ ok: true, url: `/api/platform/tenants/${id}/export?token=${token}`, expires_in: "1 hour" });
 }

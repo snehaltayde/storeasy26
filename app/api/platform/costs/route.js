@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
+import { requireOperator } from "@/lib/platform/require-operator";
 import { costReport, setCostInputs } from "@/lib/platform/costs";
 import { patchTenant, getTenant } from "@/lib/platform/control";
 import { audit } from "@/lib/platform/audit";
@@ -14,21 +14,21 @@ import { audit } from "@/lib/platform/audit";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const authed = async (request) => verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value);
-
 export async function GET(request) {
-  if (!(await authed(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireOperator(request);
+  if (auth instanceof Response) return auth;
   const month = new URL(request.url).searchParams.get("month") || undefined;
   return NextResponse.json({ ok: true, report: await costReport(month) });
 }
 
 export async function POST(request) {
-  if (!(await authed(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireOperator(request, { write: true });
+  if (auth instanceof Response) return auth;
   const body = await request.json().catch(() => ({}));
   try {
     if (body.inputs) {
       const r = await setCostInputs(String(body.inputs.month || ""), body.inputs.totals, body.inputs.note);
-      await audit({ actor: "operator", action: "costs.inputs", resource: `costs:${r.month}`, diff: r.totals });
+      await audit({ actor: auth.operator, action: "costs.inputs", resource: `costs:${r.month}`, diff: r.totals });
       return NextResponse.json({ ok: true, ...r });
     }
     if (body.budget) {
@@ -39,7 +39,7 @@ export async function POST(request) {
       // only the budget: patchTenant merges it into the row as it is now. Spreading
       // the (cached) config here wrote back an old copy of every other setting.
       await patchTenant(t.id, { config: { cost_budget: amount } });
-      await audit({ actor: "operator", action: "costs.budget", tenantId: t.id, diff: { cost_budget: amount } });
+      await audit({ actor: auth.operator, action: "costs.budget", tenantId: t.id, diff: { cost_budget: amount } });
       return NextResponse.json({ ok: true, tenant: t.id, cost_budget: amount });
     }
     return NextResponse.json({ error: "Nothing to do" }, { status: 400 });

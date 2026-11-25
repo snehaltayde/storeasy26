@@ -1,6 +1,5 @@
 import { NextResponse, after } from "next/server";
-import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
-import { sameOrigin } from "@/lib/origin-check";
+import { requireOperator } from "@/lib/platform/require-operator";
 import { patchTenant, getTenant, listTenants, platformDb } from "@/lib/platform/control.js";
 import { audit } from "@/lib/platform/audit";
 import { startCatalogSync, KICK_BUDGET_MS } from "@/lib/platform/sync-jobs";
@@ -12,13 +11,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
 // GET — tenant DETAIL (S41 / OP03): lifecycle, config summary, secrets as a
 // PRESENCE MAP (which keys exist — values never leave the envelope), billing
 // snapshot, onboarding progress, provisioning history.
 export async function GET(request, { params }) {
-  if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
+  const auth = await requireOperator(request);
+  if (auth instanceof Response) return auth;
   const { id } = await params;
   const tenant = await getTenant(id, { fresh: true }); // the operator's next view after a save shows it
   if (!tenant) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -82,7 +80,7 @@ export async function GET(request, { params }) {
 const HOST_RE = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d{2,5})?$/;
 const bad = (error) => NextResponse.json({ ok: false, error }, { status: 400 });
 
-async function applyUpdate(id, u) {
+async function applyUpdate(id, u, operator) {
   // fresh: `site` below is merged from this read, so a cached copy would undo
   // a founder's save from the last 30 seconds (P1-FIX-C)
   const current = await getTenant(id, { fresh: true });
@@ -153,17 +151,17 @@ async function applyUpdate(id, u) {
     ...(Object.keys(secrets).length ? { secrets } : {}),
   });
   slog("tenant_updated", { tenant: id, changed });
-  await audit({ actor: { kind: "operator", id: "operator" }, action: "tenant.update", tenantId: id, diff: { changed } });
+  await audit({ actor: operator, action: "tenant.update", tenantId: id, diff: { changed } });
   return NextResponse.json({ ok: true, tenant: { id: t.id, name: t.name, domains: t.domains }, changed });
 }
 
 export async function PATCH(request, { params }) {
-  if (!sameOrigin(request)) return NextResponse.json({ error: "Cross-origin request rejected" }, { status: 403 });
-  if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
+  const auth = await requireOperator(request, { write: true });
+  if (auth instanceof Response) return auth;
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
   try {
-    if (body.update && typeof body.update === "object") return await applyUpdate(id, body.update);
+    if (body.update && typeof body.update === "object") return await applyUpdate(id, body.update, auth.operator);
     if (body.maintenance !== undefined) {
       const m = body.maintenance;
       const maintenance = m?.enabled
@@ -171,14 +169,14 @@ export async function PATCH(request, { params }) {
         : null;
       const t = await patchTenant(id, { config: { maintenance } });
       slog("tenant_maintenance", { tenant: id, enabled: !!maintenance });
-      await audit({ actor: { kind: "operator", id: "operator" }, action: "tenant.status", tenantId: id, diff: { maintenance: !!maintenance } });
+      await audit({ actor: auth.operator, action: "tenant.status", tenantId: id, diff: { maintenance: !!maintenance } });
       return NextResponse.json({ ok: true, tenant: { id: t.id, maintenance: t.config?.maintenance || null } });
     }
     if (!["active", "suspended"].includes(body.status))
       return NextResponse.json({ error: 'status must be "active" or "suspended" (or pass maintenance)' }, { status: 400 });
     const t = await patchTenant(id, { status: body.status });
     slog("tenant_status_changed", { tenant: id, status: body.status });
-    await audit({ actor: { kind: "operator", id: "operator" }, action: "tenant.status", tenantId: id, diff: { status: body.status } });
+    await audit({ actor: auth.operator, action: "tenant.status", tenantId: id, diff: { status: body.status } });
     return NextResponse.json({ ok: true, tenant: { id: t.id, status: t.status } });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 404 });
@@ -191,8 +189,8 @@ export async function PATCH(request, { params }) {
 // run's progress; the queue finishes it.
 export async function POST(request, { params }) {
   const started = Date.now();
-  if (!sameOrigin(request)) return NextResponse.json({ error: "Cross-origin request rejected" }, { status: 403 });
-  if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
+  const auth = await requireOperator(request, { write: true });
+  if (auth instanceof Response) return auth;
   const { id } = await params;
   const tenant = await getTenant(id);
   if (!tenant) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -204,7 +202,7 @@ export async function POST(request, { params }) {
       startCatalogSync({ startedBy: "operator", defer: after, budgetMs: Math.max(0, KICK_BUDGET_MS - (Date.now() - started)) }),
     );
     slog("tenant_sync_queued", { tenant: id, run: run.id, action, via: "platform-console" });
-    await audit({ actor: { kind: "operator", id: "operator" }, action: "tenant.sync", tenantId: id, diff: { run: run.id, action } });
+    await audit({ actor: auth.operator, action: "tenant.sync", tenantId: id, diff: { run: run.id, action } });
     return NextResponse.json(
       { ok: true, queued: true, action, runId: run.id, products: Number(run.products_fetched || 0), collections: Number(run.collections_fetched || 0) },
       { status: 202 },

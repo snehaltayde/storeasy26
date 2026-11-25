@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
+import { requireOperator } from "@/lib/platform/require-operator";
 import { listTenants, getTenant } from "@/lib/platform/control.js";
 import { KITS, kitFor, kitUpgradeAvailable, themePinOf } from "@/lib/themes/kits";
 
@@ -15,9 +15,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
-  if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireOperator(request);
+  if (auth instanceof Response) return auth;
   const tenants = [];
   for (const t of await listTenants()) {
     const full = await getTenant(t.id);

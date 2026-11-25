@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
+import { requireOperator } from "@/lib/platform/require-operator";
 import { listTenants, getTenant } from "@/lib/platform/control";
 import { forEachActiveTenant } from "@/lib/platform/ops";
 import { loadMigrations } from "@/lib/platform/migrate";
@@ -22,10 +22,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(request) {
-  if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+  const auth = await requireOperator(request);
+  if (auth instanceof Response) return auth;
   const rows = await listTenants();
   const repoHead = (await loadMigrations("tenant")).at(-1)?.id || "0001_baseline";
 

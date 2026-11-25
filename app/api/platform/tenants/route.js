@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
+import { requireOperator } from "@/lib/platform/require-operator";
 import { listTenants, getTenant } from "@/lib/platform/control.js";
 import { withTenant } from "@/lib/tenant-context.js";
 import { db } from "@/lib/db";
@@ -12,8 +12,6 @@ import { db } from "@/lib/db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-
-const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
 async function tenantHealth(row) {
   const tenant = await getTenant(row.id);
@@ -41,7 +39,8 @@ async function tenantHealth(row) {
 }
 
 export async function GET(request) {
-  if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
+  const auth = await requireOperator(request);
+  if (auth instanceof Response) return auth;
   const rows = await listTenants();
   const health = await Promise.all(rows.map(tenantHealth));
   return NextResponse.json({

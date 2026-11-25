@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
+import { requireOperator } from "@/lib/platform/require-operator";
 import { billingOverview, ensureDefaultPlans, setOverride, clearOverride, listPlans, createPlanVersion } from "@/lib/platform/billing";
 import { billingProviderConfigured } from "@/lib/platform/razorpay-billing";
 import { slog } from "@/lib/log";
@@ -11,10 +11,9 @@ import { slog } from "@/lib/log";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const authed = async (request) => verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value);
-
 export async function GET(request) {
-  if (!(await authed(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireOperator(request);
+  if (auth instanceof Response) return auth;
   await ensureDefaultPlans();
   const overview = await billingOverview();
   return NextResponse.json({
@@ -26,19 +25,20 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  if (!(await authed(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireOperator(request, { write: true });
+  if (auth instanceof Response) return auth;
   const body = await request.json().catch(() => ({}));
   try {
     if (body.action === "override") {
       await setOverride(String(body.tenant || ""), {
         features: body.features,
         reason: body.reason,
-        setBy: "operator",
+        setBy: auth.operator.id,
         expiresAt: body.expiresAt || null,
       });
       slog("billing_override_set", { tenant: body.tenant });
     } else if (body.action === "clear_override") {
-      await clearOverride(String(body.tenant || ""), { setBy: "operator" });
+      await clearOverride(String(body.tenant || ""), { setBy: auth.operator.id });
       slog("billing_override_cleared", { tenant: body.tenant });
     } else if (body.action === "plan_version") {
       // versioned catalog: a change = a NEW version; old versions stay for

@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
+import { requireOperator } from "@/lib/platform/require-operator";
 import { upsertCaseStudy, setCaseStudyPublished, listCaseStudies, deleteCaseStudy } from "@/lib/platform/case-studies";
 import { audit } from "@/lib/platform/audit";
-import { sameOrigin } from "@/lib/origin-check";
 
 // Case-study authoring for the marketing site's /customers (MK06), operator
 // only. Publishing is gated in lib/platform/case-studies.js; every save,
@@ -13,32 +12,30 @@ import { sameOrigin } from "@/lib/origin-check";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const OPERATOR = { kind: "operator", id: "operator" };
-const authed = async (request) => verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value);
-
 export async function GET(request) {
-  if (!(await authed(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireOperator(request);
+  if (auth instanceof Response) return auth;
   return NextResponse.json({ ok: true, caseStudies: await listCaseStudies() });
 }
 
 export async function POST(request) {
-  if (!sameOrigin(request)) return NextResponse.json({ error: "Cross-origin request rejected" }, { status: 403 });
-  if (!(await authed(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireOperator(request, { write: true });
+  if (auth instanceof Response) return auth;
   const body = await request.json().catch(() => ({}));
   try {
     if (body?.case_study) {
       const caseStudy = await upsertCaseStudy(body.case_study);
-      await audit({ actor: OPERATOR, action: "case_study.save", resource: `case:${caseStudy.slug}`, tenantId: null });
+      await audit({ actor: auth.operator, action: "case_study.save", resource: `case:${caseStudy.slug}`, tenantId: null });
       return NextResponse.json({ ok: true, caseStudy });
     }
     if (body?.publish_case) {
       const r = await setCaseStudyPublished(String(body.publish_case.slug || ""), !!body.publish_case.published);
-      await audit({ actor: OPERATOR, action: "case_study.publish", resource: `case:${r.slug}`, diff: { published: r.published }, tenantId: null });
+      await audit({ actor: auth.operator, action: "case_study.publish", resource: `case:${r.slug}`, diff: { published: r.published }, tenantId: null });
       return NextResponse.json({ ok: true, ...r });
     }
     if (body?.delete_case) {
       const r = await deleteCaseStudy(String(body.delete_case.slug || ""));
-      await audit({ actor: OPERATOR, action: "case_study.delete", resource: `case:${r.slug}`, tenantId: null });
+      await audit({ actor: auth.operator, action: "case_study.delete", resource: `case:${r.slug}`, tenantId: null });
       return NextResponse.json({ ok: true, ...r });
     }
     return NextResponse.json({ error: "Nothing to do" }, { status: 400 });

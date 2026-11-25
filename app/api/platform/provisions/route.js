@@ -1,6 +1,5 @@
 import { NextResponse, after } from "next/server";
-import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
-import { sameOrigin } from "@/lib/origin-check";
+import { requireOperator } from "@/lib/platform/require-operator";
 import { listProvisionRuns, runProvision, compensateProvision, getProvisionRun } from "@/lib/platform/provision";
 import { resumeSignupRun, signupsForRuns } from "@/lib/platform/signup-provision";
 import { runJobById } from "@/lib/platform/worker";
@@ -22,26 +21,26 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 const JOB_SOURCES = ["signup", "operator"];
 
 export async function GET(request) {
-  if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
+  const auth = await requireOperator(request);
+  if (auth instanceof Response) return auth;
   const runs = await listProvisionRuns({ limit: 20 });
   const signups = await signupsForRuns(runs.filter((r) => JOB_SOURCES.includes(r.params?.source)).map((r) => r.id));
   return NextResponse.json({ ok: true, runs: runs.map((r) => (signups[r.id] ? { ...r, signup: signups[r.id] } : r)) });
 }
 
 export async function POST(request) {
-  if (!sameOrigin(request)) return NextResponse.json({ error: "Cross-origin request rejected" }, { status: 403 });
-  if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
+  const auth = await requireOperator(request, { write: true });
+  if (auth instanceof Response) return auth;
   const body = await request.json().catch(() => ({}));
   try {
     if (body.action === "resume" && JOB_SOURCES.includes((await getProvisionRun(String(body.run || "")))?.params?.source)) {
       const q = await resumeSignupRun(String(body.run));
       if (q?.jobId) after(() => runJobById(q.jobId, { budgetMs: 50_000 }));
       slog("provision_resumed", { run: body.run, queued: Boolean(q?.jobId) });
-      await audit({ actor: { kind: "operator", id: "operator" }, action: "tenant.provision", resource: `run:${body.run}`, diff: { resumed: true, queued: Boolean(q?.jobId), signup: q?.signupId || null } });
+      await audit({ actor: auth.operator, action: "tenant.provision", resource: `run:${body.run}`, diff: { resumed: true, queued: Boolean(q?.jobId), signup: q?.signupId || null } });
       if (!q?.jobId) return NextResponse.json({ error: q?.lapsed ? "This signup has lapsed; the founder has to start again." : q?.already === "done" ? "This signup is already done." : "No signup uses this run." }, { status: 422 });
       return NextResponse.json({ ok: true, queued: true, signup: q.signupId });
     }
@@ -49,13 +48,13 @@ export async function POST(request) {
       // dbToken may be re-supplied for adopted-db runs (tokens are never stored)
       const r = await runProvision({ dbToken: body.dbToken || null }, { resumeRunId: String(body.run || "") });
       slog("provision_resumed", { run: body.run, status: r.run.status });
-      await audit({ actor: { kind: "operator", id: "operator" }, action: "tenant.provision", resource: `run:${body.run}`, diff: { resumed: true, status: r.run.status } });
+      await audit({ actor: auth.operator, action: "tenant.provision", resource: `run:${body.run}`, diff: { resumed: true, status: r.run.status } });
       return NextResponse.json({ ok: true, run: r.run, failedStep: r.failedStep || null, generated: r.generated || null });
     }
     if (body.action === "compensate") {
       const r = await compensateProvision(String(body.run || ""));
       slog("provision_compensate", { run: body.run });
-      await audit({ actor: { kind: "operator", id: "operator" }, action: "tenant.provision", resource: `run:${body.run}`, diff: { compensated: true } });
+      await audit({ actor: auth.operator, action: "tenant.provision", resource: `run:${body.run}`, diff: { compensated: true } });
       return NextResponse.json({ ok: true, run: r.run, notes: r.notes });
     }
     return NextResponse.json({ error: "action must be resume or compensate" }, { status: 400 });

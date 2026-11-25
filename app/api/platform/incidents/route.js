@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
-import { sameOrigin } from "@/lib/origin-check";
+import { requireOperator } from "@/lib/platform/require-operator";
 import { platformDb } from "@/lib/platform/control";
 import { audit } from "@/lib/platform/audit";
 import { slog } from "@/lib/log";
@@ -16,17 +15,17 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const incId = () => "inc_" + Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, "0")).join("");
-const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
 export async function GET(request) {
-  if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
+  const auth = await requireOperator(request);
+  if (auth instanceof Response) return auth;
   const r = await platformDb().execute("SELECT * FROM incidents ORDER BY created_at DESC LIMIT 50");
   return NextResponse.json({ ok: true, incidents: r.rows.map((row) => ({ ...row })) });
 }
 
 export async function POST(request) {
-  if (!sameOrigin(request)) return NextResponse.json({ error: "Cross-origin request rejected" }, { status: 403 });
-  if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
+  const auth = await requireOperator(request, { write: true });
+  if (auth instanceof Response) return auth;
   const body = await request.json().catch(() => ({}));
   const db = platformDb();
   try {
@@ -39,7 +38,7 @@ export async function POST(request) {
         args: [id, body.tenant || null, title, String(body.internalNote || "").slice(0, 2000) || null, String(body.publicMessage || "").slice(0, 500) || null, new Date().toISOString()],
       });
       slog("incident_opened", { id, tenant: body.tenant || "platform" });
-      await audit({ actor: { kind: "operator", id: "operator" }, action: "tenant.status", resource: `incident:${id}`, diff: { opened: title.slice(0, 80) } });
+      await audit({ actor: auth.operator, action: "tenant.status", resource: `incident:${id}`, diff: { opened: title.slice(0, 80) } });
     } else if (body.action === "update") {
       await db.execute({
         sql: "UPDATE incidents SET public_message = COALESCE(?, public_message), internal_note = COALESCE(?, internal_note) WHERE id = ?",
@@ -48,7 +47,7 @@ export async function POST(request) {
     } else if (body.action === "resolve") {
       await db.execute({ sql: "UPDATE incidents SET status = 'resolved', resolved_at = ? WHERE id = ?", args: [new Date().toISOString(), String(body.id || "")] });
       slog("incident_resolved", { id: body.id });
-      await audit({ actor: { kind: "operator", id: "operator" }, action: "tenant.status", resource: `incident:${body.id}`, diff: { resolved: true } });
+      await audit({ actor: auth.operator, action: "tenant.status", resource: `incident:${body.id}`, diff: { resolved: true } });
     } else {
       return NextResponse.json({ error: "unknown action" }, { status: 400 });
     }

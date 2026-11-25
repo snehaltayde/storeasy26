@@ -1,6 +1,6 @@
 import { NextResponse, after } from "next/server";
-import { platformOperator, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
-import { sameOrigin, requestOrigin } from "@/lib/origin-check";
+import { requireOperator } from "@/lib/platform/require-operator";
+import { requestOrigin } from "@/lib/origin-check";
 import { checkOperatorStore, createOperatorStore, operatorStoreStatus } from "@/lib/platform/operator-stores";
 import { runJobById } from "@/lib/platform/worker";
 
@@ -9,18 +9,18 @@ import { runJobById } from "@/lib/platform/worker";
 //   GET  ?signup=sgn_…                -> progress, then the done screen's facts
 //   POST { storeName, email, founderName, shop, slug, clientId, clientSecret }
 //        -> { ok, signup } (the provision_store job runs in after())
-// Operators only (platformOperator); the POST is audited with the operator's
+// Operators only (requireOperator); the POST is audited with the operator's
 // id. No answer carries a token, an invite link or the app's secret.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const json = (body, status = 200) => NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
-const unauthorized = () => json({ error: "Unauthorized" }, 401);
 
 export async function GET(request) {
-  const operator = await platformOperator(request.cookies.get(PLATFORM_COOKIE)?.value);
-  if (!operator) return unauthorized();
+  const auth = await requireOperator(request);
+  if (auth instanceof Response) return auth;
+  const { operator } = auth;
   const sp = request.nextUrl.searchParams;
   try {
     if (sp.get("signup")) {
@@ -35,9 +35,9 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  if (!sameOrigin(request)) return json({ error: "Cross-origin request rejected" }, 403);
-  const operator = await platformOperator(request.cookies.get(PLATFORM_COOKIE)?.value);
-  if (!operator) return unauthorized();
+  const auth = await requireOperator(request, { write: true });
+  if (auth instanceof Response) return auth;
+  const { operator } = auth;
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") return json({ error: "Fill in the form, then press Create store." }, 400);
   let r;

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
-import { sameOrigin } from "@/lib/origin-check";
+import { requireOperator } from "@/lib/platform/require-operator";
 import { listJobs, listInbox, queueStats, replayJob, replayInbox } from "@/lib/platform/jobs";
 import { runDueJobs, TICK_BUDGET_MS } from "@/lib/platform/worker";
 
@@ -15,10 +14,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
 export async function GET(request) {
-  if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
+  const auth = await requireOperator(request);
+  if (auth instanceof Response) return auth;
   const p = request.nextUrl.searchParams;
   const [stats, jobs, inbox] = await Promise.all([
     queueStats(),
@@ -29,8 +27,8 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  if (!sameOrigin(request)) return NextResponse.json({ error: "Cross-origin request rejected" }, { status: 403 });
-  if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
+  const auth = await requireOperator(request, { write: true });
+  if (auth instanceof Response) return auth;
   const body = await request.json().catch(() => ({}));
   try {
     if (body.action === "replay" && body.kind === "job") {

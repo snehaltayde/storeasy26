@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
-import { sameOrigin } from "@/lib/origin-check";
+import { requireOperator } from "@/lib/platform/require-operator";
 import { forEachActiveTenant, runAsTenant } from "@/lib/platform/ops";
 import { listPrivacyRequests, redactCustomer } from "@/lib/privacy";
 import { db } from "@/lib/db";
@@ -15,10 +14,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
 export async function GET(request) {
-  if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
+  const auth = await requireOperator(request);
+  if (auth instanceof Response) return auth;
   const results = await forEachActiveTenant(async () => listPrivacyRequests({ limit: 30 }));
   const requests = [];
   for (const r of results) {
@@ -33,8 +31,8 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  if (!sameOrigin(request)) return NextResponse.json({ error: "Cross-origin request rejected" }, { status: 403 });
-  if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
+  const auth = await requireOperator(request, { write: true });
+  if (auth instanceof Response) return auth;
   const body = await request.json().catch(() => ({}));
   if (body.action !== "redact") return NextResponse.json({ error: "action must be redact" }, { status: 400 });
   try {
@@ -51,7 +49,7 @@ export async function POST(request) {
       return r;
     });
     slog("privacy_redact_operator", { tenant: body.tenant, request: body.requestId });
-    await audit({ actor: { kind: "operator", id: "operator" }, action: "tenant.status", tenantId: body.tenant, diff: { privacy_redact: body.requestId } });
+    await audit({ actor: auth.operator, action: "tenant.status", tenantId: body.tenant, diff: { privacy_redact: body.requestId } });
     return NextResponse.json({ ok: true, result });
   } catch (e) {
     return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
