@@ -3,6 +3,17 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-26 Phase 8 line 5: scheduled bundles and collection offers (on the owner's behalf)
+
+- **Schema:** migration 0038 adds `bundles.starts_at` and `bundles.ends_at` (UTC ISO, nullable, additive). Readers ask `hasColumns` first (`lib/bundles.js bundleScheduleReady`, `lib/commerce/bundle-read.js`); a store one migration behind keeps unscheduled bundles and refuses a window in words. The migration runner applies files by id, so the 0036/0037 gap until lines 2 and 3 merge is harmless.
+- **Permissions:** no new action. Scheduling a bundle or offer is `offers.write` (staff, admin, owner); support gets 403 on every write. The collection picker is `GET /api/admin/offers/targets` under `offers.read` (support reads it; it lists only this store's collections). Audit `offers.write` diffs now carry `starts_at`, `ends_at` and `target: "collection"`.
+- **Windows** are stored as canonical `toISOString()` (`lib/offers/validate.js scheduleWindow`), so every reader's string compare is exact to the millisecond: start inclusive, end exclusive. Any parseable date is accepted on the API and converted; start must be before end.
+- **Bundle = its offer row:** `syncOffer` writes the bundle's window onto `bundle-<id>`; an edit that leaves the window out keeps it, `null` clears a bound. Once 0038 is in, any difference between the two windows is `not_ready` / `offer_differs` (the old `offer_scheduled` detail now only shows on a store without 0038; `test-commerce-exp` updated).
+- **New bundle state `scheduled`** (on, offer in sync, outside its window) in `bundlesByIds`: hidden from shoppers like a turned-off bundle (not a shown state; publish checks warn with `BUNDLE_DISABLED`; the editor chip says Scheduled). `getBundle` returns nothing outside the window, so the bundle page is the not-found page.
+- **Collection target** `{ kind: "collection", value: <handle>, label: <title> }`: a cart line's collections come from this store's `collection_products` (one subquery in `cartRows` and in the simulator's `exampleCatalog`); saving refuses a handle this store doesn't have, so another store's handle never matches. Collections are engine-only on cart lines (never in the shopper's cart JSON).
+- **Words:** the founder's sentence is "Buy 2+ from Summer Edit, get 10% off" (plan words); the default shopper title is "Buy 2+, save more" (the cart adds "· 10% off", so a default never repeats the percent), BXGY "Buy 2, get 1 free". The collection page note shows offer titles only.
+- **Bundle schedule UI** is in `BundleEditor.js` (the console's bundle screen), not `BundleForm.js` (now only the editor's inline create, which goes live at once); the plan's file list named the latter. The list chip uses `offerScheduleStatus` (draft / scheduled / active / expired, plus paused), worded by StatusBadge.
+
 ## 2026-11-26 Phase 8 India and global checkout plan (on the owner's behalf)
 
 - **Schema:** four additive tenant migrations: 0036 `cod_otps` + `orders.payment_discount`, `cod_verified_at`; 0037 `customer_addresses` (copies each `default_address`); 0038 `bundles.starts_at`, `ends_at`; 0039 the order's market, rate and base-currency amounts. No platform migration.

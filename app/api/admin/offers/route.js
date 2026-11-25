@@ -38,7 +38,7 @@ export const POST = tenantHandler(async (request) => {
       endsAt: body.endsAt || null,
     });
     slog("offer_saved", { offer_id: saved.id, type: saved.type, enabled: saved.enabled });
-    await audit({ actor: auth.actor, action: "offers.write", resource: `offer:${saved.id}`, diff: { type: saved.type, enabled: saved.enabled } });
+    await audit({ actor: auth.actor, action: "offers.write", resource: `offer:${saved.id}`, diff: { type: saved.type, enabled: saved.enabled, starts_at: saved.starts_at ?? null, ends_at: saved.ends_at ?? null, ...(saved.config?.target?.kind === "collection" ? { target: "collection" } : {}) } });
     return NextResponse.json({ ok: true, offer: saved });
   } catch (e) {
     if (e?.code === "OFFER_INVALID") return NextResponse.json({ error: String(e.message), errors: e.errors }, { status: 422 });

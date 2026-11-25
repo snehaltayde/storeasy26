@@ -14,6 +14,8 @@ import { PageHeader } from "@/components/kit/page-header";
 import { RoleGate } from "@/components/kit/role-gate";
 import { StatusBadge } from "@/components/kit/status-badge";
 import { stateLine } from "@/lib/commerce/bundle-words";
+import { offerScheduleStatus } from "@/lib/admin/schedule";
+import { scheduleText } from "@/components/admin/offers/ScheduleField";
 import { ConfirmAction, sendJson } from "@/components/admin/offers/ConfirmAction";
 import { allWords, componentLabel } from "./BundleCheck";
 
@@ -31,7 +33,7 @@ const HOME_UNKNOWN = "We couldn't check whether your home page uses this bundle.
 // asks first unless the home page was read and does not use it
 export const disableAsksFirst = (b) => b?.usedOnHome !== false;
 
-export function BundlesList({ initialBundles, currency, role, canWrite }) {
+export function BundlesList({ initialBundles, currency, timezone = "UTC", role, canWrite }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState(null);
@@ -119,16 +121,21 @@ export function BundlesList({ initialBundles, currency, role, canWrite }) {
       cell: (b) => {
         const ready = b.compat?.state === "available";
         const why = allWords(b.compat?.reasons, currency);
+        // Phase 8 line 5: draft / scheduled / active / expired from its window
+        const schedule = offerScheduleStatus({ enabled: !!b.enabled, starts_at: b.starts_at ?? null, ends_at: b.ends_at ?? null });
         return (
           <div className="min-w-44 space-y-1 py-1 whitespace-normal">
             <div className="flex flex-wrap items-center gap-1.5">
-              <StatusBadge kind="bundle" status={b.enabled ? "live" : "off"} />
+              <span data-bundle-schedule={schedule}>
+                <StatusBadge kind="bundle" status={schedule} />
+              </span>
               {b.usedOnHome && (
                 <span className="inline-flex items-center gap-1 text-xs text-muted-foreground" data-bundle-home>
                   <House aria-hidden className="size-3.5" /> On your home page
                 </span>
               )}
             </div>
+            {(b.starts_at || b.ends_at) && <p className="text-xs leading-snug text-muted-foreground">{scheduleText(b.starts_at, b.ends_at, timezone)}</p>}
             {!ready && (
               <p className="text-xs leading-snug text-warning-text" data-bundle-reason>
                 {b.enabled ? stateLine(b.compat?.state, b.compat?.reasons, { currency }) : why.length ? `Can't be shown yet: ${why.join(". ")}.` : "Can't be shown yet."}

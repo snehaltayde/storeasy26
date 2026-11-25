@@ -503,6 +503,7 @@ export const BUNDLE_CHIPS = Object.freeze({
   not_ready: { tone: "warning", words: "Not ready" },
   no_saving: { tone: "danger", words: "Hidden: no saving" },
   disabled: { tone: "neutral", words: "Turned off" },
+  scheduled: { tone: "neutral", words: "Scheduled" }, // Phase 8 line 5: on, outside its dates
   missing: { tone: "danger", words: "Deleted" },
 });
 

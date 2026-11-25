@@ -389,7 +389,9 @@ await t("P5: bundlesByIds gives available, sold_out, no_saving, not_ready (offer
   const st = (id) => map.get(id).state;
   same(ids.map(st), ["available", "sold_out", "no_saving", "not_ready", "not_ready", "not_ready", "not_ready", "not_ready", "disabled", "missing"], "states");
   const detail = (id) => map.get(id).reasons.find((r) => r.kind === "not_synced")?.detail;
-  same([M.offerGone, M.offerOff, M.offerSched, M.offerPrice].map(detail), ["offer_missing", "offer_disabled", "offer_scheduled", "offer_differs"], "offer reasons");
+  // Phase 8 line 5: with the bundle window (0038), an offer row window that
+  // differs from its bundle's (here: the bundle has none) is offer_differs
+  same([M.offerGone, M.offerOff, M.offerSched, M.offerPrice].map(detail), ["offer_missing", "offer_disabled", "offer_differs", "offer_differs"], "offer reasons");
   ok(map.get(M.rawdup).reasons.some((r) => r.kind === "duplicate" && r.index === 1), "duplicate reason");
   eq(detail(M.rawdup), undefined, "the raw duplicate's offer is in sync: only the duplicate makes it not ready");
   const a = map.get(M.avail);

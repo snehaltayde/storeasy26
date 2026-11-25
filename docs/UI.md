@@ -371,3 +371,12 @@ Each Phase 3 line fills only its own sub-heading.
 - **Buy bar:** padding also clears the left and right safe-area insets (landscape), bottom inset unchanged; the button is 44px.
 - **Progress bar:** the fill uses accent-strong on a bordered track so it reads in pulse and glow and with each flagship's accent; goal ticks are dark with a surface ring so they show on the fill and on the track.
 - Unchanged: copy, `data-*` attributes, behaviour, console components (the kit's own focus ring already applies).
+
+## Scheduled bundles and collection offers (Phase 8 line 5)
+
+- **Bundle editor** (`components/admin/bundles/BundleEditor.js`): a "When shoppers see it" card under Price with the offers' `ScheduleField` (Starts / Ends, optional, in the store's time zone, which the hint names). An end at or before the start shows "The end must be after the start." under the fields and Save stays off. The header chip is the schedule state.
+- **Bundles list** (`BundlesList.js`): the State column's chip is `offerScheduleStatus` (Draft, Off, Scheduled, Live, Ended; `data-bundle-schedule`), with "Runs from 1 Dec, 10:00 am to 8 Dec, 10:00 am." under it when a window is set.
+- **Offer editor:** "What is it for?" gains "Products in a collection" (`target-collection`), a picker of the store's collections by title with each one's product count ("No collections in your store yet. Make one in Shopify, then sync." when there are none). The sentence reads "Buy 2+ from Summer Edit, get 10% off"; Try it builds its example carts from that collection's products.
+- **Storefront collection page:** `components/CollectionOfferNote.js` under the description, one pill per live collection offer showing its title only ("Buy 2+, save more"); nothing when none is live. `data-collection-offer-note`.
+- **Bundle outside its window:** its page is the store's 404 and its cards are hidden (state `scheduled`); the editor's bundle chip says Scheduled.
+- Needs the design pass (`ui-designer`): the bundle editor's schedule card, the list's schedule line, and the collection note pill.

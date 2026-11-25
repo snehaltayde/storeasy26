@@ -17,6 +17,8 @@ import { StatusBadge } from "@/components/kit/status-badge";
 import { useToast } from "@/components/kit/toast";
 import { ConfirmAction, sendJson, useLeaveGuard } from "@/components/admin/offers/ConfirmAction";
 import { RefCombobox, loadVariants } from "@/components/admin/offers/RefCombobox";
+import { ScheduleField, isoToZoned, zonedToIso } from "@/components/admin/offers/ScheduleField";
+import { offerScheduleStatus } from "@/lib/admin/schedule";
 import { BundleCheck, allWords, applyPick, componentLabel, emptyQuantity, isPickedVariant, quantityFrom, rowWords } from "./BundleCheck";
 
 // Create or edit one bundle (Phase 2 line 4) on POST /api/admin/bundles: a
@@ -35,15 +37,20 @@ const HOME_GOES = "Shoppers will stop seeing this bundle on your home page right
 const rowsFrom = (items, components) =>
   (items || []).filter((c) => c?.variantId).map((c, i) => ({ variantId: c.variantId, quantity: c.quantity ?? 1, label: componentLabel(components?.[i]) }));
 
-export function BundleEditor({ initial = null, initialCheck = null, currency, role, canWrite }) {
+export function BundleEditor({ initial = null, initialCheck = null, currency, timezone = "UTC", role, canWrite }) {
   const router = useRouter();
   const toast = useToast();
   const ro = !canWrite;
-  const start = useRef({ title: initial?.title || "", description: initial?.description || "", price: initial?.bundle_price != null ? String(initial.bundle_price) : "", rows: rowsFrom(initial?.items, initialCheck?.components) });
+  const start = useRef({ title: initial?.title || "", description: initial?.description || "", price: initial?.bundle_price != null ? String(initial.bundle_price) : "", rows: rowsFrom(initial?.items, initialCheck?.components), startsAt: isoToZoned(initial?.starts_at, timezone), endsAt: isoToZoned(initial?.ends_at, timezone) });
   const [title, setTitle] = useState(start.current.title);
   const [description, setDescription] = useState(start.current.description);
   const [price, setPrice] = useState(start.current.price);
   const [rows, setRows] = useState(start.current.rows);
+  // Phase 8 line 5: when shoppers see it, in the store's time (ScheduleField),
+  // sent as UTC ISO and mirrored onto the bundle's offer row by the server
+  const [when, setWhen] = useState({ startsAt: start.current.startsAt, endsAt: start.current.endsAt });
+  const win = { starts_at: zonedToIso(when.startsAt, timezone), ends_at: zonedToIso(when.endsAt, timezone) };
+  const windowBad = Boolean(win.starts_at && win.ends_at && win.starts_at >= win.ends_at);
   const [turnOn, setTurnOn] = useState(false);
   const key = JSON.stringify([rows.map((r) => [r.variantId, r.quantity]), price]);
   const startKey = useRef(key);
@@ -54,7 +61,7 @@ export function BundleEditor({ initial = null, initialCheck = null, currency, ro
   const [busy, setBusy] = useState(false);
   const [askDelete, setAskDelete] = useState(false);
   const seq = useRef(0);
-  const dirty = JSON.stringify({ title, description, price, rows }) !== JSON.stringify(start.current) || turnOn;
+  const dirty = JSON.stringify({ title, description, price, rows, ...when }) !== JSON.stringify(start.current) || turnOn;
   const leaving = useLeaveGuard(dirty && !ro);
 
   const unpicked = rows.some((r) => !isPickedVariant(r.variantId));
@@ -96,7 +103,7 @@ export function BundleEditor({ initial = null, initialCheck = null, currency, ro
   const reasons = current?.reasons || [];
   const passes = current?.state === "available";
   const labelOf = (r, i) => r.label || componentLabel(current?.components?.[i]) || null;
-  const canSave = !busy && rows.length > 0 && !blank && !unpicked && title.trim() && price !== "" && (initial ? dirty : true);
+  const canSave = !busy && rows.length > 0 && !blank && !unpicked && title.trim() && price !== "" && !windowBad && (initial ? dirty : true);
 
   const back = (message) => {
     leaving.current = true;
@@ -109,7 +116,7 @@ export function BundleEditor({ initial = null, initialCheck = null, currency, ro
     setBusy(true);
     setErrors(null);
     try {
-      const base = { title, description, items: items(), bundle_price: Number(price) };
+      const base = { title, description, items: items(), bundle_price: Number(price), ...win };
       const r = initial
         ? await sendJson("/api/admin/bundles", "POST", { bundle: { id: initial.id, ...base, ...(turnOn ? { enable: true } : {}) } })
         : await sendJson("/api/admin/bundles", "POST", { create: { ...base, enable: turnOn, mustPass: turnOn } });
@@ -133,7 +140,9 @@ export function BundleEditor({ initial = null, initialCheck = null, currency, ro
         actions={
           initial ? (
             <>
-              <StatusBadge kind="bundle" status={initial.enabled ? "live" : "off"} />
+              <span data-bundle-schedule={offerScheduleStatus({ enabled: !!initial.enabled, starts_at: initial.starts_at ?? null, ends_at: initial.ends_at ?? null })}>
+                <StatusBadge kind="bundle" status={offerScheduleStatus({ enabled: !!initial.enabled, starts_at: initial.starts_at ?? null, ends_at: initial.ends_at ?? null })} />
+              </span>
               <RoleGate role={role} action="offers.write" mode="hide" reason={NO_WRITE}>
                 <Button type="button" variant="destructive" onClick={() => setAskDelete(true)}>
                   <Trash2 aria-hidden /> Delete
@@ -233,6 +242,21 @@ export function BundleEditor({ initial = null, initialCheck = null, currency, ro
             {!ro && !initial?.enabled && (
               <p id="turn-on-hint" className="text-xs text-muted-foreground">
                 {turnOn ? (passes ? "Shoppers see it as soon as you save." : "It turns on only if the check passes; otherwise nothing is saved and the reasons show here.") : "It is saved turned off. Turn it on from Bundles when you're ready."}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>When shoppers see it</CardTitle>
+            <CardDescription>Leave both empty to show it whenever it&rsquo;s on. Outside these dates the bundle&rsquo;s page and cards are hidden and the cart gives no bundle price.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2" data-bundle-window>
+            <ScheduleField startsAt={when.startsAt} endsAt={when.endsAt} tz={timezone} disabled={ro} onChange={(patch) => setWhen((w) => ({ ...w, ...patch }))} />
+            {windowBad && (
+              <p className="text-xs text-warning-text" data-bundle-window-reason>
+                The end must be after the start.
               </p>
             )}
           </CardContent>

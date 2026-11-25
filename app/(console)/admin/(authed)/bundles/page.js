@@ -7,6 +7,7 @@ import { listBundles, withComponentNames } from "@/lib/bundles";
 import { storeCurrency } from "@/lib/offers/catalog";
 import { BundlesList } from "@/components/admin/bundles/BundlesList";
 import { tfetch } from "@/lib/console-request";
+import { merchantTz } from "@/lib/reporting";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Bundles · Admin", robots: { index: false } };
@@ -20,9 +21,9 @@ export default async function AdminBundlesPage() {
   if (!actor) redirect("/admin/login");
   if (!roleAllows(actor.role, "offers.read")) return <NoAccess role={actor.role} page />;
   // each row's products by name (the list API answers ids and quantities only)
-  const { bundles, currency } = await tfetch(async () => {
+  const { bundles, currency, timezone } = await tfetch(async () => {
     const bundles = await withComponentNames(await listBundles());
-    return { bundles, currency: await storeCurrency() };
+    return { bundles, currency: await storeCurrency(), timezone: merchantTz() };
   });
-  return <BundlesList initialBundles={bundles} currency={currency} role={actor.role} canWrite={roleAllows(actor.role, "offers.write")} />;
+  return <BundlesList initialBundles={bundles} currency={currency} timezone={timezone} role={actor.role} canWrite={roleAllows(actor.role, "offers.write")} />;
 }

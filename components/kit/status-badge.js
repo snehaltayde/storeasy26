@@ -29,6 +29,11 @@ export const STATUS_WORDS = Object.freeze({
     scheduled: ["Scheduled", "info"],
     ended: ["Ended", "muted"],
     off: ["Off", "muted"],
+    // Phase 8 line 5: lib/admin/schedule.js offerScheduleStatus on a bundle row
+    draft: ["Draft", "muted"],
+    paused: ["Off", "muted"],
+    active: ["Live", "success"],
+    expired: ["Ended", "muted"],
   }),
   media: Object.freeze({
     live: ["In use", "success"],

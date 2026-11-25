@@ -7,6 +7,8 @@ import { getCollectionByHandle, getProductsInCollection, getCollectionTypeFacets
 import { numericId } from "@/lib/ids";
 import { abs } from "@/lib/site";
 import { tfetch } from "@/lib/storefront-request";
+import { collectionOfferTitles } from "@/lib/offers/store";
+import CollectionOfferNote from "@/components/CollectionOfferNote";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +76,9 @@ export default async function CollectionPage({ params, searchParams }) {
     ]);
     return { products, total, facets, template: surface.template };
   });
+  // Phase 8 line 5: the live collection offers' titles (never their targets);
+  // a failed read shows no note rather than failing the page
+  const offerTitles = await tfetch(() => collectionOfferTitles(handle)).catch(() => []);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   if (page > totalPages && total > 0) notFound();
   const filtered = Boolean(filters.type || filters.inStock || filters.sort !== "featured");
@@ -106,6 +111,7 @@ export default async function CollectionPage({ params, searchParams }) {
       {collection.description ? (
         <p className="mt-3 max-w-2xl text-sf-text-subtle">{collection.description}</p>
       ) : null}
+      <CollectionOfferNote titles={offerTitles} />
       <p className="mt-2 text-sm text-sf-text-faint">
         {total} {total === 1 ? "product" : "products"}
         {totalPages > 1 ? ` · page ${page} of ${totalPages}` : ""}

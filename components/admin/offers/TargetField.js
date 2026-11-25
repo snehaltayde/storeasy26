@@ -9,12 +9,22 @@ import { RefCombobox, loadProducts, loadVariants, valueLoader } from "./RefCombo
 // product, one size or option, products with a tag, products of one type. A
 // gift or a code is for the whole cart (the engine has no target for them),
 // and the form says so instead of offering a choice.
-//   options: { tags, types } from GET /api/admin/offers/targets, or null
+//   options: { tags, types, collections } from GET /api/admin/offers/targets, or null
 //   optionsError: why they did not load; onRetry loads them again
 export function TargetField({ form, set, targetLabel, onPicked, options, optionsError, onRetry, disabled = false }) {
   const choice = TARGET_CHOICES.find((c) => c.key === form.choice) || TARGET_CHOICES[0];
   const value = form.target?.value ?? null;
-  const pickText = form.target ? "Change" : form.choice === "tag" ? "Choose a tag" : form.choice === "type" ? "Choose a type" : form.choice === "variant" ? "Choose a size or option" : "Choose a product";
+  const pickText = form.target
+    ? "Change"
+    : form.choice === "tag"
+      ? "Choose a tag"
+      : form.choice === "type"
+        ? "Choose a type"
+        : form.choice === "collection"
+          ? "Choose a collection"
+          : form.choice === "variant"
+            ? "Choose a size or option"
+            : "Choose a product";
   const pick = (target) => {
     if (target.label) onPicked(target.value, target.label);
     set({ target });
@@ -33,6 +43,19 @@ export function TargetField({ form, set, targetLabel, onPicked, options, options
           Try again
         </button>
       </p>
+    );
+  } else if (form.choice === "collection") {
+    const list = options?.collections;
+    picker = (
+      <RefCombobox
+        label="The collection"
+        buttonText={pickText}
+        disabled={disabled || !options}
+        selectedId={value}
+        emptyText={list?.length === 0 ? "No collections in your store yet. Make one in Shopify, then sync." : "Nothing matches that search."}
+        load={valueLoader(list)}
+        onPick={(o) => pick({ kind: "collection", value: o.id, label: o.label })}
+      />
     );
   } else {
     const list = form.choice === "type" ? options?.types : options?.tags;

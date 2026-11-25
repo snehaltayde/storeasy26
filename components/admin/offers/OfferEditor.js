@@ -110,13 +110,13 @@ export function OfferEditor({ existing = null, offers = [], names = {}, currency
     setOptionsError(null);
     try {
       const data = await sendJson("/api/admin/offers/targets", "GET");
-      setTargetOptions({ tags: data.tags || [], types: data.types || [] });
+      setTargetOptions({ tags: data.tags || [], types: data.types || [], collections: data.collections || [] });
     } catch {
-      setOptionsError("Your tags and types couldn't load.");
+      setOptionsError(form.choice === "collection" ? "Your collections couldn't load." : "Your tags and types couldn't load.");
     }
   }
   useEffect(() => {
-    if ((form.choice === "tag" || form.choice === "type") && !targetOptions && !optionsError) loadTargetOptions();
+    if ((form.choice === "tag" || form.choice === "type" || form.choice === "collection") && !targetOptions && !optionsError) loadTargetOptions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.choice]);
 
@@ -154,7 +154,7 @@ export function OfferEditor({ existing = null, offers = [], names = {}, currency
     }
   }
 
-  const targetLabel = form.target ? (form.target.kind === "tag" || form.target.kind === "productType" ? form.target.value : allNames[form.target.value] || form.target.label || "The chosen product") : null;
+  const targetLabel = form.target ? (form.target.kind === "tag" || form.target.kind === "productType" ? form.target.value : allNames[form.target.value] || form.target.label || (form.target.kind === "collection" ? "The chosen collection" : "The chosen product")) : null;
   const primaryLabel = !existing ? "Start offer" : live ? "Update live offer" : "Save changes";
   const title = existing ? existing.label : "New offer";
   const setTier = (i, patch) => set({ tiers: form.tiers.map((x, j) => (j === i ? { ...x, ...patch } : x)) });

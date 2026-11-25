@@ -256,7 +256,10 @@ export async function loadVariants(q, parent) {
 }
 
 // a fixed list ({ value, count }), searched here: tags and product types
+// options [{ value, count, label? }]: a collection (Phase 8 line 5) shows and
+// searches by its title (label), and picks its handle (value)
 export const valueLoader = (options) => async (q) => {
   const needle = q.toLowerCase();
-  return (options || []).filter((o) => !needle || o.value.toLowerCase().includes(needle)).map((o) => ({ id: o.value, label: o.value, sub: `${o.count} product${o.count === 1 ? "" : "s"}` }));
+  const name = (o) => o.label || o.value;
+  return (options || []).filter((o) => !needle || name(o).toLowerCase().includes(needle)).map((o) => ({ id: o.value, label: name(o), sub: `${o.count} product${o.count === 1 ? "" : "s"}` }));
 };

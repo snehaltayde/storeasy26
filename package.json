@@ -32,6 +32,7 @@
     "test:offers-admin": "node scripts/test-offers-admin.js",
     "test:offer-form": "node scripts/test-offer-form.js",
     "test:offers-console": "node scripts/test-offers-console.js",
+    "test:offer-schedule": "node scripts/test-offer-schedule.js",
     "drill:offers": "node scripts/drills/run-isolated.mjs offers",
     "drill:mobile-cart": "node scripts/drills/run-isolated.mjs mobile-cart",
     "drill:checkout": "node scripts/drills/run-isolated.mjs checkout",

@@ -22,6 +22,10 @@ import { tenantHandler } from "@/lib/tenant-request";
 // GET and check also answer `currency` (the store's, for formatting) and the
 // structured `reasons` (lib/commerce/bundle-words.js turns them into words).
 // SLUG_TAKEN answers 409 and BUNDLE_INCOMPATIBLE 422, in plain words.
+// Phase 8 line 5: create and bundle also take starts_at / ends_at (UTC ISO,
+// start inclusive, end exclusive; null clears a bound, left out keeps it on
+// an edit), mirrored onto the bundle's offer row; the audit diff names them.
+// Scheduling is offers.write (staff, admin, owner); support gets 403.
 //   POST {enable:{id, enabled}}
 //   POST {remove:{id}}
 export const runtime = "nodejs";
@@ -60,8 +64,8 @@ export const POST = tenantHandler(async (request) => {
       const items = Array.isArray(c.items) ? c.items : [];
       // only picked variants: a typed handle is never guessed at here
       if (!pickedOnly(items)) return pickAgain();
-      const saved = await createBundle({ title: c.title, items, bundle_price: c.bundle_price, description: c.description, enable: !!c.enable, mustPass: !!c.mustPass });
-      await audit({ actor: auth.actor, action: "offers.write", resource: `bundle:${saved.slug}`, diff: { enabled: !!saved.enabled, components: items.length } });
+      const saved = await createBundle({ title: c.title, items, bundle_price: c.bundle_price, description: c.description, enable: !!c.enable, mustPass: !!c.mustPass, starts_at: c.starts_at ?? null, ends_at: c.ends_at ?? null });
+      await audit({ actor: auth.actor, action: "offers.write", resource: `bundle:${saved.slug}`, diff: { enabled: !!saved.enabled, components: items.length, starts_at: saved.starts_at ?? null, ends_at: saved.ends_at ?? null } });
       const { compat, ...bundle } = saved;
       return NextResponse.json({ ok: true, bundle, compat: { state: compat.state, reasons: compat.reasons }, currency: await storeCurrency() });
     }
@@ -71,8 +75,18 @@ export const POST = tenantHandler(async (request) => {
       const items = b.items;
       // P5-BUNDLEREAD: enable and description only when sent, so an edit
       // keeps a live bundle live and its description as it was
-      const saved = await upsertBundle({ id: b.id || null, slug: b.slug, title: b.title, description: "description" in b ? b.description : undefined, items, bundle_price: b.bundle_price, enable: "enable" in b ? !!b.enable : undefined });
-      await audit({ actor: auth.actor, action: "offers.write", resource: `bundle:${saved.slug}`, diff: { enabled: !!saved.enabled, components: (b.items || []).length } });
+      const saved = await upsertBundle({
+        id: b.id || null,
+        slug: b.slug,
+        title: b.title,
+        description: "description" in b ? b.description : undefined,
+        items,
+        bundle_price: b.bundle_price,
+        enable: "enable" in b ? !!b.enable : undefined,
+        starts_at: "starts_at" in b ? b.starts_at : undefined,
+        ends_at: "ends_at" in b ? b.ends_at : undefined,
+      });
+      await audit({ actor: auth.actor, action: "offers.write", resource: `bundle:${saved.slug}`, diff: { enabled: !!saved.enabled, components: (b.items || []).length, starts_at: saved.starts_at ?? null, ends_at: saved.ends_at ?? null } });
       return NextResponse.json({ ok: true, bundle: saved });
     }
     if (body.enable) {

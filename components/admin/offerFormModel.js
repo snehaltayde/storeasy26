@@ -14,6 +14,8 @@ export const TARGET_CHOICES = [
   { key: "variant", kinds: ["variantId"], label: "One size or option", hint: "Only that size or option counts." },
   { key: "tag", kinds: ["tag"], label: "Products with a tag", hint: "Every product with the tag you set in Shopify counts." },
   { key: "type", kinds: ["productType"], label: "Products of one type", hint: "Every product of the type you set in Shopify counts." },
+  // Phase 8 line 5: membership is the store's synced Shopify collection
+  { key: "collection", kinds: ["collection"], label: "Products in a collection", hint: "Every product in the collection, as it is in Shopify, counts." },
 ];
 export const choiceOf = (target) => TARGET_CHOICES.find((c) => c.kinds.includes(target?.kind))?.key || "product";
 

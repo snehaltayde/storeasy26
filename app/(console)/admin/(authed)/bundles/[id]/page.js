@@ -7,6 +7,7 @@ import { bundleCompat, listBundles } from "@/lib/bundles";
 import { storeCurrency } from "@/lib/offers/catalog";
 import { BundleEditor } from "@/components/admin/bundles/BundleEditor";
 import { tfetch } from "@/lib/console-request";
+import { merchantTz } from "@/lib/reporting";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Bundle · Admin", robots: { index: false } };
@@ -25,12 +26,13 @@ export default async function AdminBundlePage({ params }) {
   if (id === "new" && !canWrite) redirect("/admin/bundles");
   const data = await tfetch(async () => {
     const currency = await storeCurrency();
-    if (id === "new") return { bundle: null, check: null, currency };
+    const timezone = merchantTz();
+    if (id === "new") return { bundle: null, check: null, currency, timezone };
     const bundle = (await listBundles()).find((b) => b.id === id);
     if (!bundle) return null;
     const c = await bundleCompat({ items: bundle.items, bundle_price: bundle.bundle_price });
-    return { bundle, check: { ok: c.ok, state: c.state, reasons: c.reasons, components: c.components, componentsSum: c.componentsSum, saving: c.saving }, currency };
+    return { bundle, check: { ok: c.ok, state: c.state, reasons: c.reasons, components: c.components, componentsSum: c.componentsSum, saving: c.saving }, currency, timezone };
   });
   if (!data) notFound();
-  return <BundleEditor initial={data.bundle} initialCheck={data.check} currency={data.currency} role={actor.role} canWrite={canWrite} />;
+  return <BundleEditor initial={data.bundle} initialCheck={data.check} currency={data.currency} timezone={data.timezone} role={actor.role} canWrite={canWrite} />;
 }

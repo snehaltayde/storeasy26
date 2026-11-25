@@ -17,12 +17,17 @@
 // switch, Save or Delete; every control is a marked read, natively disabled or
 // RoleGate's; "Try it" answers; no non-GET request but the listed reads
 // (scripts/support/read-controls.js READ_POSTS). An unknown id is a 404.
+// Then the schedule stage (stage-schedule.mjs, Phase 8 line 5): staff
+// schedule a bundle for about two minutes out; the anonymous shopper doesn't
+// see it, then does; the owner adds a collection offer; the collection page
+// shows its title and the cart applies it.
 // Evidence: docs/cms-reviews/drills/OFFERS/ (results-main.json, screenshots).
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT } from "../../design-harness.js";
 import { runDrill, settle } from "../p3/lib.mjs";
 import { READ_POSTS } from "../../support/read-controls.js";
+import { scheduleStage } from "./stage-schedule.mjs";
 
 const DRILL_ID = "OFFERS";
 const port = String(process.env.ROLES_PORT || "").trim();
@@ -234,6 +239,8 @@ async function offers(drill) {
   const made = (await staffFlows(drill, staff)) || {};
   const support = await signIn(drill, "support");
   await supportPass(drill, support, made);
+  console.log("— stage schedule");
+  await scheduleStage(drill, staff);
 }
 
 runDrill({ id: DRILL_ID, part: "main", title: "OFFERS — offers and bundles on the new console UI" }, offers).then(
