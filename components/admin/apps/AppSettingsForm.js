@@ -39,7 +39,8 @@ function FieldError({ id, children }) {
   );
 }
 
-function PlainControl({ s, id, value, onChange, disabled, error }) {
+// line 2: also the placements card's settings fields
+export function PlainControl({ s, id, value, onChange, disabled, error }) {
   const describedBy = error ? `${id}-error` : undefined;
   if (s.kind === "boolean") {
     return <Switch id={id} checked={Boolean(value)} onCheckedChange={onChange} disabled={disabled} aria-describedby={describedBy} aria-invalid={Boolean(error)} />;

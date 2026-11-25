@@ -456,6 +456,91 @@ await t("install off, then on; the kill switch; then uninstall: each hides every
   eq(kept.length, 2, "the rows are kept, nothing deleted:");
 });
 
+await t("store B's owner, on B's host, asks for store A's install id: 404 on read and on change", async () => {
+  eq((await call("owner-b", "apps/[id]/placements", "GET", { host: hostB, params: { id: tbId } })).status, 404, "GET:");
+  eq((await call("owner-b", "apps/[id]/placements", "POST", { host: hostB, params: { id: tbId }, body: { block: "badges", state: "live" } })).status, 404, "POST:");
+});
+
+let tb2;
+const P2 = (caller, body) => call(caller, "apps/[id]/placements", body ? "POST" : "GET", { params: { id: tb2 }, ...(body ? { body } : {}) });
+await t("uninstall then install again: the old install's rows hold no place; a moved block goes after the live ones only, Move up is correct, and a no-op move writes no audit row", async () => {
+  const r = await call("owner", "apps", "POST", { body: { install: { pluginId: "trust-badges", scopes: [] } } });
+  eq(r.status, 200, r.text.slice(0, 200));
+  tb2 = r.body.install.id;
+  const fresh = await P2("owner");
+  ok(fresh.body.placements.every((p) => p.first && p.last), `alone in their slots (the uninstalled rows don't count): ${JSON.stringify(fresh.body.placements.map((p) => [p.first, p.last]))}`);
+  eq((await P2("owner", { block: "badges", slot: "storefront.pdp.below_fold" })).status, 200, "move to below the details:");
+  let list = (await P2("owner")).body.placements;
+  ok(!list[0].first && list[0].last && list[1].first && !list[1].last, "badges second, guarantee first");
+  const before = (await placementAudit()).length;
+  eq((await P2("owner", { block: "badges", move: "down" })).status, 409, "already last:");
+  eq((await placementAudit()).length, before, "no audit row for a no-op:");
+  eq((await P2("owner", { block: "badges", move: "up" })).status, 200, "move up:");
+  list = (await P2("owner")).body.placements;
+  ok(list[0].first && list[1].last, "badges first now");
+  const pos = await a.run(() => db.selectFrom("plugin_placements").select(["block_id", "position"]).where("install_id", "=", tb2).orderBy("block_id").execute());
+  eq(pos.map((x) => `${x.block_id}:${x.position}`).join(","), "badges:0,guarantee:1", "positions renumbered among installed apps only:");
+  eq((await P2("owner", { block: "badges", move: "up" })).status, 409, "already first:");
+  eq((await placementAudit()).length, before + 1, "one audit row for the one real move:");
+  for (const block of ["badges", "guarantee"]) eq((await P2("owner", { block, state: "live" })).status, 200, `${block} live:`);
+  eq(blocksIn(await pdp(productA)).join(","), "storefront.pdp.below_fold/badges,storefront.pdp.below_fold/guarantee", "rendered in that order:");
+});
+
+await t("a fourth Live block in one slot is refused in plain words; three show", async () => {
+  const undo = CAT.registerPlugin({
+    id: "more-notes",
+    name: "More notes",
+    version: "1.0.0",
+    summary: "s",
+    description: "d",
+    icon: "Puzzle",
+    author: { name: "T" },
+    scopes: [],
+    settings: [],
+    blocks: ["n1", "n2"].map((id) => ({ id, label: `Note ${id}`, primitive: "notice", slots: ["storefront.pdp.below_fold", "storefront.footer.above"], settings: [{ key: "text", kind: "text", max: 40, default: `Words ${id}` }] })),
+  });
+  try {
+    const r = await call("owner", "apps", "POST", { body: { install: { pluginId: "more-notes", scopes: [] } } });
+    eq(r.status, 200, r.text.slice(0, 200));
+    const id = r.body.install.id;
+    const N = (body) => call("owner", "apps/[id]/placements", "POST", { params: { id }, body });
+    eq((await N({ block: "n1", state: "live" })).status, 200, "third live:");
+    const full = await N({ block: "n2", state: "live" });
+    eq(full.status, 409, `fourth: ${full.text.slice(0, 200)}`);
+    eq(full.body.code, "SLOT_FULL", "code:");
+    ok(full.body.error.includes("already shows 3 blocks") && full.body.error.includes("Turn one of them off"), full.body.error);
+    eq((await N({ block: "n2", slot: "storefront.footer.above" })).status, 200, "an Off block may move there:");
+    eq((await N({ block: "n2", state: "live" })).status, 200, "live in the footer instead:");
+    const moveIn = await N({ block: "n2", slot: "storefront.pdp.below_fold" });
+    eq(moveIn.status, 409, "a live block can't move into a full slot:");
+    eq(blocksIn(await pdp(productA)).length, 3, "three show:");
+    eq((await call("owner", "apps/[id]", "POST", { params: { id }, body: { uninstall: true } })).status, 200, "uninstall:");
+  } finally {
+    undo();
+  }
+});
+
+await t("the kill switch fails closed for rendering: when the flags can't be read, no plugin block renders (logged); the page still renders", async () => {
+  eq(blocksIn(await pdp(productA)).length, 2, "two live first:");
+  PL.__setKillReader(async () => {
+    throw new Error("control plane down");
+  });
+  const lines = [];
+  const log = console.log;
+  console.log = (...x) => lines.push(x.join(" "));
+  let h;
+  try {
+    h = await pdp(productA);
+  } finally {
+    console.log = log;
+    PL.__setKillReader(null);
+  }
+  ok(h.includes("data-pdp-template"), "the page renders");
+  eq(blocksIn(h).length, 0, "no plugin block:");
+  ok(lines.some((l) => l.includes("plugin_kill_switch_unreadable")), "logged");
+  eq(blocksIn(await pdp(productA)).length, 2, "back once readable:");
+});
+
 await t("a database one migration behind (no plugin_placements): every slot renders nothing, the install still works", async () => {
   await b.run(async () => {
     await db.schema.dropTable("plugin_placements").execute();

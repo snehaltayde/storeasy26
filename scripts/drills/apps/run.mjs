@@ -6,6 +6,7 @@
 import { runDrill } from "../p3/lib.mjs";
 import { STAGES, consoleErrors, port } from "./lib.mjs";
 import "./stage-install.mjs";
+import "./stage-slots.mjs";
 import "./stage-webhooks.mjs";
 import "./stage-tokens.mjs";
 

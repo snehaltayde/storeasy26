@@ -6,21 +6,21 @@
 // order in that place, its own settings, and "Preview on store".
 //   GET  /api/admin/apps/<id>/placements (apps.read)
 //   POST the same, one change at a time (apps.manage)
-// A role without apps.manage sees the same rows as plain words, with no
-// control that would be refused.
+// A role without apps.manage sees the same rows with every write control
+// gated (RoleGate apps.manage: aria-disabled with the reason) and the
+// settings fields natively disabled.
 import { useCallback, useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/kit/toast";
+import { RoleGate } from "@/components/kit/role-gate";
+import { PlainControl } from "@/components/admin/apps/AppSettingsForm";
 import { roleAllows } from "@/lib/platform/authz";
 import { startDocumentsPreview } from "@/components/admin/editor/documentsApi";
 
@@ -38,28 +38,22 @@ async function ask(url, init) {
   return { ok: res.ok && body?.ok === true, body: body || { error: init ? SAVE_FAILED : UNREADABLE } };
 }
 
-function SettingsForm({ placement, canManage, busy, onSave, errors }) {
+const NO_MANAGE_WORDS = "Only an owner or admin can change where this app shows.";
+const same = (a, b) => (a ?? null) === (b ?? null);
+
+// The block's own settings, each with its proper control (text, number,
+// on/off, a choice), natively disabled for a role without apps.manage.
+function SettingsForm({ placement, role, canManage, busy, onSave, errors }) {
   const [values, setValues] = useState(() => ({ ...placement.settings }));
   useEffect(() => setValues({ ...placement.settings }), [placement.settings]);
   if (!placement.form.length) return null;
-  const changed = placement.form.some((f) => (values[f.key] ?? "") !== (placement.settings[f.key] ?? ""));
-  if (!canManage) {
-    return (
-      <dl className="grid gap-2 text-[0.8125rem] sm:grid-cols-[10rem_1fr]">
-        {placement.form.map((f) => (
-          <div key={f.key} className="contents">
-            <dt className="text-muted-foreground">{f.label}</dt>
-            <dd className="break-words">{placement.settings[f.key] || <span className="text-muted-foreground">Not set</span>}</dd>
-          </div>
-        ))}
-      </dl>
-    );
-  }
+  const changed = placement.form.some((f) => !same(values[f.key], placement.settings[f.key]));
   return (
     <form
       className="grid gap-3"
       onSubmit={(e) => {
         e.preventDefault();
+        if (!canManage) return;
         const out = {};
         for (const f of placement.form) {
           const v = typeof values[f.key] === "string" ? values[f.key].trim() : values[f.key];
@@ -76,11 +70,11 @@ function SettingsForm({ placement, canManage, busy, onSave, errors }) {
             <div key={f.key} className="grid gap-1.5">
               <Label htmlFor={id}>
                 {f.label}
-                {f.required ? null : <span className="font-normal text-muted-foreground"> (optional)</span>}
+                {f.required || f.kind === "boolean" ? null : <span className="font-normal text-muted-foreground"> (optional)</span>}
               </Label>
-              <Input id={id} name={f.key} value={values[f.key] ?? ""} maxLength={f.max} placeholder={f.placeholder} aria-invalid={err ? true : undefined} aria-describedby={err ? `${id}-err` : undefined} onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))} />
+              <PlainControl s={f} id={id} value={values[f.key]} onChange={(v) => setValues((x) => ({ ...x, [f.key]: v }))} disabled={!canManage || busy} error={err} />
               {err ? (
-                <p id={`${id}-err`} className="text-xs text-destructive">
+                <p id={`${id}-error`} className="text-xs text-destructive">
                   {err}
                 </p>
               ) : null}
@@ -89,17 +83,20 @@ function SettingsForm({ placement, canManage, busy, onSave, errors }) {
         })}
       </div>
       <div>
-        <Button type="submit" size="sm" disabled={busy || !changed} data-placement-save={placement.blockId}>
-          {busy ? "Saving…" : `Save ${placement.label.toLowerCase()}`}
-        </Button>
+        <RoleGate role={role} action="apps.manage" reason={NO_MANAGE_WORDS}>
+          <Button type="submit" size="sm" disabled={busy || !changed} data-placement-save={placement.blockId}>
+            {busy ? "Saving…" : `Save ${placement.label.toLowerCase()}`}
+          </Button>
+        </RoleGate>
       </div>
     </form>
   );
 }
 
-function PlacementRow({ placement, previewPath, canManage, busy, errors, onChange, onPreview }) {
+function PlacementRow({ placement, previewPath, role, canManage, busy, errors, onChange, onPreview }) {
   const live = placement.state === "live";
   const slotLabel = placement.slots.find((s) => s.id === placement.slot)?.label || placement.slot;
+  const name = placement.label.toLowerCase();
   return (
     <li className="grid gap-4 py-4 first:pt-0 last:pb-0" data-placement={placement.blockId}>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -107,22 +104,32 @@ function PlacementRow({ placement, previewPath, canManage, busy, errors, onChang
           <p className="text-sm font-medium">{placement.label}</p>
           <p className="text-[0.8125rem] text-muted-foreground">{live ? `Shoppers see it: ${slotLabel.toLowerCase()}.` : "Shoppers don't see it."}</p>
         </div>
-        {canManage ? (
-          <div className="flex items-center gap-2">
-            <Label htmlFor={`pl-${placement.blockId}-live`} className="text-[0.8125rem] font-medium">
-              {live ? "Live" : "Off"}
-            </Label>
-            <Switch id={`pl-${placement.blockId}-live`} checked={live} disabled={busy} aria-label={`Show ${placement.label.toLowerCase()} on your store`} onCheckedChange={(on) => onChange({ state: on ? "live" : "off" })} />
-          </div>
-        ) : (
-          <Badge variant={live ? "success" : "muted"}>{live ? "Live" : "Off"}</Badge>
-        )}
+        <RoleGate role={role} action="apps.manage" reason={NO_MANAGE_WORDS}>
+          <Button
+            type="button"
+            id={`pl-${placement.blockId}-live`}
+            role="switch"
+            aria-checked={live}
+            aria-label={`Show ${name} on your store`}
+            variant={live ? "default" : "outline"}
+            size="sm"
+            disabled={busy}
+            data-placement-state={live ? "live" : "off"}
+            onClick={() => onChange({ state: live ? "off" : "live" })}
+          >
+            {live ? "Live" : "Off"}
+          </Button>
+        </RoleGate>
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="grid min-w-56 gap-1.5">
           <Label htmlFor={`pl-${placement.blockId}-slot`}>Where it shows</Label>
-          {canManage && placement.slots.length > 1 ? (
+          {placement.slots.length < 2 ? (
+            <p id={`pl-${placement.blockId}-slot`} className="text-sm">
+              {slotLabel}
+            </p>
+          ) : canManage ? (
             <Select value={placement.slot} disabled={busy} onValueChange={(slot) => onChange({ slot })}>
               <SelectTrigger id={`pl-${placement.blockId}-slot`} className="w-full">
                 <SelectValue />
@@ -136,21 +143,26 @@ function PlacementRow({ placement, previewPath, canManage, busy, errors, onChang
               </SelectContent>
             </Select>
           ) : (
-            <p id={`pl-${placement.blockId}-slot`} className="text-sm">
-              {slotLabel}
-            </p>
+            // the gated form of the place picker: the current place, aria-disabled with the reason
+            <RoleGate role={role} action="apps.manage" reason={NO_MANAGE_WORDS}>
+              <Button type="button" id={`pl-${placement.blockId}-slot`} variant="outline" className="w-full justify-start">
+                {slotLabel}
+              </Button>
+            </RoleGate>
           )}
         </div>
-        {canManage ? (
-          <div className="flex gap-1" role="group" aria-label={`Order of ${placement.label.toLowerCase()} in this place`}>
-            <Button type="button" variant="outline" size="icon" disabled={busy || placement.first} aria-label="Move up" onClick={() => onChange({ move: "up" })}>
+        <div className="flex gap-1" role="group" aria-label={`Order of ${name} in this place`}>
+          <RoleGate role={role} action="apps.manage" reason={NO_MANAGE_WORDS}>
+            <Button type="button" variant="outline" size="icon" disabled={busy || placement.first} aria-label="Move up" data-placement-move="up" onClick={() => onChange({ move: "up" })}>
               <ArrowUp />
             </Button>
-            <Button type="button" variant="outline" size="icon" disabled={busy || placement.last} aria-label="Move down" onClick={() => onChange({ move: "down" })}>
+          </RoleGate>
+          <RoleGate role={role} action="apps.manage" reason={NO_MANAGE_WORDS}>
+            <Button type="button" variant="outline" size="icon" disabled={busy || placement.last} aria-label="Move down" data-placement-move="down" onClick={() => onChange({ move: "down" })}>
               <ArrowDown />
             </Button>
-          </div>
-        ) : null}
+          </RoleGate>
+        </div>
         {previewPath ? (
           <Button type="button" variant="outline" size="sm" data-read-control="" data-placement-preview={placement.blockId} onClick={() => onPreview(previewPath)}>
             <ExternalLink data-icon="inline-start" />
@@ -163,7 +175,7 @@ function PlacementRow({ placement, previewPath, canManage, busy, errors, onChang
         )}
       </div>
 
-      <SettingsForm placement={placement} canManage={canManage} busy={busy} errors={errors} onSave={(settings) => onChange({ settings })} />
+      <SettingsForm placement={placement} role={role} canManage={canManage} busy={busy} errors={errors} onSave={(settings) => onChange({ settings })} />
     </li>
   );
 }
@@ -254,6 +266,7 @@ export default function PlacementsCard({ installId, role, installOff = false }) 
                   key={p.blockId}
                   placement={p}
                   previewPath={data.previewPaths?.[p.slot] || null}
+                  role={role}
                   canManage={canManage}
                   busy={busy === p.blockId}
                   errors={refusal?.blockId === p.blockId ? refusal.errors : null}
@@ -268,7 +281,7 @@ export default function PlacementsCard({ installId, role, installOff = false }) 
               </Alert>
             ) : null}
             {canManage ? null : <Separator />}
-            {canManage ? null : <p className="text-[0.8125rem] text-muted-foreground">Only an owner or admin can change where this app shows.</p>}
+            {canManage ? null : <p className="text-[0.8125rem] text-muted-foreground">{NO_MANAGE_WORDS}</p>}
           </>
         )}
       </CardContent>
