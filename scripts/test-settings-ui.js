@@ -417,7 +417,7 @@ await t("Shipping: the starter-rates notice and Keep these rates show only on st
   ok(ro.includes(STARTER_NOTICE) && !ro.includes(KEEP), "read-only: the notice, never the button:");
   const live = new RegExp(`<button(?![^>]*\\s(aria-disabled="true"|disabled=""))[^>]*>${KEEP}<`);
   ok(live.test(starter), "the admin's button is live:");
-  ok(!live.test(render({ shipping_is_default: true }, "staff")), "a role without settings.write never gets a live Keep button:");
+  for (const role of ["staff", "support"]) ok(!live.test(render({ shipping_is_default: true }, role)), `${role}, without settings.write, never gets a live Keep button:`);
 });
 await t("Shipping (clicked): Keep these rates PUTs the rates shown, only { shipping }", async () => {
   // a one-pass hook shim: state is its initial value; the tree is walked to the button
