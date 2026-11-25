@@ -254,7 +254,9 @@ export class Drill {
       const h = await page.evaluate(() => document.documentElement.scrollHeight);
       if (h > MAX_SHOT_HEIGHT) clip = { x: 0, y: 0, width: page.viewportSize().width, height: MAX_SHOT_HEIGHT };
     }
-    const raw = await page.screenshot({ fullPage, clip, animations: "disabled", caret: "hide" });
+    // caret "initial": hiding it makes Playwright inject caret-color on inputs, and a shot taken while a page
+    // hydrates then trips React's hydration-mismatch warning (Phase 6 studio drill); these shots are not compared
+    const raw = await page.screenshot({ fullPage, clip, animations: "disabled", caret: "initial" });
     const png = await compressShot(raw);
     const file = join(this.dir, `${name}.png`);
     writeFileSync(file, png);
