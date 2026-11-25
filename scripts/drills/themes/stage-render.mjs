@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { ROOT, harnessPorts } from "../../design-harness.js";
 import { ROLES_PROFILE } from "../../seed-roles-store.js";
 import { ORIGIN, open, signIn, stage, state } from "./lib.mjs";
+import { CONSENT_COOKIE, serializeConsent } from "../../../lib/track/names.js";
 
 const AURORA_TEXT = readFileSync(join(ROOT, "scripts/fixtures/themes/aurora.theme.json"), "utf8");
 const AURORA = JSON.parse(AURORA_TEXT);
@@ -78,6 +79,8 @@ stage("render", async (drill) => {
 
   // --- the anonymous shopper: a fresh context with no cookies ---
   const ctx = await drill.browser.newContext({ viewport: { width: 1280, height: 900 } });
+  // the shopper has already answered the cookie banner (declined), so it doesn't cover the cart's Checkout link
+  await ctx.addCookies([{ name: CONSENT_COOKIE, value: encodeURIComponent(serializeConsent({ analytics: false, marketing: false })), url: ORIGIN }]);
   ctx.setDefaultTimeout(30_000);
   const anon = await ctx.newPage();
   anon.on("pageerror", (e) => drill.check(false, "no page error for the shopper", String(e?.message || e).slice(0, 300)));
