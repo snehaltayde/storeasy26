@@ -429,7 +429,7 @@ await t("sync: a suspended store refuses (409); export mints an expiring link an
   await C.patchTenant(lone.id, { status: "active" });
   const r = await call("operator", "tenants/[id]/export", { method: "POST", params: { id: a.id } });
   eq(r.status, 200, r.text.slice(0, 200));
-  eq(r.body.expires_in, "1 hour");
+  eq(r.body.expires_in, "15 minutes");
   ok(r.body.url.startsWith(`/api/platform/tenants/${a.id}/export?token=x.`), r.body.url);
   eq((await lastAudit(a.id, "tenant.export")).actor, operatorId, "actor");
 });
