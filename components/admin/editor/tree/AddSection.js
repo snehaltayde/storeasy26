@@ -1,8 +1,10 @@
 "use client";
 
 // P3-TREE (ED-02, AU-04): the add-section picker. Prop-driven, no store.
+// Phase 2 line 6 (6a): on components/ui; storefront.write only (RoleGate,
+// hidden for anyone without it).
 //
-//   <AddSection type sections index collections body? onChange onSelect afterLabel open? />
+//   <AddSection type sections index collections body? onChange onSelect afterLabel open? role />
 // `body` (the whole draft, optional): a kind whose add would make it too big
 // to save is shown refused (P3-FIX3).
 //
@@ -14,14 +16,17 @@
 // `open` only sets how it first renders (tests and hosts that want it open).
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
-import { cx } from "@/components/console/cx";
-import { Button, IconButton } from "@/components/console/Button";
+import { cn } from "@/components/ui/utils";
+import { Button } from "@/components/ui/button";
+import { RoleGate } from "@/components/kit/role-gate";
+import { roleAllows } from "@/lib/platform/authz";
 import { add, addOptions } from "./treeModel";
 
-export default function AddSection({ type, sections, index, collections = null, body = null, onChange, onSelect, afterLabel = "", open: openAtFirst = false }) {
+export default function AddSection({ type, sections, index, collections = null, body = null, onChange, onSelect, afterLabel = "", open: openAtFirst = false, role = null }) {
   const [open, setOpen] = useState(!!openAtFirst);
-  const options = open ? addOptions(type, sections, index, { body }) : [];
   const where = afterLabel ? `Adds below the ${afterLabel}` : "Adds at the end";
+  if (!roleAllows(role, "storefront.write")) return null;
+  const options = open ? addOptions(type, sections, index, { body }) : [];
 
   const pick = (kind) => {
     const r = add(sections, kind, index, { type, collections, body });
@@ -33,17 +38,22 @@ export default function AddSection({ type, sections, index, collections = null, 
 
   if (!open) {
     return (
-      <Button size="sm" variant="secondary" icon={<Plus size={13} aria-hidden />} onClick={() => setOpen(true)} data-tree-add="">
-        Add a section
-      </Button>
+      <RoleGate role={role} action="storefront.write" mode="hide">
+        <Button size="sm" variant="outline" onClick={() => setOpen(true)} data-tree-add="">
+          <Plus aria-hidden />
+          Add a section
+        </Button>
+      </RoleGate>
     );
   }
   return (
-    <div role="group" aria-label="Add a section" className="rounded-ctl border border-edge bg-surface p-2" data-tree-picker="">
+    <div role="group" aria-label="Add a section" className="rounded-md border border-border bg-card p-2" data-tree-picker="">
       <div className="mb-1.5 flex items-center gap-2 px-1">
-        <p className="text-xs font-semibold text-fg">Add a section</p>
-        <p className="text-[11px] text-fg-subtle">{where}</p>
-        <IconButton className="ml-auto" label="Close the list" icon={<X size={13} aria-hidden />} onClick={() => setOpen(false)} />
+        <p className="text-xs font-semibold text-foreground">Add a section</p>
+        <p className="text-[11px] text-muted-foreground">{where}</p>
+        <Button variant="ghost" size="icon-xs" className="ml-auto" aria-label="Close the list" title="Close the list" onClick={() => setOpen(false)}>
+          <X aria-hidden />
+        </Button>
       </div>
       <ul className="space-y-0.5">
         {options.map((o) => (
@@ -54,13 +64,13 @@ export default function AddSection({ type, sections, index, collections = null, 
               title={o.reason || undefined}
               onClick={() => pick(o.kind)}
               data-kind={o.kind}
-              className={cx(
-                "flex w-full flex-col items-start rounded-ctl px-2 py-1.5 text-left focus-ring motion-safe:transition-colors",
-                o.ok ? "hover:bg-surface-sunken" : "cursor-not-allowed opacity-60",
+              className={cn(
+                "flex w-full flex-col items-start rounded-md px-2 py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring motion-safe:transition-colors",
+                o.ok ? "hover:bg-muted" : "cursor-not-allowed opacity-60",
               )}
             >
-              <span className="text-sm font-medium text-fg">{o.label}</span>
-              <span className="text-xs text-fg-muted">{o.ok ? o.placeholder : o.reason}</span>
+              <span className="text-sm font-medium text-foreground">{o.label}</span>
+              <span className="text-xs text-muted-foreground">{o.ok ? o.placeholder : o.reason}</span>
             </button>
           </li>
         ))}

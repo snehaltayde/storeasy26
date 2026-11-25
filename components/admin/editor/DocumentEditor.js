@@ -2,9 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader } from "@/components/console/PageHeader";
-import { Banner } from "@/components/console/Banner";
-import { Button } from "@/components/console/Button";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { cn } from "@/components/ui/utils";
+import { RoleGate } from "@/components/kit/role-gate";
 import * as documentsApi from "./documentsApi";
 import { createDocumentStore } from "./store";
 import SectionTree from "./tree/SectionTree";
@@ -22,7 +25,7 @@ import RecentlyPublished from "./publish/RecentlyPublished";
 import { createPublishFlow } from "./publish/publishModel";
 import { SwitcherView, ProductCounts } from "./Switcher";
 import PreviewPane from "./PreviewPane";
-import StatusLine from "./StatusLine";
+import StatusLine, { Notice } from "./StatusLine";
 import {
   WORDS,
   ENTITY_TYPES,
@@ -120,6 +123,9 @@ const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const noSub = () => () => {};
 const noState = () => null;
 const ROUTE_FAMILY = { page: "page", campaign: "campaign", journal: "journal" };
+// Phase 2 line 6 (6a): the phone tabs (below 768px)
+const PANES = ["sections", "edit", "preview"];
+const PANE_WORDS = { sections: "Sections", edit: "Edit", preview: "Preview" };
 
 function makeTabId() {
   try {
@@ -163,6 +169,10 @@ export function EditorView({
   productsState = { status: "ready", more: false },
   productFilter = "all",
   entityBusy = false,
+  role = null,
+  paneTab = "edit",
+  tabletPreview = false,
+  showArchived = false,
   on = {},
 }) {
   // P4-FIX3: while the store still holds the document opened before (see
@@ -257,133 +267,150 @@ export function EditorView({
     return <SettingsForm key={`doc-${state.id}`} type={type} value={body} issues={issues} focusRequest={focusRequest} context={context} onChange={(_next, m) => on.edit?.({ sectionId: null, path: m.path, value: m.value })} />;
   };
 
+  const canWrite = can?.write === true;
+  const canPublish = can?.publish === true;
+  const tab = PANES.includes(paneTab) ? paneTab : "edit";
+  const ready = Boolean(state) && !staleEntity;
+  const loading = load.status === "loading" || (!state && load.status === "ready");
+
   const actions = state && (
-    <div className="flex flex-wrap items-start gap-3" data-editor-actions="">
+    <div className="flex flex-wrap items-start gap-2" data-editor-actions="">
       {publish && <PublishPanelView state={publish.state} canConfirm={publish.canConfirm} access={access} call={call} on={publish.on} />}
       {changed && !goBack?.confirming && (
-        <Button size="md" onClick={on.goBack} disabled={Boolean(state.busy)} data-go-back="">
-          {WORDS.goBackToLive}
-        </Button>
+        <RoleGate role={role} action="storefront.write" mode="hide">
+          <Button size="sm" variant="outline" onClick={on.goBack} disabled={Boolean(state.busy)} data-go-back="">
+            {WORDS.goBackToLive}
+          </Button>
+        </RoleGate>
       )}
       {goBack?.confirming && (
-        <div className="space-y-2 rounded-ctl border border-edge bg-surface-sunken p-3 text-[13px]" data-go-back-confirm="">
+        <Notice tone="warning" data-go-back-confirm="">
           <p>{WORDS.goBackConfirm}</p>
-          <div className="flex gap-2">
-            <Button size="sm" variant="primary" onClick={on.goBackConfirm} busy={goBack.busy}>
-              {WORDS.goBackToLive}
-            </Button>
-            <Button size="sm" onClick={on.goBackCancel} disabled={goBack.busy}>
+          <div className="mt-2 flex gap-2">
+            <RoleGate role={role} action="storefront.write" mode="hide">
+              <Button size="xs" onClick={on.goBackConfirm} disabled={goBack.busy}>
+                {WORDS.goBackToLive}
+              </Button>
+            </RoleGate>
+            <Button size="xs" variant="outline" onClick={on.goBackCancel} disabled={goBack.busy}>
               Cancel
             </Button>
           </div>
-        </div>
+        </Notice>
       )}
-      {route && live && !staff && (
+      {route && live && !staff && canPublish && (
         <UndoNotice target={{ kind: "offline", label, id: state.id, revision: state.revision }} label="Take this page offline" call={call} access={access} onUndone={on.afterUndo} />
       )}
-      {route && live && staff && (
+      {route && live && (staff || !canPublish) && canWrite && (
         <div className="space-y-1">
-          <Button size="md" disabled>
+          <Button size="sm" variant="outline" disabled>
             Take this page offline
           </Button>
-          <p className="text-[13px] text-fg-muted">{access.reason}</p>
+          <p className="text-[13px] text-muted-foreground">{access?.reason}</p>
         </div>
       )}
-      <Button size="md" variant="ghost" onClick={on.toggleVersions} data-versions-toggle="">
+      <Button size="sm" variant="ghost" onClick={on.toggleVersions} data-versions-toggle="" data-read-control="">
         {versions ? "Hide earlier versions" : "Earlier versions"}
       </Button>
     </div>
   );
 
-  return (
-    <div data-document-editor="" data-doc={entry?.id || ""} data-writing={writing ? "" : undefined} className="space-y-4">
-      <PageHeader title="Editor" description="Edit your store's pages, menus and look here. Changes save as drafts and go live when you publish." />
-      {note && (
-        <Banner tone="info" className="mb-1">
-          {note}
-        </Banner>
-      )}
-      {switchNote && (
-        <Banner tone="info" className="mb-1">
-          <span data-switch-note="">{switchNote}</span>
-        </Banner>
-      )}
-      <section aria-label="Open document" className="rounded-card border border-edge bg-surface p-4 shadow-card">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-fg-subtle">Editing</p>
-            <h2 data-document-label="" className="mt-1 text-lg font-semibold text-fg">
-              {label}
-            </h2>
-          </div>
-          <Button size="sm" onClick={on.toggleSwitcher} aria-expanded={showSwitcher} data-switcher-toggle="">
-            {showSwitcher ? "Close the page list" : "All pages"}
-          </Button>
-        </div>
-        <div className="mt-1">
-          <ProductCounts counts={products?.counts || null} />
-        </div>
-        {showSwitcher && (
-          <div className="mt-3">
-            <SwitcherView
-              documents={docs || []}
-              products={products?.items || []}
-              counts={products?.counts || null}
-              productsState={productsState}
-              collections={catalog.collections || []}
-              openId={entry?.id}
-              openEntityId={entityId}
-              query={on.query ?? ""}
-              onQuery={on.setQuery}
-              filter={productFilter}
-              onFilter={on.setFilter}
-              onMore={on.moreProducts}
-              onOpen={on.open}
-              onOpenHref={on.openHref}
-              busyId={busyOpen}
-            />
-          </div>
-        )}
-        <div className="mt-3">
-          <StatusLine save={state} preview={previewView} closed={closed} blocked={blocked} previewHidden={writing && !previewOpen} on={on.status || {}} />
-        </div>
-      </section>
+  const paneSkeleton = (rows) => (
+    <div className="space-y-2 p-3" data-pane-skeleton="" aria-hidden>
+      {Array.from({ length: rows }, (_, i) => (
+        <Skeleton key={i} className="h-9 w-full" />
+      ))}
+    </div>
+  );
 
-      {load.status === "loading" && <p className="text-sm text-fg-muted" role="status">{WORDS.loading(label)}</p>}
+  const pageList = showSwitcher && (
+    <SwitcherView
+      documents={docs || []}
+      products={products?.items || []}
+      counts={products?.counts || null}
+      productsState={productsState}
+      collections={catalog.collections || []}
+      openId={entry?.id}
+      openEntityId={entityId}
+      query={on.query ?? ""}
+      onQuery={on.setQuery}
+      filter={productFilter}
+      onFilter={on.setFilter}
+      onMore={on.moreProducts}
+      onOpen={on.open}
+      onOpenHref={on.openHref}
+      busyId={busyOpen}
+      showArchived={showArchived}
+      onShowArchived={on.setShowArchived}
+      role={role}
+      onCreate={on.createPage}
+      onArchive={on.archive}
+    />
+  );
+
+  // the left pane: the page list (when open) or the open document's sections
+  const sectionsPane = (
+    <div className="flex min-h-0 flex-col" data-pane-body="sections">
+      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+        <p className="text-xs font-medium text-muted-foreground">{showSwitcher ? "All pages" : "Sections"}</p>
+        <Button size="xs" variant="ghost" onClick={on.toggleSwitcher} aria-expanded={showSwitcher} data-switcher-toggle="" data-read-control="">
+          {showSwitcher ? "Close the page list" : "All pages"}
+        </Button>
+      </div>
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="p-3">
+          {pageList}
+          {!showSwitcher && loading && paneSkeleton(5)}
+          {!showSwitcher && ready && sections && !writing && !entityDoc && (
+            <>
+              <SectionTree type={type} sections={sections} selectedId={selection} issuesBySection={groupIssues(issues)} collections={catalog.collections} onChange={on.treeChange} onSelect={on.treeSelect} body={body} role={role} />
+              {selection && (
+                <Button size="xs" variant="link" className="mt-2 px-0" onClick={() => on.treeSelect?.(null, { force: true })} data-read-control="">
+                  {route ? "Edit the page's details" : "Edit the settings of the whole page"}
+                </Button>
+              )}
+            </>
+          )}
+          {!showSwitcher && ready && (writing || entityDoc || !sections) && <p className="text-[13px] text-muted-foreground">{entityDoc ? "This content has no sections. Its fields are in Edit." : writing ? WORDS.writingView : "This page has no sections. Its settings are in Edit."}</p>}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+
+  const editPane = (
+    <div className="min-w-0 space-y-4 p-4" data-pane-body="edit">
+      {loading && paneSkeleton(6)}
       {load.status === "failed" && (
-        <Banner tone="danger" title={load.message || WORDS.loadFailed} />
+        <Notice tone="danger" title={load.message || WORDS.loadFailed} data-load-failed="">
+          <Button size="xs" variant="outline" className="mt-2" onClick={on.retryLoad} data-load-retry="" data-read-control="">
+            Try again
+          </Button>
+        </Notice>
       )}
       {load.status === "missing" && entityDoc && readOnly && (
-        <div className="space-y-3 rounded-card border border-edge bg-surface p-4" data-entity-untouched="">
-          <p className="text-[13px] text-fg-muted">{type === "product_content" ? "Nothing has been changed on this product yet. It shows what Shopify sends." : "Nothing has been changed on this collection yet."}</p>
-          {type === "product_content" ? (
-            <ProductForm body={null} entity={entity} access={{ canPublish: false }} readOnly={readOnly} context={context} />
-          ) : (
-            <CollectionForm body={null} entity={entity} readOnly={readOnly} context={context} />
-          )}
+        <div className="space-y-3" data-entity-untouched="">
+          <p className="text-[13px] text-muted-foreground">{type === "product_content" ? "Nothing has been changed on this product yet. It shows what Shopify sends." : "Nothing has been changed on this collection yet."}</p>
+          {type === "product_content" ? <ProductForm body={null} entity={entity} access={{ canPublish: false }} readOnly={readOnly} context={context} /> : <CollectionForm body={null} entity={entity} readOnly={readOnly} context={context} />}
         </div>
       )}
       {load.status === "missing" && !(entityDoc && readOnly) && (
-        <Banner tone="info" title={WORDS.notFoundSingleton(label)}>
-          <div className="mt-2">
-            <Button size="sm" variant="primary" onClick={on.startMissing} data-start-missing="">
+        <Notice tone="info" title={WORDS.notFoundSingleton(label)}>
+          <RoleGate role={role} action="storefront.write" mode="hide">
+            <Button size="xs" className="mt-2" onClick={on.startMissing} data-start-missing="">
               {WORDS.start}
             </Button>
-          </div>
-        </Banner>
+          </RoleGate>
+        </Notice>
       )}
-
-      {state && !staleEntity && actions}
-      {state && !staleEntity && versions && (
-        <section aria-label="Earlier versions" className="rounded-card border border-edge bg-surface p-4" data-earlier-versions-panel="">
-          {versions.status === "loading" ? <p className="text-[13px] text-fg-muted">Loading earlier versions…</p> : <EarlierVersions versions={versions.rows} onRestore={on.restore} message={versions.message} />}
-        </section>
+      {staleEntity && load.status !== "loading" && (
+        <p className="text-sm text-muted-foreground" role="status" data-entity-switching="">
+          {WORDS.loading(label)}
+        </p>
       )}
-
-      {state && !staleEntity && writing && (
+      {ready && writing && (
         <div className="space-y-4" data-writing-view="">
-          <p className="text-[13px] text-fg-muted">{WORDS.writingView}</p>
-          <div className="space-y-6 rounded-card border border-edge bg-surface p-4">
+          <p className="text-[13px] text-muted-foreground">{WORDS.writingView}</p>
+          <div className="space-y-6" data-inspector="">
             <SettingsForm key={`doc-${state.id}`} type={type} value={body} issues={issues} focusRequest={selection ? null : focusRequest} context={context} onChange={(_n, m) => on.edit?.({ sectionId: null, path: m.path, value: m.value })} />
             {sections
               .filter((s) => s.kind === RICH)
@@ -391,55 +418,112 @@ export function EditorView({
                 <SettingsForm key={s.id} kind={s.kind} sectionId={s.id} value={s.settings} issues={issues} focusRequest={selection === s.id ? focusRequest : null} context={context} onChange={(_n, m) => on.edit?.({ sectionId: s.id, path: m.path, value: m.value })} />
               ))}
           </div>
-          <Button size="sm" onClick={on.togglePreview} aria-expanded={previewOpen} data-preview-toggle="">
+          <Button size="sm" variant="outline" className="hidden md:inline-flex" onClick={on.togglePreview} aria-expanded={previewOpen} data-preview-toggle="" data-read-control="">
             {previewOpen ? WORDS.hidePreview : WORDS.showPreview}
           </Button>
-          {preview}
         </div>
       )}
-
-      {staleEntity && load.status !== "loading" && (
-        <p className="text-sm text-fg-muted" role="status" data-entity-switching="">
-          {WORDS.loading(label)}
-        </p>
+      {ready && !writing && (
+        <section aria-label="Settings" className="min-w-0" data-inspector="">
+          {inspector()}
+        </section>
       )}
+    </div>
+  );
 
-      {state && !staleEntity && !writing && entityDoc && (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)]" data-editor-layout="" data-entity-layout="">
-          <section aria-label="Settings" className="min-w-0 rounded-card border border-edge bg-surface p-4" data-inspector="">
-            {inspector()}
-          </section>
-          <div className="min-w-0 lg:sticky lg:top-18 lg:self-start">{preview}</div>
-        </div>
-      )}
+  // phone (below 768px): one pane at a time, chosen by the tabs; tablet
+  // (768-1023px): the sections beside the settings, the preview by a toggle
+  // in their place; from 1024px all three side by side. The preview is
+  // mounted once and only shown or hidden, so its frame never reloads.
+  // A writing document (rich text only) keeps its preview behind its own
+  // toggle from 768px; on a phone the Preview tab shows it.
+  const paneClass = {
+    sections: cn(tab === "sections" ? "flex" : "hidden", "min-h-0 flex-col border-border md:flex md:border-r"),
+    edit: writing
+      ? cn(tab === "edit" ? "block" : "hidden", "min-h-0 min-w-0 overflow-y-auto md:block", !previewOpen && "lg:col-span-2")
+      : cn(tab === "edit" ? "block" : "hidden", tabletPreview ? "md:hidden" : "md:block", "min-h-0 min-w-0 overflow-y-auto lg:block"),
+    preview: cn(
+      tab === "preview" ? "block" : "hidden",
+      "min-h-0 min-w-0 overflow-y-auto border-border bg-muted/40 p-3 lg:border-l",
+      writing ? (previewOpen ? "md:block md:col-span-2 lg:col-span-1" : "md:hidden") : cn(tabletPreview ? "md:block" : "md:hidden", "lg:block"),
+    ),
+  };
 
-      {state && !staleEntity && !writing && !entityDoc && (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)]" data-editor-layout="">
-          <div className="min-w-0 space-y-4">
-            {sections && (
-              <section aria-label="Sections" className="max-h-[45vh] overflow-y-auto rounded-card border border-edge bg-surface p-3 lg:max-h-[40vh]">
-                <SectionTree type={type} sections={sections} selectedId={selection} issuesBySection={groupIssues(issues)} collections={catalog.collections} onChange={on.treeChange} onSelect={on.treeSelect} />
-                {selection && (
-                  <button type="button" className="mt-2 text-[13px] underline focus-ring" onClick={() => on.treeSelect?.(null, { force: true })}>
-                    {route ? "Edit the page's details" : "Edit the settings of the whole page"}
-                  </button>
-                )}
-              </section>
-            )}
-            <section aria-label="Settings" className="rounded-card border border-edge bg-surface p-4" data-inspector="">
-              {inspector()}
-            </section>
+  return (
+    <div data-document-editor="" data-doc={entry?.id || ""} data-writing={writing ? "" : undefined} className="flex min-h-[calc(100svh-3.5rem)] flex-col lg:h-[calc(100svh-3.5rem)]">
+      <header className="space-y-2 border-b border-border bg-background px-4 py-3" data-editor-bar="">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-muted-foreground">Editing</p>
+            <h2 data-document-label="" className="truncate text-lg font-semibold text-foreground">
+              {label}
+            </h2>
+            <ProductCounts counts={products?.counts || null} />
           </div>
-          <div className="min-w-0 lg:sticky lg:top-18 lg:self-start">{preview}</div>
+          {ready && actions}
         </div>
-      )}
+        <StatusLine save={state} preview={previewView} closed={closed} blocked={blocked} previewHidden={writing && !previewOpen} readOnly={!canWrite} role={role} on={on.status || {}} />
+        {note && (
+          <Notice tone="info" data-entry-note="">
+            {note}
+          </Notice>
+        )}
+        {switchNote && (
+          <Notice tone="info">
+            <span data-switch-note="">{switchNote}</span>
+          </Notice>
+        )}
+        {ready && versions && (
+          <section aria-label="Earlier versions" className="rounded-md border border-border bg-card p-3" data-earlier-versions-panel="">
+            {versions.status === "loading" ? <p className="text-[13px] text-muted-foreground">Loading earlier versions…</p> : <EarlierVersions versions={versions.rows} onRestore={canWrite ? on.restore : undefined} message={versions.message} />}
+          </section>
+        )}
+        <div className="flex items-center gap-2 md:hidden">
+          <ToggleGroup type="single" variant="outline" size="sm" spacing={0} value={tab} onValueChange={(v) => v && on.setPane?.(v)} aria-label="Show" className="w-full" data-editor-tabs="">
+            {PANES.map((p) => (
+              <ToggleGroupItem key={p} value={p} className="flex-1" data-pane-tab={p} data-read-control="">
+                {PANE_WORDS[p]}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </div>
+        {!writing && (
+          <div className="hidden md:flex lg:hidden">
+            <Button size="xs" variant="outline" onClick={on.toggleTabletPreview} aria-pressed={tabletPreview} data-tablet-preview="" data-read-control="">
+              {tabletPreview ? "Show the settings" : "Show the preview"}
+            </Button>
+          </div>
+        )}
+      </header>
+
+      <div
+        className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[16rem_minmax(0,1fr)] lg:grid-cols-[16rem_minmax(20rem,26rem)_minmax(0,1fr)]"
+        data-editor-frame=""
+        data-editor-layout={!writing && ready ? "" : undefined}
+        data-entity-layout={entityDoc && ready && !writing ? "" : undefined}
+      >
+        <aside aria-label="Sections and pages" className={paneClass.sections} data-pane="sections">
+          {sectionsPane}
+        </aside>
+        <div className={paneClass.edit} data-pane="edit">
+          {editPane}
+        </div>
+        <section aria-label="Preview" className={paneClass.preview} data-pane="preview">
+          {loading && !preview ? paneSkeleton(1) : preview}
+        </section>
+      </div>
     </div>
   );
 }
 
 // ---- the editor ---------------------------------------------------------------------
 
-export default function DocumentEditor({ document: entry, note = null, entity: entityProp = null, readOnly = null, can = {}, currency = undefined, startingBrand = null, api = documentsApi }) {
+// Phase 2 line 6 (6a) props, besides the ones above:
+//   can            { write, publish, offersWrite } from the page (roleAllows).
+//                  can.write false: the store is read-only (no saveDraft is
+//                  ever sent, not even the keepalive on pagehide)
+//   role           the actor's role, for RoleGate
+export default function DocumentEditor({ document: entry, note = null, entity: entityProp = null, readOnly = null, can = {}, role = null, currency = undefined, startingBrand = null, api = documentsApi }) {
   const router = useRouter();
   const [docs, setDocs] = useState(null);
   const [catalog, setCatalog] = useState({ products: [], collections: [] });
@@ -464,6 +548,9 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
   const [productsState, setProductsState] = useState({ status: "loading", more: false });
   const [productFilter, setProductFilter] = useState("all");
   const [entityBusy, setEntityBusy] = useState(false);
+  const [paneTab, setPaneTab] = useState("edit");
+  const [tabletPreview, setTabletPreview] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [bundles, setBundles] = useState({ status: "loading", items: [], answered: [] });
   const bundleSeq = useRef(0);
   const bundleAsked = useRef(new Set()); // ids already asked for by ids=
@@ -498,8 +585,10 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
   const state = useSyncExternalStore(store ? store.subscribe : noSub, store ? store.getState : noState, noState);
 
   // ---- loading ----
+  // Phase 2 line 6: with "Show archived pages" on, archived pages are read too
+  const archivedRef = useRef(false);
   const refreshDocs = useCallback(async () => {
-    const r = await api.call("listDocuments", true);
+    const r = await api.call("listDocuments", archivedRef.current ? { includeArchived: true } : true);
     if (r?.ok && Array.isArray(r.data?.documents)) setDocs(r.data.documents);
   }, [api]);
 
@@ -581,13 +670,13 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
   const adopt = useCallback(
     async (document) => {
       storeRef.current?.dispose();
-      const s = createDocumentStore({ api, document, tenant: typeof window !== "undefined" ? window.location.host : "", storage: tabStorage });
+      const s = createDocumentStore({ api, document, tenant: typeof window !== "undefined" ? window.location.host : "", storage: tabStorage, readOnly: can?.write !== true });
       storeRef.current = s;
       setStore(s);
       await s.open();
       return s;
     },
-    [api, tabStorage],
+    [api, tabStorage, can?.write],
   );
 
   const openEntry = useCallback(
@@ -630,6 +719,7 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
   }, [entry?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => storeRef.current?.dispose(), []);
+
 
   // P5-EDITOR: read the bundles again when the founder comes back to this
   // tab (a bundle changed on the Bundles page changes the live blocks at
@@ -878,7 +968,7 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
         problem={problem}
         select={selection && !Object.hasOwn(pending, selection) ? selection : null}
         adding={adding}
-        hidden={writing && !previewOpen}
+        hidden={writing && !previewOpen && paneTab !== "preview"}
         label={state?.document?.label || entry?.label}
         onPick={onPick}
         onView={onView}
@@ -919,7 +1009,36 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
       productsState={productsState}
       productFilter={productFilter}
       entityBusy={entityBusy}
+      role={role}
+      paneTab={paneTab}
+      tabletPreview={tabletPreview}
+      showArchived={showArchived}
       on={{
+        setPane: (p) => setPaneTab(p),
+        toggleTabletPreview: () => setTabletPreview((v) => !v),
+        retryLoad: () => entry?.id && openEntry(entry.id),
+        setShowArchived: (v) => {
+          archivedRef.current = v;
+          setShowArchived(v);
+          refreshDocs();
+        },
+        // New page (storefront.write; the server checks it again)
+        createPage: async ({ title, slug }) => {
+          const r = await api.call("createDocument", { type: "page", meta: { title, slug }, body: null, entityId: null });
+          if (!r?.ok) return { ok: false, message: r?.issues?.[0]?.message || r?.message || "The page wasn't made. Try again." };
+          await refreshDocs();
+          const id = r.data?.document?.id;
+          if (id) openDocument(id);
+          return { ok: true };
+        },
+        // Archive (storefront.write): only a page that is not live
+        archive: async (row) => {
+          const r = await api.call("archive", row.id, { revision: row.revision });
+          if (!r?.ok) return { ok: false, message: r?.message || "The page wasn't archived. Try again." };
+          await refreshDocs();
+          if (row.id === entry?.id) guard.go(editorHref("doc_home"));
+          return { ok: true };
+        },
         edit,
         searchBundles,
         refreshBundles: loadBundles,
@@ -1015,6 +1134,6 @@ export function PublishingHistory({ initialRows = null, access = null, api = doc
     if (!initialRows) load();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (list.status === "loading") return <p className="text-sm text-fg-muted" role="status">Loading what was published…</p>;
-  if (list.status === "failed") return <Banner tone="warning" title={list.message || "We couldn't load what was published. Reload the page."} />;
+  if (list.status === "failed") return <Notice tone="warning" title={list.message || "We couldn't load what was published. Reload the page."} />;
   return <RecentlyPublished rows={list.rows} call={api.call} access={access} editorHref={(id) => editorHref(id)} onUndone={() => load()} />;
 }

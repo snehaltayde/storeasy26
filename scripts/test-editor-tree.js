@@ -480,7 +480,10 @@ async function loadJsx(file) {
   seen.set(file, mod.exports);
   return mod.exports;
 }
-const SectionTree = (await loadJsx(join(ROOT, "components/admin/editor/tree/SectionTree.js"))).default;
+// Phase 2 line 6: the tree's write buttons are storefront.write (RoleGate);
+// these tests are an owner's unless they say otherwise
+const TreeRaw = (await loadJsx(join(ROOT, "components/admin/editor/tree/SectionTree.js"))).default;
+const SectionTree = (p) => TreeRaw({ role: "owner", ...p });
 const AddSection = (await loadJsx(join(ROOT, "components/admin/editor/tree/AddSection.js"))).default;
 
 // the <li> of one row
@@ -533,18 +536,18 @@ await t("the protected product details row offers no hide, copy or delete", () =
 
 await t("the open picker lists every registered kind for the type with its label; a refused one is disabled with its reason", () => {
   for (const type of SECTION_TYPES) {
-    const html = renderToStaticMarkup(React.createElement(AddSection, { type, sections: sample(type), index: 1, open: true }));
+    const html = renderToStaticMarkup(React.createElement(AddSection, { role: "owner",  type, sections: sample(type), index: 1, open: true }));
     for (const kind of offeredKinds(type)) {
       const m = html.match(new RegExp(`<button[^>]*data-kind="${kind}"[^>]*>(.*?)</button>`));
       ok(m && m[1].includes(`>${sectionType(kind).label}</span>`), `${type}: ${kind} with its label`);
     }
     eq((html.match(/data-kind="/g) || []).length, offeredKinds(type).length, `${type}: only its kinds`);
   }
-  const home = renderToStaticMarkup(React.createElement(AddSection, { type: "home", sections: sample("home"), index: 1, open: true, afterLabel: "hero" }));
+  const home = renderToStaticMarkup(React.createElement(AddSection, { role: "owner",  type: "home", sections: sample("home"), index: 1, open: true, afterLabel: "hero" }));
   ok(/<button[^>]*disabled=""[^>]*data-kind="hero"/.test(home) || /<button[^>]*data-kind="hero"[^>]*disabled=""/.test(home), "a second hero is disabled");
   ok(home.includes("The home page already has a hero. It can have only one."), "with its reason");
   ok(home.includes("Adds below the hero"), "says where it adds");
-  const closed = renderToStaticMarkup(React.createElement(AddSection, { type: "home", sections: [], index: 0 }));
+  const closed = renderToStaticMarkup(React.createElement(AddSection, { role: "owner",  type: "home", sections: [], index: 0 }));
   ok(closed.includes("Add a section") && !closed.includes("data-kind"), "closed, it is one button");
 });
 
@@ -661,7 +664,7 @@ await t("P3-FIX3 unit+rendered: a copy (or an add) that would make the draft too
   const shown = renderToStaticMarkup(React.createElement(SectionTree, { type: "page", sections: s, body: padded, selectedId: null }));
   ok(/disabled=""/.test(buttonTag(wholeRow(shown, "sec_big0"), "Copy Rich text")), "Copy is disabled by the body's size");
   const rec = record();
-  drive(SectionTree, { type: "page", sections: s, body: padded, selectedId: null, ...rec }).find((p) => p.label === "Copy Rich text").onClick();
+  drive(SectionTree, { type: "page", sections: s, body: padded, selectedId: null, ...rec }).find((p) => p["aria-label"] === "Copy Rich text").onClick();
   eq(rec.changes.length, 0, "a copy call is refused:");
   ok(T.duplicate(s, "sec_big0", { type: "page", body: bodyOf("page", s) }).ok, "a small draft copies");
 });
@@ -671,33 +674,33 @@ await t("P3-FIX3 driven: move, copy and delete call onChange and onSelect; Delet
   // move: the moved row is selected (even an unselected one)
   let r = record();
   let d = drive(SectionTree, { type: "home", sections: s, selectedId: "sec_text", ...r });
-  d.find((p) => p.label === "Move Banner down").onClick();
+  d.find((p) => p["aria-label"] === "Move Banner down").onClick();
   eq([r.changes[0].info.op, r.changes[0].next.map((x) => x.id), r.selects], ["moveDown", ["sec_hero", "sec_coll", "sec_text", "sec_bann", "sec_faq"], ["sec_bann"]], "move:");
   // copy: the copy is selected
   r = record();
   d = drive(SectionTree, { type: "home", sections: s, selectedId: "sec_text", ...r });
-  d.find((p) => p.label === "Copy Text").onClick();
+  d.find((p) => p["aria-label"] === "Copy Text").onClick();
   const copyId = r.changes[0].info.id;
   ok(copyId !== "sec_text" && r.changes[0].next[4].id === copyId, "the copy is below the original");
   eq(r.selects, [copyId], "the copy is selected:");
   // delete asks first: the trash icon calls nothing
   r = record();
   d = drive(SectionTree, { type: "home", sections: s, selectedId: "sec_text", ...r });
-  d.find((p) => p.label === "Delete Text").onClick();
+  d.find((p) => p["aria-label"] === "Delete Text").onClick();
   eq([r.changes.length, r.selects.length], [0, 0], "the trash icon only asks:");
   // the confirm: Delete removes, the neighbour is selected; Keep it removes nothing
   r = record();
   d = drive(SectionTree, { type: "home", sections: s, selectedId: "sec_text", confirmingId: "sec_text", ...r });
   ok(d.find((p) => p["aria-label"] === "Delete Text: Our story?"), "the confirm shows in the row");
-  ok(!d.find((p) => p.label === "Delete Text"), "the row's buttons give way to it");
+  ok(!d.find((p) => p["aria-label"] === "Delete Text"), "the row's buttons give way to it");
   d.find((p, n) => n.type !== "p" && p.variant === "ghost" && p.children === "Keep it").onClick();
   eq(r.changes.length, 0, "Keep it changes nothing:");
-  d.find((p) => p.variant === "danger" && p.children === "Delete").onClick();
+  d.find((p) => p.variant === "destructive" && p.children === "Delete").onClick();
   eq([r.changes[0].info.op, r.changes[0].next.map((x) => x.id), r.selects], ["remove", ["sec_hero", "sec_coll", "sec_bann", "sec_faq"], ["sec_faq"]], "delete:");
   // at the top: Move up is disabled, and does nothing if called
   r = record();
   d = drive(SectionTree, { type: "home", sections: s, selectedId: null, ...r });
-  const up = d.find((p) => p.label === "Move Hero up");
+  const up = d.find((p) => p["aria-label"] === "Move Hero up");
   ok(up.disabled === true, "Move up is disabled at the top");
   up.onClick();
   eq(r.changes.length, 0, "and refused:");

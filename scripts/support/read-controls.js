@@ -68,6 +68,13 @@ export const READ_CONTROLS = [
   { path: "components/admin/settings/AuditTable.js", reason: "the who and what selects, the two dates, Try again, Clear filters and Load more only ask GET /api/admin/audit for another page", marks: 7 },
   { path: "components/admin/settings/HelpPanel.js", reason: "Copy diagnostics (the clipboard) and the mailto link to Storeasy's team send nothing from the page", marks: 2 },
   { path: "components/admin/integrations/IntegrationsList.js", reason: "Test asks POST /api/admin/integrations { action: \"test\" } (settings.read): the cheapest provider check, it stores nothing", marks: 1 },
+  // Phase 2 line 6 (6a): the editor frame, the page list, the tree, templates
+  { path: "components/admin/editor/DocumentEditor.js", reason: "the page-list toggle, the phone tabs (Sections, Edit, Preview), the tablet preview toggle, the writing view's preview toggle, Earlier versions (listHistory, a document read), \"Edit the page's details\" (a selection) and Try again (getDocument) only show, select or read", marks: 7 },
+  { path: "components/admin/editor/Switcher.js", reason: "the search box, Show archived pages (listDocuments with includeArchived, a read), the product filters, Show more products (listProductContent) and each page, product and collection row (opens it in the editor, a GET) only read", marks: 7 },
+  { path: "components/admin/editor/StatusLine.js", reason: "Try the preview again asks for a new preview session (POST /api/admin/preview-session, storefront.read)", marks: 1 },
+  { path: "components/admin/editor/tree/SectionTree.js", reason: "a row's own button selects the section (nothing is sent); a section's blocks open and close", marks: 2 },
+  { path: "components/admin/editor/templates/TemplatesList.js", reason: "Open it in the editor is a link to the new page (a GET)", marks: 1 },
+  { path: "app/(console)/admin/(authed)/editor/error.js", reason: "Try again re-renders the editor segment (reset(), a re-read, no write)", marks: 1 },
 ];
 
 // Reads sent as a non-GET request: { page, method, path, reason, body? }. page
@@ -86,6 +93,12 @@ export const READ_POSTS = [
   // Phase 2 line 7 (test:settings-ui proves the test action writes nothing)
   { page: "/admin/settings/checkout", method: "POST", path: "/api/admin/integrations", body: { action: "test" }, reason: "\"Test keys\": the integrations test action (settings.read), a provider check that stores nothing" },
   { page: "/admin/integrations", method: "POST", path: "/api/admin/integrations", body: { action: "test" }, reason: "a provider's Test: the integrations test action (settings.read), a provider check that stores nothing" },
+  // Phase 2 line 6: the editor's and Publishing's document reads (ops: the
+  // body's single top-level key must be one of them; never saveDraft), and
+  // the preview session (storefront.read in admin-routes.js)
+  { page: "/admin/editor", method: "PUT", path: "/api/admin/documents", ops: ["listDocuments", "getDocument", "listHistory", "listProductContent", "listChanges", "openingChecks"], reason: "the editor's reads: the page list, the open document, Earlier versions, the products in the page list, what changed since live and the opening checks (DOCUMENT_READS; support's store never sends saveDraft)" },
+  { page: "/admin/editor", method: "POST", path: "/api/admin/preview-session", reason: "the preview's session (create, showDesign, revoke), storefront.read: it lets this browser see the draft and writes no content" },
+  { page: "/admin/releases", method: "PUT", path: "/api/admin/documents", ops: ["listRecentlyPublished", "listDocuments", "getDocument", "listChanges"], reason: "Publishing's reads: recently published, the pages waiting to publish and what changed in each (DOCUMENT_READS)" },
 ];
 
 // A READ_POSTS row's body rule: no `body` matches any request; otherwise the

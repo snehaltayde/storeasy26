@@ -45,6 +45,11 @@ import DocumentEditor from "@/components/admin/editor/DocumentEditor";
 // compiles) don't follow them; they are pure and small. If they can't load,
 // the editor gets null and the design form uses the default palette (slate),
 // still never lime; the failure is logged.
+// Phase 2 line 6 (6a): the page hands the editor can = { write, publish,
+// offersWrite } (roleAllows: storefront.write, storefront.publish,
+// offers.write) and the actor's role (RoleGate). can.write: false makes the
+// editor's store read-only, so support never sends saveDraft. The generator
+// runs only when can.write.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Editor · Admin", robots: { index: false } };
@@ -96,7 +101,8 @@ export default async function EditorPage({ searchParams }) {
 
   const query = (await searchParams) || {};
   const target = parseEditorTarget(query);
-  const editable = canEdit(actor);
+  const can = { write: canEdit(actor), publish: roleAllows(actor?.role, "storefront.publish"), offersWrite: roleAllows(actor?.role, "offers.write") };
+  const editable = can.write;
   const { entry, entity, readOnly, startingBrand } = await tfetch(async () => {
     await getCmsMode();
     // P6-NAV: read inside the store's context (the tenant tfetch resolved)
@@ -122,7 +128,17 @@ export default async function EditorPage({ searchParams }) {
     return { entry: e, entity: await entityForDocument(row), readOnly: editable ? null : ENTRY_WORDS.readOnly };
   }
 
-  const offersWrite = roleAllows(actor?.role, "offers.write");
-  const currency = offersWrite ? await tfetch(currencyForBundles) : undefined;
-  return <DocumentEditor document={entry.document} note={entry.note} entity={entity ?? null} readOnly={readOnly ?? null} can={{ offersWrite }} currency={currency} startingBrand={startingBrand} />;
+  const currency = can.offersWrite ? await tfetch(currencyForBundles) : undefined;
+  return (
+    <DocumentEditor
+      document={entry.document}
+      note={entry.note}
+      entity={entity ?? null}
+      readOnly={readOnly ?? null}
+      can={can}
+      role={actor?.role ?? null}
+      currency={currency}
+      startingBrand={startingBrand}
+    />
+  );
 }

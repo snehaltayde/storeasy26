@@ -928,7 +928,8 @@ const snap = (over = {}) => ({
   ...over,
 });
 const entryOf = (s) => ({ id: s.id, type: s.type, label: s.document.label, slug: s.document.slug ?? null });
-const view = (props) => html(h(Editor.EditorView, { load: { status: "ready" }, docs: [{ id: "doc_home", type: "home", label: "Home page", live: true }], ...props }));
+// Phase 2 line 6: the page hands the editor can and role (an owner's here unless a test says)
+const view = (props) => html(h(Editor.EditorView, { load: { status: "ready" }, docs: [{ id: "doc_home", type: "home", label: "Home page", live: true }], can: { write: true, publish: true, offersWrite: true }, role: "owner", ...props }));
 
 await t("rendered: a policy (rich text only) opens in the full-width writing view with the preview behind a toggle; a page with other sections opens beside the preview", () => {
   const s = snap();
@@ -957,7 +958,7 @@ await t("rendered: a closed store shows the opening copy: 'Your store isn't open
 await t("rendered: staff see Publish disabled with the reason, and Take offline disabled with the reason; an owner's are enabled", () => {
   const reason = "Only the store owner or an admin can publish. You can edit and preview.";
   const s = snap({ document: { ...snap().document, access: { canPublish: false, reason } } });
-  const m = view({ entry: entryOf(s), state: s, publish: { state: { phase: "closed", order: [], lists: {}, items: [] }, canConfirm: false, on: {} } });
+  const m = view({ entry: entryOf(s), state: s, can: { write: true, publish: false, offersWrite: true }, role: "staff", publish: { state: { phase: "closed", order: [], lists: {}, items: [] }, canConfirm: false, on: {} } });
   ok(/<button[^>]*disabled=""[^>]*>Publish<\/button>/.test(m), `Publish disabled: ${m.match(/<button[^>]*>Publish<\/button>/)?.[0]}`);
   ok(textOf(m).includes(reason), "the reason is shown");
   ok(/<button[^>]*disabled=""[^>]*>Take this page offline<\/button>/.test(m), "Take offline disabled for staff");
@@ -974,7 +975,7 @@ await t("rendered: the default export renders P3-ROUTES' markers on the server (
 await t("rendered: conflict, backup offer and a link held for a failed save show their choices in words", () => {
   const s = snap({ status: "conflict", statusWords: "This page was changed in another tab.", conflict: { words: "This page was changed in another tab.", choices: ["useNewer", "keepMine"] }, backupOffer: { words: "We found edits that weren't saved. Keep them as an earlier draft?" } });
   const m = textOf(view({ entry: entryOf(s), state: s, blocked: { message: M.WORDS.leaveBlocked, to: "/admin/orders" } }));
-  for (const w of ["Use the newer version", "Keep mine", "We found edits that weren't saved", "Keep them as an earlier draft", M.WORDS.leaveBlocked, "Leave anyway"]) ok(m.includes(w), `missing: ${w}`);
+  for (const w of ["Load theirs", "Keep mine", "We found edits that weren't saved", "Keep them as an earlier draft", M.WORDS.leaveBlocked, "Leave anyway"]) ok(m.includes(w), `missing: ${w}`);
   const changed = snap({ draftHash: "h4" });
   ok(textOf(view({ entry: entryOf(changed), state: changed })).includes("Go back to the live version"), "Go back to the live version when the draft differs from live");
   ok(!textOf(view({ entry: entryOf(snap()), state: snap() })).includes("Go back to the live version"), "not when the draft is the live version");

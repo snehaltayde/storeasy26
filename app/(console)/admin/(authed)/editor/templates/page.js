@@ -6,14 +6,20 @@ import { libsql } from "@/lib/db";
 import { notMigratedYet } from "@/lib/schema-shape";
 import { tfetch } from "@/lib/console-request";
 import { parseTemplateSections, TEMPLATE_FAMILIES } from "@/lib/admin/saved-templates";
-import { PageHeader } from "@/components/console/PageHeader";
-import SavedTemplates from "@/components/admin/SavedTemplates";
+import { listDocuments } from "@/lib/documents/service";
+import { PageHeader } from "@/components/kit/page-header";
+import TemplatesList from "@/components/admin/editor/templates/TemplatesList";
 
 // P4-ED05 (DOC-09 partly pulled in; plan decision 12): the store's old saved
 // page templates, READ-ONLY, on a documents store. They are not blueprints
 // (DOC-09 is P1); "Make a page from this" makes a new draft page from one
 // (components/admin/SavedTemplates.js). This page reads cms_templates and
 // never writes it: the table is never edited or deleted here.
+// Phase 2 line 6 (6a): on the new UI (components/admin/editor/templates/
+// TemplatesList.js, which replaces SavedTemplates.js). Besides "Make a page
+// from this", "Insert into a page" adds a template's sections to the end of a
+// page that exists (the editor at ?doc=<id>&template=<id>, through its draft).
+// Both are storefront.write (RoleGate, hidden for anyone without it).
 // A store not in documents mode (500 STORE_MODE_INVALID) or a mode that can't
 // be read is an error page, never a guess.
 export const runtime = "nodejs";
@@ -21,6 +27,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Saved templates · Admin", robots: { index: false } };
 
 const FAMILIES = new Set(TEMPLATE_FAMILIES.map((f) => f.family));
+const SECTION_PAGES = new Set(["home", "page", "campaign", "journal"]);
 
 async function readSavedTemplates() {
   let r;
@@ -43,10 +50,14 @@ export default async function SavedTemplatesPage() {
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
 
-  const templates = await tfetch(async () => {
+  const { templates, pages } = await tfetch(async () => {
     await getCmsMode();
-    return readSavedTemplates();
+    const templates = await readSavedTemplates();
+    // the pages a template can go into: the store's own pages with sections
+    const pages = templates.length ? (await listDocuments()).filter((d) => SECTION_PAGES.has(d.type)).map((d) => ({ id: d.id, label: d.label || "Untitled" })) : [];
+    return { templates, pages };
   });
+  const role = actor?.role ?? null;
 
   return (
     <>
@@ -56,7 +67,7 @@ export default async function SavedTemplatesPage() {
         breadcrumb={[{ label: "Editor", href: "/admin/editor" }, { label: "Saved templates" }]}
       />
       <div data-saved-templates="">
-        <SavedTemplates templates={templates} />
+        <TemplatesList templates={templates} pages={pages} role={role} />
       </div>
     </>
   );

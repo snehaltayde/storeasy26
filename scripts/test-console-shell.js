@@ -489,6 +489,16 @@ await t("support's shell on a new-UI route: main holds the page directly, the no
   ok(new RegExp(`<div data-legacy="true" class="contents"><div class="mb-6">${NOTICES}</div>${PAGE}</div>`).test(old), "old route: notices and page share main > [data-legacy]:");
 });
 
+await t("Phase 2 line 6: /admin/editor is full-bleed (data-shell=\"editor\", no max width or side padding) and keeps main > [data-legacy] until it is a new-UI route; Saved templates keeps the column", async () => {
+  const actor = { kind: "merchant", id: "usr_owner", role: "owner" };
+  const ed = render("owner", actor, "/admin/editor");
+  const main = ed.match(/<main [^>]*id="console-content"[^>]*>/)?.[0] || "";
+  ok(main.includes('data-shell="editor"') && !main.includes("max-w-[1200px]") && !/\bpx-4\b/.test(main), `the editor's main: ${main}`);
+  ok(isNewUiRoute("/admin/editor") || /<main [^>]*id="console-content"[^>]*>\s*<div data-legacy="true" class="contents">/.test(ed), "main > [data-legacy] while the editor is not on NEW_UI_ROUTES:");
+  const tpl = render("owner", actor, "/admin/editor/templates").match(/<main [^>]*id="console-content"[^>]*>/)?.[0] || "";
+  ok(tpl.includes("max-w-[1200px]") && !tpl.includes('data-shell="editor"'), `templates keep the column: ${tpl}`);
+});
+
 await t("no notices on a new-UI route: the layout passes none, so main has no empty [data-legacy] box", async () => {
   eq([RealNotices.hasConsoleNotices({ grant: null, incidents: [] }), RealNotices.hasConsoleNotices({ grant: { operator: "x" }, incidents: [] }), RealNotices.hasConsoleNotices({ grant: null, incidents: [{ id: "i" }] }), RealNotices.hasConsoleNotices(null)], [false, true, true, false], "hasConsoleNotices:");
   // the real element renders nothing for empty data: that is why the layout must not pass it
@@ -529,7 +539,8 @@ await t("every old region carries data-legacy (className contents); the editor p
   ok(/return children;/.test(platformLayout) && !platformLayout.includes("data-legacy"), "the platform layout is a pass-through:");
   for (const f of ["app/(console)/platform/onboarding/page.js", "app/(console)/platform/onboarding/loading.js", "components/platform/onboarding/OnboardingOps.js", "components/platform/onboarding/OnboardingTable.js", "components/platform/onboarding/SubjectSheet.js"]) ok(!read(f).replace(/^\s*\/\/.*$/gm, "").includes("data-legacy"), `${f} is new UI, never in a data-legacy region:`);
   const de = read("components/admin/editor/DocumentEditor.js");
-  eq((de.match(/lg:sticky lg:top-18 lg:self-start/g) || []).length, 2, "DocumentEditor preview at lg:top-18 (twice):");
+  // Phase 2 line 6: the editor's panes fill the height under the 56px top bar (no sticky preview)
+  ok(de.includes("lg:h-[calc(100svh-3.5rem)]") && !de.includes("lg:sticky"), "the editor frame sits under the 56px top bar:");
   ok(!de.includes("lg:top-4"), "no lg:top-4 left:");
   ok(!/admin\/\(authed\)\/layout/.test("") && !require("node:fs").existsSync(join(ROOT, "app/(console)/admin/layout.js")), "the old admin layout is gone (its notices moved):");
   for (const f of ["components/console/nav/ConsoleShell.js", "components/console/nav/SidebarNav.js", "components/admin/StoreSwitcher.js"]) ok(!require("node:fs").existsSync(join(ROOT, f)), `${f} is gone:`);

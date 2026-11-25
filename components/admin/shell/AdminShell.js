@@ -53,6 +53,11 @@ function SkipLink() {
   );
 }
 
+// The editor (Phase 2 line 6): full-bleed, no side padding and no max width,
+// so its panes use the whole width under the top bar (data-shell="editor").
+// Only the editor itself: its sub-pages (Saved templates) keep the column.
+export const isEditorRoute = (pathname) => pathname === "/admin/editor";
+
 export const isOnboardingRoute = (pathname) => typeof pathname === "string" && (pathname === "/admin/onboarding" || pathname.startsWith("/admin/onboarding/"));
 
 function TopBar({ actor, account, stores, storeName, storeId, toggle = true }) {
@@ -118,7 +123,12 @@ export function AdminShell({ nav, badges = {}, actor, account = null, stores = [
         <AdminNav nav={nav} badges={badges} />
         <div className="flex min-w-0 flex-1 flex-col">
           <TopBar actor={actor} account={account} stores={stores} storeName={storeName} storeId={storeId} />
-          <SidebarInset id="console-content" tabIndex={-1} className="mx-auto block w-full max-w-[1200px] flex-none px-4 py-6 outline-none md:px-6">
+          <SidebarInset
+            id="console-content"
+            tabIndex={-1}
+            data-shell={isEditorRoute(pathname) ? "editor" : undefined}
+            className={isEditorRoute(pathname) ? "block w-full min-w-0 flex-none outline-none" : "mx-auto block w-full max-w-[1200px] flex-none px-4 py-6 outline-none md:px-6"}
+          >
             {content}
           </SidebarInset>
         </div>

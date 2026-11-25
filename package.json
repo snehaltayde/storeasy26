@@ -136,6 +136,8 @@
     "test:editor-inspector": "node scripts/test-editor-inspector.js",
     "test:editor-tree": "node scripts/test-editor-tree.js",
     "test:publish-ui": "node scripts/test-publish-ui.js",
+    "test:editor-ui": "node scripts/test-editor-ui.js",
+    "drill:editor": "node scripts/drills/run-isolated.mjs editor",
     "test:editor-routes": "node scripts/test-editor-routes.js",
     "test:editor-shell": "node scripts/test-editor-shell.js",
     "test:design-doc": "node scripts/test-design-doc.js",

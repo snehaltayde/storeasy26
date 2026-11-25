@@ -13,6 +13,10 @@
 //     timers,     { setTimeout, clearTimeout }
 //     now,        () => milliseconds, for the backup's time
 //     pauseMs,    the autosave pause (AUTOSAVE_PAUSE_MS)
+//     readOnly,   true for a person who may only read (support; Phase 2
+//                 line 6): every edit is refused, so no saveDraft is ever
+//                 sent (not by autosave, a flush, a backup or the keepalive
+//                 on tab close), and no backup is kept or offered
 //   })
 //
 // How saving works (ED-03):
@@ -186,6 +190,7 @@ export function createDocumentStore({
   now = () => Date.now(),
   pauseMs = AUTOSAVE_PAUSE_MS,
   retryDelays = RETRY_DELAYS_MS,
+  readOnly = false,
 } = {}) {
   if (!api || typeof api.call !== "function") throw new TypeError("createDocumentStore needs documentsApi");
   if (!isObj(initial) || typeof initial.id !== "string") throw new TypeError("createDocumentStore needs the document");
@@ -372,6 +377,7 @@ export function createDocumentStore({
   }
 
   async function saveOnce() {
+    if (readOnly) return { ok: false, error: true, code: "READ_ONLY", message: WORDS.notSavedFirst };
     const sentSeq = seq;
     const out = outgoing(body);
     const r = await api.call("saveDraft", { id, body: out.body }, { revision });
@@ -454,7 +460,7 @@ export function createDocumentStore({
 
   // ---- edits ----
   function edit(op) {
-    if (disposed) return false;
+    if (disposed || readOnly) return false;
     const next = applyOp(body, op);
     if (next === FAILED) return false;
     body = next;
@@ -685,6 +691,7 @@ export function createDocumentStore({
   // true: warn. Sends the save with fetch keepalive when it fits. A backup
   // offered and not answered yet also warns.
   function beforeUnload() {
+    if (readOnly) return false;
     const warn = unacknowledged() || Boolean(backupOffer);
     if (warn && unsavedEdits() && !conflict && typeof api.sendKeepalive === "function") {
       const args = { id, body: outgoing(body).body };
@@ -724,7 +731,7 @@ export function createDocumentStore({
   // Only this tab's own keys are ever cleared here. A backup found on open
   // (or another tab's) stays until acceptBackup or dismissBackup answers it.
   function mirror() {
-    if (!storage) return;
+    if (!storage || readOnly) return;
     try {
       const keep = unsavedEdits() || Boolean(slugProblem(body)) || Boolean(conflict);
       const key = `${docPrefix()}${revision}`;
@@ -751,7 +758,7 @@ export function createDocumentStore({
   // On open: a backup from an earlier visit (its base revision is not newer
   // than the server's) that differs from the draft is offered.
   async function open() {
-    if (!storage) return getState();
+    if (!storage || readOnly) return getState();
     let found = null;
     try {
       for (const k of backupKeys()) {

@@ -38,4 +38,6 @@ export const ALLOWLIST = [
   { path: "components/admin/IntegrationsAdmin.js", reason: "removed by Phase 2 line 11" },
   { path: "components/admin/MessagesPanel.js", reason: "removed by Phase 2 line 11" },
   { path: "components/admin/BillingAdmin.js", reason: "removed by Phase 2 line 11" },
+  // Phase 2 line 6 (6a): Saved templates moved to components/admin/editor/templates/TemplatesList.js
+  { path: "components/admin/SavedTemplates.js", reason: "removed by Phase 2 line 11" },
 ];
