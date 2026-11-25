@@ -361,6 +361,29 @@ await t("least-trusted: verify with no cookie or another browser's cookie fails 
   eq(resend.status, 400, "resend without a cookie");
 });
 
+await t("least-trusted (Phase 1 audit): a signup an operator freed (released) or that was superseded is dead in its old browser: verify, Try again, resend and status answer generically, queue no job and change nothing", async () => {
+  for (const gone of ["released", "superseded", "expired"]) {
+    const s = await start();
+    const code = await codeFor(s.f.email);
+    await db.execute({ sql: "UPDATE signups SET status = ? WHERE email = ?", args: [gone, s.f.email] });
+    const jobsBefore = Number((await one("SELECT COUNT(*) AS n FROM jobs")).n);
+    const verify = await api("signup/verify", "POST", { body: { code }, cookie: s.cookie });
+    eq(verify.status, 400, `${gone}: verify`);
+    eq(verify.body.error, S.CODE_FAILED, `${gone}: verify words`);
+    const retry = await api("signup/verify", "POST", { body: { retry: true }, cookie: s.cookie });
+    eq(retry.status, 400, `${gone}: retry`);
+    eq(retry.body.error, S.SIGNUP_GONE, `${gone}: retry words`);
+    eq((await api("signup/resend", "POST", { cookie: s.cookie })).status, 400, `${gone}: resend`);
+    const st = await status(s.cookie);
+    eq(st.status, 400, `${gone}: status`);
+    eq(st.body.error, S.SIGNUP_GONE, `${gone}: status words`);
+    eq(Number((await one("SELECT COUNT(*) AS n FROM jobs")).n), jobsBefore, `${gone}: no job queued`);
+    const row = await rowFor(s.f.email);
+    eq(row.status, gone, `${gone}: unchanged`);
+    eq(row.user_id ?? null, null, `${gone}: no user`);
+  }
+});
+
 await t("five wrong codes and the code is dead: the right one then fails with the same words", async () => {
   const s = await start();
   const code = await codeFor(s.f.email);
