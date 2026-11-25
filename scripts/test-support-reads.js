@@ -69,6 +69,8 @@ const CNY = {
   // Phase 4 line 1: an app's secret setting in A (no one reads it back) and store B's install
   appSecret: "cnyappsecret0",
   bApp: "cnybapp0",
+  // Phase 4 line 3: store B's custom app (its name)
+  bWebhookApp: "cnybhookapp0",
 };
 const SECRET_KEYS = [
   "platformSecret", "orderLinkSecret", "adminPassword", "shopifyAdminToken", "shopifyClientSecret", "storefrontToken", "storefrontPrivateToken",
@@ -263,9 +265,27 @@ const secretSaved = await call("owner", "apps/[id]", "POST", { params: { id: sec
 const appB = await call("owner-b", "apps", "POST", { body: { install: { pluginId: "sup-secret-app", scopes: ["orders.read"] } }, host: b.tenant.domains[0] });
 await call("owner-b", "apps/[id]", "POST", { params: { id: appB.body?.install?.id }, body: { settings: { greeting: CNY.bApp } }, host: b.tenant.domains[0] });
 
+// Phase 4 line 3: a custom app in A with a delivered order.created event for
+// the fixture order (its secret a canary), and a custom app in B (its name a canary)
+process.env.STOREASY_PLUGIN_EGRESS_LOCAL = "1";
+const hookBody = (name) => ({ create_custom: { name, url: "http://127.0.0.1:9/hooks", topics: ["order.created"], scopes: ["orders.read"] } });
+const hookA = await call("owner", "apps", "POST", { body: hookBody("Support webhook app") });
+const hookB = await call("owner-b", "apps", "POST", { body: hookBody(CNY.bWebhookApp), host: b.tenant.domains[0] });
+CNY.webhookSecret = hookA.body?.secret ?? "";
+SECRET_KEYS.push("webhookSecret");
+await a.run(async () => {
+  const { emitOrderEvent, fanOut } = await import("../lib/plugins/events.js");
+  const ev = await emitOrderEvent("order.created", ORDER_ID);
+  if (ev) await fanOut(ev.id);
+  const { db: tdb } = await import("../lib/db.js");
+  await tdb.updateTable("plugin_deliveries").set({ status: "delivered", attempts: 1, last_status: 200, delivered_at: new Date().toISOString() }).execute();
+});
+
 const CTX = {
   appId: appA.body?.install?.id ?? null,
   secretAppId: secretApp.body?.install?.id ?? null,
+  webhookAppId: hookA.body?.install?.id ?? null,
+  bWebhookAppId: hookB.body?.install?.id ?? null,
   docId: pageA.doc.id,
   bundleId: bundleA.body?.bundle?.id ?? null,
   experimentSlug: experimentA.body?.experiment?.slug ?? null,
@@ -329,6 +349,7 @@ const skipFor = (caller) => [...(REDACTED(caller) ? [] : ORDER_PII), OWN_TOKEN[c
 await t("setup: outside services blank, only file: databases, the fixture planted", () => {
   eq(secretSaved.status, 200, `the app secret saved: ${secretSaved.text?.slice(0, 200)}`);
   eq(appB.status, 200, `store B's app: ${appB.text?.slice(0, 200)}`);
+  ok(/^whsec_/.test(CNY.webhookSecret) && hookB.status === 200, `the custom apps (line 3): ${hookA.text?.slice(0, 160)} | ${hookB.text?.slice(0, 160)}`);
   for (const [k, v] of Object.entries({ appId: CTX.appId, secretAppId: CTX.secretAppId, bundleId: CTX.bundleId, experimentSlug: CTX.experimentSlug, quizSlug: CTX.quizSlug, collectionGid: CTX.collectionGid })) ok(v, `fixture ${k} (${bundleA.text?.slice(0, 120)} | ${experimentA.text?.slice(0, 120)} | ${quizA.text?.slice(0, 120)})`);
   for (const k of H.OUTSIDE_SERVICE_ENV) eq(process.env[k], "", k);
   for (const tn of [a, b, c, d]) F.assertLocalDbUrl(tn.tenant.dbUrl);

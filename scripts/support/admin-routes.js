@@ -34,6 +34,16 @@ export const ADMIN_ROUTES = Object.freeze([
   { path: "apps", method: "POST", action: "apps.manage", probe: { body: { install: { pluginId: "no-such-app", scopes: [] } } } },
   { path: "apps/[id]", method: "GET", action: "apps.read", probe: { params: { id: "pin_0000000000000000" } } },
   { path: "apps/[id]", method: "POST", action: "apps.manage", probe: { params: { id: "pin_0000000000000000" }, body: { disable: true } } },
+  // Phase 4 line 3: custom apps and their webhooks (probes fail validation or find no app)
+  { path: "apps", method: "POST", variant: "create_custom", action: "apps.manage", probe: { body: { create_custom: { name: "" } } } },
+  { path: "apps/[id]/webhooks", method: "GET", action: "apps.read", probe: { params: { id: "pin_0000000000000000" } } },
+  ...["endpoint", "rotate_secret", "test", "pause", "resume", "resend"].map((v) => ({
+    path: "apps/[id]/webhooks",
+    method: "POST",
+    variant: v,
+    action: "apps.manage",
+    probe: { params: { id: "pin_0000000000000000" }, body: { [v]: v === "endpoint" ? { url: "https://example.com/hook" } : v === "resend" ? "dlv_0000000000000000" : true } },
+  })),
   { path: "audit", method: "GET", action: "audit.read" },
   { path: "automations", method: "GET", action: "settings.read" },
   { path: "automations", method: "POST", action: "settings.write", probe: { body: {} } },

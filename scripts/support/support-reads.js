@@ -21,6 +21,11 @@ export const SUPPORT_PROBES = Object.freeze([
   { name: "apps", path: "apps", method: "GET", keys: ["ok", "installs", "catalog"] },
   { name: "apps/[id]", path: "apps/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.appId } }), keys: ["ok", "install", "plugin"] },
   { name: "apps/[id] (secret app)", path: "apps/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.secretAppId } }), keys: ["ok", "install", "plugin"] },
+  // Phase 4 line 3: an app's webhooks and deliveries (support gets no payloads,
+  // never a secret; store B's app is not found on A)
+  { name: "apps/[id]/webhooks", path: "apps/[id]/webhooks", method: "GET", req: (ctx) => ({ params: { id: ctx.webhookAppId } }), keys: ["ok", "endpoint", "topics", "canSeePayloads", "deliveries"] },
+  { name: "apps/[id]/webhooks ?status=delivered", path: "apps/[id]/webhooks", method: "GET", req: (ctx) => ({ params: { id: ctx.webhookAppId }, query: "status=delivered&topic=order.created" }), keys: ["ok", "endpoint", "topics", "canSeePayloads", "deliveries"] },
+  { name: "apps/[id]/webhooks (store B's app)", path: "apps/[id]/webhooks", method: "GET", req: (ctx) => ({ params: { id: ctx.bWebhookAppId } }), status: 404, keys: ["error", "code"], note: "another store's app is not on this store" },
   { name: "brand-step", path: "brand-step", method: "GET", keys: ["ok", "brandStep", "palettes", "current", "design", "storeOpen", "canEditDescription", "descriptionMax"] },
   { name: "bundles", path: "bundles", method: "GET", keys: ["ok", "bundles", "currency"] },
   { name: "catalog", path: "catalog", method: "GET", keys: ["ok", "products", "overrides", "collections", "shopify_admin"] },

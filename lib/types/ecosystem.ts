@@ -55,6 +55,22 @@ export interface PluginManifest {
   settings: PluginSetting[];
   // line 2: blocks (declarative only: no iframe or script slot kinds)
   // line 3: events and egress
+  events?: Exclude<WebhookTopic, "ping">[]; // handlers: lib/plugins/handlers.js
+  egress?: string[]; // the hosts its handlers may call (lowercase DNS names, never Shopify)
+}
+
+/** Phase 4 line 3: store events a plugin receives (lib/plugins/topics.js TOPICS). */
+export type WebhookTopic = "order.created" | "order.fulfilled" | "ping";
+
+export type DeliveryStatus = "pending" | "retrying" | "delivered" | "failed" | "skipped";
+
+/** The body POSTed to a custom app, signed per Standard Webhooks v1. No customer details. */
+export interface WebhookBody {
+  id: string; // "evt_" + 16 hex
+  type: WebhookTopic;
+  created_at: string;
+  store: string | null; // the store's host
+  data: Record<string, unknown>;
 }
 
 export type PluginInstallStatus = "enabled" | "disabled" | "uninstalled";
