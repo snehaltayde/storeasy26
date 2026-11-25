@@ -73,6 +73,12 @@ const throws = async (fn, re, label = "") => {
 async function seedProviderSub(rpId, planId = "starter", version = 1) {
   // pinned explicitly at the SOLD version (v1), so the entitlement tests can
   // prove pinning even after the catalog moved to v2
+  // one current subscription per store (platform migration 0017): the store's
+  // earlier rows end first, as a plan change would end them
+  await C.platformDb().execute({
+    sql: "UPDATE subscriptions SET status = 'cancelled', replaced_by = ? WHERE tenant_id = 'shop' AND replaced_by IS NULL AND status NOT IN ('cancelled','completed','expired')",
+    args: [`sub_test_${rpId}`],
+  });
   await C.platformDb().execute({
     sql: `INSERT INTO subscriptions (id, tenant_id, plan_id, plan_version, razorpay_subscription_id, status, created_at, updated_at)
           VALUES (?, 'shop', ?, ?, ?, 'created', ?, ?)`,

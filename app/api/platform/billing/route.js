@@ -16,7 +16,7 @@ import {
 } from "@/lib/platform/billing";
 import { billingProviderConfigured } from "@/lib/platform/razorpay-billing";
 import { slog } from "@/lib/log";
-import { audit } from "@/lib/platform/audit";
+import { audit, OPERATOR_ONLY } from "@/lib/platform/audit";
 
 // Operator billing (S40 / OP08; Phase 3 line 3): fleet subscriptions, MRR,
 // gross/refunds/net by month (sums over the deduped provider-event ledger),
@@ -56,6 +56,7 @@ export async function GET(request) {
   }
 }
 
+const tenantOf = (body) => String(body.tenant || "");
 const reasonOf = (body) => String(body.reason || "").trim().slice(0, 300);
 
 export async function POST(request) {
@@ -84,25 +85,35 @@ export async function POST(request) {
       await audit({ actor, action: "billing.plan_retired", resource: `plan:${p.id}`, tenantId: null, diff: { version: p.version } });
       result = { plan: p.id, version: p.version, status: "retired" };
     } else if (body.action === "start") {
-      const tenant = String(body.tenant || "");
-      const r = await startSubscription(tenant, String(body.plan || ""));
-      await audit({ actor, action: "billing.start", resource: `subscription:${r.id}`, tenantId: tenant, diff: { plan: r.plan, status: r.status, previous: r.previous } });
+      const r = await startSubscription(tenantOf(body), String(body.plan || ""));
+      // what happened to each row it ended; a provider's error text is operator-only
+      const previous = r.previous.map(({ id, ended, retried = false }) => ({ id, ended, retried, cancel_failed: ended == null }));
+      const errors = r.previous.filter((p) => p.error).map(({ id, error }) => ({ id, error }));
+      await audit({ actor, action: "billing.start", resource: `subscription:${r.id}`, tenantId: tenantOf(body), diff: { plan: r.plan, status: r.status, previous, ...(errors.length ? { [OPERATOR_ONLY]: { errors } } : {}) } });
       // the founder's payment link is shown to the operator once, here
-      result = { id: r.id, plan: r.plan, status: r.status, local: Boolean(r.local), shortUrl: r.shortUrl || null, previous: r.previous || null };
+      result = { id: r.id, plan: r.plan, status: r.status, local: Boolean(r.local), shortUrl: r.shortUrl || null, previous: r.previous };
     } else if (body.action === "grace") {
       const reason = reasonOf(body);
       const r = await extendGrace(String(body.subscription || ""), { days: body.days, reason });
-      await audit({ actor, action: "billing.grace", resource: `subscription:${r.id}`, tenantId: r.tenant, diff: { days: Number(body.days), reason, previous: r.previous, grace_until: r.grace_until } });
+      await audit({ actor, action: "billing.grace", resource: `subscription:${r.id}`, tenantId: r.tenant, diff: { days: Number(body.days), previous: r.previous, grace_until: r.grace_until, [OPERATOR_ONLY]: { reason } } });
       result = r;
     } else if (body.action === "cancel") {
       const r = await cancelSubscription(String(body.subscription || ""), { atCycleEnd: body.atCycleEnd !== false });
-      await audit({ actor, action: "billing.cancel", resource: `subscription:${r.id}`, tenantId: r.tenant, diff: { ended: r.ended, local: r.local, reason: reasonOf(body) || null } });
+      await audit({ actor, action: "billing.cancel", resource: `subscription:${r.id}`, tenantId: r.tenant, diff: { ended: r.ended, local: r.local, [OPERATOR_ONLY]: { reason: reasonOf(body) || null } } });
       result = r;
     } else {
       return NextResponse.json({ error: "unknown action" }, { status: 400 });
     }
     return NextResponse.json({ ok: true, result, ...(await summary()) });
   } catch (e) {
+    // a start or cancel that failed part way is audited as it happened
+    if (["PROVIDER_ERROR", "BILLING_CONFLICT"].includes(e?.code) && ["start", "cancel"].includes(body.action)) {
+      const { error = null, ...detail } = e.detail || {};
+      const tenantId = body.action === "start" ? tenantOf(body) : detail.tenant || null;
+      const resource = body.action === "start" ? `store:${tenantId}` : `subscription:${detail.subscription}`;
+      await audit({ actor, action: `billing.${body.action}_failed`, resource, tenantId, diff: { code: e.code, plan: body.plan || null, ...detail, [OPERATOR_ONLY]: { error, reason: reasonOf(body) || null } } });
+      return NextResponse.json({ error: String(e.message).slice(0, 300), code: e.code, detail: e.detail || null }, { status: e.code === "BILLING_CONFLICT" ? 409 : 502 });
+    }
     if (e?.code === "BILLING_UNCONFIGURED") return NextResponse.json({ error: String(e.message).slice(0, 300), code: e.code }, { status: 503 });
     return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
   }

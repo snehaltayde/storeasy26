@@ -25,6 +25,11 @@ process.env.PLATFORM_BILLING_GRACE_DAYS = "7";
 const razorpay = [];
 const elsewhere = [];
 let rpSeq = 0;
+// failNext.push(regex): the next Razorpay call whose path matches answers 400
+const failNext = [];
+// gate: when set, new Razorpay subscriptions wait until `of` callers have asked
+// for one, so two plan changes both read the store before either writes
+let gate = null;
 globalThis.fetch = async (input, init = {}) => {
   const url = new URL(String(input?.url ?? input));
   if (url.host !== "api.razorpay.com") {
@@ -34,7 +39,17 @@ globalThis.fetch = async (input, init = {}) => {
   const body = init.body ? JSON.parse(init.body) : null;
   razorpay.push({ method: init.method || "GET", path: url.pathname, body });
   const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json" } });
+  const f = failNext.findIndex((re) => re.test(url.pathname));
+  if (f >= 0) {
+    failNext.splice(f, 1);
+    return json({ error: { code: "BAD_REQUEST_ERROR", description: "RZP_CANARY stand-in refusal" } }, 400);
+  }
   if (url.pathname === "/v1/plans") return json({ id: `plan_rp${++rpSeq}` });
+  if (url.pathname === "/v1/subscriptions" && gate) {
+    gate.n++;
+    if (gate.n >= gate.of) gate.open();
+    await gate.opened;
+  }
   if (url.pathname === "/v1/subscriptions") return json({ id: `sub_rp${++rpSeq}`, status: "created", short_url: `https://rzp.io/i/pay${rpSeq}` });
   const m = url.pathname.match(/^\/v1\/subscriptions\/([^/]+)\/cancel$/);
   if (m) return json({ id: m[1], status: body?.cancel_at_cycle_end ? "active" : "cancelled" });
@@ -241,7 +256,7 @@ await t("change plan: free -> starter returns the founder's payment link once an
   const r = await op({ action: "start", tenant: A, plan: "starter" });
   eq(r.status, 200, r.text.slice(0, 160));
   ok(/^https:\/\/rzp\.io\/i\/pay\d+$/.test(r.body.result.shortUrl || ""), `link ${r.body.result.shortUrl}`);
-  eq(r.body.result.previous?.ended, "now", "old ended now");
+  eq(r.body.result.previous?.[0]?.ended, "now", "old ended now");
   const made = razorpay.slice(calls).map((c) => `${c.method} ${c.path}`);
   eq(made.join(", "), "POST /v1/plans, POST /v1/subscriptions", "provider calls");
   const subs = await subsOf(A);
@@ -260,7 +275,7 @@ await t("change plan: starter (Razorpay, paid) -> growth cancels the old one at 
   await tick();
   const r = await op({ action: "start", tenant: A, plan: "growth" });
   eq(r.status, 200, r.text.slice(0, 160));
-  eq(r.body.result.previous?.ended, "cycle_end", "old at cycle end");
+  eq(r.body.result.previous?.[0]?.ended, "cycle_end", "old at cycle end");
   const cancel = razorpay.slice(calls).find((c) => c.path.endsWith("/cancel"));
   ok(cancel, "a cancel call");
   eq(cancel.path, `/v1/subscriptions/${paidSub.razorpay_subscription_id}/cancel`, "the old provider id");
@@ -434,6 +449,176 @@ await t("events list: newest first, 50 a page, filters for store, type, month an
 });
 
 // --- least trusted --------------------------------------------------------------------
+// --- review fixes: one current subscription, features in force, partial failures --------
+const C3 = "platbill-c";
+await C.upsertTenant({ id: C3, name: "Platbill C", domains: ["platbill-c.test"], dbUrl: "file:.test-platbill-c-tenant.db", config: {}, secrets: {} });
+const liveRows = async (tenant) => (await db().execute({ sql: "SELECT * FROM subscriptions WHERE tenant_id = ? AND replaced_by IS NULL AND status NOT IN ('cancelled','completed','expired')", args: [tenant] })).rows;
+const rpEvent = (type, rpId, extra = {}) => B.applyBillingEvent({ eventId: `evt_${type}_${rpId}_${Math.random()}`, type, occurredAt: new Date().toISOString(), subscription: { id: rpId, ...extra } });
+
+await t("concurrent: a double click on a free plan leaves exactly one current subscription", async () => {
+  providerOff();
+  const answers = await Promise.all([1, 2, 3].map(() => op({ action: "start", tenant: C3, plan: "free" })));
+  eq(answers.filter((a) => a.status === 200).length, 1, answers.map((a) => a.status).join(","));
+  ok(answers.every((a) => [200, 409, 422].includes(a.status)), "the others are refused, never a 500");
+  eq((await liveRows(C3)).length, 1, "one current row");
+});
+
+await t("unique index: a second current row for a store is refused by the database itself", async () => {
+  const now = new Date().toISOString();
+  const tried = await db()
+    .execute({ sql: "INSERT INTO subscriptions (id, tenant_id, plan_id, plan_version, status, created_at, updated_at) VALUES ('sub_dup', ?, 'free', 1, 'active', ?, ?)", args: [C3, now, now] })
+    .then(() => "inserted", (e) => String(e.message));
+  ok(/UNIQUE/.test(tried), tried);
+});
+
+await t("concurrent: two paid changes at once: one wins; the loser's new Razorpay subscription is cancelled now", async () => {
+  providerOn();
+  const calls = razorpay.length;
+  const since = new Date().toISOString();
+  gate = { n: 0, of: 2 };
+  gate.opened = new Promise((r) => (gate.open = r));
+  const [x, y] = await Promise.all([op({ action: "start", tenant: C3, plan: "starter" }), op({ action: "start", tenant: C3, plan: "growth" })]);
+  gate = null;
+  const failed = await auditSince(since, "billing.start_failed");
+  eq(failed.length, 1, "the loser is audited");
+  ok(/BILLING_CONFLICT/.test(failed[0].diff || ""), "with its code");
+  eq([x.status, y.status].sort().join(","), "200,409", `${x.status} / ${y.status} ${y.text.slice(0, 120)}`);
+  const loser = (x.status === 409 ? x : y).body.detail;
+  ok(loser.provider_subscription, "the loser made a Razorpay subscription");
+  eq(loser.provider_cancelled, true, "and it was cancelled");
+  const sent = razorpay.slice(calls).find((c) => c.path === `/v1/subscriptions/${loser.provider_subscription}/cancel`);
+  eq(sent?.body.cancel_at_cycle_end, false, "cancelled now");
+  const live = await liveRows(C3);
+  eq(live.length, 1, "one current row");
+  eq(live[0].id, (x.status === 200 ? x : y).body.result.id, "the winner is current");
+});
+
+await t("features: an unpaid upgrade unlocks nothing; once Razorpay activates it, it does", async () => {
+  // the current row (paid, created) is activated, so the store is on a paid plan
+  const cur = (await liveRows(C3))[0];
+  await rpEvent("subscription.activated", cur.razorpay_subscription_id, { current_end: Math.floor(Date.now() / 1000) + 20 * 86400 });
+  const paidPlan = cur.plan_id;
+  eq((await B.entitlementsFor(C3)).plan, paidPlan, "on the paid plan");
+  await db().execute({ sql: "INSERT INTO plans (id, version, name, price, currency, interval, features, status, created_at) VALUES ('platinum', 1, 'Platinum', 999900, 'INR', 'month', '{\"orders_per_month\":99999}', 'active', ?) ON CONFLICT DO NOTHING", args: [new Date().toISOString()] });
+  await tick();
+  const up = await op({ action: "start", tenant: C3, plan: "platinum" });
+  eq(up.status, 200, up.text.slice(0, 160));
+  const ent = await B.entitlementsFor(C3);
+  eq(ent.plan, paidPlan, "the unpaid upgrade unlocks nothing");
+  const snap = (await C.getTenant(C3)).config.billing;
+  eq(`${snap.plan}/${snap.status}`, `${paidPlan}/active`, "the snapshot stays on the paid plan");
+  const rp = (await db().execute({ sql: "SELECT razorpay_subscription_id r FROM subscriptions WHERE id = ?", args: [up.body.result.id] })).rows[0].r;
+  await rpEvent("subscription.activated", rp, { current_end: Math.floor(Date.now() / 1000) + 30 * 86400 });
+  eq((await B.entitlementsFor(C3)).plan, "platinum", "paid: unlocked");
+  eq((await C.getTenant(C3)).config.billing.plan, "platinum", "snapshot follows");
+  // the replaced plan's cycle ends
+  await rpEvent("subscription.cancelled", cur.razorpay_subscription_id, { current_end: Math.floor(Date.now() / 1000) - 60 });
+  eq((await B.entitlementsFor(C3)).plan, "platinum", "still platinum");
+});
+
+await t("features: a downgrade from paid to free keeps the paid plan until its cycle ends, with no grace on the replaced row", async () => {
+  const paid = (await liveRows(C3))[0];
+  await tick();
+  const down = await op({ action: "start", tenant: C3, plan: "free" });
+  eq(down.status, 200, down.text.slice(0, 160));
+  eq(down.body.result.previous.find((p) => p.id === paid.id)?.ended, "cycle_end", "the paid one is cancelled at cycle end");
+  eq((await B.entitlementsFor(C3)).plan, "platinum", "paid features until the cycle ends");
+  eq((await C.getTenant(C3)).config.billing.plan, "platinum", "snapshot");
+  // the cycle ends: Razorpay's cancelled webhook
+  await rpEvent("subscription.cancelled", paid.razorpay_subscription_id, { current_end: Math.floor(Date.now() / 1000) - 60 });
+  const row = (await db().execute({ sql: "SELECT status, grace_until FROM subscriptions WHERE id = ?", args: [paid.id] })).rows[0];
+  eq(`${row.status}/${row.grace_until}`, "cancelled/null", "no grace on a replaced row");
+  eq((await B.entitlementsFor(C3)).plan, "free", "then free");
+  eq((await C.getTenant(C3)).config.billing.status, "active", "the free plan runs");
+});
+
+await t("razorpay errors: a failed cancel during a change is flagged, then retried by the next change", async () => {
+  // the store on a paid, active plan again
+  await tick();
+  const p = await op({ action: "start", tenant: C3, plan: "starter" });
+  const rpOld = (await db().execute({ sql: "SELECT razorpay_subscription_id r FROM subscriptions WHERE id = ?", args: [p.body.result.id] })).rows[0].r;
+  await rpEvent("subscription.activated", rpOld, { current_end: Math.floor(Date.now() / 1000) + 10 * 86400 });
+  const since = new Date().toISOString();
+  failNext.push(/\/cancel$/);
+  await tick();
+  const ch = await op({ action: "start", tenant: C3, plan: "growth" });
+  eq(ch.status, 200, ch.text.slice(0, 160));
+  const prev = ch.body.result.previous.find((x) => x.id === p.body.result.id);
+  eq(prev?.ended, null, "not cancelled");
+  ok(/RZP_CANARY/.test(prev?.error || ""), "the operator sees why");
+  const row = (await db().execute({ sql: "SELECT cancel_state, replaced_by FROM subscriptions WHERE id = ?", args: [p.body.result.id] })).rows[0];
+  eq(row.cancel_state, "failed", "flagged on the row");
+  ok(row.replaced_by, "still replaced: one current subscription");
+  eq((await liveRows(C3)).length, 1, "one current row");
+  const ov = (await call("operator", "billing", "GET")).body;
+  ok(ov.exceptions.some((x) => x.kind === "cancel_failed" && x.tenant === C3), "in the exception queue");
+  const [a] = await audited(since, "billing.start", { tenant: C3 });
+  ok(/"cancel_failed":true/.test(a.diff) && /RZP_CANARY/.test(a.diff), "the audit says what happened");
+  const calls = razorpay.length;
+  await tick();
+  const again = await op({ action: "start", tenant: C3, plan: "starter" });
+  eq(again.status, 200, again.text.slice(0, 160));
+  ok(razorpay.slice(calls).some((c) => c.path === `/v1/subscriptions/${rpOld}/cancel` && c.body.cancel_at_cycle_end === true), "the next change retries it at cycle end");
+  eq(again.body.result.previous.find((x) => x.id === p.body.result.id)?.retried, true, "reported as a retry");
+  eq((await db().execute({ sql: "SELECT cancel_state s FROM subscriptions WHERE id = ?", args: [p.body.result.id] })).rows[0].s, "cycle_end", "now confirmed");
+});
+
+await t("razorpay errors: a refused new subscription changes nothing; a refused cancel is a 502, flagged and audited", async () => {
+  const before = (await db().execute({ sql: "SELECT id, status, replaced_by FROM subscriptions WHERE tenant_id = ? ORDER BY id", args: [C3] })).rows.map((r) => `${r.id}:${r.status}:${r.replaced_by}`).join(" ");
+  const since = new Date().toISOString();
+  failNext.push(/^\/v1\/subscriptions$/);
+  const r = await op({ action: "start", tenant: C3, plan: "growth" });
+  eq(r.status, 502, r.text.slice(0, 160));
+  ok(!/RZP_CANARY/.test(r.body.error), "plain words, not the provider's");
+  const after = (await db().execute({ sql: "SELECT id, status, replaced_by FROM subscriptions WHERE tenant_id = ? ORDER BY id", args: [C3] })).rows.map((x) => `${x.id}:${x.status}:${x.replaced_by}`).join(" ");
+  eq(after, before, "no row written or ended");
+  ok(/PROVIDER_ERROR/.test((await audited(since, "billing.start_failed", { tenant: C3 }))[0].diff), "audited");
+  const cur = (await liveRows(C3))[0];
+  failNext.push(/\/cancel$/);
+  const c = await op({ action: "cancel", subscription: cur.id, reason: "CANCEL_REASON_CANARY" });
+  eq(c.status, 502, c.text.slice(0, 160));
+  eq((await db().execute({ sql: "SELECT cancel_state s FROM subscriptions WHERE id = ?", args: [cur.id] })).rows[0].s, "failed", "flagged");
+  const rows = await audited(since, "billing.cancel_failed", { tenant: C3 });
+  ok(/RZP_CANARY/.test(rows[0].diff) && /CANCEL_REASON_CANARY/.test(rows[0].diff), "error and reason kept for operators");
+  eq((await op({ action: "cancel", subscription: cur.id })).status, 200, "a retry goes through");
+});
+
+await t("grace: only the store's newest subscription, and never a paused one", async () => {
+  const older = (await subsOf(A)).find((s) => s.status === "cancelled");
+  ok(older && older.id !== (await B.subscriptionFor(A)).id, "an older ended row");
+  const r = await op({ action: "grace", subscription: older.id, days: 3, reason: "x" });
+  eq(r.status, 422, "older row");
+  ok(/newest/.test(r.body.error), r.body.error);
+  const newest = await B.subscriptionFor(Bid);
+  await db().execute({ sql: "UPDATE subscriptions SET status = 'paused' WHERE id = ?", args: [newest.id] });
+  eq((await op({ action: "grace", subscription: newest.id, days: 3, reason: "x" })).status, 422, "paused");
+  await db().execute({ sql: "UPDATE subscriptions SET status = ? WHERE id = ?", args: [newest.status, newest.id] });
+});
+
+await t("merchant audit log: the store sees operator billing actions but never their reason or Razorpay's error text", async () => {
+  const since = new Date().toISOString();
+  await tick();
+  const sub = await B.subscriptionFor(Bid);
+  eq((await op({ action: "grace", subscription: sub.id, days: 2, reason: "GRACE_REASON_CANARY" })).status, 200, "grace");
+  const future = new Date(Date.now() + 86400000).toISOString();
+  eq((await op({ action: "override", tenant: A, features: { staff_seats: 3 }, reason: "OVERRIDE_REASON_CANARY", expiresAt: future })).status, 200, "override");
+  await op({ action: "clear_override", tenant: A });
+  ok((await auditSince(since, "billing.grace"))[0].diff.includes("GRACE_REASON_CANARY"), "kept for operators");
+  const canaries = ["GRACE_REASON_CANARY", "OVERRIDE_REASON_CANARY", "CANCEL_REASON_CANARY", "RZP_CANARY", "founder asked", "bank holiday"];
+  const hosts = { owner: store.a.tenant.domains[0], "owner-b": store.b.tenant.domains[0], support: store.a.tenant.domains[0] };
+  for (const [caller, host] of Object.entries(hosts)) {
+    const r = await store.call(caller, "audit", "GET", { host, query: "limit=200" });
+    for (const c of canaries) ok(!r.text.includes(c), `${caller} (${r.status}) sees ${c}`);
+    if (caller !== "support") {
+      eq(r.status, 200, `${caller} reads its audit log`);
+      ok(r.body.entries.some((e) => e.action.startsWith("billing.")), `${caller} sees the billing actions`);
+    }
+  }
+  const { auditChanges, OPERATOR_ONLY } = await import("../lib/platform/audit.js");
+  const long = JSON.stringify({ note: "x".repeat(3000), [OPERATOR_ONLY]: { reason: "TRUNC_CANARY" } });
+  ok(!auditChanges(JSON.stringify({ truncated: true, preview: long.slice(0, 2000) + "\"operator_only\":{\"reason\":\"TRUNC_CANARY\"}" })).join(" ").includes("TRUNC_CANARY"), "a truncated preview is cut too");
+});
+
 await t("least trusted: signed out and merchant callers get 401 on every billing view and action, with no store data", async () => {
   const views = ["", "view=subscriptions", "view=events", `view=subscriptions&store=${A}`];
   const actions = [

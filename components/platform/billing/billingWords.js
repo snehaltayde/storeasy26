@@ -28,6 +28,7 @@ export const EXCEPTION_WORDS = Object.freeze({
   payment_trouble: "Payment trouble",
   past_grace: "Past grace: checkout paused",
   orphan_event: "Event with no store",
+  cancel_failed: "Razorpay cancel failed",
 });
 
 export const EVENT_WORDS = Object.freeze({

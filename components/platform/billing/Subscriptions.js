@@ -31,7 +31,7 @@ import { useBillingData } from "./useBillingData";
 export const selectClass =
   "h-8 rounded-md border border-input bg-muted px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background pointer-coarse:h-10";
 const ENDED = ["cancelled", "completed", "expired"];
-const GRACEABLE = ["halted", "cancelled", "expired", "paused"];
+const GRACEABLE = ["halted", "cancelled", "expired"]; // lib/billing-state.js grace states
 
 // Subscriptions: every subscription row, searchable by store, filtered by
 // status and plan, ?store=<id> opens one store's rows (and the start dialog
@@ -95,7 +95,7 @@ export default function Subscriptions({ params, setParams }) {
       header: "Status",
       cell: (r) => {
         const [label, tone] = subStatus(r.status);
-        const note = r.cancel_requested && !ENDED.includes(r.status) ? (r.cancel_requested.ended === "now" ? "Cancel sent" : "Cancels at cycle end") : null;
+        const note = ENDED.includes(r.status) ? null : r.cancel_failed ? "Cancel failed at Razorpay" : r.cancel_requested ? (r.cancel_requested.ended === "now" ? "Cancel sent" : "Cancels at cycle end") : r.replaced_by ? "Replaced" : null;
         return (
           <span className="flex flex-col items-start gap-0.5 leading-tight">
             <Badge variant={tone}>{label}</Badge>
@@ -107,6 +107,8 @@ export default function Subscriptions({ params, setParams }) {
     { key: "current_end", header: "Cycle ends", className: "hidden lg:table-cell", cell: (r) => <span className="whitespace-nowrap">{shortDate(r.current_end)}</span> },
   ];
 
+  // rows come newest first; grace is extended only on a store's newest one (the server checks too)
+  const newestOf = (tenant) => data?.rows?.find((x) => x.tenant_id === tenant)?.id;
   const rowActions = (r) => {
     const ended = ENDED.includes(r.status);
     const cancelBlocked = ended ? "This subscription has already ended." : r.provider && !configured ? "Razorpay isn't set up, so this can't be cancelled from here." : null;
@@ -117,7 +119,7 @@ export default function Subscriptions({ params, setParams }) {
             Change plan
           </Button>
         )}
-        {GRACEABLE.includes(r.status) && (
+        {GRACEABLE.includes(r.status) && r.id === newestOf(r.tenant_id) && (
           <Button size="sm" variant="ghost" onClick={() => setDialog({ kind: "grace", row: r })}>
             Extend grace
           </Button>
@@ -236,6 +238,15 @@ export default function Subscriptions({ params, setParams }) {
   );
 }
 
+// what happened to the rows a plan change ended
+function previousWords(previous = []) {
+  const failed = previous.filter((p) => p.ended == null);
+  if (failed.length) return ` Razorpay did not cancel ${failed.length === 1 ? "the old subscription" : `${failed.length} old subscriptions`} (${failed[0].error}). It is flagged in Overview; cancel it there or change plan again to retry.`;
+  if (previous.some((p) => p.ended === "cycle_end")) return " The old subscription ends at the end of its billing cycle.";
+  if (previous.length) return " The old subscription has ended.";
+  return "";
+}
+
 function Gated({ reason, children }) {
   if (!reason) return children;
   return (
@@ -346,7 +357,7 @@ function StartDialog({ stores, plans, configured, initial, onClose, onDone }) {
             disabled={busy || !tenant || !plan || Boolean(blocked)}
             onClick={() =>
               submit({ action: "start", tenant, plan }, (r) => ({
-                text: `${chosen?.name || plan} ${r.local ? "is active" : "is waiting for the founder's payment"} for ${tenant}.${r.previous?.ended === "cycle_end" ? " The old subscription ends at the end of its billing cycle." : r.previous?.ended === "now" ? " The old subscription has ended." : r.previous?.error ? ` The old subscription could not be cancelled: ${r.previous.error}` : ""}`,
+                text: `${chosen?.name || plan} ${r.local ? "is active" : "is waiting for the founder's payment"} for ${tenant}.${previousWords(r.previous)}`,
                 link: r.shortUrl || null,
               }))
             }
