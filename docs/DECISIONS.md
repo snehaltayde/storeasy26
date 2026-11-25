@@ -3,6 +3,17 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Phase 4 least-trusted audit fixes (on the owner's behalf)
+
+- **Kill switch for custom apps:** the flag key is `ff_plugin-custom-<hex>` (the route accepts it); delivery and fan-out check it too; first-party ids may not start with `custom-`.
+- **No coupon codes to apps:** `coupon_code` is dropped from webhook payloads and v1 orders (the discount total stays), and a coupon's line in `applied_offers` says only "Coupon". Events stored before the fix keep their code until the 30-day prune; nothing is hosted, so this is accepted.
+- **Support:** first-party handler errors are stored as fixed words (raw text to the log), and support sees fixed words for every delivery error.
+- **Rate limits:** each app has one budget of 120 calls a minute across its tokens, beside the per-token one. v1 orders with an unknown status answer 400.
+- **Tests:** the order slot's context is proven end to end on both order pages (only id, status, fulfilment status and created time).
+- **Audit:** `docs/cms-reviews/PHASE-4-AUDIT.md`.
+- **Decided by:** Claude
+- **Slice:** Phase 4 audit
+
 ## 2026-11-25 Plugin blocks in storefront slots (on the owner's behalf)
 
 - **Schema:** tenant migration `0031_plugin_placements.sql` (table `plugin_placements`), additive.
