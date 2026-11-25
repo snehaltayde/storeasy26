@@ -10,7 +10,7 @@
 // gated (RoleGate apps.manage: aria-disabled with the reason) and the
 // settings fields natively disabled.
 import { useCallback, useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, ExternalLink } from "lucide-react";
+import { ArrowDown, ArrowUp, CircleAlert, ExternalLink, TriangleAlert } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -74,7 +74,7 @@ function SettingsForm({ placement, role, canManage, busy, onSave, errors }) {
               </Label>
               <PlainControl s={f} id={id} value={values[f.key]} onChange={(v) => setValues((x) => ({ ...x, [f.key]: v }))} disabled={!canManage || busy} error={err} />
               {err ? (
-                <p id={`${id}-error`} className="text-xs text-destructive">
+                <p id={`${id}-error`} className="text-[0.8125rem] text-destructive">
                   {err}
                 </p>
               ) : null}
@@ -154,12 +154,12 @@ function PlacementRow({ placement, previewPath, role, canManage, busy, errors, o
         <div className="flex gap-1" role="group" aria-label={`Order of ${name} in this place`}>
           <RoleGate role={role} action="apps.manage" reason={NO_MANAGE_WORDS}>
             <Button type="button" variant="outline" size="icon" disabled={busy || placement.first} aria-label="Move up" data-placement-move="up" onClick={() => onChange({ move: "up" })}>
-              <ArrowUp />
+              <ArrowUp aria-hidden="true" />
             </Button>
           </RoleGate>
           <RoleGate role={role} action="apps.manage" reason={NO_MANAGE_WORDS}>
             <Button type="button" variant="outline" size="icon" disabled={busy || placement.last} aria-label="Move down" data-placement-move="down" onClick={() => onChange({ move: "down" })}>
-              <ArrowDown />
+              <ArrowDown aria-hidden="true" />
             </Button>
           </RoleGate>
         </div>
@@ -232,6 +232,7 @@ export default function PlacementsCard({ installId, role, installOff = false }) 
       <CardContent className="grid gap-4">
         {loadError ? (
           <Alert variant="destructive">
+            <CircleAlert aria-hidden="true" />
             <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
               <span>{loadError}</span>
               <Button type="button" size="sm" variant="outline" data-read-control="" onClick={load}>
@@ -252,11 +253,13 @@ export default function PlacementsCard({ installId, role, installOff = false }) 
           <>
             {off ? (
               <Alert variant="warning">
+                <TriangleAlert aria-hidden="true" />
                 <AlertDescription>This app is off, so none of its parts show on your store, even ones set to Live. Turn the app on to show them.</AlertDescription>
               </Alert>
             ) : null}
             {refusal && !refusal.errors ? (
-              <Alert variant="destructive" data-placement-refusal="">
+              <Alert variant="destructive" role="alert" data-placement-refusal="">
+                <CircleAlert aria-hidden="true" />
                 <AlertDescription>{refusal.message}</AlertDescription>
               </Alert>
             ) : null}
@@ -276,7 +279,8 @@ export default function PlacementsCard({ installId, role, installOff = false }) 
               ))}
             </ul>
             {refusal?.errors ? (
-              <Alert variant="destructive" data-placement-refusal="">
+              <Alert variant="destructive" role="alert" data-placement-refusal="">
+                <CircleAlert aria-hidden="true" />
                 <AlertDescription>{refusal.message}</AlertDescription>
               </Alert>
             ) : null}

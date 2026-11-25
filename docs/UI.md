@@ -212,6 +212,13 @@ Phase 2 line 11. `/admin/login`, `/admin/reset` and `/admin/accept-invite` take 
 - **Recent calls** (`CallLog.js`, inside the card, owner and admin only, `audit.read`): Refresh (a read), then a `DataTable` of the last 100 calls: Time, Call (method and path, mono), Answer (the status as a mono badge: 2xx success, 401/403/429 warning, 5xx danger), Token. Empty: "No calls yet".
 - **Staff and support:** the card read-only (Edit permissions, Create token and Revoke disabled with the reason in a tooltip); no Recent calls.
 
+### Design sweep (Phase 4)
+
+- **Loading:** the app page has its own `loading.js` (title, Overview, Settings, Danger zone shapes); the Webhooks and API access cards load as their own titled card with skeleton rows (`CardLoading.js`), so the page does not jump.
+- **Shown once:** the signing secret and the API token say "You won't see it again after you close this" (or "after you leave this page" for a rotated secret, which scrolls into view); once a secret or token is on screen, a click outside the dialog no longer closes it (Esc, Close and Done still do).
+- **Blocked actions say why:** Turn on while Storeasy has the app off, and Send test event while paused or off, carry a one-line reason under the actions (`aria-describedby`).
+- **Small parts:** hints and field errors are 0.8125rem; a switch setting keeps its label and help on the left; Activity reads "<what> by <who>" with the who muted; the tokens table puts "by <who>" under the date; custom apps carry a "Custom" outline badge in the Installed list; Revoke is red text; every alert in the Where it shows card has its icon.
+
 ## Operator screens (Phase 3)
 
 Each Phase 3 line fills only its own sub-heading.
