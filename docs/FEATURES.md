@@ -108,6 +108,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 
 ## Later (not planned yet)
 
+- **Flaky under the full suite's load (2026-11-25):** `test:editor-store` ("409 stops autosave": status `saving`, not `conflict`) and `test:design-doc` ("a failing pin write does not change the publish result") each failed once in a full `pnpm test` while three heavy jobs ran, and pass alone every time. Find the timing they depend on and wait on a real signal.
 - A read-only operator role (Phase 3 gives every operator every action; decided 2026-11-25).
 - Support access: signing every member out and rotating the Turso database token as part of secret rotation (Phase 3 rotates only the keys Storeasy holds).
 - **Drill install race (from the drill flake under load):** the sign-in 500 under load was Turbopack's `next/font/google` failing one boot's build; drills now check each boot and reboot only that error (2026-11-25, see DECISIONS). The `ERR_MODULE_NOT_FOUND @libsql/client` in a drill worktree was suspected to be a concurrent `pnpm install`; installs are now serialized, but the race was never reproduced. Watch `server.log` in `.drill-results/` if it shows again.
