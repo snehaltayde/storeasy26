@@ -79,9 +79,10 @@ const MIGRATION = await readFile(join(ROOT, "migrations/tenant/0037_customer_add
 
 await t("0037 on a fresh database: customer_addresses with the plan's columns and index, and no rows", async () => {
   const cols = (await q(sFresh, "PRAGMA table_info(customer_addresses)")).map((r) => r.name);
-  same(cols, ["id", "customer_id", "label", "name", "phone", "line1", "line2", "city", "state", "pincode", "country_code", "is_default", "last_used_at", "created_at", "updated_at"], "columns");
+  same(cols, ["id", "customer_id", "label", "name", "phone", "line1", "line2", "city", "state", "pincode", "country_code", "is_default", "last_used_at", "created_at", "updated_at", "address_key"], "columns");
   const idx = await q(sFresh, "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'customer_addresses'");
   ok(idx.some((r) => r.name === "idx_customer_addresses_customer"), "index");
+  ok(idx.some((r) => r.name === "idx_customer_addresses_key"), "unique key index");
   eq((await q(sFresh, "SELECT COUNT(*) AS n FROM customer_addresses"))[0].n, 0, "rows");
   const ledger = await q(sFresh, "SELECT id FROM schema_migrations WHERE id = '0037_customer_addresses'");
   eq(ledger.length, 1, "0037 in the ledger");
@@ -95,6 +96,10 @@ await t("0037 on a store with default_address: each valid one becomes one defaul
     ["cus_bad", "bad@x.test", "Bad", null, "{not json"],
     ["cus_none", "none@x.test", "None", null, null],
     ["cus_noline", "noline@x.test", "No Line", null, JSON.stringify({ city: "Pune", state: "MH", pincode: "411001" })],
+    // review fix 1: incomplete ones are skipped, not a NOT NULL failure
+    ["cus_nocity", "nocity@x.test", "No City", null, JSON.stringify({ line1: "1 St", pincode: "411001" })],
+    ["cus_nostate", "nostate@x.test", "No State", null, JSON.stringify({ line1: "1 St", city: "Pune", state: "", pincode: "411001" })],
+    ["cus_nopin", "nopin@x.test", "No Pin", null, JSON.stringify({ line1: "1 St", city: "Pune", state: "MH" })],
   ];
   for (const [id, email, name, phone, addr] of rows) {
     await q(sOld, "INSERT INTO customers (id, email, name, phone, default_address, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?, ?)", [id, email, name, phone, addr, now, now]);
@@ -108,6 +113,9 @@ await t("0037 on a store with default_address: each valid one becomes one defaul
   const named = got.find((r) => r.customer_id === "cus_named");
   same([named.name, named.phone, named.line1], ["Address Name", "9000000099", "2 Named St"], "the address's own name and phone win");
   ok(/^adr_[0-9a-f]{16}$/.test(full.id), `prefixed id: ${full.id}`);
+  eq((await q(sOld, "SELECT id FROM schema_migrations WHERE id = '0037_customer_addresses'")).length, 1, "0037 recorded");
+  const { addressKey } = await import("../lib/addresses.js");
+  eq(full.address_key, addressKey({ ...full, country_code: "IN" }), "the copy's key is the one saves build");
   const c = sOld.client();
   await c.executeMultiple(MIGRATION);
   c.close();
@@ -247,6 +255,39 @@ await t("an identical address is not saved twice (case and spacing ignored); the
   eq((await q(sA, "SELECT COUNT(*) AS n FROM customer_addresses WHERE customer_id = ?", [A.id]))[0].n, 2, "still two");
 });
 
+await t("parallel saves: 12 different addresses at once leave 10 rows and one default; 3 identical at once leave one", async () => {
+  const C = await signIn("adrrace@shopper.test");
+  const base = { name: "Race", phone: "9811100009", city: "Pune", state: "MH", pincode: "411001" };
+  const r = await Promise.allSettled(Array.from({ length: 12 }, (_, i) => sA.run(() => Adr.saveAddress(C.id, { ...base, line1: `race ${i}` }))));
+  eq(r.filter((x) => x.status === "fulfilled").length, 10, "ten saved");
+  ok(r.filter((x) => x.status === "rejected").every((x) => /up to 10/.test(x.reason?.message)), "the rest are refused with the cap's reason");
+  eq((await q(sA, "SELECT COUNT(*) AS n FROM customer_addresses WHERE customer_id = ?", [C.id]))[0].n, 10, "rows");
+  eq((await q(sA, "SELECT COUNT(*) AS n FROM customer_addresses WHERE customer_id = ? AND is_default = 1", [C.id]))[0].n, 1, "one default");
+  await q(sA, "DELETE FROM customer_addresses WHERE customer_id = ?", [C.id]);
+  const ident = await Promise.allSettled(Array.from({ length: 3 }, () => sA.run(() => Adr.saveAddress(C.id, { ...base, line1: "same" }))));
+  ok(ident.every((x) => x.status === "fulfilled"), "all answer");
+  eq((await q(sA, "SELECT COUNT(*) AS n FROM customer_addresses WHERE customer_id = ?", [C.id]))[0].n, 1, "one row");
+  eq(new Set(ident.map((x) => x.value.address.id)).size, 1, "every answer is that row");
+  // a parallel delete of the default and the other never leaves none-default rows
+  const two = await sA.run(() => Adr.saveAddress(C.id, { ...base, line1: "other" }));
+  const three = await sA.run(() => Adr.saveAddress(C.id, { ...base, line1: "third" }));
+  const def = (await q(sA, "SELECT id FROM customer_addresses WHERE customer_id = ? AND is_default = 1", [C.id]))[0].id;
+  await Promise.all([sA.run(() => Adr.deleteAddress(C.id, def)), sA.run(() => Adr.deleteAddress(C.id, two.address.id))]);
+  {
+    const left = await q(sA, "SELECT id, is_default FROM customer_addresses WHERE customer_id = ?", [C.id]);
+    same(left.map((x) => [x.id, x.is_default]), [[three.address.id, 1]], "the one left is the default");
+  }
+  await q(sA, "DELETE FROM customer_addresses WHERE customer_id = ?", [C.id]);
+});
+
+await t("an edit into an address already saved is refused (422) and changes nothing", async () => {
+  const before = await rowOf(A.work);
+  const r = await call("POST", { ...asA, body: { action: "address_save", address: { ...HOME, id: A.work, label: "Copy" } } });
+  eq(r.status, 422, "edit into home");
+  eq(r.body.error, "You already have this address saved.", "message");
+  same(await rowOf(A.work), before, "unchanged");
+});
+
 await t("at most 10: the 11th is refused with a reason, and nothing is written", async () => {
   IP = nextIp();
   for (let i = 3; i <= 10; i++) {
@@ -303,6 +344,18 @@ await t("last_used_at on an order: the signed-in shopper's matching address only
   // the hook sits on the new-order path of createOrder
   const src = await readFile(join(ROOT, "lib/orders.js"), "utf8");
   eq((src.match(/markOrderAddressUsed\(/g) || []).length, 1, "one call in lib/orders.js");
+});
+
+await t("the order hook on a store without 0037: the order is placed and nothing throws", async () => {
+  const pre = await F.makeTenant({ name: "adr-pre", stage: "0034", products: 1, secrets: { order_link_secret: LINK } });
+  const cart = { items: [{ variantId: "gid://v/1", productId: "gid://p/1", title: "Thing", variantTitle: "Default", image: null, price: 100, quantity: 1, lineTotal: 100, discount: 0 }], gifts: [], appliedOffers: [], subtotal: 100, discountTotal: 0, total: 100, currency: "INR" };
+  const now = new Date().toISOString();
+  await q(pre, "INSERT INTO customers (id, email, created_at) VALUES ('cus_pre', 'pre@x.test', ?)", [now]);
+  await q(pre, "INSERT INTO customer_sessions (token_hash, customer_id, created_at, expires_at) VALUES (?, 'cus_pre', ?, ?)", [sha(`ct_pre|${LINK}|customer`), now, new Date(Date.now() + 3600000).toISOString()]);
+  const o = await pre.run(() => O.createOrder({ cartId: "cart-pre", cart, contact: { email: "pre@x.test", phone: "9811100001", name: "Pre" }, address: { line1: "1 St", city: "Pune", state: "MH", pincode: "411001" }, paymentMethod: "cod", idempotencyKey: "pre-key" }));
+  ok(o.id && !o.deduped, "order placed");
+  eq(await pre.run(() => Adr.markOrderAddressUsed({ name: "Pre", phone: "9811100001" }, { line1: "1 St" }, { readToken: () => "ct_pre" })), undefined, "a signed-in shopper on a store without the table: nothing");
+  ok(!(await q(pre, "SELECT name FROM sqlite_master WHERE name = 'customer_addresses'")).length, "still no table");
 });
 
 await t("delete is a real delete; the order keeps its own copy; deleting the default promotes the next", async () => {

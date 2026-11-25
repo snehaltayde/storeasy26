@@ -13,7 +13,8 @@ import { ORIGIN, flow, orderRow, rolesSql, seedStore, shopper, stage } from "./l
 const EMAIL = `address-drill-${Date.now()}@example.test`;
 const HOME = { label: "Home", name: "Address Drill", phone: "9999999999", line1: "11 Home Street", line2: "Flat 1", city: "Pune", state: "Maharashtra", pincode: "411001" };
 const WORK = { label: "Work", name: "Address Drill", phone: "9999999999", line1: "22 Work Road", line2: "", city: "Mumbai", state: "Maharashtra", pincode: "400001" };
-const NEW = { line1: "33 New Lane", city: "Nagpur", state: "Maharashtra", pincode: "440001" };
+const TYPO = { line1: "33 New Lnae", city: "Nagpur", state: "Maharashtra", pincode: "440001" };
+const NEW = { ...TYPO, line1: "33 New Lane" };
 
 async function until(fn, what, ms = 15_000) {
   const end = Date.now() + ms;
@@ -108,13 +109,48 @@ stage("addresses", async (drill) => {
   await f.getByRole("radio", { name: "Use a new address" }).check();
   await until(async () => (await line1.inputValue()) === "", "a new address clears the address fields");
   drill.check(await saveBox.isChecked(), "a new address has 'Save this address to my account' ticked");
-  for (const [k, v] of Object.entries(NEW)) await f.locator(`input[name="${k}"]`).fill(v);
-  const saved = page.waitForResponse((x) => x.url().endsWith("/api/account") && x.request().method() === "POST" && x.request().postDataJSON()?.action === "address_save");
+  for (const [k, v] of Object.entries(TYPO)) await f.locator(`input[name="${k}"]`).fill(v);
+  const isSave = (x) => x.url().endsWith("/api/account") && x.request().method() === "POST" && x.request().postDataJSON()?.action === "address_save";
+  const saved = page.waitForResponse(isSave);
   await f.getByRole("button", { name: "Continue to review" }).click();
   await f.getByRole("heading", { name: "Review your order" }).waitFor();
   const res = await saved;
   drill.check(res.status() === 200, "Continue saves the new address (POST address_save answers 200)", res.status());
-  drill.check((await addressRows()).some((r) => r.line1 === NEW.line1), "the new address is in the store");
+  drill.check((await addressRows()).some((r) => r.line1 === TYPO.line1), "the new address is in the store");
+
+  // Edit → fix the typo → Continue: the row saved in this checkout is edited, not added again
+  await f.getByRole("button", { name: "Edit" }).click();
+  await until(async () => (await line1.inputValue()) === TYPO.line1, "the address step is back");
+  await line1.fill(NEW.line1);
+  const edited = page.waitForResponse(isSave);
+  await f.getByRole("button", { name: "Continue to review" }).click();
+  await f.getByRole("heading", { name: "Review your order" }).waitFor();
+  const er = await edited;
+  drill.check(er.status() === 200 && Boolean(er.request().postDataJSON()?.address?.id), "fixing it edits the saved row (address_save carries its id)", er.status());
+  const afterEdit = await addressRows();
+  drill.check(afterEdit.length === 3 && afterEdit.some((r) => r.line1 === NEW.line1) && !afterEdit.some((r) => r.line1 === TYPO.line1), "still three addresses, the typo is gone", afterEdit.map((r) => r.line1));
+
+  // Edit → untick → change → Continue: nothing saved, and the box stays unticked when the step comes back
+  await f.getByRole("button", { name: "Edit" }).click();
+  await until(async () => (await line1.inputValue()) === NEW.line1, "the address step is back");
+  await f.locator('input[name="line2"]').fill("Back gate");
+  await saveBox.uncheck();
+  let posted = false;
+  const spy = (x) => {
+    if (isSave(x)) posted = true;
+  };
+  page.on("request", spy);
+  await f.getByRole("button", { name: "Continue to review" }).click();
+  await f.getByRole("heading", { name: "Review your order" }).waitFor();
+  await page.waitForTimeout(1000);
+  page.off("request", spy);
+  drill.check(!posted && (await addressRows()).length === 3, "unticked: Continue saves nothing");
+  await f.getByRole("button", { name: "Edit" }).click();
+  await saveBox.waitFor();
+  drill.check(!(await saveBox.isChecked()), "back on the address step, the box is still unticked");
+  await f.locator('input[name="line2"]').fill("");
+  await f.getByRole("button", { name: "Continue to review" }).click();
+  await f.getByRole("heading", { name: "Review your order" }).waitFor();
 
   // place the order (cash on delivery): its address gets last_used_at
   await f.getByRole("button", { name: "Continue to payment" }).click();

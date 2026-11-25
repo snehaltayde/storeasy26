@@ -14,9 +14,14 @@ import { addressValid } from "./checkoutModel";
 //   the form matches, so typing over a picked address makes it a new one.
 //   A new address with "Save this address to my account" ticked is saved when
 //   the shopper continues: this step closes while the checkout stays open.
-//   Saving the same address twice keeps one (the server checks too).
+//   Saving the same address twice keeps one (the server checks too). The tick
+//   and the id of an address saved in this checkout live in sessionStorage per
+//   cart, so going back from review keeps an unticked box unticked, and fixing
+//   an address saved moments ago edits that row instead of adding another.
 const PICK = ["name", "phone", "line1", "line2", "city", "state", "pincode"];
 const ADDRESS_ONLY = ["line1", "line2", "city", "state", "pincode"];
+// a pincode alone (line 1's prefill) still counts as an empty address
+const ADDRESS_TYPED = ["line1", "line2", "city", "state"];
 const norm = (v) => String(v ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 const matches = (a, form) => PICK.every((k) => norm(a[k]) === norm(form[k]));
 
@@ -25,11 +30,32 @@ async function getJson(url) {
   return res.ok ? res.json().catch(() => null) : null;
 }
 
+const memoKey = (cartId) => `sf_saved_address:${cartId || "cart"}`;
+function readMemo(k) {
+  try {
+    return JSON.parse(sessionStorage.getItem(k) || "null") || {};
+  } catch {
+    return {};
+  }
+}
+function writeMemo(k, patch) {
+  try {
+    sessionStorage.setItem(k, JSON.stringify({ ...readMemo(k), ...patch }));
+  } catch {
+    // private mode: the tick just isn't remembered
+  }
+}
+
 export default function SavedAddressPicker({ form, onAddress }) {
   const [state, setState] = useState({ loaded: false, signedIn: false, email: "", list: [] });
-  const [save, setSave] = useState(true);
+  const [save, setSaveState] = useState(true);
   const anchor = useRef(null);
+  const memo = useRef(null); // the sessionStorage key, once the cart is known
   const latest = useRef({});
+  const setSave = (v) => {
+    setSaveState(v);
+    if (memo.current) writeMemo(memo.current, { save: v });
+  };
   const picked = state.list.find((a) => matches(a, form)) || null;
   latest.current = { form, save, signedIn: state.signedIn, picked };
 
@@ -39,12 +65,15 @@ export default function SavedAddressPicker({ form, onAddress }) {
       const me = await getJson("/api/account");
       if (!live) return;
       if (!me?.authenticated) return setState({ loaded: true, signedIn: false, email: "", list: [] });
-      const r = await getJson("/api/account?view=addresses");
+      const [r, cart] = await Promise.all([getJson("/api/account?view=addresses"), getJson("/api/cart")]);
       if (!live) return;
+      memo.current = memoKey(cart?.id);
+      const remembered = readMemo(memo.current);
+      if (typeof remembered.save === "boolean") setSaveState(remembered.save);
       const list = r?.addresses || [];
       setState({ loaded: true, signedIn: true, email: r?.email || "", list });
       const f = latest.current.form;
-      const empty = ADDRESS_ONLY.every((k) => !String(f[k] || "").trim());
+      const empty = ADDRESS_TYPED.every((k) => !String(f[k] || "").trim());
       const patch = {};
       if (!String(f.email || "").trim() && r?.email) patch.email = r.email;
       if (empty && list[0]) for (const k of PICK) patch[k] = list[0][k];
@@ -63,8 +92,16 @@ export default function SavedAddressPicker({ form, onAddress }) {
     return () => {
       const { form: f, save: ticked, signedIn, picked: p } = latest.current;
       if (!flow?.isConnected || !signedIn || p || !ticked || !addressValid(f)) return;
-      const address = Object.fromEntries(PICK.map((k) => [k, f[k]]));
-      fetch("/api/account", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "address_save", address }) }).catch(() => {});
+      const key = memo.current;
+      const savedId = key ? readMemo(key).savedId : null;
+      // an address saved earlier in this checkout is edited, not added again
+      const address = { ...Object.fromEntries(PICK.map((k) => [k, f[k]])), ...(savedId ? { id: savedId } : {}) };
+      fetch("/api/account", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "address_save", address }) })
+        .then((res) => res.json().catch(() => null))
+        .then((j) => {
+          if (key) writeMemo(key, { savedId: j?.address?.id || null });
+        })
+        .catch(() => {});
     };
   }, []);
 
