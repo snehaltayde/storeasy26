@@ -223,7 +223,8 @@ export function strayPass({ origin, controls, nextLog = null }) {
       }
       // Next's dev overlay posts stack frames on its own schedule (an HMR dev
       // server only); it is no request of the page under test, so never wait on it
-      if (!(devServer && url.pathname.startsWith("/__nextjs"))) pending.add(req);
+      // static chunk loads are GETs of the app's own files, never a write: under load they can still be in flight
+      if (!(devServer && url.pathname.startsWith("/__nextjs")) && !(req.method() === "GET" && url.pathname.startsWith("/_next/static/"))) pending.add(req);
       if (req.method() === "GET" || req.method() === "HEAD") return;
       seen.push({ method: req.method(), path: url.pathname });
       let body;
