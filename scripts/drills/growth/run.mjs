@@ -61,9 +61,9 @@ async function adminStarts(drill) {
   await page.getByRole("button", { name: "New experiment" }).click();
   const form = page.locator('[data-experiment="form"]');
   await form.waitFor({ timeout: 10_000 });
-  await form.getByLabel("Name").fill(`Drill hero ${STAMP}`);
-  await form.getByLabel("Short name").fill(ADMIN_EXP);
-  await form.getByLabel("Hypothesis").fill("A shorter hero title gets more orders");
+  await form.locator("#exp-name").fill(`Drill hero ${STAMP}`);
+  await form.locator("#exp-slug").fill(ADMIN_EXP);
+  await form.locator("#exp-hypothesis").fill("A shorter hero title gets more orders");
   await form.locator("#exp-v1-title").fill("Shorter title");
   await form.locator("#exp-v1-weight").fill("40");
   const off = await form.locator('[data-experiment="weight-total"]').innerText();
