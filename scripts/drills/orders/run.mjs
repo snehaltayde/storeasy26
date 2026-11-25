@@ -49,10 +49,7 @@ const writeButtons = (page) => page.locator("main button").evaluateAll((els, re)
 // console errors and uncaught page errors while a role uses the list's reads
 async function consoleClean(drill, page, role) {
   const errors = [];
-  // the dev server's CSP-eval notice and Next's smooth-scroll hint show on every
-  // console page in dev (not this page's fault); anything else counts
-  const DEV_NOISE = /eval\(\) is not supported in this environment|missing-data-scroll-behavior/;
-  const onConsole = (m) => (m.type() === "error" || m.type() === "warning") && !DEV_NOISE.test(m.text()) && errors.push(`${m.type()}: ${m.text().slice(0, 400)}`);
+  const onConsole = (m) => (m.type() === "error" || m.type() === "warning") && errors.push(`${m.type()}: ${m.text().slice(0, 400)}`);
   const onError = (e) => errors.push(`pageerror: ${String(e?.message || e).slice(0, 400)}`);
   page.on("console", onConsole);
   page.on("pageerror", onError);
