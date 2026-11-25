@@ -57,7 +57,7 @@ Line 1 rewrites these types to match the decisions below. Phase 5 themes already
 - line 1: tenant `0030`
 - line 2: tenant `0031`
 - line 3: tenant `0032`
-- line 4: tenant `0033` and platform `0018`
+- line 4: tenant `0033` and platform `0019` (0018 went to the Phase 3 audit fixes)
 
 The runner (`lib/platform/migrate.js`) keeps a ledger by id and runs any un-applied file in order. So 0032 merging before 0031 still applies cleanly, as long as neither references the other's tables. They don't.
 
@@ -541,7 +541,7 @@ CREATE TABLE IF NOT EXISTS plugin_tokens (
 );
 CREATE INDEX IF NOT EXISTS idx_plugin_tokens_install ON plugin_tokens(install_id, created_at);
 ```
-`migrations/platform/0018_audit_actor_index.sql` (additive; serves the per-app call list):
+`migrations/platform/0019_audit_actor_index.sql` (additive; serves the per-app call list):
 ```sql
 CREATE INDEX IF NOT EXISTS idx_audit_tenant_actor_at ON audit_log(tenant_id, actor, at);
 ```
@@ -563,7 +563,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_tenant_actor_at ON audit_log(tenant_id, act
 - v1 is called as anonymous, with store B's token, with a revoked, expired or suspended-app token, and with an out-of-scope token. A token without `customers.read` never sees order A's customer canaries.
 
 ### File plan
-1. `migrations/tenant/0033_plugin_tokens.sql`, `migrations/platform/0018_audit_actor_index.sql`
+1. `migrations/tenant/0033_plugin_tokens.sql`, `migrations/platform/0019_audit_actor_index.sql`
 2. `lib/platform/audit.js` (`strict` option; the default stays best-effort), `lib/plugins/tokens.js` (mint, verify, revoke, list, expiry), `lib/plugins/api-auth.js` (`requireAppToken`), `lib/plugins/api-reads.js` (v1 shapes over the existing readers, with redaction)
 3. `app/api/admin/apps/[id]/tokens/route.js`, `app/api/admin/apps/[id]/calls/route.js`
 4. `app/api/apps/v1/{me,products,products/[handle],collections,offers,orders,orders/[id]}/route.js` (`runtime = "nodejs"`, `tenantHandler`, not `storefrontHandler`)
