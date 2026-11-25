@@ -901,6 +901,10 @@ async function renderConfirmation(tn, orderId) {
     "@/lib/ids": ids,
     "@/lib/tenant-request": { tfetch: (fn) => tn.run(fn) },
     "@/lib/storefront-request": { tfetch: (fn) => tn.run(fn) },
+    // Phase 8 line 1: the "Expected by" line (no titles in it)
+    "@/lib/tenant-context": await import("../lib/tenant-context.js"),
+    "@/lib/delivery-estimate": await import("../lib/delivery-estimate.js"),
+    "@/components/checkout/DeliveryEstimate": nothing,
   });
   const status = await loadComponent("app/(storefront)/orders/[orderId]/page.js", {
     "next/link": Link,

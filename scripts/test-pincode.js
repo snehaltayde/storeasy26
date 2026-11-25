@@ -172,7 +172,7 @@ await t("brute force: every zone/default configuration × pins × times around I
           ok(valid.ok, valid.errors.join("; "));
           for (const pin of pins) {
             const want = refRule(valid.value, pin);
-            const got = computeShipping({ subtotal: 500, pincode: pin, config: valid.value }).estimate;
+            const got = computeShipping({ subtotal: 500, pincode: pin, config: valid.value }).estimate ?? null;
             eq(got, want, `${JSON.stringify(cfg)} ${pin}:`);
             for (const ms of times) {
               const w = deliveryWindow(got, { from: new Date(ms), timeZone: "Asia/Kolkata" });
@@ -185,7 +185,8 @@ await t("brute force: every zone/default configuration × pins × times around I
 });
 
 await t("no settings → estimate null, and no line anywhere", async () => {
-  eq(computeShipping({ subtotal: 500, pincode: "560001" }).estimate, null, "code default:");
+  const plain = computeShipping({ subtotal: 500, pincode: "560001" });
+  ok(!("estimate" in plain) && !("zoneCod" in plain), "a store without the settings keeps the old shape");
   eq(estimateDays({ dispatchDays: 2 }), null, "dispatch alone is no estimate:");
   eq(deliveryLine(null), null);
   eq(expectedLine(undefined), null);
@@ -207,7 +208,7 @@ await t("computeShipping: the zone's COD flag, and the money unchanged by the ne
   const remote = computeShipping({ subtotal: 500, paymentMethod: "cod", pincode: "194101", config: cfg });
   eq([remote.zoneCod, remote.estimate, remote.total], [false, { minDays: 6, maxDays: 9 }, 198]);
   const plain = computeShipping({ subtotal: 500, pincode: "560001", config: cfg });
-  eq([plain.zoneCod, plain.estimate, plain.total], [true, { minDays: 3, maxDays: 5 }, 79]);
+  eq([plain.zoneCod, plain.estimate, plain.total], [undefined, { minDays: 3, maxDays: 5 }, 79]);
 });
 
 await t("shippingExample: the estimate in words when days are set, nothing new when not", () => {

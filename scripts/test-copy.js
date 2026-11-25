@@ -822,6 +822,19 @@ const flowStubs = {
   "@/lib/track/client": { track() {} },
   "@/lib/checkout/payment-terms": await import("../lib/checkout/payment-terms.js"),
 };
+// Phase 8 line 1: the PIN field and the estimate line AddressStep renders.
+flowStubs["@/lib/pincode/client"] = await import("../lib/pincode/client.js");
+flowStubs["@/lib/delivery-estimate"] = await import("../lib/delivery-estimate.js");
+// PincodeField keeps hooks (the lookup), which this file's mount() only gives the
+// top component, so a stateless stand-in renders the PIN input and the rest of
+// the address; the PIN field's own copy is checked through its constants below.
+flowStubs["./PincodeField"] = {
+  __esModule: true,
+  default: ({ form, onAddress, children }) => [
+    React.createElement("input", { key: "pin", type: "text", name: "pincode", value: form.pincode, onChange: (e) => onAddress({ pincode: e.target.value }, "typed") }),
+    React.createElement(React.Fragment, { key: "rest" }, children?.(false)),
+  ],
+};
 // Phase 8 step 0: CheckoutFlow's own parts, loaded with the same stubs.
 // Phase 8 line 2: and the nudge, the code dialog, the quote hook and placeOrder.
 for (const part of ["checkoutModel", "AddressStep", "PrepaidNudge", "PaymentStep", "OrderSummary", "CodOtpDialog", "useQuote", "placeOrder"]) {
@@ -1354,6 +1367,16 @@ await t("search API: a real database error leaves no error text in the response"
   const route = await loadRoute("search", { "@/lib/typesense-search": { typesenseSearch: async () => null }, "@/lib/repo": repo });
   const req = new NextRequest("http://broken.test/api/search?q=candle", { headers: { host: "broken.test" } });
   eq(JSON.stringify(await (await route.GET(req)).json()), JSON.stringify({ q: "candle", hits: [], source: "error" }), "body:");
+});
+
+await t("PIN code and delivery copy (Phase 8 line 1) is shopper language", async () => {
+  const P = await import("../lib/pincode/client.js");
+  const D = await import("../lib/delivery-estimate.js");
+  const lines = [P.BAD_PIN, P.NOT_FOUND, D.deliveryLine({ minDays: 2, maxDays: 4 }), D.expectedLine({ minDays: 2, maxDays: 4 })];
+  for (const file of ["components/checkout/PincodeField.js", "components/pdp/DeliveryCheck.js"]) {
+    lines.push(...[...(await readFile(join(ROOT, file), "utf8")).matchAll(/>\s*([A-Z][^<>{}]{3,})\s*</g)].map((m) => m[1]));
+  }
+  for (const l of lines) assertClean(l, `"${l}"`);
 });
 
 await t("cart API: a failed change leaves no error text in the response", async () => {

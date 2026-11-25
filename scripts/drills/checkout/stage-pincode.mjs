@@ -107,7 +107,7 @@ stage("pincode", async (drill) => {
 
   const order = await orderRow(orderId);
   const snap = JSON.parse(order?.snapshot || "{}");
-  drill.check(JSON.stringify(snap.shipping?.estimate) === JSON.stringify({ minDays: 3, maxDays: 5 }) && snap.shipping?.zoneCod === true, "the order's snapshot keeps the estimate and the zone's COD flag", snap.shipping);
+  drill.check(JSON.stringify(snap.shipping?.estimate) === JSON.stringify({ minDays: 3, maxDays: 5 }) && snap.shipping?.zoneCod !== false, "the order's snapshot keeps the estimate (and no zone turned COD off)", snap.shipping);
   drill.check(order?.pincode === "999999" && order?.city === "Testpur", "the order holds the PIN and the typed city", order && { pincode: order.pincode, city: order.city });
   await page.context().close();
 });
