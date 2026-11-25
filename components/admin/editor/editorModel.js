@@ -298,6 +298,12 @@ export const storeDocument = (s) => ({ ...(s.document || {}), id: s.id, type: s.
 //                      document replaces the store (onReplaced)
 
 // Everything else goes to api.call as it is.
+// A read-only store (support) sends only these document reads through call();
+// every other op (archive, createDocument, startMissing, undoSet, …) is
+// refused here with READ_ONLY, so nothing reaches the server
+// (test-editor-ui pins STORE_CALL_READS ⊆ DOCUMENT_READS).
+export const STORE_CALL_READS = Object.freeze(["getDocument", "listDocuments", "listHistory", "listChanges", "listProductContent", "openingChecks", "listRecentlyPublished"]);
+const READ_ONLY_REFUSAL = Object.freeze({ ok: false, error: true, code: "READ_ONLY", message: "You can look at this page but not change it." });
 export function createStoreCall({ api, getStore, getPinned = () => null, onReplaced = () => {} }) {
   const refusal = { refused: true, code: "DRAFT_CHANGED", message: WORDS.changedSinceReview };
   async function flushed(store) {
@@ -307,6 +313,7 @@ export function createStoreCall({ api, getStore, getPinned = () => null, onRepla
   }
   return async function call(op, args, extra) {
     const store = getStore();
+    if (store?.readOnly === true && !STORE_CALL_READS.includes(op)) return { ...READ_ONLY_REFUSAL };
     const openId = store ? store.getState().id : null;
     const id = idOfArgs(args);
     if (!store || !openId) return api.call(op, args, extra);

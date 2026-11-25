@@ -143,6 +143,74 @@ await t("readOnly: a backup left in this browser is neither offered nor written,
   eq(api.calls.map((c) => c.op), [], "no request at all:");
 });
 
+const STORE_WRITES = {
+  discardDraft: (s) => s.discardDraft(),
+  restoreVersion: (s) => s.restoreVersion("ver_1"),
+  undo: (s) => s.undo({ logId: "log_1" }),
+  "undo (dry run)": (s) => s.undo({ logId: "log_1", dryRun: true }),
+  unpublish: (s) => s.unpublish(),
+  "unpublish (dry run)": (s) => s.unpublish({ dryRun: true }),
+  keepLiveSection: (s) => s.keepLiveSection("sec_t1"),
+  keepAsEarlierDraft: (s) => s.keepAsEarlierDraft(fakeDoc().body),
+  publish: (s) => s.publish(),
+  publishSet: (s) => s.publishSet([{ id: "doc_p2", revision: 1, draftHash: "h" }]),
+  keepMine: (s) => s.keepMine(),
+};
+for (const [name, run] of Object.entries(STORE_WRITES)) {
+  await t(`readOnly: the store's ${name} answers READ_ONLY and sends nothing`, async () => {
+    const api = fakeApi(fakeDoc());
+    const s = St.createDocumentStore({ api, document: fakeDoc(), readOnly: true, timers: instantTimers() });
+    await s.open();
+    const r = await run(s);
+    ok(r && (r.code === "READ_ONLY" || r.nothing === true), `${name}: ${JSON.stringify(r)}`);
+    eq(api.calls.map((c) => c.op), [], `${name}: requests:`);
+  });
+}
+const EM = await import("../components/admin/editor/editorModel.js");
+const CALL_WRITES = {
+  saveDraft: [{ id: "doc_p1", body: {} }, { revision: 3 }],
+  archive: ["doc_p1", { revision: 3 }],
+  createDocument: [{ type: "page", meta: { title: "x", slug: "x" }, body: null, entityId: null }],
+  startMissing: [{ type: "header" }],
+  resolveShopifyChange: [{ id: "doc_p1", field: "title", choice: "keep" }],
+  discardOrphanEdits: [{ id: "doc_p1" }],
+  undoSet: [{ setId: "set_1", members: [] }],
+  publish: [{ id: "doc_p1", draftHash: "h3" }, { revision: 3 }],
+  publishSet: [[{ id: "doc_p1", revision: 3, draftHash: "h3" }]],
+  undo: [{ id: "doc_p1", logId: "log_1" }, { revision: 3 }],
+  unpublish: [{ id: "doc_p1" }, { revision: 3 }],
+  keepLiveSection: [{ id: "doc_p1", sectionId: "sec_t1" }, { revision: 3 }],
+  restoreVersion: [{ id: "doc_p1", versionId: "ver_1" }, { revision: 3 }],
+  discardDraft: ["doc_p1", { revision: 3 }],
+  keepAsEarlierDraft: [{ id: "doc_p1", body: {} }],
+};
+for (const [op, args] of Object.entries(CALL_WRITES)) {
+  await t(`readOnly: createStoreCall refuses ${op} with READ_ONLY and sends nothing`, async () => {
+    const api = fakeApi(fakeDoc());
+    const s = St.createDocumentStore({ api, document: fakeDoc(), readOnly: true, timers: instantTimers() });
+    await s.open();
+    const call = EM.createStoreCall({ api, getStore: () => s });
+    const r = await call(op, ...args);
+    eq([r?.code, api.calls.map((c) => c.op)], ["READ_ONLY", []], `${op}:`);
+  });
+}
+await t("readOnly: createStoreCall still sends the document reads (STORE_CALL_READS ⊆ DOCUMENT_READS); a writer's store is not refused", async () => {
+  const { DOCUMENT_READS } = await import("../lib/admin/documents-api.js");
+  eq(EM.STORE_CALL_READS.filter((op) => !DOCUMENT_READS.includes(op)), [], "reads that aren't DOCUMENT_READS:");
+  const api = fakeApi(fakeDoc());
+  const s = St.createDocumentStore({ api, document: fakeDoc(), readOnly: true, timers: instantTimers() });
+  await s.open();
+  const call = EM.createStoreCall({ api, getStore: () => s });
+  await call("listDocuments", true);
+  await call("listHistory", "doc_p1");
+  eq(api.calls.map((c) => c.op), ["listDocuments", "listHistory"], "reads sent:");
+  const api2 = fakeApi(fakeDoc());
+  const w = St.createDocumentStore({ api: api2, document: fakeDoc(), timers: instantTimers() });
+  const call2 = EM.createStoreCall({ api: api2, getStore: () => w });
+  await call2("archive", "doc_p2", { revision: 1 });
+  eq(api2.calls.map((c) => c.op), ["archive"], "a writer's archive goes through:");
+});
+
 // ---- 2. the page ------------------------------------------------------------------------
 console.log("— 2. the page");
 const store = await H.makeRoleStore({ name: "edui" });
@@ -244,9 +312,12 @@ await t("READ_POSTS rows for /admin/editor and /admin/releases: PUT /api/admin/d
   for (const r of rows) ok(typeof r.reason === "string" && r.reason.length >= 10, "a reason");
 });
 await t("the shell drill's matcher: a READ_POSTS row with ops passes only a body whose single top-level operation is listed (saveDraft never)", async () => {
-  const src = read("scripts/drills/shell/run.mjs");
-  ok(/opsOf|bodyOp/.test(src) && /r\.ops/.test(src), "the matcher reads ops:");
-  ok(/403/.test(src.slice(src.indexOf("nextLogWrites"))), "the server log counts a 403 on an ops row as a write:");
+  // the matcher itself is scripts/support/read-post-match.js (test-drills runs it on real bodies)
+  ok(/from "\.\.\/\.\.\/support\/read-post-match\.js"/.test(read("scripts/drills/shell/run.mjs")), "the drill uses the shared matcher:");
+  const { readPost } = await import("./support/read-post-match.js");
+  const rp = (body, status) => readPost("/admin/editor", "PUT", "/api/admin/documents", body, status);
+  ok(rp(JSON.stringify({ listDocuments: true })) && !rp(JSON.stringify({ saveDraft: { id: "doc_home", body: {} }, revision: 3 })), "a read passes, saveDraft never");
+  ok(rp(null, 200) && !rp(null, 403) && !rp(null, 400) && !rp(null, 0), "the server log: only a 2xx on an ops row is a read");
 });
 
 // ---- 4. the frame's markup ---------------------------------------------------------------
@@ -548,6 +619,37 @@ await t("sectionsFromTemplate: fresh ids not already on the page; kinds the page
   eq(onHeader.sections.length, 0, "a header takes none:");
   ok(onHeader.notes.some((n) => /left out/.test(n)), "and says so:");
 });
+await t("sectionsFromTemplate respects each kind's per-page limit and place: a second hero is left out with words, a hero never goes below other sections; the server refuses either (422)", async () => {
+  const hero = (id) => ({ id, kind: "hero", v: 1, enabled: true, settings: { title: "Hi" }, blocks: [] });
+  const one = ST.placeableSections([hero("sec_h2"), textSec("sec_x", "X")], [hero("sec_h1")]);
+  eq(one.kept.map((s) => s.id), ["sec_x"], "the extra hero is left out:");
+  ok(one.notes.some((n) => /only one Hero/.test(n)), `words: ${one.notes}`);
+  const two = ST.placeableSections([hero("sec_h1"), hero("sec_h2")], []);
+  eq(two.kept.map((s) => s.id), ["sec_h1"], "on an empty page, one hero, first:");
+  const low = ST.placeableSections([hero("sec_h1")], [textSec("sec_t1", "One")]);
+  ok(low.kept.length === 0 && low.notes.some((n) => /only go at the top/.test(n)), `below a section: ${low.notes}`);
+  // a template's insert leaves the page's own ids alone
+  const tpl = { id: "t1", name: "Launch", family: "page", sections: JSON.stringify([{ type: "text", title: "Hi", body: "Words" }]) };
+  const out = ST.sectionsFromTemplate(tpl, "page", { existing: [textSec("sec_t1", "One")] });
+  ok(out.sections.length === 1 && out.sections[0].id !== "sec_t1", "fresh ids beside existing ones:");
+  // what the server's saveDraft does with a duplicate: refuses it, so nothing is saved
+  const made = await store.call("owner", "documents", "PUT", { body: { createDocument: { type: "home", meta: null, body: null, entityId: null } } });
+  eq(made.status, 200, `home: ${JSON.stringify(made.body).slice(0, 200)}`);
+  const home = made.body.document;
+  const dup = await store.call("owner", "documents", "PUT", { body: { saveDraft: { id: home.id, body: { ...home.body, sections: [hero("sec_dh1"), hero("sec_dh2")] } }, revision: home.revision } });
+  eq(dup.status, 422, `two heroes: ${JSON.stringify(dup.body).slice(0, 200)}`);
+  ok(JSON.stringify(dup.body).includes("TOO_MANY_OF_KIND"), "TOO_MANY_OF_KIND");
+});
+await t("insertIntoPage: a revision conflict says so and offers a reload; nothing else is sent", async () => {
+  const TL = await loadJsx(join(ROOT, "components/admin/editor/templates/TemplatesList.js"));
+  const doc = { id: "doc_about", type: "page", revision: 4, body: pageBody("about", [textSec("sec_t1", "One")]) };
+  const calls = [];
+  const api = { call: async (op) => (calls.push(op), op === "getDocument" ? { ok: true, data: { document: doc } } : { conflict: true, code: "DOCUMENT_CHANGED", message: "Changed." }) };
+  const tpl = { id: "tpl_1", name: "Launch", family: "page", sections: JSON.stringify([{ type: "text", title: "Hi", body: "Words" }]) };
+  const r = await TL.insertIntoPage(api, tpl, "doc_about");
+  eq([r.ok, r.reload, calls], [false, true, ["getDocument", "saveDraft"]], "the answer:");
+  ok(/Reload/.test(r.message), r.message);
+});
 await t("TemplatesList: a writer gets Make a page and Insert into a page; support gets the list only", async () => {
   const TL = await loadJsx(join(ROOT, "components/admin/editor/templates/TemplatesList.js"));
   const tpls = [{ id: "tpl_1", name: "Launch", family: "page", sections: [{}, {}] }];
@@ -578,6 +680,28 @@ await t("a draft page made in the editor is not on the storefront without a prev
   eq(r.status, 200, `created: ${JSON.stringify(r.body).slice(0, 200)}`);
   const Res = await import("../lib/content/resolve.js");
   eq(await a.run(() => Res.resolvedContentPage("draft-only-ui")), null, "the shopper's read:");
+});
+
+await t("a published page with a newer saved draft: the shopper still reads the published body, never the draft", async () => {
+  const put = async (body) => {
+    const r = await store.call("owner", "documents", "PUT", { body });
+    eq(r.status, 200, `${Object.keys(body)[0]}: ${JSON.stringify(r.body).slice(0, 300)}`);
+    return r.body.document || r.body;
+  };
+  let d = await put({ createDocument: { type: "page", meta: { title: "Live words", slug: "live-words-ui" }, body: null, entityId: null } });
+  d = await put({ saveDraft: { id: d.id, body: pageBody("live-words-ui", [textSec("sec_lw1", "Published title")]) }, revision: d.revision });
+  // the store's first publish goes with its home page
+  // the home page made by the template test above (its refused save left it as it was)
+  const made = await put({ getDocument: "doc_home" });
+  const home = await put({ saveDraft: { id: made.id, body: homeBody }, revision: made.revision });
+  const pub = await store.call("owner", "documents", "PUT", { body: { publishSet: [{ id: home.id, revision: home.revision, draftHash: home.draftHash }, { id: d.id, revision: d.revision, draftHash: d.draftHash }] } });
+  eq(pub.status, 200, `publish: ${JSON.stringify(pub.body).slice(0, 300)}`);
+  const cur = await put({ getDocument: d.id });
+  await put({ saveDraft: { id: d.id, body: pageBody("live-words-ui", [textSec("sec_lw1", "Draft title, not live")]) }, revision: cur.revision });
+  const Res = await import("../lib/content/resolve.js");
+  const seen = await a.run(() => Res.resolvedContentPage("live-words-ui"));
+  const words = JSON.stringify(seen);
+  ok(seen && words.includes("Published title") && !words.includes("Draft title"), `the shopper's read: ${words.slice(0, 300)}`);
 });
 
 console.log(`\n${pass} passed, ${fail} failed (${((Date.now() - started) / 1000).toFixed(1)} s)`);

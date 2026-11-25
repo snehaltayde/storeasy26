@@ -774,5 +774,28 @@ await t("withRolesStore: the roles store boots once, /admin/login is loaded, the
   ok(started.every((s) => s.stopped), "stopped by its own handle:");
 });
 
+await t("the shell drill's read-POST matcher on real bodies: one read op passes; saveDraft, two keys or no JSON is a write; in the server log only a 2xx on an ops row is a read", async () => {
+  const { bodyOp, readPost } = await import("./support/read-post-match.js");
+  const DOCS = "/api/admin/documents";
+  const rp = (body, status) => readPost("/admin/editor", "PUT", DOCS, body, status);
+  eq(bodyOp(JSON.stringify({ listDocuments: true })), "listDocuments", "bodyOp of a read:");
+  ok(rp(JSON.stringify({ listDocuments: true })), "{listDocuments:true} is a read");
+  ok(rp(JSON.stringify({ getDocument: "doc_home" })), "{getDocument} is a read");
+  ok(!rp(JSON.stringify({ saveDraft: { id: "doc_home", body: { sections: [] } }, revision: 3 })), "{saveDraft:{…},revision} is a write");
+  ok(!rp(JSON.stringify({ saveDraft: { id: "doc_home", body: {} } })), "saveDraft alone is a write");
+  ok(!rp(JSON.stringify({ listDocuments: true, saveDraft: { id: "doc_home" } })), "a body with two keys is a write");
+  for (const bad of ["", "not json", "null", "[]", JSON.stringify(["listDocuments"])]) ok(!rp(bad), `an unreadable body (${JSON.stringify(bad)}) is a write`);
+  // the server log: a status, no body
+  ok(rp(null, 200) && rp(null, 204), "a 2xx in the log is a read");
+  for (const st of [403, 400, 401, 500, 0]) ok(!rp(null, st), `a ${st} in the log is a write`);
+  // the drill passes w.status ?? 0, so a missing status is a 0
+  ok(!rp(null, undefined ?? 0), "a missing status is a write");
+  // a row without ops only matches its page, method and path
+  ok(readPost("/admin/editor", "POST", "/api/admin/preview-session", JSON.stringify({ create: true })), "the preview session row");
+  ok(!readPost("/admin/orders", "PUT", DOCS, JSON.stringify({ listDocuments: true })), "another page's request is not this row's");
+  const src = readFileSync(join(ROOT, "scripts/drills/shell/run.mjs"), "utf8");
+  ok(/from "\.\.\/\.\.\/support\/read-post-match\.js"/.test(src) && !/const bodyOp =/.test(src) && /w\.status \?\? 0/.test(src), "the drill uses this matcher, and passes a missing status as 0");
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

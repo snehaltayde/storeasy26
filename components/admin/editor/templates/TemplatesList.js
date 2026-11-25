@@ -39,10 +39,12 @@ export async function insertIntoPage(api, template, pageId) {
   const g = await api.call("getDocument", pageId);
   const doc = g?.ok ? g.data?.document : null;
   if (!doc || !Array.isArray(doc.body?.sections)) return { ok: false, message: g?.message || "That page couldn't be opened, so nothing was added. Reload and try again.", notes: [] };
-  const { sections, notes } = sectionsFromTemplate(template, doc.type, { taken: doc.body.sections.map((s) => s?.id) });
+  const { sections, notes } = sectionsFromTemplate(template, doc.type, { existing: doc.body.sections });
   if (!sections.length) return { ok: false, message: "Nothing from this template can go on that page, so nothing was added.", notes };
   const r = await api.call("saveDraft", { id: doc.id, body: { ...doc.body, sections: [...doc.body.sections, ...sections] } }, { revision: doc.revision });
   if (r?.ok) return { ok: true, href: editorHref(doc.id), added: sections.length, notes };
+  // the page changed since it was read (another tab, someone else): reload, then insert again
+  if (r?.conflict) return { ok: false, reload: true, message: "That page changed while the template was being added, so nothing was added. Reload and insert it again.", notes };
   return { ok: false, message: r?.message || "Something went wrong on our side, so nothing was added. Try again in a minute.", notes };
 }
 
@@ -109,9 +111,14 @@ function TemplateRow({ template, pages, role, api }) {
         )}
       </div>
       {result && !result.ok && (
-        <p role="alert" className="text-[13px] text-destructive">
-          {result.message}
-        </p>
+        <div role="alert" className="flex flex-wrap items-center gap-2 text-[13px] text-destructive">
+          <p>{result.message}</p>
+          {result.reload && (
+            <Button size="sm" variant="outline" onClick={() => window.location.reload()} data-insert-reload="">
+              Reload
+            </Button>
+          )}
+        </div>
       )}
       {result?.ok && (
         <div role="status" className="rounded-md border border-border bg-muted/40 px-3 py-2 text-[13px] text-foreground">

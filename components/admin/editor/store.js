@@ -84,6 +84,7 @@ export const WORDS = Object.freeze({
   backupKept: "Your edits were kept as an earlier draft. Find them in Earlier versions.",
   slugNotSaved: "Not saved yet: the web address can use lower-case letters, digits and hyphens only, and must start with a letter or digit.",
   notSavedFirst: "Your latest changes aren't saved yet, so nothing else was done. They are still here.",
+  readOnly: "You can look at this page but not change it.",
   busy: "Wait for the last change to finish, then try again.",
   inConflict: "Choose which version to keep first.",
   replayKept: "Some edits you made while that ran couldn't be added back, so we kept your version as an earlier draft. Find it in Earlier versions.",
@@ -377,7 +378,7 @@ export function createDocumentStore({
   }
 
   async function saveOnce() {
-    if (readOnly) return { ok: false, error: true, code: "READ_ONLY", message: WORDS.notSavedFirst };
+    if (readOnly) return refusedReadOnly();
     const sentSeq = seq;
     const out = outgoing(body);
     const r = await api.call("saveDraft", { id, body: out.body }, { revision });
@@ -485,7 +486,11 @@ export function createDocumentStore({
   }
 
   // ---- holding autosave around a server call ----
+  // readOnly (support): every write is refused here, before any request, the
+  // same answer saveOnce gives (the server refuses them too)
+  const refusedReadOnly = () => ({ ok: false, error: true, code: "READ_ONLY", message: WORDS.readOnly });
   async function held(name, fn) {
+    if (readOnly) return refusedReadOnly();
     if (disposed) return { error: true, code: "CLOSED", message: WORDS.notSavedFirst };
     if (conflict) return { ok: false, conflict: true, code: conflict.code, message: WORDS.inConflict };
     if (opPromise) return { error: true, code: "BUSY", message: WORDS.busy };
@@ -551,9 +556,9 @@ export function createDocumentStore({
 
   const rev = () => ({ revision });
   const undo = ({ logId, dryRun = false } = {}) =>
-    dryRun ? api.call("undo", { id, logId, dryRun: true }, rev()) : held("undo", async () => checkUnknown(await api.call("undo", { id, logId }, rev())));
+    readOnly ? Promise.resolve(refusedReadOnly()) : dryRun ? api.call("undo", { id, logId, dryRun: true }, rev()) : held("undo", async () => checkUnknown(await api.call("undo", { id, logId }, rev())));
   const unpublish = ({ dryRun = false } = {}) =>
-    dryRun ? api.call("unpublish", { id, dryRun: true }, rev()) : held("unpublish", async () => checkUnknown(await api.call("unpublish", { id }, rev())));
+    readOnly ? Promise.resolve(refusedReadOnly()) : dryRun ? api.call("unpublish", { id, dryRun: true }, rev()) : held("unpublish", async () => checkUnknown(await api.call("unpublish", { id }, rev())));
   const keepLiveSection = (sectionId) => held("keepLiveSection", () => api.call("keepLiveSection", { id, sectionId }, rev()));
   const discardDraft = () => held("discardDraft", () => api.call("discardDraft", id, rev()));
   const restoreVersion = (versionId) => held("restoreVersion", () => api.call("restoreVersion", { id, versionId }, rev()));
@@ -582,7 +587,7 @@ export function createDocumentStore({
   // (P6-OPEN's modifiers), only when set
   const openingKeys = ({ checkOpening = false, confirmOpen = false } = {}) => ({ ...(checkOpening === true ? { checkOpening: true } : {}), ...(confirmOpen === true ? { confirmOpen: true } : {}) });
   const publish = ({ confirmRepublish = false, checkOpening = false, confirmOpen = false } = {}) =>
-    held("publish", async () => {
+    readOnly ? Promise.resolve(refusedReadOnly()) : held("publish", async () => {
       const r = await api.call("publish", { id, draftHash, ...(confirmRepublish ? { confirmRepublish: true } : {}) }, { ...rev(), ...openingKeys({ checkOpening, confirmOpen }) });
       markPublished(r);
       return publishResult(r);
@@ -591,7 +596,7 @@ export function createDocumentStore({
   // items: [{id, revision, draftHash, confirmRepublish?}] (an offer's
   // publishSet). This document's entry is always the acknowledged one.
   const publishSet = (items = [], { checkOpening = false, confirmOpen = false } = {}) =>
-    held("publishSet", async () => {
+    readOnly ? Promise.resolve(refusedReadOnly()) : held("publishSet", async () => {
       const list = [];
       let mineIn = false;
       for (const it of Array.isArray(items) ? items : []) {
@@ -611,7 +616,7 @@ export function createDocumentStore({
   // ---- kept drafts and the conflict choice ----
   // P3-FIX5: from "backup" for the local backup offer, so its version reads
   // "Edits this browser kept", not "Kept from another tab"
-  const keepBody = (b, { from = null } = {}) => api.call("keepAsEarlierDraft", { id, body: outgoing(b).body, ...(from ? { from } : {}) });
+  const keepBody = (b, { from = null } = {}) => (readOnly ? Promise.resolve(refusedReadOnly()) : api.call("keepAsEarlierDraft", { id, body: outgoing(b).body, ...(from ? { from } : {}) }));
 
   async function useNewer() {
     if (!conflict) return { ok: true, nothing: true };
@@ -897,5 +902,6 @@ export function createDocumentStore({
     acceptBackup,
     dismissBackup,
     dispose,
+    readOnly: Boolean(readOnly),
   };
 }
