@@ -33,7 +33,11 @@ async function signIn(drill, role, width = 1280) {
   if (res.status() !== 200) throw new Error(`sign-in as ${role} answered ${res.status()}`);
   const page = await ctx.newPage();
   page.on("console", (msg) => {
-    if (msg.type() === "error" && !/eval\(\) is not supported/.test(msg.text())) consoleErrors.push(`${role}: ${msg.text().slice(0, 300)}`);
+    // the roles store's catalog fixture images are not on Shopify's CDN: the
+    // preview's next/image requests for them answer 404 (the server logs
+    // "upstream image response failed"); nothing else is let through
+    const fixtureImage = /status of 404/.test(msg.text()) && /\/_next\/image\?url=https%3A%2F%2Fcdn\.shopify\.com%2Ffixture%2F/.test(msg.location()?.url || "");
+    if (msg.type() === "error" && !fixtureImage && !/eval\(\) is not supported/.test(msg.text())) consoleErrors.push(`${role}: ${msg.text().slice(0, 300)}`);
   });
   page.on("pageerror", (e) => consoleErrors.push(`${role}: ${String(e?.message || e).slice(0, 300)}`));
   return page;
@@ -91,7 +95,8 @@ async function ownerFlows(drill) {
   await page.locator("#new-page-title").fill("Drill page");
   await page.locator('[data-new-page] button[type="submit"]').click();
   const opened = await page.waitForURL(/\/admin\/editor\?doc=doc_/, { timeout: 30_000 }).then(() => true, () => false);
-  drill.check(opened && (await page.locator("[data-document-label]").innerText()).includes("Drill page"), "New page makes the draft and opens it", page.url());
+  const named = opened && (await waitFor(page, () => /Drill page/.test(document.querySelector("[data-document-label]")?.textContent || "")));
+  drill.check(named, "New page makes the draft and opens it", { url: page.url(), label: await page.locator("[data-document-label]").innerText().catch(() => null) });
   await settle(page);
   await page.locator("[data-switcher-toggle]").click();
   const id = new URL(page.url()).searchParams.get("doc");
