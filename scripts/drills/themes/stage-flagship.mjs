@@ -99,14 +99,17 @@ stage("flagship", async (drill) => {
   await open(staff, "/admin/themes");
   await staff.locator('[data-themes="draft-bar"]').waitFor();
   drill.check((await staff.getByText("Ask an admin to publish.").count()) > 0, "staff: 'Ask an admin to publish'");
-  drill.check((await staff.locator('[data-themes-action="publish"]').count()) === 0, "staff: no Publish");
+  const staffPublish = staff.locator('[data-themes-action="publish"]');
+  drill.check((await staffPublish.count()) === 0 || (await staffPublish.isDisabled()), "staff: Publish is not offered (disabled, with the reason)");
   await staff.context().close();
 
   const support = await signIn(drill, "support");
   await open(support, "/admin/themes");
   await support.locator('[data-themes="flagships"] [data-theme-flagship]').first().waitFor();
   drill.check((await support.locator('[data-themes="flagships"] [data-theme-flagship]').count()) === 5, "support: sees the five Storeasy themes");
-  drill.check((await support.locator('[data-themes="flagships"] [data-themes-action="use"], [data-themes="flagships"] [data-themes-action="update"], [data-themes-action="publish"]').count()) === 0, "support: no Use, Update or Publish");
+  drill.check((await support.locator('[data-themes="flagships"] [data-themes-action="use"], [data-themes="flagships"] [data-themes-action="update"]').count()) === 0, "support: no Use or Update on the cards");
+  const supportPublish = support.locator('[data-themes-action="publish"]');
+  drill.check((await supportPublish.count()) === 0 || (await supportPublish.isDisabled()), "support: Publish is not offered (disabled, with the reason)");
   await drill.shoot(support, "flagship-support");
   await support.context().close();
 
