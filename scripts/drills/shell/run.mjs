@@ -280,7 +280,9 @@ async function supportNewUiControls(page, href) {
       }
       return;
     }
-    pending.add(req);
+    // Next's dev overlay posts stack frames on its own schedule (an HMR dev
+    // server only); it is no request of the page under test, so never wait on it
+    if (!(devServer && url.pathname.startsWith("/__nextjs"))) pending.add(req);
     if (req.method() === "GET" || req.method() === "HEAD") return;
     seen.push({ method: req.method(), path: url.pathname });
     let body;
