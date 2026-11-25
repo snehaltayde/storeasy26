@@ -254,11 +254,12 @@ await t("health: only the named stores, reachable ones with reasons, a missing d
 
 // a store whose database never answers: the probe hangs for that store only
 const { tenantId: currentTenant } = await import("../lib/tenant-context.js");
-async function withHangingStore(id, fn, timeoutMs = 100) {
+async function withHangingStore(id, fn, timeoutMs = 100, hooks = {}) {
+  const ids = new Set([id].flat());
   const saved = { ...L.storesHooks };
   const real = saved.probe;
-  L.storesHooks.probe = () => (currentTenant() === id ? new Promise(() => {}) : real());
-  L.storesHooks.timeoutMs = timeoutMs;
+  L.storesHooks.probe = () => (ids.has(currentTenant()) ? new Promise(() => {}) : real());
+  Object.assign(L.storesHooks, { timeoutMs, ...hooks });
   try {
     return await fn();
   } finally {
@@ -372,6 +373,70 @@ await t("overview: a store that never answers is cut off at the limit and report
   ok(r.body.revenue30d.uncovered.some((u) => u.tenant === b.id), "b is uncovered, not counted");
   for (const id of ["bulk-03", "bulk-40"]) eq(r.body.fleet.find((f) => f.tenant === id)?.reachable, false, `${id}: a database that does not exist is unreachable`);
   noCanary(r.text, "overview");
+});
+
+await t("overview: 12 stores that never answer run 10 at a time under the per-store limit and all show unreachable and uncovered", async () => {
+  const HANG = Array.from({ length: 12 }, (_, i) => `hang-${String(i).padStart(2, "0")}`);
+  const row = (await db().execute({ sql: "SELECT db_url, db_token_enc FROM tenants WHERE id = ?", args: [a.id] })).rows[0];
+  for (const id of HANG) {
+    await db().execute({ sql: "INSERT INTO tenants (id, name, status, domains, db_url, db_token_enc, config, created_at, updated_at) VALUES (?, ?, 'active', '[]', ?, ?, '{}', ?, ?)", args: [id, `Hanging ${id}`, row.db_url, row.db_token_enc, now, now] });
+  }
+  const starts = [];
+  const real = L.storesHooks.probe;
+  try {
+    // the per-store limit: two rounds of 10 and 2, 150 ms each
+    let t0 = Date.now();
+    const r = await withHangingStore(HANG, () => call("operator", "overview"), 150, {
+      probe: () => {
+        if (!HANG.includes(currentTenant())) return real();
+        starts.push(Date.now());
+        return new Promise(() => {});
+      },
+    });
+    const took = Date.now() - t0;
+    eq(r.status, 200, r.text.slice(0, 200));
+    ok(took < 2500, `bounded by the per-store limit (${took} ms)`);
+    // the revenue and fleet passes each start 10, then 2 more once those time out
+    const first = starts.filter((x) => x - starts[0] < 120).length;
+    eq([first, starts.length], [20, 24], `10 at a time in each of the two passes (${starts.map((x) => x - starts[0]).join(",")})`);
+    for (const id of HANG) {
+      eq(r.body.fleet.find((f) => f.tenant === id)?.reachable, false, `${id} in the fleet`);
+      ok(r.body.revenue30d.uncovered.some((u) => u.tenant === id), `${id} uncovered`);
+    }
+    eq(r.body.fleet.find((f) => f.tenant === a.id).reachable, true, "a still reachable");
+    noCanary(r.text, "overview, 12 hanging");
+    // the overall deadline: a 5 s per-store limit but a 400 ms deadline
+    t0 = Date.now();
+    const d = await withHangingStore(HANG, () => call("operator", "overview"), 5000, { deadlineMs: 400 });
+    const tookD = Date.now() - t0;
+    ok(tookD < 2500, `cut off at the overall deadline (${tookD} ms)`);
+    for (const id of HANG) {
+      eq(d.body.fleet.find((f) => f.tenant === id)?.reachable, false, `${id}: not done by the deadline is unreachable`);
+      ok(d.body.revenue30d.uncovered.some((u) => u.tenant === id), `${id}: not done by the deadline is uncovered, not zero`);
+    }
+    eq(L.storesHooks.deadlineMs, 15_000, "the real deadline is about 15 s");
+    eq(L.storesHooks.concurrency, 10, "10 stores at once");
+  } finally {
+    await db().execute({ sql: `DELETE FROM tenants WHERE id IN (${HANG.map(() => "?").join(",")})`, args: HANG });
+  }
+});
+
+await t("overview and health: a local file: store whose database file is missing is unreachable, and no empty database is made", async () => {
+  const { existsSync } = await import("node:fs");
+  const file = ".test-platstores-missing-file.db";
+  ok(!existsSync(file), "no file before");
+  await db().execute({ sql: "INSERT INTO tenants (id, name, status, domains, db_url, config, created_at, updated_at) VALUES ('missing-file', 'Missing File', 'active', '[]', ?, '{}', ?, ?)", args: [`file:${file}`, now, now] });
+  try {
+    const r = await call("operator", "overview");
+    eq(r.body.fleet.find((f) => f.tenant === "missing-file")?.reachable, false, "fleet");
+    ok(r.body.revenue30d.uncovered.some((u) => u.tenant === "missing-file"), "uncovered");
+    eq((await L.storeHealth(["missing-file"]))["missing-file"].state, "unreachable", "health");
+    eq((await L.storeDetail("missing-file")).live.reachable, false, "store page");
+    ok(!existsSync(file), "still no file after");
+    eq([L.storeFileMissing("file:/definitely/not/here.db"), L.storeFileMissing(a.tenant.dbUrl), L.storeFileMissing("libsql://x.turso.io")], [true, false, false], "storeFileMissing");
+  } finally {
+    await db().execute("DELETE FROM tenants WHERE id = 'missing-file'");
+  }
 });
 
 // StoreDetail rendered for real (the page harness only records props): Next's
