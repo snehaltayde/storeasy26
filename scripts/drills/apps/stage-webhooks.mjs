@@ -26,6 +26,18 @@ const signed = (secret, r) => {
   const mac = createHmac("sha256", Buffer.from(secret.slice(6), "base64")).update(`${r.headers["webhook-id"]}.${r.headers["webhook-timestamp"]}.${r.body}`).digest("base64");
   return String(r.headers["webhook-signature"] || "").split(" ").includes(`v1,${mac}`);
 };
+// The sign-in allows 5 tries a minute per address, and the stages before this
+// one sign in four times: on a 429 wait the minute out once, then sign in.
+async function signInPatient(drill, role) {
+  try {
+    return await signIn(drill, role);
+  } catch (e) {
+    if (!/answered 429/.test(String(e?.message))) throw e;
+    drill.note(`sign-in as ${role} was rate limited; waiting the minute out`);
+    await new Promise((r) => setTimeout(r, 62_000));
+    return signIn(drill, role);
+  }
+}
 const tick = (page) => page.evaluate(async () => (await fetch("/api/jobs/tick", { method: "POST" })).status);
 async function until(page, fn, label, tries = 20) {
   for (let i = 0; i < tries; i++) {
@@ -85,7 +97,7 @@ stage("webhooks", async (drill) => {
   const server = await receiver();
   const hook = `http://127.0.0.1:${server.address().port}/hooks`;
   try {
-    const page = await signIn(drill, "owner");
+    const page = await signInPatient(drill, "owner");
     drill.check((await open(page, "/admin/apps")) === 200, "owner: /admin/apps opens (200)");
     await page.locator('[data-apps="create-custom"]').click();
     const dialog = page.locator('[data-apps="custom-dialog"]');
@@ -127,7 +139,7 @@ stage("webhooks", async (drill) => {
     await drill.shoot(page, "owner-deliveries");
     await page.context().close();
 
-    const support = await signIn(drill, "support");
+    const support = await signInPatient(drill, "support");
     await open(support, `/admin/apps/${state.customId}`);
     await support.locator('[data-apps="deliveries"] tbody tr').first().waitFor();
     const live = await support.evaluate(() => [...document.querySelectorAll("[data-webhooks-action], [data-delivery-action=resend], [data-apps=create-custom]")].filter((el) => !el.disabled && el.getAttribute("aria-disabled") !== "true").map((el) => el.outerHTML.slice(0, 100)));
