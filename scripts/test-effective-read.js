@@ -860,6 +860,7 @@ async function renderCheckout(tn, cartId) {
         "next/headers": { cookies: async () => ({ get: (n) => (n === Cart.CART_COOKIE && globalThis.__effCheckoutCart ? { value: globalThis.__effCheckoutCart } : undefined) }) },
         "@/lib/cart": Cart,
         "@/lib/tenant-context": await import("../lib/tenant-context.js"),
+        "@/lib/delivery-estimate": await import("../lib/delivery-estimate.js"), // Phase 8 line 1
         "@/lib/commerce/adapter": { checkoutCapability: () => ({ available: true }) },
         "@/lib/site": { siteName: () => "Fixture Store", siteLogo: () => null },
         "@/lib/content/resolve": { resolvedContentPageList: async () => [] },
@@ -901,6 +902,10 @@ async function renderConfirmation(tn, orderId) {
     "@/lib/ids": ids,
     "@/lib/tenant-request": { tfetch: (fn) => tn.run(fn) },
     "@/lib/storefront-request": { tfetch: (fn) => tn.run(fn) },
+    // Phase 8 line 1: the "Expected by" line (no titles in it)
+    "@/lib/tenant-context": await import("../lib/tenant-context.js"),
+    "@/lib/delivery-estimate": await import("../lib/delivery-estimate.js"),
+    "@/components/checkout/DeliveryEstimate": nothing,
   });
   const status = await loadComponent("app/(storefront)/orders/[orderId]/page.js", {
     "next/link": Link,

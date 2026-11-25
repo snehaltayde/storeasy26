@@ -820,9 +820,29 @@ const flowStubs = {
   "@/lib/checkout-price": checkoutPrice,
   "@/lib/checkout/confirm-payment": await import("../lib/checkout/confirm-payment.js"),
   "@/lib/track/client": { track() {} },
+  "@/lib/checkout/payment-terms": await import("../lib/checkout/payment-terms.js"),
+};
+// Phase 8 line 1: the PIN field and the estimate line AddressStep renders.
+flowStubs["@/lib/pincode/client"] = await import("../lib/pincode/client.js");
+flowStubs["@/lib/delivery-estimate"] = await import("../lib/delivery-estimate.js");
+flowStubs["./DeliveryEstimate"] = await loadComponent(sources.get("components/checkout/DeliveryEstimate.js"), flowStubs);
+// PincodeField keeps hooks (the lookup), which this file's mount() only gives the
+// top component, so a stateless stand-in renders the PIN input and the rest of
+// the address; the PIN field's own copy is checked through its constants below.
+flowStubs["./PincodeField"] = {
+  __esModule: true,
+  default: ({ form, onAddress, children }) => [
+    React.createElement("input", { key: "pin", type: "text", name: "pincode", value: form.pincode, onChange: (e) => onAddress({ pincode: e.target.value }, "typed") }),
+    React.createElement(React.Fragment, { key: "rest" }, children?.(false)),
+  ],
 };
 // Phase 8 step 0: CheckoutFlow's own parts, loaded with the same stubs.
-for (const part of ["checkoutModel", "AddressStep", "PaymentStep", "OrderSummary"]) {
+// Phase 8 line 2: and the nudge, the code dialog, the quote hook and placeOrder.
+// Phase 8 line 3: AddressStep's SavedAddressPicker keeps its own hooks and
+// fetches, which this stand-in can't run; it renders nothing here (its copy is
+// still in the source scan, and scripts/test-addresses.js scans it too).
+flowStubs["./SavedAddressPicker"] = nothing;
+for (const part of ["checkoutModel", "AddressStep", "PrepaidNudge", "PaymentStep", "OrderSummary", "CodOtpDialog", "useQuote", "placeOrder"]) {
   flowStubs[`./${part}`] = await loadComponent(sources.get(`components/checkout/${part}.js`), flowStubs);
 }
 const realFlow = () => loadComponent(sources.get("components/checkout/CheckoutFlow.js"), flowStubs);
@@ -834,6 +854,7 @@ async function renderCheckoutPage(inTenant, cartId, flow) {
     "next/headers": { cookies: async () => ({ get: () => ({ value: cartId }) }) },
     "@/lib/cart": cartLib,
     "@/lib/tenant-context": tenantContext,
+    "@/lib/delivery-estimate": await import("../lib/delivery-estimate.js"), // Phase 8 line 1
     "@/lib/commerce/adapter": commerceAdapter,
     "@/lib/site": site,
     "@/lib/content/resolve": { resolvedContentPageList: async () => [] },
@@ -892,7 +913,7 @@ await t("checkout page (rendered): a closed checkout shows fixed text, never the
 });
 
 await t("checkout preview can fail: dropping the store's rates is caught", async () => {
-  const broken = plant("components/checkout/CheckoutFlow.js", ", config: shippingConfig }", " }");
+  const broken = plant("components/checkout/CheckoutFlow.js", "paymentTerms({ cart, shippingConfig, paymentConfig", "paymentTerms({ cart, paymentConfig");
   const { default: CheckoutFlow } = await loadComponent(broken, flowStubs);
   const html = renderToStaticMarkup(React.createElement(CheckoutFlow, { cart: checkoutFixture, razorpayEnabled: true, storeName: "Acme", shippingConfig: OWN_RATES }));
   ok(html.includes("₹128") && !html.includes("₹550"), "the broken wiring rendered correct numbers");
@@ -968,7 +989,10 @@ async function mount(src, stubs, props) {
     },
     useEffect() {},
   };
-  const { default: Component } = await loadComponent(src, { ...stubs, react: hooks });
+  // Phase 8 line 2: CheckoutFlow's quote hook runs on these hooks too
+  const own = { ...stubs, react: hooks };
+  if (stubs["./useQuote"]) own["./useQuote"] = await loadComponent(sources.get("components/checkout/useQuote.js"), own);
+  const { default: Component } = await loadComponent(src, own);
   const render = () => {
     cursor = 0;
     return Component(props);
@@ -1215,6 +1239,7 @@ await t("account API: a real database error reaches the shopper as plain words",
     "@/lib/customers": await import("../lib/customers.js"),
     "@/lib/returns": await import("../lib/returns.js"),
     "@/lib/wishlist": await import("../lib/wishlist.js"),
+    "@/lib/addresses": await import("../lib/addresses.js"),
     "@/lib/shopper-errors": shopperErrors,
   });
   const res = await route.POST(jsonPost("broken.test", "/api/account", { action: "verify", email: "a@b.test", code: "123456" }));
@@ -1230,6 +1255,7 @@ await t("account API: a plain error with internal text never reaches the shopper
     "@/lib/customers": { ...customers, verifyOtp: async () => { throw new Error("SQLITE_BUSY: database is locked"); } },
     "@/lib/returns": await import("../lib/returns.js"),
     "@/lib/wishlist": await import("../lib/wishlist.js"),
+    "@/lib/addresses": await import("../lib/addresses.js"),
     "@/lib/shopper-errors": shopperErrors,
   });
   const res = await route.POST(jsonPost("own.test", "/api/account", { action: "verify", email: "a@b.test", code: "123456" }));
@@ -1265,7 +1291,9 @@ await t("account errors: what the sign-in, profile and returns code throws still
   await inOwn(async () => {
     eq(await shown(() => customers.requestOtp("not-an-email")), "That email doesn't look right.", "bad email:");
     eq(await shown(() => customers.verifyOtp("nobody@b.test", "123456")), "No active code — request a new one.", "no code:");
-    eq(await shown(() => customers.updateCustomerProfile("nobody", { address: { line1: "" } })), "An address needs at least line 1, city and pincode.", "bad address:");
+    // Phase 8 line 3: addresses are saved through lib/addresses.js
+    const { saveAddress } = await import("../lib/addresses.js");
+    eq(await shown(() => saveAddress("nobody", { line1: "" })), "Fill in your name, phone, address, city, state and PIN code.", "bad address:");
     eq(await shown(() => requestReturn({ customerId: "nobody", orderId: "nope", reason: "x" })), returnEligibility(null).reason, "no such order:");
   });
   // Every throw in the shopper's account code is one a shopper may read.
@@ -1313,6 +1341,8 @@ async function accountBadges(src = accountSrc) {
     "@/lib/format": format,
     "@/components/account/AccountAuth": nothing,
     "@/components/account/ProfileForm": nothing,
+    "@/components/account/AddressBook": nothing,
+    "@/lib/addresses": { listAddresses: async () => [] },
     "@/lib/tenant-request": { tfetch: inOwn },
     "@/lib/storefront-request": { tfetch: inOwn },
   });
@@ -1349,6 +1379,16 @@ await t("search API: a real database error leaves no error text in the response"
   const route = await loadRoute("search", { "@/lib/typesense-search": { typesenseSearch: async () => null }, "@/lib/repo": repo });
   const req = new NextRequest("http://broken.test/api/search?q=candle", { headers: { host: "broken.test" } });
   eq(JSON.stringify(await (await route.GET(req)).json()), JSON.stringify({ q: "candle", hits: [], source: "error" }), "body:");
+});
+
+await t("PIN code and delivery copy (Phase 8 line 1) is shopper language", async () => {
+  const P = await import("../lib/pincode/client.js");
+  const D = await import("../lib/delivery-estimate.js");
+  const lines = [P.BAD_PIN, P.NOT_FOUND, D.deliveryLine({ minDays: 2, maxDays: 4 }), D.expectedLine({ minDays: 2, maxDays: 4 })];
+  for (const file of ["components/checkout/PincodeField.js", "components/pdp/DeliveryCheck.js"]) {
+    lines.push(...[...(await readFile(join(ROOT, file), "utf8")).matchAll(/>\s*([A-Z][^<>{}]{3,})\s*</g)].map((m) => m[1]));
+  }
+  for (const l of lines) assertClean(l, `"${l}"`);
 });
 
 await t("cart API: a failed change leaves no error text in the response", async () => {

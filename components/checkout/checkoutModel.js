@@ -39,3 +39,25 @@ export function addressValid(form) {
     ["name", "line1", "city", "state", "pincode"].every((k) => form[k].trim())
   );
 }
+
+// Phase 8 line 1: what a pincode lookup may write. City and state are filled
+// only when they are empty or still hold the lookup's own earlier values
+// (`filled`, the { city, state } it last wrote); a value the shopper typed or
+// picked is never overwritten. → a patch for applyAddress(form, patch, "pincode").
+export function pincodePatch(form, place, filled = {}) {
+  const patch = {};
+  if (!place) return patch;
+  for (const k of ["city", "state"]) {
+    const now = form[k].trim();
+    if (place[k] && (!now || (filled[k] && now === filled[k]))) patch[k] = place[k];
+  }
+  return patch;
+}
+
+// Has the shopper started an address of their own? Judged on the street lines
+// only: a PIN, and the city and state its lookup filled (an sf_pin prefill can
+// land before the saved-address picker loads), are not an address yet, so the
+// picker may still fill the saved default (Phase 8 lines 1 and 3).
+export function addressStarted(form) {
+  return ["line1", "line2"].some((k) => String(form?.[k] ?? "").trim() !== "");
+}

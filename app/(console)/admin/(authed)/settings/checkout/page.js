@@ -8,6 +8,7 @@ import { currentTenant } from "@/lib/tenant-context";
 import { tfetch } from "@/lib/console-request";
 import { NoAccess } from "@/components/admin/settings/NoAccess";
 import { CheckoutForm } from "@/components/admin/settings/CheckoutForm";
+import { smsAvailable } from "@/lib/messaging/sms";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Checkout and payments · Settings · Admin", robots: { index: false } };
@@ -31,7 +32,7 @@ export default async function SettingsCheckoutPage() {
     <>
       <h2 className="mb-4 text-[1.125rem] font-semibold">Checkout and payments</h2>
       <CheckoutForm
-        initial={{ readOnly: v.readOnly, commerce: { checkout_mode: v.commerce.checkout_mode, timezone: v.commerce.timezone }, payments: v.payments, payment }}
+        initial={{ readOnly: v.readOnly, commerce: { checkout_mode: v.commerce.checkout_mode, timezone: v.commerce.timezone }, payments: v.payments, payment, payment_config: v.payment_config, shipping: v.shipping, smsAvailable: smsAvailable() }}
         role={actor.role}
       />
     </>

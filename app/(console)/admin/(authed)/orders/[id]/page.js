@@ -6,6 +6,7 @@ import { getOrder, canTransition, ORDER_STATUS } from "@/lib/orders";
 import { canPush } from "@/lib/shopify-push";
 import { roleAllows } from "@/lib/platform/authz";
 import { getOrderProjection } from "@/lib/order-projection";
+import { codCheckChannel, codCheckWords } from "@/lib/checkout/cod-otp";
 import { redactOrderForRole, shopifyMatchLine, orderTime } from "@/lib/admin/order-view";
 import { shopifyAdminUrl } from "@/lib/admin/shopify-admin-url";
 import { merchantTz } from "@/lib/reporting";
@@ -48,9 +49,11 @@ export default async function AdminOrderDetail({ params }) {
 
   const { id } = await params;
   const role = actor.role;
-  const [rawOrder, projection, timeZone, shopifyUrl] = await tfetch(async () => {
+  const [rawOrder, projection, timeZone, shopifyUrl, codChannel] = await tfetch(async () => {
     const o = await getOrder(id);
-    return [o, o ? await getOrderProjection(id) : null, merchantTz(), o?.shopify_order_id ? shopifyAdminUrl({ order: o.shopify_order_id }) : null];
+    // Phase 8 line 2: how the COD code was sent (SMS proves the phone, email only the email)
+    const channel = o?.cod_verified_at ? await codCheckChannel(id).catch(() => null) : null;
+    return [o, o ? await getOrderProjection(id) : null, merchantTz(), o?.shopify_order_id ? shopifyAdminUrl({ order: o.shopify_order_id }) : null, channel];
   });
   if (!rawOrder) notFound();
   const order = redactOrderForRole(rawOrder, role);
@@ -91,10 +94,10 @@ export default async function AdminOrderDetail({ params }) {
           <OrderLines
             items={order.items}
             shopifyLines={shopifyLines}
-            totals={{ subtotal: order.subtotal, discount_total: order.discount_total, coupon_code: order.coupon_code, shipping_total: order.shipping_total, total: order.total, refunded_total: order.refunded_total }}
+            totals={{ subtotal: order.subtotal, discount_total: order.discount_total, payment_discount: order.payment_discount ?? 0, coupon_code: order.coupon_code, shipping_total: order.shipping_total, total: order.total, refunded_total: order.refunded_total }}
             currency={order.currency}
           />
-          <OrderTimeline fulfillments={projection.fulfillments} refunds={projection.refunds} events={order.events} currency={order.currency} timeZone={timeZone} />
+          <OrderTimeline fulfillments={projection.fulfillments} refunds={projection.refunds} events={order.events} codVerifiedAt={order.cod_verified_at ?? null} codCheck={codCheckWords(codChannel)} currency={order.currency} timeZone={timeZone} />
         </div>
         <aside aria-label="Customer and payment" className="min-w-0 space-y-4">
           <Card>

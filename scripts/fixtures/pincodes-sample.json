@@ -1,0 +1,20 @@
+{
+  "source": "Hand-written test fixture in the shape of data/in-pincodes.json (scripts/build-pincodes.js). Tests and drills only; never shipped as the dataset.",
+  "license": "Test data",
+  "attribution": "",
+  "districts": ["Bengaluru", "Pune", "Mumbai", "New Delhi", "Chennai", "Hyderabad", "Kolkata", "Leh", "Srinagar", "Gurugram"],
+  "states": ["Karnataka", "Maharashtra", "Delhi", "Tamil Nadu", "Telangana", "West Bengal", "Ladakh", "Jammu And Kashmir", "Haryana"],
+  "pins": {
+    "560001": [0, 0],
+    "560034": [0, 0],
+    "411001": [1, 1],
+    "400001": [2, 1],
+    "110001": [3, 2],
+    "600001": [4, 3],
+    "500001": [5, 4],
+    "700001": [6, 5],
+    "194101": [7, 6],
+    "190001": [8, 7],
+    "122001": [9, 8]
+  }
+}

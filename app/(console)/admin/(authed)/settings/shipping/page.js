@@ -21,7 +21,7 @@ export default async function SettingsShippingPage() {
   return (
     <>
       <h2 className="mb-4 text-[1.125rem] font-semibold">Shipping</h2>
-      <ShippingForm initial={{ readOnly: v.readOnly, shipping: v.shipping, shipping_is_default: v.shipping_is_default }} role={actor.role} />
+      <ShippingForm initial={{ readOnly: v.readOnly, shipping: v.shipping, shipping_is_default: v.shipping_is_default, timeZone: v.commerce?.timezone }} role={actor.role} />
     </>
   );
 }

@@ -1,7 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { CART_COOKIE, getCart, clearCart, shopperCart } from "@/lib/cart";
 import { computeShipping } from "@/lib/shipping";
-import { tenantShippingConfig } from "@/lib/tenant-context";
+import { tenantShippingConfig, currentTenant } from "@/lib/tenant-context";
 import { CONSENT_COOKIE } from "@/lib/track/names";
 import { rateLimitAsync } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
@@ -22,11 +22,18 @@ import { conversionUnit } from "@/lib/experiments";
 import { closedStoreGate, STORE_CLOSED_CODE, STORE_CLOSED_MESSAGE, STORE_CLOSED_COD_ONLY_MESSAGE } from "@/lib/content/resolve";
 import { isTransient } from "@/lib/db";
 import { shopperErrorMessage } from "@/lib/shopper-errors";
+import { paymentTerms, COD_OTP_MESSAGES } from "@/lib/checkout/payment-terms";
+import { sendCodOtp, verifyCodOtp, requireVerified, consumeChallenge, CodOtpError } from "@/lib/checkout/cod-otp";
+import { smsAvailable } from "@/lib/messaging/sms";
+import { e164, PHONE_INVALID } from "@/lib/checkout/phone";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const cartIdFrom = (request) => request.cookies.get(CART_COOKIE)?.value || null;
+
+// Phase 8 line 2: one strict phone format (lib/checkout/phone.js).
+const phoneInvalid = () => NextResponse.json({ error: PHONE_INVALID, code: "PHONE_INVALID" }, { status: 400 });
 
 function validate(contact, address) {
   const required = [
@@ -80,25 +87,52 @@ async function dedupByKey(key, cartId, cart, expectedTotal) {
   return existing;
 }
 
+// Phase 8 line 2 (decision 10): both payment methods' totals, the prepaid
+// nudge, whether COD is offered and whether it needs a code, from the server's
+// cart, the store's saved rates and payment rules. Every action prices with
+// this; nothing in the request body (prepaidDiscount, nudge, payment_discount)
+// is ever read.
+const termsFor = (cart, address) =>
+  paymentTerms({
+    cart,
+    shippingConfig: tenantShippingConfig(),
+    paymentConfig: currentTenant()?.config?.payment_config ?? null,
+    pincode: address?.pincode || null,
+    prepaidAvailable: razorpayConfigured(),
+    smsAvailable: smsAvailable(),
+  });
+
+const codUnavailable = (terms) =>
+  NextResponse.json({ ok: false, code: "COD_UNAVAILABLE", error: terms.cod.reason, quote: terms }, { status: 409 });
+
+// A code answer: its own sentence, its own code, nothing about anyone else.
+const otpError = (e) =>
+  NextResponse.json(
+    { ok: false, code: e.code, error: e.message, ...e.extra },
+    { status: e.code === "COD_OTP_COOLDOWN" || e.code === "COD_OTP_CART_CAP" ? 429 : e.code === "COD_OTP_UNAVAILABLE" ? 503 : 409 },
+  );
+
 // P1-RATES: never charge an amount the shopper wasn't shown (lib/checkout-price.js).
 // The refusal also carries the server's cart and rates, which the checkout page
 // already hands this shopper, so the UI redraws the summary and the button from
 // the numbers the server will charge. undefined rates (the code default) drop
 // out of the JSON and the UI's computeShipping falls back to the same default.
-function priceCheck(body, cart, shipping, shippingConfig) {
+function priceCheck(body, cart, shipping, shippingConfig, terms, paymentDiscount = 0) {
   const currency = cart.currency || "INR";
   const m = priceMismatch({
     expectedTotal: body?.expectedTotal,
     expectedShipping: body?.expectedShipping,
     goodsTotal: cart.total || 0,
     shippingTotal: shipping.total,
+    paymentDiscount,
     currency,
   });
   if (!m) return null;
   return NextResponse.json(
     // P4-EFFECTIVE (OVL-06): the browser gets the shopper's projection of the
     // cart (no Shopify title or SKU); createOrder below keeps the full cart.
-    { ok: false, code: PRICE_CHANGED, error: m.message, total: m.total, shippingTotal: m.shippingTotal, currency, cart: shopperCart(cart), shippingConfig },
+    // Phase 8 line 2: and the fresh quote, so the page redraws both methods.
+    { ok: false, code: PRICE_CHANGED, error: m.message, total: m.total, shippingTotal: m.shippingTotal, currency, cart: shopperCart(cart), shippingConfig, quote: terms },
     { status: 409 },
   );
 }
@@ -181,12 +215,23 @@ export const POST = tenantHandler(async (request) => {
       );
     }
   }
-  const limited = await rateLimitAsync(request, { name: "checkout", limit: 10 });
-  if (limited) return limited;
-
   const cartId = cartIdFrom(request);
   const body = await request.json().catch(() => ({}));
   const { action, contact, address, idempotencyKey } = body;
+
+  // Phase 8 line 2: the quote is asked for as the PIN code changes (60 a
+  // minute); sending a code has its own cap (10 per IP per 15 minutes) and its
+  // own sentence. Everything else shares the checkout limit.
+  if (action === "cod_otp_send") {
+    const capped = await rateLimitAsync(request, { name: "cod_otp_send", limit: 10, windowMs: 15 * 60_000 });
+    if (capped) {
+      slog("cod_otp_failed", { reason: "ip_cap" });
+      return NextResponse.json({ ok: false, code: "COD_OTP_IP_CAP", error: COD_OTP_MESSAGES.ipCap }, { status: 429 });
+    }
+  } else {
+    const limited = await rateLimitAsync(request, action === "quote" ? { name: "checkout_quote", limit: 60 } : { name: "checkout", limit: 10 });
+    if (limited) return limited;
+  }
 
   // PUB-06: a store that has never published takes no orders from shoppers.
   // A founder's valid preview session may place a cash on delivery test
@@ -196,11 +241,51 @@ export const POST = tenantHandler(async (request) => {
   const closed = await closedStoreGate();
   if (closed) {
     if (!closed.preview) return NextResponse.json({ error: STORE_CLOSED_MESSAGE, code: STORE_CLOSED_CODE }, { status: 403 });
-    if (action !== "cod") return NextResponse.json({ error: STORE_CLOSED_COD_ONLY_MESSAGE, code: STORE_CLOSED_CODE }, { status: 403 });
+    if (!["cod", "quote", "cod_otp_send", "cod_otp_verify"].includes(action))
+      return NextResponse.json({ error: STORE_CLOSED_COD_ONLY_MESSAGE, code: STORE_CLOSED_CODE }, { status: 403 });
     slog("closed_store_test_order", { action });
   }
 
   try {
+    // Phase 8 line 2: a read of this cart cookie's cart only; no order, no write.
+    if (action === "quote") {
+      const cart = cartId ? await getCart(cartId) : { items: [], subtotal: 0, discountTotal: 0, total: 0 };
+      return NextResponse.json({ ok: true, quote: termsFor(cart, address) });
+    }
+
+    // Phase 8 line 2 (decision 13): send or check the COD code. The challenge
+    // is bound to this cart cookie, this key, this phone and this COD amount.
+    if (action === "cod_otp_send" || action === "cod_otp_verify") {
+      const disabled = noLinkSecret();
+      if (disabled) return disabled;
+      if (!idempotencyKey) return NextResponse.json({ error: "idempotencyKey is required" }, { status: 400 });
+      if (!cartId) return NextResponse.json({ error: "No cart session" }, { status: 400 });
+      const cart = await getCart(cartId);
+      if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
+      if (!validate(contact, address)) return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
+      if (!e164(contact.phone)) return phoneInvalid();
+      const terms = termsFor(cart, address);
+      if (!terms.cod.available) return codUnavailable(terms);
+      const bind = { cartId, key: String(idempotencyKey), phone: contact.phone, amount: terms.cod.total, currency: cart.currency || "INR", cart };
+      try {
+        if (action === "cod_otp_verify") return NextResponse.json({ ok: true, ...(await verifyCodOtp({ ...bind, challengeId: body.challengeId, code: body.code })) });
+        if (!terms.cod.otpRequired) return NextResponse.json({ ok: true, required: false });
+        const shippingConfig = tenantShippingConfig();
+        const shipping = computeShipping({ subtotal: cart.subtotal || 0, discountTotal: cart.discountTotal || 0, paymentMethod: "cod", pincode: address?.pincode, config: shippingConfig });
+        const changed = priceCheck(body, cart, shipping, shippingConfig, terms);
+        if (changed) return changed;
+        const { reply, deliver } = await sendCodOtp({ ...bind, email: contact.email, channel: terms.cod.otpChannel });
+        // the message goes after the answer, on both paths (lib/checkout/cod-otp.js)
+        const later = () => deliver();
+        later.codOtp = true;
+        after(later);
+        return NextResponse.json({ ok: true, required: true, ...reply });
+      } catch (e) {
+        if (e instanceof CodOtpError) return otpError(e);
+        throw e;
+      }
+    }
+
     if (action === "cod") {
       const disabled = noLinkSecret();
       if (disabled) return disabled;
@@ -220,7 +305,8 @@ export const POST = tenantHandler(async (request) => {
         config: shippingConfig,
       });
 
-      const dup = await dedupByKey(idempotencyKey, cartId, cart, (cart.total || 0) + shipping.total);
+      const terms = termsFor(cart, address);
+      const dup = await dedupByKey(idempotencyKey, cartId, cart, terms.cod.total);
       if (dup instanceof NextResponse) return dup;
       if (dup) {
         // Finish what the first request started: it may have died before
@@ -233,10 +319,23 @@ export const POST = tenantHandler(async (request) => {
       if (!cartId) return NextResponse.json({ error: "No cart session" }, { status: 400 });
       if (!validate(contact, address))
         return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
+      if (!e164(contact.phone)) return phoneInvalid();
       if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
+      // Phase 8 line 2: the quote hides COD here, so the route refuses it too.
+      if (!terms.cod.available) return codUnavailable(terms);
       // P1-RATES: never store an amount the shopper wasn't shown.
-      const changed = priceCheck(body, cart, shipping, shippingConfig);
+      const changed = priceCheck(body, cart, shipping, shippingConfig, terms);
       if (changed) return changed;
+      // Phase 8 line 2: a verified code for this cart, key, phone and amount.
+      let challenge = null;
+      if (terms.cod.otpRequired) {
+        try {
+          challenge = await requireVerified({ challengeId: body.challengeId, cartId, key: String(idempotencyKey), phone: contact.phone, amount: terms.cod.total, currency: cart.currency || "INR", cart });
+        } catch (e) {
+          if (e instanceof CodOtpError) return otpError(e);
+          throw e;
+        }
+      }
 
       const order = await createOrder({
         cartId,
@@ -247,7 +346,9 @@ export const POST = tenantHandler(async (request) => {
         idempotencyKey,
         shipping,
         consent: request.cookies.get(CONSENT_COOKIE)?.value || null,
+        codVerifiedAt: challenge?.verified_at || null,
       });
+      if (challenge) await consumeChallenge(challenge.id, order.id);
       slog(order.deduped ? "order_deduped" : "order_created", {
         order_id: order.id,
         method: "cod",
@@ -281,25 +382,29 @@ export const POST = tenantHandler(async (request) => {
         config: shippingConfig,
       });
 
+      // Phase 8 line 2: the prepaid discount, priced by the server only.
+      const terms = termsFor(cart, address);
+      const paymentDiscount = terms.prepaid.discount;
       // Dedup BEFORE creating a Razorpay order, so a retry reopens the SAME
       // payment instead of minting a parallel one.
-      const dup = await dedupByKey(idempotencyKey, cartId, cart, (cart.total || 0) + shipping.total);
+      const dup = await dedupByKey(idempotencyKey, cartId, cart, terms.prepaid.total);
       if (dup instanceof NextResponse) return dup;
       if (dup) return await razorpayResponse(dup, dup.razorpay_order_id, true);
 
       if (!cartId) return NextResponse.json({ error: "No cart session" }, { status: 400 });
       if (!validate(contact, address))
         return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
+      if (!e164(contact.phone)) return phoneInvalid();
       if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
       // P1-RATES: the Razorpay order is minted for the amount on the Pay button,
       // or not at all.
-      const changed = priceCheck(body, cart, shipping, shippingConfig);
+      const changed = priceCheck(body, cart, shipping, shippingConfig, terms, paymentDiscount);
       if (changed) return changed;
 
       // One getCart + one shipping compute → the SAME amount for the Razorpay
       // order, our order row, and (later) the Shopify shipping line.
       const rzOrder = await createRazorpayOrder({
-        amountPaise: toMinor(cart.total + shipping.total, cart.currency || "INR"),
+        amountPaise: toMinor(terms.prepaid.total, cart.currency || "INR"),
         receipt: `cart_${cartId.slice(0, 12)}`,
       });
       const order = await createOrder({
@@ -311,6 +416,7 @@ export const POST = tenantHandler(async (request) => {
         idempotencyKey,
         razorpayOrderId: rzOrder.id,
         shipping,
+        paymentDiscount,
         consent: request.cookies.get(CONSENT_COOKIE)?.value || null,
       });
       slog(order.deduped ? "order_deduped" : "order_created", {

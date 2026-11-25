@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin, adminSessionTokenFor, adminBootstrapMode, ADMIN_COOKIE } from "@/lib/admin-auth";
 import { audit } from "@/lib/platform/audit";
 import { settingsView, buildSettingsPatch } from "@/lib/admin/settings";
+import { smsAvailable } from "@/lib/messaging/sms";
 import { patchTenant } from "@/lib/platform/control.js";
 import { currentTenant, tenantId } from "@/lib/tenant-context.js";
 import { db } from "@/lib/db";
@@ -46,7 +47,8 @@ export const PUT = tenantHandler(async (request) => {
     );
 
   const body = await request.json().catch(() => ({}));
-  const { ok, errors, patch } = buildSettingsPatch(body, tenant.config);
+  // Phase 8 line 2: SMS codes only where a provider is set (lib/messaging/sms.js)
+  const { ok, errors, patch } = buildSettingsPatch(body, tenant.config, { smsAvailable: smsAvailable() });
   if (!ok) return NextResponse.json({ error: "Validation failed", errors }, { status: 422 });
 
   const updated = await patchTenant(tenant.id, patch);

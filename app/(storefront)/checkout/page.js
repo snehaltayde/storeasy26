@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { getCart, emptyCart, shopperCart, CART_COOKIE } from "@/lib/cart";
-import { tenantOwnCfg, tenantShippingConfig } from "@/lib/tenant-context";
+import { tenantCfg, tenantOwnCfg, tenantShippingConfig, currentTenant } from "@/lib/tenant-context";
+import { DEFAULT_TIME_ZONE } from "@/lib/delivery-estimate";
 import { checkoutCapability } from "@/lib/commerce/adapter";
 import { siteName, siteLogo } from "@/lib/site";
 import { resolvedContentPageList } from "@/lib/content/resolve";
@@ -29,7 +30,7 @@ export const dynamic = "force-dynamic";
 
 export default async function CheckoutPage() {
   const id = (await cookies()).get(CART_COOKIE)?.value;
-  const { cart, storeName, logo, razorpayEnabled, capability, policies, shippingConfig } = await tfetch(async () => ({
+  const { cart, storeName, logo, razorpayEnabled, capability, policies, shippingConfig, paymentConfig, timeZone } = await tfetch(async () => ({
     // P4-EFFECTIVE (OVL-06): CheckoutFlow is a client component, so it gets the
     // shopper's projection (no Shopify title or SKU). The order itself is made
     // by the checkout API from the full server-side cart.
@@ -43,6 +44,10 @@ export default async function CheckoutPage() {
     capability: checkoutCapability(), // S32 (BE06): the per-tenant mode gate
     policies: await policyLinks(), // S38 (SF14): links near the pay button
     shippingConfig: tenantShippingConfig(), // GEN-03: the live preview must use THIS store's rates
+    timeZone: tenantCfg("timezone", null, DEFAULT_TIME_ZONE), // Phase 8 line 1: the summary's delivery dates
+    // Phase 8 line 2: the prepaid discount and COD rules, for the first render
+    // before the server's quote lands (no secrets live in payment_config)
+    paymentConfig: currentTenant()?.config?.payment_config ?? null,
   }));
 
   if (!capability.available) {
@@ -77,5 +82,5 @@ export default async function CheckoutPage() {
     );
   }
 
-  return <CheckoutFlow cart={cart} razorpayEnabled={razorpayEnabled} storeName={storeName} logo={logo} policies={policies} shippingConfig={shippingConfig} />;
+  return <CheckoutFlow cart={cart} razorpayEnabled={razorpayEnabled} storeName={storeName} logo={logo} policies={policies} shippingConfig={shippingConfig} paymentConfig={paymentConfig} timeZone={timeZone} />;
 }

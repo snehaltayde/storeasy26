@@ -270,6 +270,8 @@ async function renderOrderPage(orderId, { role = "owner", src = linesSrc } = {})
     "@/lib/shopify-push": push,
     "@/lib/platform/authz": authz,
     "@/lib/order-projection": projection,
+    // Phase 8 line 2: the COD check label (no COD code on these orders)
+    "@/lib/checkout/cod-otp": { codCheckChannel: async () => null, codCheckWords: () => null },
     "@/lib/admin/order-view": view,
     "@/lib/admin/shopify-admin-url": adminUrl,
     "@/lib/reporting": reporting,

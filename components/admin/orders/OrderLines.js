@@ -49,6 +49,12 @@ export function OrderLines({ items = [], shopifyLines = [], totals = {}, currenc
               <dd className="font-mono tabular-nums">−{money(totals.discount_total)}</dd>
             </div>
           )}
+          {totals.payment_discount > 0 && (
+            <div className="flex justify-between text-muted-foreground">
+              <dt>Prepaid discount</dt>
+              <dd className="font-mono tabular-nums">−{money(totals.payment_discount)}</dd>
+            </div>
+          )}
           <div className="flex justify-between text-muted-foreground">
             <dt>Shipping</dt>
             <dd className="font-mono tabular-nums">{totals.shipping_total ? money(totals.shipping_total) : "Free"}</dd>

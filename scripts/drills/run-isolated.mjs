@@ -240,6 +240,9 @@ export function drillEnv(base, worktree, ports) {
     // Phase 4 line 3: drill:apps stage webhooks sends to a receiver on
     // 127.0.0.1 (lib/plugins/egress.js refuses this flag in production)
     STOREASY_PLUGIN_EGRESS_LOCAL: "1",
+    // Phase 8 line 1: the pincode route reads the hand-written fixture
+    // (lib/pincode/offline.js ignores this in production)
+    PINCODE_DATA_FILE: join(worktree, "scripts", "fixtures", "pincodes-sample.json"),
   };
 }
 
@@ -575,7 +578,9 @@ export const ALL = ["smoke", "p5", "p6", "agency-gone", "shell", "signup", "conn
   // Phase 5
   "themes",
   // Phase 6
-  "studio"];
+  "studio",
+  // Phase 7 (phase end) and Phase 8 step 0
+  "search", "mobile-cart", "checkout"];
 
 const git = (root, args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
 
