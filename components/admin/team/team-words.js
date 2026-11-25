@@ -49,6 +49,30 @@ export function dateWords(iso) {
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
+// When an invite stops working, in words: "Expires today", "Expires tomorrow",
+// "Expires in 5 days", "Expired 2 days ago". Counted in whole UTC days so the
+// server and the browser agree. soon: a day or less left (or gone).
+export function expiryWords(iso, now = Date.now()) {
+  const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return { text: "", soon: false };
+  const day = (t) => Math.floor(t / 86_400_000);
+  const left = day(d.getTime()) - day(typeof now === "number" ? now : new Date(now).getTime());
+  if (d.getTime() <= (typeof now === "number" ? now : new Date(now).getTime())) {
+    const ago = -left;
+    return { text: ago <= 0 ? "Expired today" : ago === 1 ? "Expired yesterday" : `Expired ${ago} days ago`, soon: true, expired: true };
+  }
+  if (left <= 0) return { text: "Expires today", soon: true };
+  if (left === 1) return { text: "Expires tomorrow", soon: true };
+  return { text: `Expires in ${left} days`, soon: false };
+}
+
+// Initials for a member's avatar: "Asha Rao" -> "AR", "a@x.test" -> "A".
+export function initials(name, email) {
+  const words = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (words.length) return (words[0][0] + (words.length > 1 ? words[words.length - 1][0] : "")).toUpperCase();
+  return String(email || "?").trim().charAt(0).toUpperCase() || "?";
+}
+
 export const TEAM_WORDS = Object.freeze({
   failed: "Something went wrong and nothing changed. Try again.",
   loadFailed: "We couldn't load your team. Nothing has changed.",

@@ -11,6 +11,7 @@ import { InvitesTable } from "@/components/admin/team/InvitesTable";
 import { InviteDialog } from "@/components/admin/team/InviteDialog";
 import { TransferDialog } from "@/components/admin/team/TransferDialog";
 import { TEAM_WORDS, refusalWords } from "@/components/admin/team/team-words";
+import { Refusal } from "@/components/admin/team/Refusal";
 
 const TITLE = "Team";
 const DESCRIPTION = "Who can open this store's console, and what each person can do.";
@@ -173,11 +174,7 @@ export function TeamPage({ initial, supported = true, role, storeName }) {
   return (
     <>
       {header}
-      {notice && (
-        <p role="alert" className="mb-4 text-sm text-destructive">
-          {notice}
-        </p>
-      )}
+      <Refusal className="mb-4">{notice}</Refusal>
       <div className="space-y-6">
         <Card data-team="members">
           <CardHeader>

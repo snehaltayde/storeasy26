@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Pencil, ShieldCheck, UserMinus } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -9,7 +11,9 @@ import { DataTable } from "@/components/kit/data-table";
 import { RoleGate } from "@/components/kit/role-gate";
 import { RoleSelect } from "@/components/admin/team/RoleSelect";
 import { RemoveDialog } from "@/components/admin/team/RemoveDialog";
-import { actionFor, dateWords, roleWords } from "@/components/admin/team/team-words";
+import { Refusal } from "@/components/admin/team/Refusal";
+import { RowAction } from "@/components/admin/team/RowAction";
+import { actionFor, dateWords, initials, roleWords } from "@/components/admin/team/team-words";
 
 // Change one member's role (a dialog: the role select and Save). The route
 // refuses the last owner in plain words, shown here; nothing changes.
@@ -32,7 +36,7 @@ function RoleDialog({ member, actorRole, open, onOpenChange, onSave }) {
   const who = member?.name || member?.email;
   return (
     <Dialog open={open} onOpenChange={change}>
-      <DialogContent data-team="role-dialog">
+      <DialogContent data-team="role-dialog" className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{`Change ${who}'s role`}</DialogTitle>
           <DialogDescription>{`Now ${roleWords(member?.role)}. The change takes effect on their next click, and any invite still waiting for them stops working.`}</DialogDescription>
@@ -42,11 +46,7 @@ function RoleDialog({ member, actorRole, open, onOpenChange, onSave }) {
             <Label htmlFor="team-role">Role</Label>
             <RoleSelect id="team-role" actorRole={actorRole} value={role} onChange={setRole} />
           </div>
-          {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          )}
+          <Refusal>{error}</Refusal>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => change(false)}>
               Cancel
@@ -73,22 +73,43 @@ export function MembersTable({ members, you, onRole, onRemove }) {
     {
       key: "name",
       header: "Name",
+      // takes the room that's left and truncates inside (the full name in title)
+      className: "w-full max-w-0 lg:w-auto lg:max-w-none",
       cell: (m) => (
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="truncate font-medium" title={m.name || m.email}>
-            {m.name || m.email}
+        <span className="flex min-w-0 items-center gap-2.5">
+          <Avatar size="sm" aria-hidden="true" className="max-sm:hidden">
+            <AvatarFallback className="text-[0.625rem] font-medium">{initials(m.name, m.email)}</AvatarFallback>
+          </Avatar>
+          <span className="flex min-w-0 flex-col">
+            <span className="truncate font-medium text-foreground" title={m.name || m.email}>
+              {m.name || m.email}
+            </span>
+            {/* below 1024px the email column folds in here */}
+            {m.name && <span className="truncate text-xs text-muted-foreground lg:hidden">{m.email}</span>}
           </span>
           {m.id === you?.id && (
-            <Badge variant="muted" data-team="you">
+            <Badge variant="default" data-team="you" title="This is you">
               You
             </Badge>
           )}
         </span>
       ),
     },
-    { key: "email", header: "Email", truncate: true },
-    { key: "role", header: "Role", cell: (m) => roleWords(m.role) },
-    { key: "created_at", header: "Joined", cell: (m) => dateWords(m.created_at) },
+    { key: "email", header: "Email", truncate: true, className: "hidden lg:table-cell" },
+    {
+      key: "role",
+      header: "Role",
+      cell: (m) =>
+        m.role === "owner" ? (
+          <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+            <ShieldCheck aria-hidden="true" className="size-4 text-primary" />
+            {roleWords(m.role)}
+          </span>
+        ) : (
+          roleWords(m.role)
+        ),
+    },
+    { key: "created_at", header: "Joined", className: "hidden lg:table-cell", cell: (m) => <span className="whitespace-nowrap text-muted-foreground">{dateWords(m.created_at)}</span> },
   ];
   return (
     <>
@@ -99,15 +120,15 @@ export function MembersTable({ members, you, onRole, onRemove }) {
         rowActions={(m) => (
           <>
             <RoleGate role={you?.role} action={actionFor(m.role)} mode="hide" reason="Only an owner can change an owner.">
-              <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(m)} data-team="change-role">
+              <RowAction icon={Pencil} onClick={() => setEditing(m)} data-team="change-role">
                 Change role
-              </Button>
+              </RowAction>
             </RoleGate>
             {m.id !== you?.id && (
               <RoleGate role={you?.role} action={actionFor(m.role)} mode="hide" reason="Only an owner can remove an owner.">
-                <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => setRemoving(m)} data-team="remove">
+                <RowAction icon={UserMinus} danger onClick={() => setRemoving(m)} data-team="remove">
                   Remove
-                </Button>
+                </RowAction>
               </RoleGate>
             )}
           </>

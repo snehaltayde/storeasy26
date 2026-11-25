@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { roleWords } from "@/components/admin/team/team-words";
+import { Refusal } from "@/components/admin/team/Refusal";
 
 // Remove a member (an AlertDialog first). The last owner and your own row are
 // refused by the route; its words show here and nothing changes.
@@ -32,11 +33,7 @@ export function RemoveDialog({ member, open, onOpenChange, onRemove }) {
             {`${who} (${roleWords(member?.role)}) loses access to this store at once, in every open tab. Any invite still waiting for them stops working. You can invite them again later.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
-        {error && (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        )}
+        <Refusal>{error}</Refusal>
         <AlertDialogFooter>
           <AlertDialogCancel>Keep them</AlertDialogCancel>
           <Button type="button" variant="destructive" disabled={busy} onClick={go}>
