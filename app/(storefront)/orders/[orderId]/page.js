@@ -145,7 +145,8 @@ export default async function OrderStatusPage({ params, searchParams }) {
           <div className="mt-4 rounded-sf-control bg-sf-warning-surface p-4 text-sm">
             <p className="font-semibold text-sf-warning-strong">
               {order.financial_status === "refunded" ? "Fully refunded" : "Partially refunded"} ·{" "}
-              {formatMoney(order.refunded_total, order.currency)}
+              {/* Phase 8 line 4: refunds are in the shop's currency (Shopify's) */}
+              {formatMoney(order.refunded_total, order.base_currency || order.currency)}
             </p>
             <p className="mt-0.5 text-xs text-sf-warning">
               Refunds go back to the original payment method. Your bank may take a few days to show it.

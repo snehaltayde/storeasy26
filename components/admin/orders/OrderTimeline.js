@@ -21,7 +21,8 @@ const metaOf = (e) => {
 // `codCheck` says what it proved ("Phone confirmed by code" for SMS, "Email
 // confirmed by code" for email). A time, not the number, so every role
 // (support included) sees it.
-export function OrderTimeline({ fulfillments = [], refunds = [], events = [], codVerifiedAt = null, codCheck = null, currency, timeZone }) {
+// Phase 8 line 4: a refund shows in its own currency (Shopify's, the base one)
+export function OrderTimeline({ fulfillments = [], refunds = [], events = [], codVerifiedAt = null, codCheck = null, currency, refundCurrency = null, timeZone }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
       <Card>
@@ -69,7 +70,7 @@ export function OrderTimeline({ fulfillments = [], refunds = [], events = [], co
                     {orderTime(r.created_at, timeZone)}
                     {r.note ? <span className="ml-2 text-xs">{r.note}</span> : null}
                   </span>
-                  <span className="font-mono tabular-nums text-destructive">−{formatMoney(r.amount, currency)}</span>
+                  <span className="font-mono tabular-nums text-destructive">−{formatMoney(r.amount, r.currency || refundCurrency || currency)}</span>
                 </li>
               ))}
             </ul>

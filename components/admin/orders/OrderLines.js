@@ -7,7 +7,9 @@ import { SHOPIFY_LINE_CLASS } from "@/lib/admin/order-view";
 // line the shopper saw under another title, "Shopify title: X, SKU: Y"
 // (OVL-06, lib/admin/order-view.js shopifyMatchLine; the page passes one entry
 // per line, null where the titles match). Discounts name the coupon.
-export function OrderLines({ items = [], shopifyLines = [], totals = {}, currency }) {
+// Phase 8 line 4: refundCurrency, the shop's (base) currency refunds are in; a
+// market order's lines and totals are in the currency it was charged in.
+export function OrderLines({ items = [], shopifyLines = [], totals = {}, currency, refundCurrency = null }) {
   const money = (n) => formatMoney(n ?? 0, currency);
   return (
     <Card className="gap-0 py-0">
@@ -66,7 +68,7 @@ export function OrderLines({ items = [], shopifyLines = [], totals = {}, currenc
           {totals.refunded_total > 0 && (
             <div className="flex justify-between text-destructive">
               <dt>Refunded</dt>
-              <dd className="font-mono tabular-nums">−{money(totals.refunded_total)}</dd>
+              <dd className="font-mono tabular-nums">−{formatMoney(totals.refunded_total ?? 0, refundCurrency || currency)}</dd>
             </div>
           )}
         </dl>

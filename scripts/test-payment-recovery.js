@@ -162,7 +162,7 @@ const callVerify = async (o, opts = {}) => {
 const callWebhook = async (o, opts = {}) => {
   const raw = JSON.stringify({
     event: "payment.captured",
-    payload: { payment: { entity: { id: o.paymentId, order_id: o.razorpayOrderId, amount: 200000 } } },
+    payload: { payment: { entity: { id: o.paymentId, order_id: o.razorpayOrderId, amount: 200000, currency: "INR" } } },
   });
   const signature = createHmac("sha256", WEBHOOK_SECRET).update(raw).digest("hex");
   const res = await post(webhook, raw, { headers: { "x-razorpay-signature": signature, "x-razorpay-event-id": uid("evt") }, ...opts });

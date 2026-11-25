@@ -100,7 +100,7 @@ export default async function AccountOrderPage({ params }) {
           {Number(o.refunded_total) > 0 && (
             <p className="flex justify-between text-sf-danger">
               <span>Refunded</span>
-              <span>−{formatMoney(o.refunded_total, cur)}</span>
+              <span>−{formatMoney(o.refunded_total, o.base_currency || cur)}</span>
             </p>
           )}
         </div>

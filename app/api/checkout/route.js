@@ -28,7 +28,7 @@ import { sendCodOtp, verifyCodOtp, requireVerified, consumeChallenge, CodOtpErro
 import { smsAvailable } from "@/lib/messaging/sms";
 import { e164, PHONE_INVALID } from "@/lib/checkout/phone";
 import { requestMarket, MARKET_COOKIE_OPTS } from "@/lib/market-request";
-import { MARKET_COOKIE, marketForCountry, marketShipping, marketPaymentConfig, baseCountry, countryName, postalCodeValid } from "@/lib/markets";
+import { MARKET_COOKIE, marketForCountry, marketShipping, marketPaymentConfig, baseCountry, baseCurrency, countryName, postalCodeValid } from "@/lib/markets";
 import { RAZORPAY_CURRENCIES } from "@/lib/money";
 import { baseFigures } from "@/lib/checkout/market-order";
 
@@ -127,7 +127,8 @@ async function dedupByKey(key, cartId, cart, expectedTotal, currency = cart?.cur
   if (!existing) return null;
   // Same key but a different (non-empty) cart ⇒ not a retry: the client must
   // rotate its key. 409 tells it to.
-  if (cart?.items?.length && !sameAmount(expectedTotal, existing.total, currency)) return conflictResponse();
+  // Phase 8 line 4: the same number in another currency is another order
+  if (cart?.items?.length && (!sameAmount(expectedTotal, existing.total, currency) || (existing.currency || "INR") !== currency)) return conflictResponse();
   return existing;
 }
 
@@ -200,6 +201,9 @@ function priceCheck(body, cart, shipping, shippingConfig, terms, paymentDiscount
     shippingTotal: shipping.total,
     paymentDiscount,
     currency,
+    // Phase 8 line 4: a page that names no currency (an older tab) showed the
+    // store's own, so a market cart is refused for it
+    expectedCurrency: typeof body?.expectedCurrency === "string" ? body.expectedCurrency : cart.market ? baseCurrency(storeConfig()) : null,
   });
   if (!m) return null;
   return NextResponse.json(
@@ -349,7 +353,7 @@ export const POST = tenantHandler(async (request) => {
       const cart = await getCart(cartId, { market });
       if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
       if (!validate(contact, address)) return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
-      if (!e164(contact.phone)) return phoneInvalid();
+      if (!e164(contact.phone, ctx.country)) return phoneInvalid();
       const terms = termsFor(cart, address, market);
       if (!terms.cod.available) return codUnavailable(terms);
       const bind = { cartId, key: String(idempotencyKey), phone: contact.phone, amount: terms.cod.total, currency: cart.currency || "INR", cart };
@@ -405,7 +409,7 @@ export const POST = tenantHandler(async (request) => {
       if (!cartId) return NextResponse.json({ error: "No cart session" }, { status: 400 });
       if (!validate(contact, address))
         return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
-      if (!e164(contact.phone)) return phoneInvalid();
+      if (!e164(contact.phone, ctx.country)) return phoneInvalid();
       if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
       // Phase 8 line 2: the quote hides COD here, so the route refuses it too.
       if (!terms.cod.available) return codUnavailable(terms);
@@ -483,7 +487,7 @@ export const POST = tenantHandler(async (request) => {
       if (!cartId) return NextResponse.json({ error: "No cart session" }, { status: 400 });
       if (!validate(contact, address))
         return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
-      if (!e164(contact.phone)) return phoneInvalid();
+      if (!e164(contact.phone, ctx.country)) return phoneInvalid();
       if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
       // P1-RATES: the Razorpay order is minted for the amount on the Pay button,
       // or not at all.

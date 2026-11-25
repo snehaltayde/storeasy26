@@ -127,13 +127,14 @@ const market = (currency, rounding, extra = {}) => ({
   international: true,
   ...extra,
 });
+let PAYMENT = null; // the store's prepaid rule (the second brute force sets one)
 const tenantA = (markets) => ({
   id: "mka",
   name: "Markets A",
   domains: [HOST_A],
   dbUrl: "file:.test-mk-a.db",
   secrets: { order_link_secret: "mk-link-secret", razorpay_key_secret: "mk-key-secret", razorpay_webhook_secret: WEBHOOK_SECRET },
-  config: { country: "IN", currency: "INR", shipping_config: BASE_SHIPPING, payment_config: null, razorpay_key_id: "rzp_test_mk", markets },
+  config: { country: "IN", currency: "INR", shipping_config: BASE_SHIPPING, payment_config: PAYMENT, razorpay_key_id: "rzp_test_mk", markets },
 });
 const saveA = (markets) => C.upsertTenant(tenantA(markets));
 await C.migratePlatform(await readFile(join(ROOT, "lib/platform/schema.sql"), "utf8"));
@@ -204,11 +205,11 @@ let keys = 0;
 const key = () => `mk-key-${++keys}`;
 const cookieHeader = (cartId, country) => [cartId ? `${CART_COOKIE}=${cartId}` : null, country ? `${M.MARKET_COOKIE}=${country}` : null].filter(Boolean).join("; ");
 
-async function postCheckout(cartId, body, { country = null, address = ADDR.IN, host = HOST_A } = {}) {
+async function postCheckout(cartId, body, { country = null, address = ADDR.IN, host = HOST_A, contact = CONTACT } = {}) {
   const headers = { host, "content-type": "application/json", "x-forwarded-for": "10.0.0.9" };
   const cookie = cookieHeader(cartId, country);
   if (cookie) headers.cookie = cookie;
-  const req = new NextRequest(`https://${host}/api/checkout`, { method: "POST", headers, body: JSON.stringify({ contact: CONTACT, address, ...body }) });
+  const req = new NextRequest(`https://${host}/api/checkout`, { method: "POST", headers, body: JSON.stringify({ contact, address, ...body }) });
   const res = await checkout.POST(req);
   globalThis.__mkAfter = [];
   return { status: res.status, body: await res.json(), setCookie: res.headers.get("set-cookie") || "" };
@@ -279,12 +280,13 @@ function unitsToCover(remaining, m) {
 // ---- 1. brute force ---------------------------------------------------------------
 console.log("— brute force: card = cart line, drawer = charged = minted, nudges hold, base = Shopify");
 
-await t("1,000 random carts × USD, JPY, AED × exact, whole, x.99", async () => {
+async function bruteForce(CARTS, { minNudges, minPushes }) {
   const COMBOS = ["USD", "JPY", "AED"].flatMap((c) => M.ROUNDING_RULES.map((r) => [c, r]));
   let nudgesChecked = 0;
   let pushed = 0;
   const shop = fakeShopify();
-  for (let i = 0; i < 1000; i++) {
+  let prepaidGiven = 0;
+  for (let i = 0; i < CARTS; i++) {
     const [currency, rounding] = COMBOS[i % COMBOS.length];
     if (i < COMBOS.length || i % 50 === 0) await saveA([market("USD", currency === "USD" ? rounding : "x.99"), market("JPY", currency === "JPY" ? rounding : "whole"), market("AED", currency === "AED" ? rounding : "exact")]);
     const m = (await C.getTenant("mka")).config.markets.find((x) => x.currency === currency);
@@ -310,14 +312,16 @@ await t("1,000 random carts × USD, JPY, AED × exact, whole, x.99", async () =>
     // the route's charged total = the drawer total = the stubbed Razorpay amount
     const q = (await postCheckout(cartId, { action: "quote" }, { country, address: ADDR[country] })).body.quote;
     ok(q && !q.cod.available && q.cod.reason === COD_OUTSIDE_BASE, `${where}: COD offered outside the base market`);
-    eq(toMinor(q.prepaid.total, currency), toMinor(drawer.grandTotal, currency), `${where}: quote vs drawer`);
+    // the drawer has no payment method yet; paying online takes the prepaid discount off it
+    eq(toMinor(q.prepaid.total, currency), toMinor(drawer.grandTotal, currency) - toMinor(q.prepaid.discount || 0, currency), `${where}: quote vs drawer`);
+    if (q.prepaid.discount > 0) prepaidGiven++;
     const before = razorpayCalls.length;
-    const placed = await postCheckout(cartId, { action: "razorpay_create", idempotencyKey: key(), expectedTotal: q.prepaid.total, expectedShipping: q.prepaid.shipping }, { country, address: ADDR[country] });
+    const placed = await postCheckout(cartId, { action: "razorpay_create", idempotencyKey: key(), expectedTotal: q.prepaid.total, expectedShipping: q.prepaid.shipping, expectedCurrency: currency }, { country, address: ADDR[country] });
     ok(placed.status === 200 && placed.body.ok, `${where}: razorpay_create ${placed.status} ${JSON.stringify(placed.body).slice(0, 200)}`);
     const minted = razorpayCalls[before];
     ok(minted && razorpayCalls.length === before + 1, `${where}: no Razorpay order minted`);
     eq(minted.currency, currency, `${where}: minted currency`);
-    eq(minted.amount, toMinor(drawer.grandTotal, currency), `${where}: minted amount`);
+    eq(minted.amount, toMinor(q.prepaid.total, currency), `${where}: minted amount`);
     eq(placed.body.amount, minted.amount, `${where}: modal amount`);
     eq(placed.body.currency, currency, `${where}: modal currency`);
 
@@ -364,9 +368,25 @@ await t("1,000 random carts × USD, JPY, AED × exact, whole, x.99", async () =>
       nudgesChecked++;
     }
   }
-  ok(nudgesChecked > 50, `only ${nudgesChecked} nudges were checked`);
-  ok(pushed >= 20, `only ${pushed} pushes`);
-  console.log(`    (${nudgesChecked} nudges completed, ${pushed} Shopify pushes reconciled)`);
+  ok(nudgesChecked > minNudges, `only ${nudgesChecked} nudges were checked`);
+  ok(pushed >= minPushes, `only ${pushed} pushes`);
+  ok(!PAYMENT || prepaidGiven > CARTS / 4, `only ${prepaidGiven} prepaid discounts were given`);
+  console.log(`    (${nudgesChecked} nudges completed, ${pushed} Shopify pushes reconciled, ${prepaidGiven} prepaid discounts)`);
+}
+
+await t("1,000 random carts × USD, JPY, AED × exact, whole, x.99", () => bruteForce(1000, { minNudges: 50, minPushes: 20 }));
+// the reviewer's probe-prepaid.mjs: a prepaid discount (percent with a cap,
+// then a fixed amount) converted into each market; the minted amount is the
+// quoted prepaid total and the base run's own prepaid discount reaches Shopify
+await t("360 random carts with a prepaid discount (5% capped at ₹300, then a fixed ₹120)", async () => {
+  try {
+    PAYMENT = { prepaid: { kind: "percent", value: 5, max: 300 } };
+    await bruteForce(180, { minNudges: 10, minPushes: 4 });
+    PAYMENT = { prepaid: { kind: "fixed", value: 120 } };
+    await bruteForce(180, { minNudges: 10, minPushes: 4 });
+  } finally {
+    PAYMENT = null;
+  }
 });
 
 // ---- 2. the rules -----------------------------------------------------------------
@@ -492,7 +512,7 @@ await t("store B's markets never apply on store A", async () => {
 await t("the webhook compares in the order's own currency and minor units", async () => {
   const cartId = await freshCart(inA, [["1005", 1]]);
   const q = (await postCheckout(cartId, { action: "quote" }, { country: "JP", address: ADDR.JP })).body.quote;
-  const placed = await postCheckout(cartId, { action: "razorpay_create", idempotencyKey: key(), expectedTotal: q.prepaid.total, expectedShipping: q.prepaid.shipping }, { country: "JP", address: ADDR.JP });
+  const placed = await postCheckout(cartId, { action: "razorpay_create", idempotencyKey: key(), expectedTotal: q.prepaid.total, expectedShipping: q.prepaid.shipping, expectedCurrency: "JPY" }, { country: "JP", address: ADDR.JP });
   ok(placed.body.ok && placed.body.currency === "JPY" && Number.isInteger(placed.body.amount), JSON.stringify(placed.body));
   eq(placed.body.amount, toMinor(q.prepaid.total, "JPY"), "JPY minor units are whole yen:");
   const send = async (amount, currency, n) => {
@@ -591,6 +611,100 @@ await t("a market order needs migration 0039 (refused, not stored wrong)", async
   ok(/hasColumns\("orders", ORDER_MARKET_COLUMNS\)/.test(src) && /MARKET_UNAVAILABLE/.test(src), "createOrder probes 0039");
   const sql = await readFile(join(ROOT, "migrations/tenant/0039_order_markets.sql"), "utf8");
   for (const c of ["market", "base_currency", "fx_rate", "base_subtotal", "base_discount_total", "base_shipping_total", "base_total"]) ok(new RegExp(`ADD COLUMN ${c}\\b`).test(sql), c);
+});
+
+// ---- 3. review fixes ---------------------------------------------------------------
+console.log("— review fixes");
+const Proj = await import("../lib/order-projection.js");
+const { returnEligibility } = await import("../lib/returns.js");
+const { e164 } = await import("../lib/checkout/phone.js");
+
+await t("the Ship to return: tabs, newlines, backslashes and other origins go home; a path keeps its query and hash", async () => {
+  const go = async (ret) => {
+    const res = await marketRoute.GET(new NextRequest(`https://${HOST_A}/api/market?country=US&return=${ret}`, { headers: { host: HOST_A } }));
+    return [res.status, res.headers.get("location")];
+  };
+  for (const ret of ["%2F%09%2Fevil.example", "%2F%0A%2Fevil.example", "%2F%0D%2Fevil.example", "%2F%5Cevil.example", "%5C%5Cevil.example", "%2F%2Fevil.example", "https%3A%2F%2Fevil.example%2F", "%2F%00x", "%2F%7Fx"]) eq(await go(ret), [303, "/"], `${decodeURIComponent(ret)}:`);
+  eq(await go("%2Fproducts%2Fp-1002%3Fv%3D1%23reviews"), [303, "/products/p-1002?v=1#reviews"], "a real path:");
+  eq(M.safeReturnPath("/%2F%2Fevil.example"), "/%2F%2Fevil.example", "an encoded slash stays a path:");
+  eq(new URL(M.safeReturnPath("/%2F%2Fevil.example"), "https://store.example").host, "store.example", "and resolves on the store");
+});
+
+await t("refunds on USD and JPY orders: Shopify's INR amounts keep their currency and paise; eligibility compares base money", async () => {
+  await saveA([market("USD", "x.99"), market("JPY", "whole")]);
+  for (const [country, currency] of [["US", "USD"], ["JP", "JPY"]]) {
+    const cartId = await freshCart(inA, [["1004", 1]]);
+    const q = (await postCheckout(cartId, { action: "quote" }, { country, address: ADDR[country] })).body.quote;
+    const placed = await postCheckout(cartId, { action: "razorpay_create", idempotencyKey: key(), expectedTotal: q.prepaid.total, expectedShipping: q.prepaid.shipping, expectedCurrency: currency }, { country, address: ADDR[country] });
+    ok(placed.body.ok, JSON.stringify(placed.body));
+    const id = placed.body.orderId;
+    await inA(() => db.updateTable("orders").set({ status: "synced", shopify_order_id: `gid://shopify/Order/R${id}` }).where("id", "=", id).execute());
+    const o0 = await inA(() => db.selectFrom("orders").selectAll().where("id", "=", id).executeTakeFirst());
+    const partial = 123.45; // rupees and paise, as Shopify sends them
+    const gql = (amounts) => async () => ({ node: { id: o0.shopify_order_id, name: "#R", updatedAt: new Date().toISOString(), cancelledAt: null, displayFinancialStatus: "PARTIALLY_REFUNDED", displayFulfillmentStatus: null, refunds: amounts.map((a, i) => ({ id: `gid://shopify/Refund/${id}-${i}`, createdAt: new Date().toISOString(), note: null, totalRefundedSet: { shopMoney: { amount: String(a), currencyCode: "INR" } } })), fulfillments: [] } });
+    const r = await inA(() => Proj.reconcileOrderProjection(id, { gql: gql([partial]) }));
+    ok(r.ok, JSON.stringify(r));
+    const rows = await inA(() => db.selectFrom("order_refunds").selectAll().where("order_id", "=", id).execute());
+    eq(rows.map((x) => [x.amount, x.currency]), [[partial, "INR"]], `${currency} refund row (no rounding to ${currency}):`);
+    const o1 = await inA(() => db.selectFrom("orders").selectAll().where("id", "=", id).executeTakeFirst());
+    eq(o1.refunded_total, partial, `${currency} refunded_total in base money:`);
+    eq(formatMoney(o1.refunded_total, o1.base_currency || o1.currency), "₹123.45", `${currency} refund label:`);
+    // ₹123.45 is above a USD order's charged number but far below its base total: still partial
+    ok(returnEligibility({ ...o1, created_at: new Date().toISOString() }).ok, `${currency}: a partial base refund leaves the order returnable`);
+    await inA(() => Proj.reconcileOrderProjection(id, { gql: gql([o1.base_total]) }));
+    const o2 = await inA(() => db.selectFrom("orders").selectAll().where("id", "=", id).executeTakeFirst());
+    eq(returnEligibility({ ...o2, created_at: new Date().toISOString() }).reason, "this order is already fully refunded", `${currency}: a full base refund:`);
+  }
+  for (const f of ["app/(storefront)/orders/[orderId]/page.js", "app/(storefront)/account/orders/[orderId]/page.js"]) ok(/refunded_total, (order|o)\.base_currency \|\|/.test(await readFile(join(ROOT, f), "utf8")), `${f} labels refunds with base_currency`);
+  ok(/formatMoney\(r\.amount, r\.currency \|\| refundCurrency \|\| currency\)/.test(await readFile(join(ROOT, "components/admin/orders/OrderTimeline.js"), "utf8")), "the console timeline labels refunds in their own currency");
+  ok(/refundCurrency \|\| currency/.test(await readFile(join(ROOT, "components/admin/orders/OrderLines.js"), "utf8")), "the console lines label refunds in the base currency");
+  ok(/refundCurrency=\{order\.base_currency \|\| order\.currency\}/.test(await readFile(join(ROOT, "app/(console)/admin/(authed)/orders/[id]/page.js"), "utf8")), "the console page passes it");
+});
+
+await t("reports: labelled in the store's base currency; top products count a market order's base lines", async () => {
+  const now = new Date().toISOString();
+  await inA(async () => {
+    await db.deleteFrom("orders").execute();
+    await db.deleteFrom("order_refunds").execute();
+    const snap = { items: [{ variantId: "gid://shopify/ProductVariant/1002", productId: "gid://shopify/Product/1002", title: "Product 1002", quantity: 2, price: 30.99, lineTotal: 61.98 }], base: { currency: "INR", items: [{ variantId: "gid://shopify/ProductVariant/1002", quantity: 2, price: 1299, lineTotal: 2598 }] } };
+    await db.insertInto("orders").values({ id: "R-US", idempotency_key: "rus", total: 70.98, currency: "USD", market: "US", base_currency: "INR", fx_rate: 84.2, base_total: 5976, status: "paid", payment_method: "razorpay", payment_status: "paid", sync_attempts: 0, created_at: now, updated_at: now, snapshot: JSON.stringify(snap), applied_offers: "[]", subtotal: 61.98, discount_total: 0, shipping_total: 9 }).execute();
+  });
+  const r = await inA(() => Rep.salesRollup({ days: 30 }));
+  eq([r.currency, r.gross], ["INR", 5976], "a market-only period:");
+  const top = await inA(() => Rep.topProducts({ days: 30 }));
+  eq(top.products.map((p) => [p.product_id, p.revenue]), [["gid://shopify/Product/1002", 2598]], "top products in base money:");
+});
+
+await t("smaller money edges: one minor unit at least, the webhook's currency, expectedCurrency, phones abroad", async () => {
+  for (const r of M.ROUNDING_RULES) {
+    ok(M.convertPrice(0.4, { currency: "USD", rate: 84.2, rounding: r }) >= 0.01, `USD ${r}: ₹0.40 is at least a cent`);
+    ok(M.convertPrice(0.4, { currency: "JPY", rate: 0.56, rounding: r }) >= 1, `JPY ${r}`);
+  }
+  eq(M.convertPrice(0, { currency: "USD", rate: 84.2, rounding: "exact" }), 0, "free stays free:");
+  // the webhook refuses a capture with no currency
+  const cartId = await freshCart(inA, [["1005", 1]]);
+  const q = (await postCheckout(cartId, { action: "quote" }, { country: "US", address: ADDR.US })).body.quote;
+  // a page that showed the right number in rupees (or names no currency) is refused for a USD cart
+  for (const extra of [{ expectedCurrency: "INR" }, {}]) {
+    const wrong = await postCheckout(cartId, { action: "razorpay_create", idempotencyKey: key(), expectedTotal: q.prepaid.total, expectedShipping: q.prepaid.shipping, ...extra }, { country: "US", address: ADDR.US });
+    eq([wrong.status, wrong.body.code, wrong.body.currency], [409, "PRICE_CHANGED", "USD"], `expectedCurrency ${JSON.stringify(extra)}:`);
+  }
+  const placed = await postCheckout(cartId, { action: "razorpay_create", idempotencyKey: key(), expectedTotal: q.prepaid.total, expectedShipping: q.prepaid.shipping, expectedCurrency: "USD" }, { country: "US", address: ADDR.US });
+  ok(placed.body.ok, JSON.stringify(placed.body));
+  const raw = JSON.stringify({ event: "payment.captured", payload: { payment: { entity: { id: "pay_nocur", order_id: placed.body.razorpayOrderId, amount: placed.body.amount } } } });
+  const sig = createHmac("sha256", WEBHOOK_SECRET).update(raw).digest("hex");
+  const res = await webhook.POST(new NextRequest(`https://${HOST_A}/api/razorpay/webhook`, { method: "POST", headers: { host: HOST_A, "x-razorpay-signature": sig, "content-type": "application/json" }, body: raw }));
+  globalThis.__mkAfter = [];
+  eq((await res.json()).flagged, "amount_mismatch", "no currency:");
+  // phones: a US number is +1, never +91; a country without a calling code must write the +
+  eq([e164("5125550100", "US"), e164("+1 512 555 0100", "US"), e164("07700 900123", "GB"), e164("9876543210"), e164("5550100", "ZZ"), e164("+15125550100", "ZZ")], ["+15125550100", "+15125550100", "+447700900123", "+919876543210", "", "+15125550100"], "e164:");
+  // a US address with a US number passes the phone check (it was read as +91 before)
+  const usCart = await freshCart(inA, [["1005", 1]]);
+  const qq = (await postCheckout(usCart, { action: "quote" }, { country: "US", address: ADDR.US })).body.quote;
+  const usPhone = await postCheckout(usCart, { action: "razorpay_create", idempotencyKey: key(), expectedTotal: qq.prepaid.total, expectedShipping: qq.prepaid.shipping, expectedCurrency: "USD", contactPhone: null }, { country: "US", address: ADDR.US, contact: { ...CONTACT, phone: "(512) 555-0100" } });
+  ok(usPhone.body.ok, `a US number: ${JSON.stringify(usPhone.body).slice(0, 200)}`);
+  const inPhoneAbroad = await postCheckout(usCart, { action: "razorpay_create", idempotencyKey: key(), expectedTotal: qq.prepaid.total, expectedShipping: qq.prepaid.shipping, expectedCurrency: "USD" }, { country: "US", address: ADDR.US, contact: { ...CONTACT, phone: "12345" } });
+  eq(inPhoneAbroad.body.code, "PHONE_INVALID", "a short number abroad:");
 });
 
 globalThis.fetch = realFetch;

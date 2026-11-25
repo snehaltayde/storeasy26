@@ -85,7 +85,8 @@ export const POST = tenantHandler(async (request) => {
   // it), so the minor units are that currency's; a capture in any other
   // currency is a mismatch too.
   const expectedMinor = toMinor(order.total, order.currency || "INR");
-  const currencyOk = !payment.currency || String(payment.currency).toUpperCase() === String(order.currency || "INR").toUpperCase();
+  // Razorpay's payment entity always carries its currency; a capture without one is refused too.
+  const currencyOk = typeof payment.currency === "string" && payment.currency.toUpperCase() === String(order.currency || "INR").toUpperCase();
   if (Number(amount) !== expectedMinor || !currencyOk) {
     console.error(
       `[rz-webhook] AMOUNT MISMATCH ${order.id}: captured ${amount} ${payment.currency || ""}, expected ${expectedMinor} ${order.currency || "INR"} (payment ${paymentId})`,

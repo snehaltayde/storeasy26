@@ -224,7 +224,7 @@ await t("ACCEPTANCE: razorpay webhook_apply replay marks the order paid exactly 
   });
   const rawBody = JSON.stringify({
     event: "payment.captured",
-    payload: { payment: { entity: { id: "pay_jobs1", order_id: "order_jobs1", amount: 50000 } } },
+    payload: { payment: { entity: { id: "pay_jobs1", order_id: "order_jobs1", amount: 50000, currency: "INR" } } },
   });
   const inboxId = await J.recordWebhook({ source: "razorpay", topic: "payment.captured", tenantId: "jt", rawBody, hmacOk: true });
   await J.enqueueJob({ type: "webhook_apply", tenantId: "jt", payload: { inboxId }, idempotencyKey: `wh:${inboxId}` });

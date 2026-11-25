@@ -352,7 +352,7 @@ await t("guard: both payment methods send the total the button shows, and a refu
   const place = await readFile(join(ROOT, "components/checkout/placeOrder.js"), "utf8");
   ok(/grandTotal=\{grandTotal\}/.test(src), "CheckoutFlow does not hand the payment step grandTotal");
   ok(/const grandTotal = selected\.total;/.test(src) && /const shipping = \{ total: selected\.shipping,/.test(src), "the button's total is not the chosen method's quote");
-  ok(/const shown = \{ expectedTotal: grandTotal, expectedShipping: shipping\.total \}/.test(src), "the UI does not send grandTotal as expectedTotal");
+  ok(/const shown = \{ expectedTotal: grandTotal, expectedShipping: shipping\.total, expectedCurrency: cart\.currency \|\| "INR" \}/.test(src), "the UI does not send grandTotal as expectedTotal (and, Phase 8 line 4, the currency it shows)");
   for (const action of ["cod", "razorpay_create", "cod_otp_send"]) {
     ok(new RegExp(`action: "${action}",[^}]*\\.\\.\\.shown \\}`).test(place), `the ${action} request does not carry the shown total`);
   }

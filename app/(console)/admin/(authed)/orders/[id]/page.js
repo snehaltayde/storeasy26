@@ -96,8 +96,9 @@ export default async function AdminOrderDetail({ params }) {
             shopifyLines={shopifyLines}
             totals={{ subtotal: order.subtotal, discount_total: order.discount_total, payment_discount: order.payment_discount ?? 0, coupon_code: order.coupon_code, shipping_total: order.shipping_total, total: order.total, refunded_total: order.refunded_total }}
             currency={order.currency}
+            refundCurrency={order.base_currency || order.currency}
           />
-          <OrderTimeline fulfillments={projection.fulfillments} refunds={projection.refunds} events={order.events} codVerifiedAt={order.cod_verified_at ?? null} codCheck={codCheckWords(codChannel)} currency={order.currency} timeZone={timeZone} />
+          <OrderTimeline fulfillments={projection.fulfillments} refunds={projection.refunds} events={order.events} codVerifiedAt={order.cod_verified_at ?? null} codCheck={codCheckWords(codChannel)} currency={order.currency} refundCurrency={order.base_currency || order.currency} timeZone={timeZone} />
         </div>
         <aside aria-label="Customer and payment" className="min-w-0 space-y-4">
           <Card>

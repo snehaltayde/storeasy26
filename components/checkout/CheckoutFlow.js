@@ -124,7 +124,8 @@ export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeNam
   }
 
   // What the button says: the server charges this or nothing.
-  const shown = { expectedTotal: grandTotal, expectedShipping: shipping.total };
+  // Phase 8 line 4: and in which currency
+  const shown = { expectedTotal: grandTotal, expectedShipping: shipping.total, expectedCurrency: cart.currency || "INR" };
   const orderCtx = (extra = {}) => ({
     method: chosen,
     cart,
