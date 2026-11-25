@@ -30,4 +30,6 @@ export const ALLOWLIST = [
   { path: "components/admin/InsightsAdmin.js", reason: "removed by Phase 2 line 11" },
   { path: "components/admin/ExperimentsAdmin.js", reason: "removed by Phase 2 line 11" },
   { path: "components/admin/AutomationsAdmin.js", reason: "removed by Phase 2 line 11" },
+  // Phase 2 line 10: the catalog page stopped importing the old quiz (and bundle) panels
+  { path: "components/admin/CommercePanels.js", reason: "removed by Phase 2 line 11" },
 ];

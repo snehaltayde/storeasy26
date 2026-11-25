@@ -489,6 +489,8 @@ export const DRILLS = {
       return seeded !== 0 ? seeded : c.node(["scripts/drills/operator-create-store/run.mjs", ...c.headed]);
     },
   },
+  // Phase 2 line 10: product-finder quizzes on the roles store (staff, admin, support); evidence in docs/cms-reviews/drills/QUIZZES/
+  quizzes: { id: "QUIZZES", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/quizzes/run.mjs", ...c.headed])) },
 };
 export const ALL = ["smoke", "p5", "p6", "agency-gone", "shell", "signup", "connect", "operator-onboarding", "operator-create-store"];
 

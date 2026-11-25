@@ -31,6 +31,9 @@ export const ADMIN_PAGES = Object.freeze([
   { page: "onboarding", action: "storefront.read", note: "the four onboarding steps (Phase 1 lines 1 and 3); every role reads it, controls a role can't use are disabled" },
   { page: "orders", action: "orders.read" },
   { page: "orders/[id]", action: "orders.read", params: { id: "$order" } },
+  // Phase 2 line 10
+  { page: "quizzes", action: "storefront.read" },
+  { page: "quizzes/[slug]", action: "storefront.read", params: { slug: "missing" }, note: "an unknown slug is a not-found; \"new\" is the create form, writers only (Phase 2 line 10)" },
   { page: "releases", action: "storefront.read" },
   { page: "settings", action: "settings.read" },
   { page: "settings/team", action: "team.manage", note: "staff and support get the no-access page; the team is never read for them (Phase 2 line 8)" },

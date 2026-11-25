@@ -1,54 +1,104 @@
 import { NextResponse } from "next/server";
 import { infraResponse } from "@/lib/infra-response";
 import { requireAdmin } from "@/lib/admin-auth";
+import { roleAllows } from "@/lib/platform/authz";
 import { audit } from "@/lib/platform/audit";
-import { db } from "@/lib/db";
-import { listQuizzes, upsertQuiz, deleteQuiz, validateQuiz } from "@/lib/quiz";
+import { slog } from "@/lib/log";
+import { listQuizzes, quizRow, upsertQuiz, deleteQuiz, validateQuiz, recommendProducts } from "@/lib/quiz";
+import { quizPages, quizTags, quizUsage } from "@/lib/admin/quiz-usage";
 import { tenantHandler } from "@/lib/tenant-request";
 
-// Quiz admin API (S46 / SF19). Deterministic product-finder quizzes: options
-// carry catalog tags, scoring is a tally — no AI anywhere in the runtime.
-//   GET                  → quizzes list
-//   GET ?slug=           → one quiz (full questions, for the editor)
-//   POST {quiz:{…}, enabled}   → validate + upsert
-//   POST {remove:{slug}}
+// Quiz admin API (S46 / SF19; Phase 2 line 10). Deterministic product-finder
+// quizzes: options carry catalog tags, scoring is a tally — no AI anywhere in
+// the runtime.
+//   GET                          → { quizzes } (each with usedOn, a page count)
+//   GET ?slug=                   → one quiz, On or Off (the editor), with its pages
+//   GET ?view=usage&slug=        → { pages }: where it is used (lib/admin/quiz-usage.js)
+//   GET ?view=tags               → { tags }: catalog tags with product counts
+//   GET ?view=try&tags=a,b       → { topTags, products }: the public quiz API's
+//                                  answer for those winning tags ("Try it")
+//   POST {quiz:{…}, enabled?, create?}  → validate + save. enabled left out keeps
+//                                  the quiz's state (a new quiz is Off); create
+//                                  refuses a slug already taken (409)
+//   POST {remove:{slug}}         → delete; 409 QUIZ_IN_USE with the pages when used
+// Decision 6: every POST needs storefront.write; turning a quiz On, or saving
+// or deleting one that is On, also needs storefront.publish (403 otherwise),
+// checked before anything else in the body is looked at.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const NEEDS_PUBLISH = "Only an owner or admin can turn a quiz on, or change or delete one that is on. You can save it while it is off.";
+const IN_USE = "This quiz is linked from your pages, so it can't be deleted. Take the links out first, or turn it off instead.";
+const TAKEN = "A quiz already uses this address. Pick another.";
+const slugOf = (v) => (typeof v === "string" ? v.trim() : "");
 
 export const GET = tenantHandler(async (request) => {
   const auth = await requireAdmin(request, "storefront.read");
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
-  const slug = new URL(request.url).searchParams.get("slug");
-  if (slug) {
-    // editor read: include disabled quizzes too (getQuiz hides them from shoppers)
-    const r = await db.selectFrom("quizzes").selectAll().where("slug", "=", slug).executeTakeFirst().catch(() => null);
-    if (!r) return NextResponse.json({ error: "quiz not found" }, { status: 404 });
-    let questions = [];
-    try {
-      questions = JSON.parse(r.questions);
-    } catch {
-      questions = [];
+  const q = new URL(request.url).searchParams;
+  const view = q.get("view");
+  const slug = slugOf(q.get("slug"));
+  try {
+    if (view === "usage") {
+      if (!slug) return NextResponse.json({ error: "Which quiz? Add its slug." }, { status: 400 });
+      return NextResponse.json({ ok: true, pages: await quizPages(slug) });
     }
-    return NextResponse.json({ ok: true, quiz: { slug: r.slug, title: r.title, intro: r.intro || "", enabled: !!r.enabled, questions } });
+    if (view === "tags") return NextResponse.json({ ok: true, tags: await quizTags() });
+    if (view === "try") {
+      const topTags = String(q.get("tags") || "")
+        .split(",")
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean)
+        .slice(0, 3);
+      return NextResponse.json({ ok: true, topTags, products: await recommendProducts(topTags) });
+    }
+    if (view) return NextResponse.json({ error: "Unknown view" }, { status: 400 });
+    if (slug) {
+      const quiz = await quizRow(slug);
+      if (!quiz) return NextResponse.json({ error: "quiz not found" }, { status: 404 });
+      return NextResponse.json({ ok: true, quiz, pages: await quizPages(slug) });
+    }
+    const [quizzes, usage] = [await listQuizzes(), await quizUsage()];
+    return NextResponse.json({ ok: true, quizzes: quizzes.map((z) => ({ ...z, usedOn: (usage.get(z.slug) || []).length })) });
+  } catch (e) {
+    const infra = infraResponse(e, { route: "admin/quiz" });
+    if (infra) return NextResponse.json(infra.body, { status: infra.status });
+    throw e;
   }
-  return NextResponse.json({ ok: true, quizzes: await listQuizzes() });
 });
 
 export const POST = tenantHandler(async (request) => {
   const auth = await requireAdmin(request, "storefront.write");
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const body = await request.json().catch(() => ({}));
+  const canPublish = roleAllows(auth.actor?.role, "storefront.publish");
+  const refused = () => NextResponse.json({ error: NEEDS_PUBLISH, code: "QUIZ_NEEDS_PUBLISH" }, { status: 403 });
   try {
-    if (body.quiz) {
-      const v = validateQuiz(body.quiz);
-      if (!v.ok) return NextResponse.json({ error: v.errors.join(" · "), errors: v.errors }, { status: 422 });
-      const saved = await upsertQuiz(body.quiz, { enabled: body.enabled !== false });
-      await audit({ actor: auth.actor, action: "storefront.write", resource: `quiz:${saved.slug}`, diff: { questions: saved.questions.length, enabled: body.enabled !== false } });
-      return NextResponse.json({ ok: true, quiz: saved });
+    if (body?.quiz) {
+      const slug = slugOf(body.quiz.slug);
+      const existing = slug ? await quizRow(slug) : null;
+      const enabled = typeof body.enabled === "boolean" ? body.enabled : Boolean(existing?.enabled);
+      const publishes = enabled || Boolean(existing?.enabled);
+      if (publishes && !canPublish) return refused();
+      if (body.create === true && existing) return NextResponse.json({ error: TAKEN, code: "QUIZ_SLUG_TAKEN" }, { status: 409 });
+      const v = validateQuiz({ ...body.quiz, slug });
+      if (!v.ok) return NextResponse.json({ error: v.errors.join(" · "), errors: v.errors, problems: v.problems }, { status: 422 });
+      const saved = await upsertQuiz({ ...body.quiz, slug }, { enabled });
+      const action = publishes ? "storefront.publish" : "storefront.write";
+      await audit({ actor: auth.actor, action, resource: `quiz:${saved.slug}`, diff: { questions: saved.questions.length, enabled, ...(existing ? { was: existing.enabled } : { created: true }) } });
+      slog("quiz_saved", { quiz: saved.slug, enabled, created: !existing });
+      return NextResponse.json({ ok: true, quiz: { ...saved, enabled } });
     }
-    if (body.remove) {
-      await deleteQuiz(String(body.remove.slug || ""));
-      await audit({ actor: auth.actor, action: "storefront.write", resource: `quiz:${body.remove.slug}`, diff: { removed: true } });
+    if (body?.remove) {
+      const slug = slugOf(body.remove.slug);
+      const existing = slug ? await quizRow(slug) : null;
+      if (!existing) return NextResponse.json({ error: "quiz not found" }, { status: 404 });
+      if (existing.enabled && !canPublish) return refused();
+      const pages = await quizPages(slug);
+      if (pages.length) return NextResponse.json({ error: IN_USE, code: "QUIZ_IN_USE", pages }, { status: 409 });
+      await deleteQuiz(slug);
+      await audit({ actor: auth.actor, action: existing.enabled ? "storefront.publish" : "storefront.write", resource: `quiz:${slug}`, diff: { removed: true, was: existing.enabled } });
+      slog("quiz_deleted", { quiz: slug });
       return NextResponse.json({ ok: true });
     }
     return NextResponse.json({ error: "Nothing to do" }, { status: 400 });

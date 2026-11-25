@@ -272,6 +272,25 @@ export async function seedRolesStore({ platformUrl, tenantUrl, defaultUrl, dataD
     return { email: shopperIn.email, name: shopperIn.name, customerId, orderId: order.id, total: Number(order.total), subtotal: Number(cart.subtotal), shippingTotal: Number(shipping.total), currency: order.currency };
   });
 
+  // one product-finder quiz, Off (Phase 2 line 10): /admin/quizzes has a row
+  // to open and "Try it" picks the fixture products by their tag; nothing
+  // goes live until a founder turns it on
+  await withTenant(tenant, async () => {
+    const { upsertQuiz } = await import("../lib/quiz.js");
+    await upsertQuiz(
+      {
+        slug: "find-your-fixture",
+        title: "Find your fixture",
+        intro: "Two quick questions and we'll pick for you.",
+        questions: [
+          { prompt: "What are you shopping for?", options: [{ label: "Something to try", tags: ["fixture"] }, { label: "Just looking", tags: [] }] },
+          { prompt: "How soon do you need it?", options: [{ label: "This week", tags: ["fixture"] }, { label: "No rush", tags: [] }] },
+        ],
+      },
+      { enabled: false },
+    );
+  });
+
   const figures = { products: Number(sync?.products ?? cat.products.length), collections: Number(sync?.collections ?? cat.collections.length), syncRunId: confirmed.runId, syncStatus: "complete" };
 
   const { audit } = await import("../lib/platform/audit.js");

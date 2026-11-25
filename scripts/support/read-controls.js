@@ -55,6 +55,10 @@ export const READ_CONTROLS = [
   { path: "components/admin/insights/InsightsList.js", reason: "Try again re-reads GET /api/admin/insights; \"Show the numbers\" opens a <details>; \"Open in editor\" is a link to the editor", marks: 3 },
   { path: "components/admin/experiments/ExperimentsList.js", reason: "the status tabs (and their list, which Radix makes focusable) filter the loaded experiments; Try again re-renders the page (router.refresh(), a GET)", marks: 3 },
   { path: "components/admin/experiments/AnalysisPanel.js", reason: "\"Open in editor\" after keeping a variant is a link to the editor", marks: 1 },
+  // Phase 2 line 10 (quizzes)
+  { path: "components/admin/quizzes/QuizList.js", reason: "the search box and Clear search filter the quizzes already on the page; nothing is sent", marks: 2 },
+  { path: "components/admin/quizzes/QuizEditor.js", reason: "Open on the store (the quiz's public page in a new tab) and Back to quizzes / Cancel (a link to the list): navigation only", marks: 2 },
+  { path: "components/admin/quizzes/QuizTry.js", reason: "\"Try it\": the answer radios, Show the picks and Start again score in the page (scoreQuiz) and ask GET /api/admin/quiz?view=try (storefront.read) for the picks; nothing is saved", marks: 3 },
 ];
 
 // Reads sent as a non-GET request: { page, method, path, reason }. page is a

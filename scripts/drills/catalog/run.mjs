@@ -10,12 +10,13 @@
 // View on store and View in Shopify), "Edit content" lands on
 // /admin/editor?product=<gid>; the Collections tab and one collection's
 // products in Shopify's order with "Edit collection content"; the Bundles
-// card links to /admin/bundles (not followed: line 4 builds that page); the
-// quiz tray; Sync from Shopify enabled (not pressed: the roles store has no
-// Shopify behind it).
-// Staff: Sync from Shopify disabled with the reason; the quiz tray kept.
-// Support (read-only): no [data-legacy] region in main, the one-line quiz
-// summary, Sync disabled by RoleGate; search, filters, the sheet and the
+// card links to /admin/bundles (not followed: line 4 builds that page); Sync
+// from Shopify enabled (not pressed: the roles store has no Shopify behind
+// it).
+// Staff: Sync from Shopify disabled with the reason.
+// Every role: no [data-legacy] region in main (the quiz tray went with Phase
+// 2 line 10; quizzes are /admin/quizzes, drill:quizzes).
+// Support (read-only): Sync disabled by RoleGate; search, filters, the sheet and the
 // collection drill-down all work; the sheet says "View content" (its link is
 // checked, not followed: the editor is line 6's to drill). No non-GET request
 // at all.
@@ -102,7 +103,6 @@ async function common(drill, page, role) {
       const b = [...document.querySelectorAll('[data-catalog="sync-header"] button')].find((x) => /Sync from Shopify/.test(x.innerText));
       return b ? { gated: b.getAttribute("data-role-gate") === "disabled", disabled: b.disabled } : null;
     })(),
-    quizSummary: document.querySelector("[data-quiz-summary]")?.innerText || null,
   }));
   drill.check(/^Last synced /.test(facts.synced || "") && facts.count === "4 products", `${role}: the header says when the catalog last synced and how many products`, facts);
   drill.check(facts.bundles === "/admin/bundles", `${role}: "Bundles are with your offers" links to /admin/bundles`, facts.bundles);
@@ -176,8 +176,7 @@ async function catalog(drill) {
   // --- support first: read-only, never the editor ---
   const sup = await signIn(drill, "support");
   const sf = await common(drill, sup.page, "support");
-  drill.check(sf.legacy.length === 0, "support: no [data-legacy] region in main (no old quiz tray)", sf.legacy);
-  drill.check(/Product-finder quizzes: \d+ quizz?e?s?\./.test(sf.quizSummary || ""), "support: the one-line quiz summary", sf.quizSummary);
+  drill.check(sf.legacy.length === 0, "support: no [data-legacy] region in main", sf.legacy);
   drill.check(sf.sync?.gated === true, "support: Sync from Shopify is RoleGate's (disabled, with the reason)", sf.sync);
   drill.check((await sup.page.evaluate(strays)).length === 0, "support: every control on the page is a read, disabled or gated", await sup.page.evaluate(strays));
   await drill.shoot(sup.page, "support-products");
@@ -204,7 +203,7 @@ async function catalog(drill) {
   const st = await signIn(drill, "staff");
   const tf = await common(drill, st.page, "staff");
   drill.check(tf.sync?.gated === true, "staff: Sync from Shopify is disabled with the reason", tf.sync);
-  drill.check(tf.legacy.join(",") === "quizzes", "staff: keeps the quiz tray (the one [data-legacy-tray])", tf.legacy);
+  drill.check(tf.legacy.length === 0, "staff: no [data-legacy] region in main (no quiz tray)", tf.legacy);
   out.staff = { facts: tf };
 
   // --- owner: everything, then into the editor ---
@@ -212,7 +211,7 @@ async function catalog(drill) {
   const of = await common(drill, ow.page, "owner");
   const unlinked = await ow.page.getByText("isn't linked to your Shopify store yet", { exact: false }).count();
   drill.check(of.sync && !of.sync.gated && (!of.sync.disabled || unlinked > 0), "owner: Sync from Shopify is the owner's (not pressed); on the roles store, with no Shopify link, natively disabled with the words why", { ...of.sync, unlinked });
-  drill.check(of.legacy.join(",") === "quizzes", "owner: the quiz tray is the only old region", of.legacy);
+  drill.check(of.legacy.length === 0, "owner: no [data-legacy] region in main (no quiz tray)", of.legacy);
   await drill.shoot(ow.page, "owner-products");
   await search(drill, ow.page, "owner");
   await collections(drill, ow.page, "owner", "owner-collection").then((c) => drill.check(c.editorText === "Edit collection content", "owner: Edit collection content", c.editorText));

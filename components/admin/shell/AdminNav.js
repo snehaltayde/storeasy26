@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   Lightbulb,
   ListChecks,
+  MessageCircleQuestionMark,
   Package,
   Plug,
   Rocket,
@@ -43,6 +44,7 @@ const ICONS = {
   onboarding: ListChecks,
   orders: ShoppingCart,
   catalog: Package,
+  quizzes: MessageCircleQuestionMark, // Phase 2 line 10
   editor: Brush,
   media: ImageIcon,
   releases: Rocket,

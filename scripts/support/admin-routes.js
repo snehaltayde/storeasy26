@@ -95,6 +95,14 @@ export const ADMIN_ROUTES = Object.freeze([
   { path: "privacy", method: "GET", action: "settings.read" },
   { path: "quiz", method: "GET", action: "storefront.read" },
   { path: "quiz", method: "POST", action: "storefront.write", probe: { body: {} } },
+  // Phase 2 line 10: the editor's reads, and decision 6 (turning a quiz On, or
+  // saving or deleting one that is On, needs storefront.publish after the
+  // storefront.write gate; scripts/test-quizzes-ui.js covers the On rows)
+  { path: "quiz", method: "GET", variant: "usage", action: "storefront.read", probe: { query: "view=usage&slug=missing" } },
+  { path: "quiz", method: "GET", variant: "tags", action: "storefront.read", probe: { query: "view=tags" } },
+  { path: "quiz", method: "GET", variant: "try", action: "storefront.read", probe: { query: "view=try&tags=nothing-has-this" } },
+  { path: "quiz", method: "POST", variant: "enable", action: "storefront.publish", asks: "storefront.write", probe: { body: { quiz: {}, enabled: true } } },
+  { path: "quiz", method: "POST", variant: "remove", action: "storefront.write", probe: { body: { remove: { slug: "missing" } } } },
   { path: "refs", method: "GET", action: "storefront.read", via: "lib/admin/refs.js" },
   { path: "releases", method: "GET", action: "storefront.read", via: RELEASES },
   { path: "releases", method: "POST", variant: "preview", action: "storefront.read", via: RELEASES, crossOrigin: "read", probe: { body: { action: "preview" } } },

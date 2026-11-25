@@ -3,8 +3,6 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
-import { QuizPanel } from "@/components/admin/CommercePanels";
-import { listQuizzes } from "@/lib/quiz";
 import { tfetch } from "@/lib/console-request";
 import { roleAllows } from "@/lib/platform/authz";
 import { storeCurrency } from "@/lib/offers/catalog";
@@ -14,7 +12,6 @@ import { PageHeader } from "@/components/kit/page-header";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CatalogTabs } from "@/components/admin/catalog/CatalogTabs";
 import { SyncHeader } from "@/components/admin/catalog/SyncHeader";
-import { QuizTray } from "@/components/admin/catalog/QuizTray";
 
 // The Catalog page on the new UI (Phase 2 line 3, docs/plans/phase-2.md
 // "Line 3"; lib/admin/new-ui-routes.js lists /admin/catalog). Browse products
@@ -41,12 +38,12 @@ export default async function AdminCatalogPage({ searchParams } = {}) {
   if (to !== PRODUCTS_LIST_HREF) redirect(to);
 
   const role = actor.role;
-  // storefront.write: the quiz tray, and the card's link into the editor's
-  // list. Support opens a product's content from its sheet ("View content");
+  // storefront.write: the card's link into the editor's list (the quizzes
+  // moved to /admin/quizzes, Phase 2 line 10). Support opens a product's content from its sheet ("View content");
   // the editor's own reads are PUTs to /api/admin/documents, which the shell
   // drill's support rule (no non-GET from a read) would count.
   const canWrite = roleAllows(role, "storefront.write");
-  const [initial, currency, quizzes] = await tfetch(async () => [await browseProducts({}), await storeCurrency(), await listQuizzes()]);
+  const [initial, currency] = await tfetch(async () => [await browseProducts({}), await storeCurrency()]);
   const header = await tfetch(() => catalogHeader({ products: initial.counts.all }));
 
   return (
@@ -82,12 +79,6 @@ export default async function AdminCatalogPage({ searchParams } = {}) {
         </Card>
       </div>
       <CatalogTabs initial={initial} currency={currency} role={role} />
-      {/* support's one-line summary sits under a rule, apart from the table; the writer's tray is its own card */}
-      <div className={canWrite ? undefined : "border-t border-border pt-4"}>
-        <QuizTray canWrite={canWrite} count={quizzes.length}>
-          {canWrite ? <QuizPanel initial={quizzes} /> : null}
-        </QuizTray>
-      </div>
     </div>
   );
 }

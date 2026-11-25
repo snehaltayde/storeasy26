@@ -147,6 +147,8 @@
     "test:media-picker": "node scripts/test-media-picker.js",
     "test:media-library": "node scripts/test-media-library.js",
     "drill:media": "node scripts/drills/run-isolated.mjs media",
+    "test:quizzes-ui": "node scripts/test-quizzes-ui.js",
+    "drill:quizzes": "node scripts/drills/run-isolated.mjs quizzes",
     "test:product-editor": "node scripts/test-product-editor.js",
     "test:commerce-blocks": "node scripts/test-commerce-blocks.js",
     "test:bundle-form": "node scripts/test-bundle-form.js",

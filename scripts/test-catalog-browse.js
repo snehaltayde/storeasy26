@@ -9,7 +9,8 @@
 //    and stock filters with counts, the content state, the sheet's facts, a
 //    collection's products in position order.
 // 3. The page under scripts/support/page-harness.js: support gets no
-//    QuizPanel and no sync control; writers keep the quiz tray; ?product= and
+//    sync control; no role gets a quiz tray (quizzes are /admin/quizzes since
+//    Phase 2 line 10); ?product= and
 //    ?collection= still redirect to the editor.
 // 4. Rendered (Next's SWC, react-dom/server): the sync button is RoleGate's for
 //    staff and support and live for an owner; support's sheet says "View
@@ -284,24 +285,19 @@ await t("the page runs for every role with no unresolved import", () => {
   }
 });
 
-await t("support: no QuizPanel and no sync control; the quiz summary instead", () => {
+await t("support: no sync control", () => {
   const s = runs.support;
-  eq(propsOf(s, "QuizPanel").length, 0, "QuizPanel:");
   const sync = propsOf(s, "SyncHeader");
   eq(sync.length, 1, "one header:");
   eq(sync[0].canSync, false, "support may not sync:");
-  const tray = propsOf(s, "QuizTray");
-  eq(tray.map((p) => [p.canWrite, typeof p.count]), [[false, "number"]], "support's quiz summary:");
   ok(!s.text.includes("cnyb"), "nothing of store B in support's props");
   ok(!s.text.includes("/admin/editor?list=products"), "no link into the editor's list for support (support opens content from the sheet)");
   ok(runs.owner.text.includes("/admin/editor?list=products"), "the owner's card opens the editor's Products list");
 });
 
-await t("writers: owner, admin and staff keep QuizPanel in the tray; sync for owner and admin only", () => {
-  for (const role of ["owner", "admin", "staff"]) {
-    eq(propsOf(runs[role], "QuizPanel").length, 1, `${role} QuizPanel:`);
-    eq(propsOf(runs[role], "QuizTray")[0].canWrite, true, `${role} tray:`);
-  }
+await t("no role gets a quiz tray or QuizPanel (Phase 2 line 10 moved quizzes to /admin/quizzes); sync for owner and admin only", () => {
+  for (const role of ROLES) eq([propsOf(runs[role], "QuizPanel").length, propsOf(runs[role], "QuizTray").length], [0, 0], `${role}:`);
+  ok(!/QuizPanel|QuizTray|CommercePanels|listQuizzes/.test(readFileSync(join(ROOT, "app/(console)/admin/(authed)/catalog/page.js"), "utf8")), "the page imports no quiz part:");
   eq(ROLES.map((r) => propsOf(runs[r], "SyncHeader")[0].canSync), [true, true, false, false], "canSync:");
 });
 
@@ -378,7 +374,7 @@ async function load(rel) {
 const { TooltipProvider } = await load("components/ui/tooltip.js");
 const html = (el) => renderToStaticMarkup(h(TooltipProvider, null, el));
 const CAT = "components/admin/catalog";
-const [SH, PS, PT, QT, CT] = await Promise.all(["SyncHeader", "ProductSheet", "ProductsTable", "QuizTray", "CatalogTabs"].map((n) => load(`${CAT}/${n}.js`)));
+const [SH, PS, PT, CT] = await Promise.all(["SyncHeader", "ProductSheet", "ProductsTable", "CatalogTabs"].map((n) => load(`${CAT}/${n}.js`)));
 const SYNC = { state: "complete", linked: true };
 
 await t("rendered: Sync from Shopify is live for owner and admin, RoleGate's (disabled, with the reason) for staff and support", () => {
@@ -435,13 +431,6 @@ await t("rendered: an empty catalog says Connect Shopify in onboarding; a search
   ok(empty.includes("Connect Shopify in onboarding") && /href="\/admin\/onboarding"[^>]*data-read-control="true"|data-read-control="true"[^>]*href="\/admin\/onboarding"/.test(empty), `empty: ${empty.slice(0, 400)}`);
   const none = html(h(PT.ProductsTable, { initial: { items: [], nextCursor: null, total: 0, counts: { all: 5, edited: 0, changedInShopify: 0, orphaned: 0 } }, currency: "INR", onOpen() {} }));
   ok(none.includes("No products match") && none.includes("Clear search and filters"), "no match:");
-});
-
-await t("rendered: support's quiz line is new UI with no control; a writer's tray is the one [data-legacy-tray] region", () => {
-  const sup = html(h(QT.QuizTray, { canWrite: false, count: 2 }));
-  eq(sup, '<p data-quiz-summary="" class="text-sm text-muted-foreground">Product-finder quizzes: 2 quizzes.</p>', "support:");
-  const w = html(h(QT.QuizTray, { canWrite: true, count: 2 }, h("div", { id: "quiz-panel" })));
-  ok(/<section[^>]*data-legacy="true"[^>]*data-legacy-tray="quizzes"[^>]*><div id="quiz-panel"><\/div><\/section>/.test(w), `writer: ${w}`);
 });
 
 await t("rendered: the tabs are marked reads", () => {
