@@ -568,9 +568,7 @@ const realOr = (p) => {
 //   → the booted handle.
 // (It used to boot again on Turbopack's next/font/google build failure; the
 // fonts are self-hosted now, app/fonts/fonts.js, and test:fonts keeps
-// next/font/google out.) FONT_BUILD_ERROR stays for the drill runner's
-// warm-up check in scripts/drills/run-isolated.mjs.
-export const FONT_BUILD_ERROR = "turbopack-next/internal/font/google";
+// next/font/google out.)
 export async function bootBuilt({ boot, baseUrl, paths, fetchPage = defaultFetchPage }) {
   const h = await boot();
   for (const path of paths) await fetchPage(baseUrl + path);

@@ -33,11 +33,8 @@
 //      with summary.json
 //   7. the worktree is removed (git worktree remove --force, prune) unless --keep;
 //      on Ctrl-C or SIGTERM the runner stops its own children first, then removes it
-//   5c. before each drill, and after one that fails, a warm-up boot checks the
-//      build (warmBuild): a next/font/google build error means .next is deleted
-//      and the boot repeated (up to 2 times), else the run stops with
-//      "Google Fonts could not be fetched; check the network"; a drill that
-//      failed on such a build is run once more
+//   5c. before each drill, a warm-up boot loads / and /admin/login (compiling
+//      them) and stops (warmUp)
 //   6b. each drill's harnesses (design and roles) write their Next output and
 //      sqld logs to <worktree>/.drill-logs/<drill>/ (DRILL_LOG_DIR); after the
 //      drill, and before the worktree goes (Ctrl-C too), they are joined into
@@ -52,7 +49,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync,
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BLANKED_ENV, FONT_BUILD_ERROR, HarnessError, ROOT, bootBuilt, isPortBusy, runningHarness } from "../design-harness.js";
+import { BLANKED_ENV, HarnessError, ROOT, bootBuilt, isPortBusy, runningHarness } from "../design-harness.js";
 
 export const OWNER_PORTS = Object.freeze([3017, 3018, 18017, 18018, 18019, 18027, 18028, 18029]);
 const HANDS_OFF = new Set(["docs/CMS_CLAUDE_DIRECTION_BRIEF.md", "docs/CMS_ENTERPRISE_AUDIT_2026-10-29.md", "docs/CMS_SESSION_HANDOFF.md"]);
@@ -312,38 +309,24 @@ async function waitUp(url, child, ms = 240_000) {
   return false;
 }
 
-// Before each drill (and after one that failed): a warm-up boot of the
-// worktree's design harness that loads / and /admin/login. Turbopack keeps its
-// dev build in .next/cache across restarts, and a next/font/google failure
-// there ("Can't resolve '@vercel/turbopack-next/internal/font/google/font'")
-// turns every later page into a 500 for every harness started from that .next.
-// When the warm-up sees it, it stops its own harness, deletes the worktree's
-// .next and boots again, up to 2 times; then the run fails plainly. A drill
-// never runs silently against that broken build.
-export { FONT_BUILD_ERROR };
-export const FONT_FAIL = "Google Fonts could not be fetched; check the network";
+// Before each drill: a warm-up boot of the worktree's design harness that
+// loads / and /admin/login, so Turbopack has compiled them before a drill's
+// browser waits on them. (It used to retry on a next/font/google build
+// failure; the fonts are self-hosted now, see app/fonts/fonts.js.)
 const WARM_PATHS = ["/", "/admin/login"];
 
-// start() → { probe() → [{ path, status, body }], output() → string, stop() };
-// clean() deletes .next; gone() → { ok, why }. → { attempts } or throws RunnerError.
-export async function warmBuild({ start, clean, gone, attempts = 3, say = () => {} }) {
-  for (let i = 1; i <= attempts; i++) {
-    const h = await start();
-    let bad = [];
-    try {
-      const pages = await h.probe();
-      bad = pages.filter((p) => p.body.includes(FONT_BUILD_ERROR)).map((p) => `${p.path} ${p.status}`);
-      if (!bad.length && h.output().includes(FONT_BUILD_ERROR)) bad = ["the harness output"];
-    } finally {
-      await h.stop();
-    }
-    const g = await gone();
-    if (!g.ok) throw new RunnerError(`After the warm-up harness: ${g.why}. Nothing was stopped.`);
-    if (!bad.length) return { attempts: i };
-    say(`✗ warm-up ${i}/${attempts}: the build failed on next/font/google (${bad.join(", ")})${i < attempts ? "; deleting the worktree's .next and starting again" : ""}`);
-    if (i < attempts) clean();
+// start() → { probe(), output() → string, stop() }; gone() → { ok, why }.
+// Its own harness is stopped even when probe() throws; one that does not go
+// is reported, never killed.
+export async function warmUp({ start, gone }) {
+  const h = await start();
+  try {
+    await h.probe();
+  } finally {
+    await h.stop();
   }
-  throw new RunnerError(`${FONT_FAIL}. The storefront build failed on next/font/google (${FONT_BUILD_ERROR}) in ${attempts} warm-up boots, each after deleting the worktree's .next; no drill ran against that build.`);
+  const g = await gone();
+  if (!g.ok) throw new RunnerError(`After the warm-up harness: ${g.why}. Nothing was stopped.`);
 }
 
 // The real warm-up harness: this worktree's dev-design.js on this run's ports, own handle only.
@@ -375,8 +358,7 @@ function warmHarness(c) {
   };
 }
 
-const realWarm = (c, say) =>
-  warmBuild({ start: warmHarness(c), clean: () => rmSync(join(c.worktree, ".next"), { recursive: true, force: true }), gone: () => waitHarnessGone({ worktree: c.worktree, ports: c.ports }), say });
+const realWarm = (c) => warmUp({ start: warmHarness(c), gone: () => waitHarnessGone({ worktree: c.worktree, ports: c.ports }) });
 
 const node = process.execPath;
 
@@ -562,21 +544,11 @@ export async function runIsolated({ root = ROOT, names, stages = [], keep = fals
         node: (args, opts = {}) => runChild(node, args, { cwd: worktree, env: denv, log, ...opts }),
       };
       let exit;
-      let fontFail = false;
       try {
         if (spec.id) clearResults(worktree, root, spec.id);
-        if (spec.warm) await warm(ctx, say);
+        if (spec.warm) await warm(ctx);
         exit = await spec.run(ctx);
-        // a failed drill: was the build broken under it? Then once more on a fresh .next.
-        if (exit !== 0 && spec.warm && (await warm(ctx, say)).attempts > 1) {
-          const again = `• ${name} failed on a broken next/font/google build; .next was rebuilt, running it once more\n`;
-          log.push(again);
-          say(again.trim());
-          if (spec.id) clearResults(worktree, root, spec.id);
-          exit = await spec.run(ctx);
-        }
       } catch (e) {
-        fontFail = e instanceof RunnerError && e.message.startsWith(FONT_FAIL);
         log.push(`✗ ${e instanceof RunnerError ? e.message : e.stack || e}\n`);
         if (e instanceof RunnerError) say(`✗ ${e.message}`);
         exit = 1;
@@ -588,10 +560,6 @@ export async function runIsolated({ root = ROOT, names, stages = [], keep = fals
       rows.push({ drill: name, exit, seconds: Math.round((Date.now() - t0) / 1000), results: copied, log: join(resultsDir, `${name}.log`), serverLog });
       say(`--- ${name}: ${exit === 0 ? "passed" : `FAILED (exit ${exit})`} in ${Math.round((Date.now() - t0) / 1000)} s`);
       if (exit !== 0) say(serverLog ? `--- the last lines of ${serverLog}:\n${tailLines(readFileSync(serverLog, "utf8"))}` : "--- no server log was written");
-      if (fontFail) {
-        say("✗ the remaining drills are not run.");
-        break;
-      }
       const g = await gone({ worktree, ports: chosen });
       if (!g.ok) {
         rows.push({ drill: `${name} (cleanup)`, exit: 1, seconds: 0, results: null, log: null, why: g.why });
