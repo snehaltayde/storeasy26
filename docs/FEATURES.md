@@ -63,6 +63,8 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - [ ] An operator can manage plans, subscriptions and billing events
 - [ ] An operator can manage feature flags and incidents
 - [ ] An operator can open time-boxed support access to a store, and the store's team sees that it is open
+- [ ] An operator can run job queues, provisioning runs, privacy requests, themes and case studies on the new UI
+- [ ] The old operator console and `components/console/` are removed once every operator screen is on the new UI
 
 ## Phase 4: plugin system (roadmap Phase 2A)
 
@@ -106,6 +108,8 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 
 ## Later (not planned yet)
 
+- A read-only operator role (Phase 3 gives every operator every action; decided 2026-11-25).
+- Support access: signing every member out and rotating the Turso database token as part of secret rotation (Phase 3 rotates only the keys Storeasy holds).
 - **Drill install race (from the drill flake under load):** the sign-in 500 under load was Turbopack's `next/font/google` failing one boot's build; drills now check each boot and reboot only that error (2026-11-25, see DECISIONS). The `ERR_MODULE_NOT_FOUND @libsql/client` in a drill worktree was suspected to be a concurrent `pnpm install`; installs are now serialized, but the race was never reproduced. Watch `server.log` in `.drill-results/` if it shows again.
 - One shared Storeasy Shopify app so self-serve founders connect without waiting for an operator (owner: later; needs Shopify app review and protected customer data approval).
 - `lib/shopify-admin.js` uses Admin API version `2025-10`, past Shopify's 12-month support window; move to a supported version.

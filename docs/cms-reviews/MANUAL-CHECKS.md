@@ -1091,3 +1091,4 @@ Tests and `pnpm drill:connect` only talk to a local Shopify stand-in. Shopify re
   - On a real https staging host, click "Store team sign-in" on the closed page with a verified staff session. Pass: the `_mx` pass cookie is stored (it is Secure, so local http can't show this) and the real site shows.
   - Check the curtain in Safari and on a phone. Only headless desktop Chrome was used.
 - [ ] Before hosting: add the SIL OFL 1.1 licence text next to the self-hosted fonts (`app/fonts/geist/`, `app/fonts/geist-mono/`, `app/fonts/fraunces/`, as `OFL.txt`). The fonts no longer come from Google Fonts (2026-11-25), so the licence must ship with the files.
+- [ ] Phase 3 billing: on a Razorpay test account, change a store's plan and confirm the old subscription is cancelled at cycle end (`POST /v1/subscriptions/{id}/cancel` with `cancel_at_cycle_end`). Built from current docs; never run against a real account.

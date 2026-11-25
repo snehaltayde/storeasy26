@@ -3,6 +3,16 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-25 Phase 3 shape: operator console on shadcn (on the owner's behalf)
+
+- **Schema:** one migration, platform `0016_support_sessions.sql` (line 5): adds `sessions.grant_id` and its index, additive. Tenant migrations stay at 0029.
+- **Permissions:** no operator roles; every operator (and bootstrap while none exists) may take every operator action; a read-only operator role goes under Later. The least-trusted callers are the signed-out visitor and a merchant session. One guard, `requireOperator`, on every operator route with the origin check on every write (fixes `billing`, `costs` and `flags`, which skipped it); audit rows name the real operator, not `"operator"`. `GET /api/platform/tenants` stops sending `db_url` to the browser.
+- **Support access:** entry across hosts uses a single-use 60-second entry token and a host-only `_support` session tied to the grant; bootstrap cannot enter. Owners and admins can end it (`team.manage`) and read its history (`audit.read`); the banner names the operator.
+- **Scope:** secret rotation covers only keys Storeasy holds (order-link key, store console password). Incidents keep history in `audit_log` (`incident.*`), never the internal note's text. Costs move into Billing. Two new lines: 6 (queues, provisioning, privacy, themes, case studies) and 7 (remove the old operator console and `components/console/`); the old console lives at `/platform/legacy` until line 7. Billing cancels a paid Razorpay subscription at cycle end by default.
+- **Order:** line 0 (guard, platform route harness, operator shell, sign-in with a real TOTP drill) → lines 1, 3, 4, 6 side by side → 2 and 5 → 7. Plan: `docs/plans/phase-3.md`.
+- **Decided by:** Claude
+- **Slice:** Phase 3 plan
+
 ## 2026-11-25 The editor and Publishing on the new UI (on the owner's behalf)
 
 - **Permissions:** support's editor store is read-only: every write op (saveDraft and its keepalive, discard, restore, undo, take offline, publish, publishSet, archive, create, keep-live/keep-earlier, backups) returns `READ_ONLY` in the browser, and `DocumentEditor`'s direct calls go through one read-only guard; the server's 403s stay the real gate. Staff and support see the publish reason, never a publish/undo/take-offline button; support gets no Restore. The first-store generator runs only with `can.write`. `READ_POSTS` rows may list allowed body `ops` (document reads only); the shared matcher lives in `scripts/support/read-post-match.js` and is tested on real bodies: a body rule (Test, not Revoke) and ops both hold, and a server-log line counts as a read only on a 2xx.
