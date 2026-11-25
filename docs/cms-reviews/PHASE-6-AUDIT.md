@@ -49,3 +49,7 @@ Date: 2026-11-25. Audited on `main` at `c93f6fd3` (Phase 6 lines 1 and 2; `45296
 
 - Real `postMessage` between windows (suites use a stand); covered by `drill:studio` in the phase suite.
 - A store B owner session on A's `/admin/studio` specifically (relies on the shared `adminActor` host binding).
+
+## Phase 6 browser suite
+
+`drill:all` at `af499918` (2026-11-26, 3,460 s, 30 drills with `studio`): 28 of 30 passed. `support-access` found a real gap: support's studio reads (`listDocuments`, `getDocument`, the preview session) had no reasoned rows for `/admin/studio`, only for `/admin/editor`. Nothing was written. The rows are added. `p6` stopped once on a sign-in button still disabled under load. After the fix, `drill:support-access` and `drill:p6` both passed alone (1,022 s).
