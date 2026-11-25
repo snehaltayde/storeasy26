@@ -106,7 +106,7 @@ async function platformStores(drill) {
   // 1. the list
   const { ctx, page } = await newPage(drill, { cookie: opToken });
   const res = await page.goto(at("/platform"), { waitUntil: "load" });
-  await page.locator(LIST).waitFor();
+  await page.locator(LIST).first().waitFor();
   await settle(page);
   drill.check(res?.status() === 200 && (await page.locator(`${SHELL} ${LIST}`).count()) === 1 && !ERROR_TEXT.test(await text(page)), "operator: /platform is the Stores list inside the shell", res?.status());
   drill.check((await page.locator("[data-fleet-strip] [data-fleet-stat]").count()) === 4, "the fleet strip shows four numbers", null);
@@ -195,7 +195,7 @@ async function platformStores(drill) {
   for (const w of [768, 375]) {
     await page.setViewportSize({ width: w, height: 900 });
     await page.goto(at("/platform"), { waitUntil: "load" });
-    await page.locator(LIST).waitFor();
+    await page.locator(LIST).first().waitFor();
     await healthResolved(page);
     await settle(page);
     if (w === 375) {
