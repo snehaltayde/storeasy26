@@ -56,17 +56,24 @@ async function placeCodOrder(page) {
     async ([v]) => {
       const add = await fetch("/api/cart", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add", variantId: v, quantity: 1 }) });
       if (!add.ok) return { error: `cart ${add.status}`, body: await add.text() };
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "cod",
-          idempotencyKey: `drill-hooks-${Date.now()}`,
-          contact: { email: "drillbuyer@example.test", phone: "9876500000", name: "Drill Buyer" },
-          address: { line1: "1 Drill Road", city: "Bengaluru", state: "KA", pincode: "560001", country: "IN" },
-        }),
-      });
-      return { status: res.status, json: await res.json().catch(() => null) };
+      // as the checkout page does: the first answer names the total (shipping
+      // included), the shopper reviews it and places the order at that total
+      const key = `drill-hooks-${Date.now()}`;
+      const place = (expected) =>
+        fetch("/api/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "cod",
+            idempotencyKey: key,
+            contact: { email: "drillbuyer@example.test", phone: "9876500000", name: "Drill Buyer" },
+            address: { line1: "1 Drill Road", city: "Bengaluru", state: "KA", pincode: "560001", country: "IN" },
+            ...expected,
+          }),
+        }).then(async (res) => ({ status: res.status, json: await res.json().catch(() => null) }));
+      let r = await place({});
+      if (r.status === 409 && r.json?.code === "PRICE_CHANGED") r = await place({ expectedTotal: r.json.total, expectedShipping: r.json.shippingTotal });
+      return r;
     },
     [variantId],
   );
