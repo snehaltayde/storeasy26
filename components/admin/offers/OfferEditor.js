@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { CircleAlert, ListTodo, Plus, RotateCcw, Trash2, TriangleAlert, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -46,9 +46,9 @@ function Field({ id, label, hint, children, className }) {
   );
 }
 
-function Section({ title, description, children, actions }) {
+function Section({ title, description, children, actions, className, ...rest }) {
   return (
-    <Card>
+    <Card className={className} {...rest}>
       <CardHeader className="flex flex-row items-start justify-between gap-3">
         <div className="space-y-1">
           <CardTitle>{title}</CardTitle>
@@ -191,7 +191,7 @@ export function OfferEditor({ existing = null, offers = [], names = {}, currency
             {toggleError}
           </p>
         )}
-        {existing && <p className="text-sm text-muted-foreground">{live ? "This offer is on. Shoppers get your changes on their next cart once you update it." : "This offer is off. Shoppers don't get it until you turn it on."}</p>}
+        {existing && <p className="text-sm text-muted-foreground">{ro ? (live ? "This offer is on." : "This offer is off, so shoppers don't get it.") : live ? "This offer is on. Shoppers get your changes on their next cart once you update it." : "This offer is off. Shoppers don't get it until you turn it on."}</p>}
 
         {existing?.previous && previousSentence && (
           <Section
@@ -249,11 +249,16 @@ export function OfferEditor({ existing = null, offers = [], names = {}, currency
                   <p className="text-sm font-medium text-foreground">Steps</p>
                   {form.tiers.map((tier, i) => (
                     <div key={i} className="flex flex-wrap items-center gap-2 text-sm text-foreground" data-tier={i}>
-                      <span>Buy</span>
-                      <Input disabled={ro} type="number" min="1" step="1" inputMode="numeric" className="w-20" aria-label={`Step ${i + 1}: how many to buy`} value={tier.minQty} onChange={(e) => setTier(i, { minQty: e.target.value })} />
-                      <span>or more, get</span>
-                      <Input disabled={ro} type="number" min="1" max="90" inputMode="decimal" className="w-20" aria-label={`Step ${i + 1}: percent off`} value={tier.percent} onChange={(e) => setTier(i, { percent: e.target.value })} />
-                      <span>% off</span>
+                      <span className="flex items-center gap-2">
+                        Buy
+                        <Input disabled={ro} type="number" min="1" step="1" inputMode="numeric" className="w-16 sm:w-20" aria-label={`Step ${i + 1}: how many to buy`} value={tier.minQty} onChange={(e) => setTier(i, { minQty: e.target.value })} />
+                        or more,
+                      </span>
+                      <span className="flex items-center gap-2">
+                        get
+                        <Input disabled={ro} type="number" min="1" max="90" inputMode="decimal" className="w-16 sm:w-20" aria-label={`Step ${i + 1}: percent off`} value={tier.percent} onChange={(e) => setTier(i, { percent: e.target.value })} />
+                        % off
+                      </span>
                       {form.tiers.length > 1 && !ro && (
                         <Button type="button" size="icon-sm" variant="ghost" aria-label={`Remove step ${i + 1}`} onClick={() => set({ tiers: form.tiers.filter((_, j) => j !== i) })}>
                           <X aria-hidden />
@@ -354,8 +359,15 @@ export function OfferEditor({ existing = null, offers = [], names = {}, currency
         )}
 
         {form.type && (
-          <Section title={ro ? "What shoppers get" : existing ? "Check before you update" : "Check before you start"}>
-            {existing ? (
+          <Section title={ro ? "What shoppers get" : existing ? "Check before you update" : "Check before you start"} className="border-primary/30" data-offer-check>
+            {existing && ro ? (
+              <div>
+                <p className="text-lg leading-snug font-semibold text-foreground" data-sentence="old">
+                  {oldSentence}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">{scheduleText(existing.starts_at, existing.ends_at, tz)}</p>
+              </div>
+            ) : existing ? (
               <div className="grid gap-3 sm:grid-cols-2" data-compare="sentences">
                 <div className="rounded-md border border-border p-3">
                   <p className="text-xs font-medium text-muted-foreground">{live ? "Live now" : "Saved now"}</p>
@@ -364,7 +376,7 @@ export function OfferEditor({ existing = null, offers = [], names = {}, currency
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">{scheduleText(existing.starts_at, existing.ends_at, tz)}</p>
                 </div>
-                <div className={cn("rounded-md border p-3", changed ? "border-primary" : "border-border")}>
+                <div className={cn("rounded-md border p-3", changed ? "border-primary bg-primary/5" : "border-border")}>
                   <p className="text-xs font-medium text-muted-foreground">{live ? "After you update" : "After you save"}</p>
                   <p className="mt-1 text-sm font-medium text-foreground" data-sentence="new">
                     {sentence || "Finish the rules to see this."}
@@ -374,7 +386,7 @@ export function OfferEditor({ existing = null, offers = [], names = {}, currency
                 </div>
               </div>
             ) : (
-              <p className={sentence ? "text-base font-semibold text-foreground" : "text-sm text-muted-foreground"} data-sentence="new">
+              <p className={sentence ? "text-lg leading-snug font-semibold text-foreground" : "text-sm text-muted-foreground"} data-sentence="new">
                 {sentence || "Finish the rules to see the offer in one sentence."}
               </p>
             )}
@@ -386,12 +398,15 @@ export function OfferEditor({ existing = null, offers = [], names = {}, currency
               </ul>
             )}
 
-            <SimulatePanel offer={offer && !problems.length ? offer : null} enabled={live} currency={currency} auto={dirty} onResult={setSim} />
+            <SimulatePanel className="rounded-md border border-border bg-muted p-3" offer={offer && !problems.length ? offer : null} enabled={live} currency={currency} auto={dirty} onResult={setSim} />
 
             {warnings.length > 0 && (
               <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm" data-offer-warnings>
-                <p className="font-medium text-warning-text">Check this is right</p>
-                <ul className="mt-1 space-y-0.5 text-foreground">
+                <p className="flex items-center gap-2 font-medium text-warning-text">
+                  <TriangleAlert aria-hidden className="size-4 shrink-0" />
+                  Check this is right
+                </p>
+                <ul className="mt-1 space-y-0.5 pl-6 text-foreground">
                   {warnings.map((w, i) => (
                     <li key={i}>{w}</li>
                   ))}
@@ -399,9 +414,12 @@ export function OfferEditor({ existing = null, offers = [], names = {}, currency
               </div>
             )}
             {!ro && problems.length > 0 && (
-              <div className="rounded-md border border-border bg-muted px-3 py-2" data-offer-problems>
-                <p className="text-xs font-medium text-muted-foreground">Still to do</p>
-                <ul className="mt-1 space-y-0.5 text-sm text-foreground">
+              <div className="rounded-md border border-dashed border-border px-3 py-2" data-offer-problems>
+                <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <ListTodo aria-hidden className="size-4 shrink-0" />
+                  Still to do
+                </p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-6 text-sm text-foreground marker:text-muted-foreground">
                   {problems.map((p, i) => (
                     <li key={i}>{p}</li>
                   ))}
@@ -413,8 +431,11 @@ export function OfferEditor({ existing = null, offers = [], names = {}, currency
 
         {errors && (
           <div role="alert" className="rounded-card border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" data-offer-errors>
-            <p className="font-medium">The offer didn&rsquo;t save</p>
-            <ul className={cn("mt-1 space-y-0.5", errors.length > 1 && "list-disc pl-4")}>
+            <p className="flex items-center gap-2 font-medium">
+              <CircleAlert aria-hidden className="size-4 shrink-0" />
+              The offer didn&rsquo;t save
+            </p>
+            <ul className={cn("mt-1 space-y-0.5 pl-6", errors.length > 1 && "list-disc pl-6")}>
               {errors.map((m, i) => (
                 <li key={i}>{m}</li>
               ))}
@@ -422,7 +443,7 @@ export function OfferEditor({ existing = null, offers = [], names = {}, currency
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-sm supports-[backdrop-filter]:bg-background/80 sm:mx-0 sm:rounded-card sm:border sm:px-4" data-offer-actions>
           {!existing && form.type && !problems.length && !ro && <p className="mr-auto text-xs text-muted-foreground">{schedule.startsAt ? `It goes live ${whenIn(schedule.startsAt, tz)}.` : "It goes live for shoppers straight away."}</p>}
           <Link href="/admin/offers" data-read-control className={buttonVariants({ variant: "outline" })}>
             {ro ? "Back to offers" : "Cancel"}

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, TriangleAlert } from "lucide-react";
+import { CircleAlert, Plus, Search, TriangleAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,16 +98,17 @@ export function OffersList({ initialOffers, initialNames = {}, currency, timezon
   );
 
   const columns = [
-    { key: "label", header: "Offer", truncate: true, className: "min-w-40" },
+    { key: "label", header: "Offer", truncate: true, className: "w-[22%] min-w-36" },
     {
       key: "sentence",
       header: "What shoppers get",
+      className: "w-[44%]",
       cell: (o) => {
         const stale = !isAutoTitle(o.config, say) && o.previous ? staleNameWarning(o.config?.title, o.previous.config, o.config, say) : null;
         const bundleId = bundleIdOf(o);
         return (
-          <div className="min-w-56 space-y-0.5 py-1 whitespace-normal">
-            <p className="text-foreground" data-sentence="row">
+          <div className="min-w-64 space-y-1 py-1.5 whitespace-normal">
+            <p className="text-sm leading-snug text-foreground" data-sentence="row">
               {offerSentence(o.config, say) || o.label}
             </p>
             {bundleId && (
@@ -130,7 +131,7 @@ export function OffersList({ initialOffers, initialNames = {}, currency, timezon
     },
     { key: "type", header: "Kind", cell: (o) => <Badge variant="muted">{OFFER_TYPE_NAMES[o.type] || "Offer"}</Badge> },
     { key: "state", header: "State", cell: (o) => <StatusBadge kind="offer" status={stateOf(o)} /> },
-    { key: "schedule", header: "When", cell: (o) => <span className="text-xs text-muted-foreground">{scheduleText(o.starts_at, o.ends_at, timezone)}</span> },
+    { key: "schedule", header: "When", className: "min-w-40 max-w-56 whitespace-normal", cell: (o) => <span className="block text-xs leading-snug text-muted-foreground">{scheduleText(o.starts_at, o.ends_at, timezone)}</span> },
   ];
 
   const rowActions = canWrite
@@ -152,7 +153,10 @@ export function OffersList({ initialOffers, initialNames = {}, currency, timezon
 
       {error && (
         <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-card border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          <span>{error}</span>
+          <span className="flex items-start gap-2">
+            <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+            {error}
+          </span>
           <Button type="button" size="sm" variant="outline" data-read-control onClick={() => refresh()}>
             Try again
           </Button>
@@ -167,7 +171,7 @@ export function OffersList({ initialOffers, initialNames = {}, currency, timezon
             setOffset(0);
           }}
         >
-          <TabsList aria-label="Offers by state" data-read-control>
+          <TabsList aria-label="Offers by state" data-read-control className="max-w-full overflow-x-auto">
             {TABS.map(([k, label]) => (
               <TabsTrigger key={k} value={k} data-read-control>
                 {label} <span className="ml-1 font-mono text-xs tabular-nums text-muted-foreground">{counts[k]}</span>

@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { House, Plus, Trash2 } from "lucide-react";
+import { CircleAlert, House, Plus, Trash2 } from "lucide-react";
+import { cn } from "@/components/ui/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { DataTable } from "@/components/kit/data-table";
@@ -64,12 +65,12 @@ export function BundlesList({ initialBundles, currency, role, canWrite }) {
   );
 
   const columns = [
-    { key: "title", header: "Bundle", truncate: true, className: "min-w-36" },
+    { key: "title", header: "Bundle", truncate: true, className: "w-[24%] min-w-36" },
     {
       key: "items",
       header: "Products",
       cell: (b) => (
-        <ul className="min-w-48 py-1 text-xs whitespace-normal text-muted-foreground" data-bundle-components>
+        <ul className="min-w-56 space-y-0.5 py-1.5 text-xs whitespace-normal text-muted-foreground" data-bundle-components>
           {(b.components || b.items || []).map((c, i) => (
             <li key={`${c.variantId}-${i}`}>
               <span className="font-mono tabular-nums">{c.quantity ?? 1} ×</span> {componentLabel(c) || "A product no longer in your catalog"}
@@ -82,19 +83,36 @@ export function BundlesList({ initialBundles, currency, role, canWrite }) {
       key: "price",
       header: "Price",
       align: "right",
-      cell: (b) => (
-        <div className="space-y-0.5">
-          <MoneyCell amount={b.bundle_price} currency={currency} />
-          {b.compat?.componentsSum > 0 && (
-            <span className="block text-right text-xs text-muted-foreground line-through">
-              <span className="sr-only">Products add up to </span>
-              <MoneyCell amount={b.compat.componentsSum} currency={currency} className="inline" />
-            </span>
-          )}
-        </div>
-      ),
+      cell: (b) => {
+        const sum = Number(b.compat?.componentsSum) || 0;
+        // the parts' sum is struck through only when the bundle really costs
+        // less; a price at or over the sum says the sum plainly instead
+        const saves = sum > 0 && Number(b.bundle_price) < sum;
+        return (
+          <div className="space-y-0.5 py-1">
+            <MoneyCell amount={b.bundle_price} currency={currency} className="font-medium text-foreground" />
+            {sum > 0 && (
+              <span className={cn("block text-right text-xs text-muted-foreground", saves && "line-through decoration-muted-foreground/70")} data-bundle-sum>
+                <span className="sr-only">{saves ? "Products add up to " : "The products add up to only "}</span>
+                {!saves && <span aria-hidden>Parts </span>}
+                <MoneyCell amount={sum} currency={currency} className="inline" />
+              </span>
+            )}
+          </div>
+        );
+      },
     },
-    { key: "saving", header: "Saving", align: "right", cell: (b) => (b.compat?.state === "available" ? <MoneyCell amount={b.compat.saving} currency={currency} /> : <span className="block text-right text-xs text-muted-foreground">None</span>) },
+    {
+      key: "saving",
+      header: "Saving",
+      align: "right",
+      cell: (b) =>
+        b.compat?.state === "available" ? (
+          <MoneyCell amount={b.compat.saving} currency={currency} className="text-success" />
+        ) : (
+          <span className="block text-right text-xs text-muted-foreground">None</span>
+        ),
+    },
     {
       key: "state",
       header: "State",
@@ -112,7 +130,7 @@ export function BundlesList({ initialBundles, currency, role, canWrite }) {
               )}
             </div>
             {!ready && (
-              <p className="text-xs text-warning-text" data-bundle-reason>
+              <p className="text-xs leading-snug text-warning-text" data-bundle-reason>
                 {b.enabled ? stateLine(b.compat?.state, b.compat?.reasons, { currency }) : why.length ? `Can't be shown yet: ${why.join(". ")}.` : "Can't be shown yet."}
               </p>
             )}
@@ -144,8 +162,9 @@ export function BundlesList({ initialBundles, currency, role, canWrite }) {
       <PageHeader title="Bundles" description="A set price for a fixed group of products, taken off in the cart. Shoppers see a bundle only while every product is in stock and the price saves money." actions={newBundle} />
 
       {error && (
-        <div role="alert" className="mb-4 rounded-card border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" data-bundle-error>
-          {error}
+        <div role="alert" className="mb-4 flex items-start gap-2 rounded-card border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" data-bundle-error>
+          <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 

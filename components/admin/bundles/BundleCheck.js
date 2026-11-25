@@ -2,6 +2,7 @@
 
 import { CircleCheck, TriangleAlert } from "lucide-react";
 import { formatMoney } from "@/lib/format";
+import { cn } from "@/components/ui/utils";
 import { reasonSentence } from "@/lib/commerce/bundle-words";
 
 // A bundle's compatibility check in words (Phase 2 line 4): the products'
@@ -70,24 +71,37 @@ export function BundleCheck({ check, price, currency, checking = false, error = 
   const passes = check.state === "available";
   const saving = passes ? savingOf(check.componentsSum, price) : null;
   const said = [...priceWords(check.reasons, currency), ...otherWords(check.reasons, currency)];
+  const sum = Number(check.componentsSum) || 0;
+  const cheaper = sum > 0 && Number(price) > 0 && Number(price) < sum;
   return (
-    <div className="space-y-1 text-sm" aria-live="polite" data-bundle-check={passes ? "passes" : "fails"}>
-      {check.componentsSum > 0 && (
-        <p className="text-foreground">
-          The products add up to <span className="font-mono tabular-nums">{money(check.componentsSum)}</span>; the bundle costs <span className="font-mono tabular-nums">{money(price)}</span>.
-        </p>
+    <div className="space-y-3 text-sm" aria-live="polite" data-bundle-check={passes ? "passes" : "fails"}>
+      {sum > 0 && (
+        <dl className="grid grid-cols-3 overflow-hidden rounded-md border border-border bg-muted" data-bundle-figures>
+          <div className="px-3 py-2">
+            <dt className="text-xs text-muted-foreground">Products add up to</dt>
+            <dd className={cn("mt-0.5 font-mono text-sm tabular-nums text-muted-foreground", cheaper && "line-through decoration-muted-foreground/70")}>{money(sum)}</dd>
+          </div>
+          <div className="border-l border-border px-3 py-2">
+            <dt className="text-xs text-muted-foreground">Bundle price</dt>
+            <dd className="mt-0.5 font-mono text-sm font-medium tabular-nums text-foreground">{money(price)}</dd>
+          </div>
+          <div className={cn("border-l border-border px-3 py-2", passes && "bg-success/10")}>
+            <dt className="text-xs text-muted-foreground">Shoppers save</dt>
+            <dd className={cn("mt-0.5 font-mono text-sm font-medium tabular-nums", passes ? "text-success" : "text-muted-foreground")}>{passes ? money(saving.exact) : "Nothing yet"}</dd>
+          </div>
+        </dl>
       )}
       {passes ? (
-        <p className="flex items-start gap-1.5 text-success" data-bundle-saving>
+        <p className="flex items-start gap-2 text-success" data-bundle-saving>
           <CircleCheck aria-hidden className="mt-0.5 size-4 shrink-0" />
           <span>
             Shoppers save {money(saving.exact)}.{saving.cart !== saving.exact ? ` The cart takes off ${money(saving.cart)}, as it rounds to a whole amount.` : ""} It can be shown to shoppers.
           </span>
         </p>
       ) : (
-        <ul className="space-y-0.5 text-warning-text" data-bundle-reasons>
+        <ul className="space-y-1 text-warning-text" data-bundle-reasons>
           {(said.length ? said : ["Fix the products listed above before shoppers can see it."]).map((w, i) => (
-            <li key={i} className="flex items-start gap-1.5">
+            <li key={i} className="flex items-start gap-2">
               <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
               {w}
             </li>

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CircleAlert, CircleCheck, FlaskConical, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/components/ui/utils";
 import { money, plainErrors } from "@/lib/offers/plain";
 
 // "Try it" (COM-03): example carts from this store's own products, each
@@ -14,7 +15,7 @@ import { money, plainErrors } from "@/lib/offers/plain";
 //   offer: the engine-shaped offer, or null while the rules are incomplete
 //   auto: follow changes (the form was edited); otherwise only "Try it" runs it
 //   onResult(sim): the fresh result, or null (the form's warnings read facts)
-export function SimulatePanel({ offer, enabled, currency, auto = false, onResult }) {
+export function SimulatePanel({ offer, enabled, currency, auto = false, onResult, className }) {
   const key = offer ? JSON.stringify(offer) : "";
   const [sim, setSim] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -56,10 +57,13 @@ export function SimulatePanel({ offer, enabled, currency, auto = false, onResult
   }, [fresh, sim]);
 
   return (
-    <div data-simulator="result" className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium text-foreground">Example from your store</p>
-        <Button type="button" size="sm" variant="outline" data-read-control disabled={!key || busy} onClick={run}>
+    <div data-simulator="result" className={cn("space-y-2", className)}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-foreground">Example from your store</p>
+          <p className="text-xs text-muted-foreground">Real products, checked against your other live offers. Nothing is saved.</p>
+        </div>
+        <Button type="button" size="sm" variant="outline" className="shrink-0 bg-card" data-read-control disabled={!key || busy} onClick={run}>
           <FlaskConical aria-hidden />
           {busy ? "Trying…" : fresh ? "Try it again" : "Try it"}
         </Button>

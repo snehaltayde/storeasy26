@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2, X } from "lucide-react";
+import { CircleAlert, Trash2, TriangleAlert, X } from "lucide-react";
+import { cn } from "@/components/ui/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -177,7 +178,7 @@ export function BundleEditor({ initial = null, initialCheck = null, currency, ro
                 const label = labelOf(r, i);
                 const said = [...(isPickedVariant(r.variantId) ? [] : ["Pick this product again with Change: it was saved by its web name."]), ...(emptyQuantity(r.quantity) ? ["Enter how many of this product, 1 or more."] : []), ...rowWords(reasons, i, currency)];
                 return (
-                  <li key={`${r.variantId}-${i}`} className="rounded-md border border-border p-2" data-bundle-row={i}>
+                  <li key={`${r.variantId}-${i}`} className={cn("rounded-md border p-2", said.length ? "border-warning/50 bg-warning/5" : "border-border")} data-bundle-row={i}>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="min-w-0 flex-1 truncate text-sm text-foreground">{label || (isPickedVariant(r.variantId) ? "A product" : `“${r.variantId}”`)}</span>
                       <RefCombobox label={`Change ${label || `product ${i + 1}`}`} buttonText="Change" disabled={ro || busy} selectedId={r.variantId} load={loadVariants} onPick={(o) => setRows(applyPick(rows, i, { variantId: o.id, label: o.label }))} />
@@ -199,15 +200,16 @@ export function BundleEditor({ initial = null, initialCheck = null, currency, ro
                       )}
                     </div>
                     {said.length > 0 && (
-                      <p className="mt-1 text-xs text-warning-text" data-bundle-row-reason>
-                        {said.join(" · ")}
+                      <p className="mt-1 flex items-start gap-1 px-1 text-xs text-warning-text" data-bundle-row-reason>
+                        <TriangleAlert aria-hidden className="mt-px size-3.5 shrink-0" />
+                        <span>{said.join(" · ")}</span>
                       </p>
                     )}
                   </li>
                 );
               })}
             </ul>
-            {rows.length === 0 && <p className="text-sm text-muted-foreground">No products yet.</p>}
+            {rows.length === 0 && <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-sm text-muted-foreground">{ro ? "No products yet." : "No products yet. Add at least two."}</p>}
             {!ro && <RefCombobox label="Add a product" buttonText="Add a product" disabled={busy} load={loadVariants} onPick={(o) => setRows(applyPick(rows, "new", { variantId: o.id, label: o.label }))} />}
           </CardContent>
         </Card>
@@ -238,8 +240,11 @@ export function BundleEditor({ initial = null, initialCheck = null, currency, ro
 
         {errors && (
           <div role="alert" className="rounded-card border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" data-bundle-errors>
-            <p className="font-medium">The bundle didn&rsquo;t save</p>
-            <ul className="mt-1 space-y-0.5">
+            <p className="flex items-center gap-2 font-medium">
+              <CircleAlert aria-hidden className="size-4 shrink-0" />
+              The bundle didn&rsquo;t save
+            </p>
+            <ul className="mt-1 space-y-0.5 pl-6">
               {errors.map((m, i) => (
                 <li key={i}>{m}</li>
               ))}
@@ -247,7 +252,7 @@ export function BundleEditor({ initial = null, initialCheck = null, currency, ro
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-sm supports-[backdrop-filter]:bg-background/80 sm:mx-0 sm:rounded-card sm:border" data-bundle-actions>
           <Link href="/admin/bundles" data-read-control className={buttonVariants({ variant: "outline" })}>
             {ro ? "Back to bundles" : "Cancel"}
           </Link>
