@@ -26,6 +26,9 @@ export const SUPPORT_PROBES = Object.freeze([
   { name: "themes/[id] (store B's theme)", path: "themes/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.bThemeId } }), status: 404, keys: ["error", "code"], note: "another store's theme is not on this store" },
   // Phase 4 line 1: the apps list and an install's page (support gets no activity)
   { name: "apps", path: "apps", method: "GET", keys: ["ok", "installs", "catalog"] },
+  // Phase 9 line 1: the review queue (support: no email, no order id, no reject reason)
+  { name: "reviews", path: "reviews", method: "GET", keys: ["ok", "reviews", "counts", "products"], inner: { counts: ["pending", "approved", "rejected", "hidden"] } },
+  { name: "reviews ?status=approved", path: "reviews", method: "GET", req: () => ({ query: "status=approved&rating=5" }), keys: ["ok", "reviews", "counts", "products"], inner: { counts: ["pending", "approved", "rejected", "hidden"] } },
   { name: "apps/[id]", path: "apps/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.appId } }), keys: ["ok", "install", "plugin"] },
   { name: "apps/[id] (secret app)", path: "apps/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.secretAppId } }), keys: ["ok", "install", "plugin"] },
   // Phase 4 line 3: an app's webhooks and deliveries (support gets no payloads,
@@ -39,6 +42,11 @@ export const SUPPORT_PROBES = Object.freeze([
   { name: "brand-step", path: "brand-step", method: "GET", keys: ["ok", "brandStep", "palettes", "themes", "current", "themeLayouts", "design", "storeOpen", "canEditDescription", "descriptionMax"], inner: { current: ["themeId", "paletteId", "logo", "description"] }, note: "themes, current.themeId, themeLayouts: Phase 7 line 1, the onboarding theme picker" },
   // Phase 4 line 2: an app's placements (ctx.installId: Trust badges, which test-support-reads installs)
   { name: "apps/[id]/blocks", path: "apps/[id]/blocks", method: "GET", req: (ctx) => ({ params: { id: ctx.installId } }), keys: ["ok", "installStatus", "blocks", "previewPaths"] },
+  // Phase 9 line 4: the Shiprocket webhook key's state (never the key or its hash)
+  { name: "apps/[id]/parcel-key", path: "apps/[id]/parcel-key", method: "GET", req: (ctx) => ({ params: { id: ctx.installId } }), keys: ["ok", "set", "rotatedAt", "address", "addressWarning"] },
+  // Phase 9 line 3: the WhatsApp card (its access token and app secret are canaries; support sees phones masked)
+  { name: "apps/[id]/whatsapp", path: "apps/[id]/whatsapp", method: "GET", req: (ctx) => ({ params: { id: ctx.whatsappAppId } }), keys: ["ok", "connection", "templates", "vars", "caps", "log"] },
+  { name: "apps/[id]/whatsapp (another app)", path: "apps/[id]/whatsapp", method: "GET", req: (ctx) => ({ params: { id: ctx.appId } }), status: 404, keys: ["error", "code"], note: "only the WhatsApp install has this card" },
   { name: "bundles", path: "bundles", method: "GET", keys: ["ok", "bundles", "currency"] },
   { name: "catalog", path: "catalog", method: "GET", keys: ["ok", "products", "overrides", "collections", "shopify_admin"] },
   // P2-D: Phase 2's catalog views (lines 5 and 6)
@@ -62,6 +70,8 @@ export const SUPPORT_PROBES = Object.freeze([
   { name: "sync", path: "sync", method: "GET", keys: ["ok", "sync"] },
   { name: "theme", path: "theme", method: "GET", keys: ["ok", "kits", "theme", "upgradeAvailable", "design"] },
   { name: "insights", path: "insights", method: "GET", keys: ["ok", "configured", "model", "budget", "insights"] },
+  // Phase 9 line 5: the copilot page's data (support gets no run buttons: can is all false)
+  { name: "copilot", path: "copilot", method: "GET", keys: ["ok", "state", "can", "products", "history"], inner: { state: ["provider", "model", "configured", "reason", "installed", "enabled", "installId", "killed", "ledgerReady", "usage"], can: ["starter", "product_seo", "offer_ideas"] } },
   { name: "media ?archived=include", path: "media", method: "GET", req: () => ({ query: "archived=include" }), keys: ["ok", "media", "limits"] },
   { name: "media ?view=library", path: "media", method: "GET", req: () => ({ query: "view=library" }), keys: ["ok", "items", "nextCursor", "counts"] },
   { name: "media PUT usage", path: "media", method: "PUT", req: (ctx) => ({ body: { id: ctx.mediaId } }), keys: ["ok", "usage"] },

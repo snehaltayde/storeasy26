@@ -14,11 +14,15 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const STAGE_FILES = [
   "stage-baseline.mjs",
   // p9: reviews
+  "stage-reviews.mjs",
   // p9: subscriptions
   "stage-subscriptions.mjs",
   // p9: whatsapp
+  "stage-whatsapp.mjs",
   // p9: shiprocket
+  "stage-shiprocket.mjs",
   // p9: ai-copilot
+  "stage-copilot.mjs",
 ];
 for (const file of STAGE_FILES) {
   const path = join(HERE, file);

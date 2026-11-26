@@ -1,0 +1,5 @@
+{ "status": 200, "data": { "available_courier_companies": [
+  { "courier_company_id": 10, "courier_name": "Delhivery Surface", "estimated_delivery_days": "4", "etd": "Dec 01, 2026", "cod": 1, "rate": 72 },
+  { "courier_company_id": 33, "courier_name": "Xpressbees Surface", "estimated_delivery_days": "3", "etd": "Nov 30, 2026", "cod": 0, "rate": 80 },
+  { "courier_company_id": 54, "courier_name": "Ekart", "estimated_delivery_days": "6", "etd": "Dec 03, 2026", "cod": 1, "rate": 65 }
+] } }

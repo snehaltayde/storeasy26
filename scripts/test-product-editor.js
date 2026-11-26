@@ -723,6 +723,7 @@ await t("unit: a shopper render of an edited product (card and product page) con
       "@/lib/sanitize": await import("../lib/sanitize.js"),
     }),
     "@/lib/repo": repo,
+    "@/lib/reviews/jsonld": await import("../lib/reviews/jsonld.js"), // Phase 9 line 1: the review rating (none: no Reviews install)
     "@/lib/content/resolve": {
       resolvedPdpPairs: (pid, o) => getPdpPairs(pid, o),
       resolvedPdpExtras: async () => [],

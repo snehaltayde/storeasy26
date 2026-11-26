@@ -1,0 +1,11 @@
+{
+  "note": "drill:plugins stage copilot: the stub's answer for product SEO and FAQs, for the first two products chosen (p1, p2)",
+  "tokensIn": 1500,
+  "tokensOut": 900,
+  "output": {
+    "products": [
+      { "ref": "p1", "seo_title": "Copilot drill title one", "seo_description": "A plain search description written for the first product.", "faqs": [{ "q": "Copilot drill question one?", "a": "An answer taken from the product's own description." }] },
+      { "ref": "p2", "seo_title": "Copilot drill title two", "seo_description": "A plain search description written for the second product.", "faqs": [{ "q": "Copilot drill question two?", "a": "Another answer from the description." }] }
+    ]
+  }
+}

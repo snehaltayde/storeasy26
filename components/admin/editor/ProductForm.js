@@ -33,7 +33,7 @@
 //   - a notice per EDITED field Shopify changed since: "Keep mine" or "Use
 //     Shopify's" ("Shopify's images changed" for the images)
 //   - price, variants and stock read-only, with "Change in Shopify"
-//   - badge, layout, keep variant images, "Goes well with" (PairsControl)
+//   - badge, layout, keep variant images, search title and description (Phase 9 line 5), "Goes well with" (PairsControl)
 //   - the modules: rich text, text and FAQ can be added (offeredKinds); an
 //     older image-with-text module stays editable
 //   - a product that left Shopify: "No longer in Shopify", the values Shopify
@@ -71,6 +71,8 @@ export const PRODUCT_CONTROLS = Object.freeze({
   template: "layout",
   pairs: "pairs",
   keep_variant_images: "toggle",
+  seo_title: "text", // Phase 9 line 5: the search title and description
+  seo_description: "text",
   sections: "modules",
 });
 
@@ -299,7 +301,7 @@ export default function ProductForm({ body, entity = null, access = null, readOn
   // every element this form renders for the document's own settings, so each
   // issue is shown under its own field (AU-02)
   const known = new Set();
-  for (const k of ["title", "description_html", "display_vendor", "display_type", "badge", "template", "keep_variant_images"]) {
+  for (const k of ["title", "description_html", "display_vendor", "display_type", "badge", "template", "keep_variant_images", "seo_title", "seo_description"]) {
     known.add(idOf(null, k));
     known.add(idOf(null, `${k}.value`));
   }
@@ -457,6 +459,8 @@ export default function ProductForm({ body, entity = null, access = null, readOn
         <TextControl field={decl("badge")} value={settings.badge ?? ""} onChange={(v) => set("badge", v === "" ? null : v)} issues={placed} owner={null} readOnly={Boolean(readOnly)} />
         <LayoutSelect id={idOf(null, "template")} ownerKey="product_layout" setting={decl("template")?.setting} value={settings.template ?? null} onChange={(v) => set("template", v)} readOnly={Boolean(readOnly)} notes={notesFor("template")} />
         <ToggleControl field={decl("keep_variant_images")} value={settings.keep_variant_images === true} onChange={(v) => set("keep_variant_images", v)} issues={placed} owner={null} readOnly={Boolean(readOnly)} />
+        <TextControl field={decl("seo_title")} value={settings.seo_title ?? ""} onChange={(v) => set("seo_title", v === "" ? null : v)} issues={placed} owner={null} readOnly={Boolean(readOnly)} />
+        <TextControl field={decl("seo_description")} value={settings.seo_description ?? ""} onChange={(v) => set("seo_description", v === "" ? null : v)} issues={placed} owner={null} readOnly={Boolean(readOnly)} />
         <PairsControl
           field={decl("pairs")}
           value={settings.pairs ?? null}

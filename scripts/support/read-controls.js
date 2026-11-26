@@ -16,6 +16,8 @@ export function routeMatches(pattern, path) {
 // fails until its row says why and the count is raised). Phase 2 lines
 // append rows; when appends conflict, keep both sides.
 export const READ_CONTROLS = [
+  // Phase 9 line 1: the review queue
+  { path: "components/admin/reviews/ReviewQueue.js", reason: "the state tabs and rating chips are links to /admin/reviews with a query, and the Product select (in a GET form) pushes the same address with ?product; no write", marks: 3 },
   // Phase 4 line 4: API access
   { path: "components/admin/apps/ApiAccessCard.js", reason: "Try again re-asks GET /api/admin/apps/[id]/tokens after a failed read", marks: 1 },
   { path: "components/admin/apps/CallLog.js", reason: "Refresh re-asks GET /api/admin/apps/[id]/calls", marks: 1 },
@@ -78,6 +80,9 @@ export const READ_CONTROLS = [
   // Phase 2 line 9: analytics and insights
   { path: "components/admin/analytics/AnalyticsTables.js", reason: "the 7/30/90-day links only change ?days= on the analytics page, and Try again reloads it (GETs)", marks: 2 },
   { path: "components/admin/analytics/CsvButton.js", reason: "CSV builds a file in the browser from the aggregated rows on screen; nothing is sent", marks: 1 },
+  // Phase 9 line 5: the copilot (support gets no run button, no picker and no Install)
+  { path: "components/admin/copilot/CopilotTasks.js", reason: "Try again re-reads GET /api/admin/copilot; \"See it in Apps\" and each draft link open another console page", marks: 3 },
+  { path: "components/admin/copilot/RunHistory.js", reason: "each run's draft links open the editor or the offer page", marks: 1 },
   { path: "components/admin/insights/InsightsList.js", reason: "Try again re-reads GET /api/admin/insights; \"Show the numbers\" opens a <details>; \"Open in editor\" is a link to the editor", marks: 3 },
   { path: "components/admin/experiments/ExperimentsList.js", reason: "the status tabs (and their list, which Radix makes focusable) filter the loaded experiments; Try again re-renders the page (router.refresh(), a GET)", marks: 3 },
   { path: "components/admin/experiments/AnalysisPanel.js", reason: "\"Open in editor\" after keeping a variant is a link to the editor", marks: 1 },

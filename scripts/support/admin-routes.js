@@ -62,6 +62,15 @@ export const ADMIN_ROUTES = Object.freeze([
   // Phase 4 line 2: where an app's blocks show (a missing install: the gate, then 404)
   { path: "apps/[id]/blocks", method: "GET", action: "apps.read", probe: { params: { id: "pin_0000000000000000" } } },
   { path: "apps/[id]/blocks", method: "POST", action: "apps.manage", probe: { params: { id: "pin_0000000000000000" }, body: { block: "badges", state: "live" } } },
+  // Phase 9 line 4: Shiprocket's webhook key (a missing install: the gate, then 404)
+  { path: "apps/[id]/parcel-key", method: "GET", action: "apps.read", probe: { params: { id: "pin_0000000000000000" } } },
+  { path: "apps/[id]/parcel-key", method: "POST", action: "apps.manage", probe: { params: { id: "pin_0000000000000000" }, body: { rotate: true } } },
+  // Phase 9 line 3: the WhatsApp card (a missing install: the gate, then 404)
+  { path: "apps/[id]/whatsapp", method: "GET", action: "apps.read", probe: { params: { id: "pin_0000000000000000" } } },
+  ...[
+    ["template", { kind: "order_confirmed", body: "x {link} {stop}" }],
+    ["approve", "order_confirmed"],
+  ].map(([v, arg]) => ({ path: "apps/[id]/whatsapp", method: "POST", variant: v, action: "apps.manage", probe: { params: { id: "pin_0000000000000000" }, body: { [v]: arg } } })),
   { path: "audit", method: "GET", action: "audit.read" },
   { path: "automations", method: "GET", action: "settings.read" },
   { path: "automations", method: "POST", action: "settings.write", probe: { body: {} } },
@@ -98,6 +107,12 @@ export const ADMIN_ROUTES = Object.freeze([
   { path: "help", method: "GET", action: "settings.read" },
   { path: "insights", method: "GET", action: "storefront.read" },
   { path: "insights", method: "POST", action: "storefront.write", probe: { body: {} } },
+  // Phase 9 line 5: the AI copilot (each task's run needs its own action; the
+  // probe store has no copilot installed, so an allowed run is refused 409)
+  { path: "copilot", method: "GET", action: "storefront.read" },
+  { path: "copilot", method: "POST", variant: "starter", action: "storefront.write", probe: { body: { task: "starter" } } },
+  { path: "copilot", method: "POST", variant: "product_seo", action: "storefront.write", probe: { body: { task: "product_seo", productIds: [] } } },
+  { path: "copilot", method: "POST", variant: "offer_ideas", action: "offers.write", probe: { body: { task: "offer_ideas" } } },
   { path: "integrations", method: "GET", action: "settings.read" },
   { path: "integrations", method: "POST", variant: "revoke", action: "settings.write", probe: { body: { action: "revoke", provider: "" } } },
   { path: "integrations", method: "POST", variant: "test", action: "settings.read", crossOrigin: "read", probe: { body: { action: "test", provider: "" } } },
@@ -148,6 +163,9 @@ export const ADMIN_ROUTES = Object.freeze([
     probe: { body: { action: v } },
   })),
   { path: "returns", method: "GET", action: "orders.read" },
+  // Phase 9 line 1: the review queue (support reads redacted; staff and up moderate)
+  { path: "reviews", method: "GET", action: "reviews.read" },
+  { path: "reviews", method: "POST", action: "reviews.moderate", probe: { body: { action: "approve", ids: ["rev_missing"] } } },
   { path: "returns", method: "POST", action: "returns.decide", probe: { body: { id: "ret_missing", action: "approve" } } },
   { path: "settings", method: "GET", action: "settings.read" },
   { path: "settings", method: "PUT", action: "settings.write", probe: { body: { bogus_setting: true } } },

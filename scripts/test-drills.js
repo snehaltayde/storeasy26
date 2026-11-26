@@ -486,6 +486,7 @@ await t("sf-styles: the runner entry and drill:sf-styles exist, outside drill:al
   eq(env.SF_STYLES_BASELINE, "/abs/base", "the baseline passes through:");
   eq(env.SF_STYLES_BITE, "1", "the bite flag passes through:");
   eq(env.STOREASY_TURBOPACK_DEV_CACHE, "off", "drills run without the Turbopack persistent dev cache:");
+  eq(`${env.AI_PROVIDER} ${env.AI_STUB_DIR}`, "stub /w/scripts/fixtures/ai", "the copilot runs on the stub with the drill fixtures (Phase 9 line 5):");
 });
 
 await t("next.config.mjs: the Turbopack persistent dev cache is off only when STOREASY_TURBOPACK_DEV_CACHE=off", async () => {

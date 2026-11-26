@@ -2,6 +2,7 @@
 
 import SavedAddressPicker from "./SavedAddressPicker";
 import PincodeField from "./PincodeField";
+import WhatsAppConsent from "./WhatsAppConsent";
 
 // Phase 8 step 0: checkout step 1, split out of CheckoutFlow. The form lives
 // in CheckoutFlow and changes only through applyAddress (./checkoutModel),
@@ -110,6 +111,7 @@ export default function AddressStep({ form, valid, onAddress, onContinue, countr
         </>
       )}
       {/* messaging-consent */}
+      <WhatsAppConsent phone={form.phone} country={form.country_code || "IN"} />
       <button
         onClick={onContinue}
         disabled={!valid}

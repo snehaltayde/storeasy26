@@ -29,9 +29,11 @@ export const SHOPPER_ROUTES = Object.freeze([
   { path: "media/[id]", methods: ["GET"], class: "public-read", suite: "test-shopper-reads.js" },
   { path: "pincode", methods: ["GET"], class: "public-read", suite: "test-pincode.js", note: "Phase 8 line 1: a PIN's place and this store's public delivery facts; no shopper data" },
   { path: "market", methods: ["GET"], class: "public-read", suite: "test-markets.js", note: "Phase 8 line 4: stores the Ship to country in the _market cookie (this store's base or enabled markets only) and returns to a path on this site; no shopper data" },
+  { path: "parcel-updates", methods: ["POST"], class: "webhook", suite: "test-shiprocket.js", note: "Phase 9 line 4: Shiprocket tracking hints; the x-api-key header against this store's own key hash (401 otherwise); the body only names an AWB, Shiprocket is asked again" },
   { path: "track", methods: ["POST"], class: "collector", suite: null },
   { path: "exp", methods: ["POST"], class: "collector", suite: null },
   { path: "contact", methods: ["POST"], class: "collector", suite: "test-commerce.js" },
+  { path: "reviews", methods: ["POST"], class: "token", suite: "test-reviews.js", note: "Phase 9 line 1: a review from a signed invite link, or the signed opt-out; the store comes from the host" },
   { path: "leads", methods: ["POST"], class: "collector", suite: "test-commerce.js" },
   { path: "signup", methods: ["GET", "POST"], class: "collector", suite: "test-signup.js", note: "marketing host only; GET checks an address, POST starts a signup" },
   { path: "signup/verify", methods: ["POST"], class: "token", suite: "test-signup.js", note: "the se_signup cookie and the emailed code" },
@@ -71,6 +73,11 @@ export const SHOPPER_ROUTES = Object.freeze([
   { path: "jobs/tick", methods: ["GET", "POST"], class: "job", suite: "test-first-sync.js" },
   { path: "health", methods: ["GET"], class: "job", suite: null },
   ...["me", "products", "products/[handle]", "collections", "offers", "orders", "orders/[id]"].map((p) => ({ path: `apps/v1/${p}`, methods: ["GET"], class: "app-token", suite: "test-app-tokens.js" })),
+  // Phase 9 line 3: WhatsApp consent, opt-out and Meta's webhook
+  { path: "messaging/consent", methods: ["GET", "POST"], class: "shopper", suite: "test-whatsapp.js", note: "bound to the cart cookie (and the _customer cookie); never an id in the body" },
+  { path: "account/messaging", methods: ["GET", "POST"], class: "shopper", suite: "test-whatsapp.js", note: "the signed-in shopper's own consents; signed out → 401" },
+  { path: "messaging/stop", methods: ["POST"], class: "token", suite: "test-whatsapp.js", note: "the signed stop token (a consent id, no PII)" },
+  { path: "whatsapp/webhook", methods: ["GET", "POST"], class: "webhook", suite: "test-whatsapp.js", note: "X-Hub-Signature-256 over the raw body with the app secret; GET is Meta's verify challenge" },
   { path: "[...unmatched]", methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], class: "public-read", suite: "test-api-unmatched.js", note: "an /api/* path with no route: 404 JSON, open or closed store" },
 ]);
 
@@ -105,11 +112,15 @@ export const STOREFRONT_PAGES = Object.freeze([
   { page: "policies/[slug]", class: "public", sweep: "public" },
   { page: "pricing", class: "public", sweep: "public" },
   { page: "products/[handle]", class: "public", sweep: "public" },
+  { page: "products/[handle]/reviews", class: "public", sweep: "public", note: "Phase 9 line 1: approved reviews only; a 404 unless the Reviews list block is live" },
+  { page: "reviews/write", class: "public", sweep: "public", note: "Phase 9 line 1: opens only with a signed invite link (?t=); without one, the same refusal" },
+  { page: "reviews/optout", class: "public", sweep: "public", note: "Phase 9 line 1: a signed opt-out link; the button writes it" },
   { page: "quiz/[slug]", class: "public", sweep: "public" },
   { page: "search", class: "public", sweep: "public" },
   { page: "templates", class: "public", sweep: "public" },
   { page: "trust", class: "public", sweep: "public" },
   { page: "verticals/[vertical]", class: "public", sweep: "public" },
+  { page: "m/stop", class: "public", sweep: "public", note: "Phase 9 line 3: the WhatsApp opt-out; the signed token only, shows nothing about the person" },
 ]);
 
 // Every other entry file under app/ outside (console)/ and api/admin/: routes
@@ -120,4 +131,5 @@ export const APP_ENTRIES = Object.freeze([
   { file: "manifest.webmanifest/route.js", methods: ["GET"], class: "public", note: "the PWA manifest: name, tagline, brand colours" },
   { file: "sitemap.js", methods: [], class: "public", note: "published pages and products only; empty for a closed store" },
   { file: "robots.js", methods: [], class: "public" },
+  { file: "(storefront)/cart/r/[token]/route.js", methods: ["GET"], class: "public", note: "Phase 9 line 3: a WhatsApp cart reminder link; the signed token (a consent id) restores that cart into the cart cookie" },
 ]);

@@ -285,6 +285,9 @@ async function renderOrderPage(orderId, { role = "owner", src = linesSrc } = {})
     "@/components/admin/orders/OrderLines": lines,
     "@/components/admin/orders/OrderTimeline": { OrderTimeline: () => null },
     "@/components/admin/orders/LatePaymentBanner": { LatePaymentBanner: () => null }, // Phase 9 line 2
+    // Phase 9 line 4: the shipment card (none of these orders has a parcel); its read is real
+    "@/components/admin/orders/ShipmentCard": { ShipmentCard: () => null },
+    "@/lib/shipments": await import("../lib/shipments.js"),
     "@/components/admin/settings/NoAccess": { NoAccess: () => null },
   });
   return renderToStaticMarkup(await page.default({ params: Promise.resolve({ id: orderId }) }));

@@ -94,6 +94,7 @@ const SKIP_DIRS = new Set([
   "lib/platform",
   "lib/onboarding", // the console's onboarding steps (Phase 1 line 3): founder words, never a shopper's
   "lib/ai",
+  "lib/copy", // the banned-copy rules themselves (Phase 9 line 5 moved them from scripts/support), not copy
   ...MARKETING_ROUTES.map((r) => `app/(storefront)/${r}`),
   // Console and machine-to-machine APIs
   ...["admin", "platform", "connect", "jobs", "shopify", "razorpay", "preview", "health", "leads"].map((d) => `app/api/${d}`),
@@ -844,6 +845,9 @@ flowStubs["./PincodeField"] = {
 // fetches, which this stand-in can't run; it renders nothing here (its copy is
 // still in the source scan, and scripts/test-addresses.js scans it too).
 flowStubs["./SavedAddressPicker"] = nothing;
+// Phase 9 line 3: the WhatsApp opt-ins save on each tick (a fetch), so the same:
+// a stand-in here; their words are in the source scan and test:whatsapp scans them.
+flowStubs["./WhatsAppConsent"] = nothing;
 for (const part of ["checkoutModel", "AddressStep", "PrepaidNudge", "PaymentStep", "OrderSummary", "CodOtpDialog", "useQuote", "placeOrder"]) {
   flowStubs[`./${part}`] = await loadComponent(sources.get(`components/checkout/${part}.js`), flowStubs);
 }
@@ -1345,6 +1349,7 @@ async function accountBadges(src = accountSrc) {
     "@/components/account/ProfileForm": nothing,
     "@/components/account/AddressBook": nothing,
     "@/components/account/SubscriptionList": nothing, // Phase 9 line 2: a client list from its own API
+    "@/components/account/MessagingPrefs": nothing, // Phase 9 line 3: fetches its own state
     "@/lib/addresses": { listAddresses: async () => [] },
     "@/lib/tenant-request": { tfetch: inOwn },
     "@/lib/storefront-request": { tfetch: inOwn },

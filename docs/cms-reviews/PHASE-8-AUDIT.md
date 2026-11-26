@@ -66,3 +66,7 @@ Date: 2026-11-26. Audited on `main` at `370f65ba` (Phase 8 step 0 and lines 1–
 - **Origin checks on shopper POST routes** (`/api/account`, `/api/checkout`) when sibling store subdomains under `SIGNUP_STORE_DOMAIN` are same-site and a store's own HTML could carry a form. Older than Phase 8; logged in `docs/FEATURES.md` Later as a pre-go-live check.
 - The real SMS provider, the real pincode dataset, Razorpay international payments, the Shopify draft for a USD order (in `MANUAL-CHECKS.md`).
 - Browser markup (covered by the Phase 8 `drill:all`).
+
+## Phase 8 browser suite
+
+`drill:all` at `fbff22cc` (2026-11-26, 3,579 s) passed every drill, now including `search`, `mobile-cart` and `checkout` (baseline, COD, addresses, pincode, markets stages), after a clean `pnpm typecheck`; `pnpm test`, migrations and build passed on the same Phase 8 state.

@@ -5,17 +5,25 @@ import BadgeRow from "./BadgeRow";
 import Notice from "./Notice";
 // Phase 9 lines import their block components at their own anchor (one per line).
 // p9: reviews
+import RatingSummary from "./RatingSummary";
+import ReviewList from "./ReviewList";
+import LinkList from "./LinkList";
 // p9: subscriptions
 // p9: whatsapp
 // p9: shiprocket
+import TrackingTimeline from "./TrackingTimeline";
 // p9: ai-copilot
 
 export const BLOCK_COMPONENTS = Object.freeze({
   badge_row: BadgeRow,
   notice: Notice,
   // p9: reviews
+  rating_summary: RatingSummary,
+  review_list: ReviewList,
+  link_list: LinkList,
   // p9: subscriptions
   // p9: whatsapp
   // p9: shiprocket
+  tracking_timeline: TrackingTimeline,
   // p9: ai-copilot
 });

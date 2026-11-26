@@ -241,6 +241,9 @@ await t("registry: product_content and collection_content are publishable, with 
     ["template", "choice", null],
     ["pairs", "pairs", null],
     ["keep_variant_images", "boolean", null],
+    // Phase 9 line 5 (decision 13): the search title and description
+    ["seo_title", "text", null],
+    ["seo_description", "text", null],
   ]);
   eq(pc.settings.find((s) => s.key === "badge").max, 30, "badge cap:");
   eq(pc.settings.find((s) => s.key === "template").options, ["classic", "editorial"], "template:");

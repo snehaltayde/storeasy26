@@ -100,14 +100,15 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 
 ## Phase 9: first-party plugins (roadmap Phase 6)
 
-- [ ] A shopper who bought a product can leave a review through an invite link, an admin moderates it, and the product page shows stars and review structured data
+- [x] A shopper who bought a product can leave a review through an invite link, an admin moderates it, and the product page shows stars and review structured data
 - [ ] A shopper can subscribe to a product and pause, skip, swap or cancel from their account
-- [ ] A shopper who agreed to marketing messages gets WhatsApp order updates and an abandoned-cart reminder; nobody else does
-- [ ] A shopper sees a delivery estimate and live tracking from Shiprocket on the order page
-- [ ] A founder can ask the AI copilot for a starter store, product SEO and FAQs, or offer ideas, and gets drafts only, within a daily token budget and with no shopper data sent
+- [x] A shopper who agreed to marketing messages gets WhatsApp order updates and an abandoned-cart reminder; nobody else does
+- [x] A shopper sees a delivery estimate and live tracking from Shiprocket on the order page
+- [x] A founder can ask the AI copilot for a starter store, product SEO and FAQs, or offer ideas, and gets drafts only, within a daily token budget and with no shopper data sent
 
 ## Later (not planned yet)
 
+- The order page's own token (`?token=`) is reported by the storefront's Google and Meta scripts like the review link was; strip it and gate pixels there too (Phase 9 line 1 review)
 - Before go-live: check origin on shopper POST routes (`/api/account`, `/api/checkout`) when sibling store subdomains under `SIGNUP_STORE_DOMAIN` are same-site and a store's own HTML could carry a form (Phase 8 audit, not checked)
 - Spend-percent tier offers ("Add ₹300 more for 10% off") as a new offer type; and a free-shipping nudge on the net basis for stores with product discounts, which today is left out because no single amount is honest (Phase 7 line 3)
 - Search filters: store values with tabs, backslashes, odd spaces or over 80 characters show in the filter rail but match nothing (links clean values, the index doesn't); clean both sides the same way (Phase 7 line 2 review)

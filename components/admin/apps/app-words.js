@@ -38,6 +38,11 @@ export const ACTION_WORDS = Object.freeze({
   "apps.scopes": "Changed what the app can see",
   "apps.token_create": "Created an API token",
   "apps.token_revoke": "Revoked an API token",
+  // Phase 9 line 4: Shiprocket
+  "apps.shiprocket_token_rotate": "Made a new Shiprocket webhook key",
+  // Phase 9 line 3: WhatsApp templates
+  "apps.whatsapp_template_save": "Changed a WhatsApp template",
+  "apps.whatsapp_template_approve": "Approved a WhatsApp template",
 });
 
 // One POST to an apps route → { ok, ...body } | { ok: false, error, errors? }

@@ -16,6 +16,8 @@ export const ADMIN_PAGES = Object.freeze([
   { page: "analytics", action: "orders.read" },
   // Phase 4 line 1
   { page: "apps", action: "apps.read" },
+  // Phase 9 line 1
+  { page: "reviews", action: "reviews.read" },
   // Phase 5 line 1
   { page: "themes", action: "storefront.read" },
   { page: "themes/[id]", action: "storefront.read", params: { id: "$theme" }, note: "the fixture's Aurora package; an unknown id is a not-found (Phase 5 line 1)" },
@@ -31,6 +33,7 @@ export const ADMIN_PAGES = Object.freeze([
   { page: "experiments", action: "storefront.read" },
   { page: "experiments/[slug]", action: "storefront.read", params: { slug: "$experiment" }, note: "the fixture experiment; an unknown slug is a not-found (Phase 2 line 9)" },
   { page: "insights", action: "storefront.read" },
+  { page: "copilot", action: "storefront.read", note: "the AI copilot (Phase 9 line 5); run buttons follow storefront.write and offers.write, support gets none" },
   { page: "integrations", action: "settings.read" },
   { page: "media", action: "storefront.read" },
   { page: "offers", action: "offers.read" },
