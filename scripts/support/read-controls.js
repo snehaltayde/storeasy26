@@ -17,7 +17,7 @@ export function routeMatches(pattern, path) {
 // append rows; when appends conflict, keep both sides.
 export const READ_CONTROLS = [
   // Phase 9 line 1: the review queue
-  { path: "components/admin/reviews/ReviewQueue.js", reason: "the state tabs and rating chips are links to /admin/reviews with a query, and the Product select pushes the same address with ?product; no write", marks: 3 },
+  { path: "components/admin/reviews/ReviewQueue.js", reason: "the state tabs and rating chips are links to /admin/reviews with a query, and the Product select (in a GET form) pushes the same address with ?product; no write", marks: 3 },
   // Phase 4 line 4: API access
   { path: "components/admin/apps/ApiAccessCard.js", reason: "Try again re-asks GET /api/admin/apps/[id]/tokens after a failed read", marks: 1 },
   { path: "components/admin/apps/CallLog.js", reason: "Refresh re-asks GET /api/admin/apps/[id]/calls", marks: 1 },

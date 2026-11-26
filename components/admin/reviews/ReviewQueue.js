@@ -16,7 +16,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/kit/empty-state";
 import { RoleGate } from "@/components/kit/role-gate";
@@ -42,7 +41,6 @@ const EMPTY = {
   hidden: "No hidden reviews.",
 };
 const BULK_MAX = 50;
-const ALL = "all";
 
 export function reviewsHref({ status = "pending", rating = null, product = null }) {
   const q = new URLSearchParams();
@@ -111,24 +109,30 @@ export function ReviewQueue({ reviews, counts, products, filters, role, timeZone
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <nav aria-label="Rating" className="flex flex-wrap gap-2">
           {[null, 5, 4, 3, 2, 1].map((n) => (
-            <Link key={n ?? ALL} href={reviewsHref({ status, rating: n, product })} data-read-control aria-current={(rating ?? null) === n ? "page" : undefined} className={chipClass((rating ?? null) === n)}>
+            <Link key={n ?? "any"} href={reviewsHref({ status, rating: n, product })} data-read-control aria-current={(rating ?? null) === n ? "page" : undefined} className={chipClass((rating ?? null) === n)}>
               {n ? `${n} ${n === 1 ? "star" : "stars"}` : "Any rating"}
             </Link>
           ))}
         </nav>
-        <Select value={product || ALL} onValueChange={(v) => router.push(reviewsHref({ status, rating, product: v === ALL ? null : v }))}>
-          <SelectTrigger className="w-full sm:w-64" aria-label="Product" data-read-control>
-            <SelectValue placeholder="Every product" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Every product</SelectItem>
+        <form method="get" action="/admin/reviews" className="w-full sm:w-64">
+          {status !== "pending" ? <input type="hidden" name="status" value={status} /> : null}
+          {rating ? <input type="hidden" name="rating" value={rating} /> : null}
+          <select
+            name="product"
+            aria-label="Product"
+            defaultValue={product || ""}
+            onChange={(e) => router.push(reviewsHref({ status, rating, product: e.target.value || null }))}
+            className="h-11 w-full rounded-md border border-input bg-background px-3 text-base md:h-8 md:text-sm"
+            data-read-control
+          >
+            <option value="">Every product</option>
             {products.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
+              <option key={p.id} value={p.id}>
                 {p.title}
-              </SelectItem>
+              </option>
             ))}
-          </SelectContent>
-        </Select>
+          </select>
+        </form>
       </div>
 
       {bulkable && selected.size > 0 ? (
