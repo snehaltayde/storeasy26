@@ -107,6 +107,18 @@ await t("normalize: tracking keeps time, hub and activity only; names and phone 
   eq(N.parseTrack({}), null, "unreadable:");
 });
 
+await t("normalize: a label outside Shiprocket's vocabulary is never kept (parcel or scan): the status's plain words instead", () => {
+  const raw = withAwb("track-delivered", "AWBX1010");
+  raw.tracking_data.shipment_track[0].current_status = "DELIVERED TO RAMESH 9876543210";
+  raw.tracking_data.shipment_track_activities[0]["sr-status-label"] = "DELIVERED TO RAMESH 9876543210";
+  const p = N.parseTrack(raw);
+  eq(p.status, "delivered", "status still read:");
+  eq(p.statusLabel, "Delivered", "parcel label:");
+  eq(p.scans.at(-1).activity, "Delivered", "scan label:");
+  ok(!PII.test(JSON.stringify(p)) && !/RAMESH/i.test(JSON.stringify(p)), `no name or phone: ${JSON.stringify(p)}`);
+  eq(N.parseTrack(withAwb("track-in-transit", "AWBX1011")).statusLabel, "IN TRANSIT", "a known label is kept:");
+});
+
 await t("normalize: the RTO fixture is returning, with its return AWB", () => {
   const p = N.parseTrack(withAwb("track-rto", "AWBX1003"));
   eq(p.status, "returning", "status:");
@@ -534,6 +546,19 @@ await t("sweep: an AWB Shiprocket doesn't know gets a hidden placeholder and mov
   } finally {
     SR.setCourierProvider(stub);
   }
+});
+
+await t("sweep: an unmatched placeholder stops being polled after 7 days; a fulfilment older than 30 days is never first-polled", async () => {
+  const T = Date.parse("2026-12-10T00:00:00.000Z");
+  await makeOrder(inA, { awb: "AWBMISS002" });
+  const old = await makeOrder(inA);
+  await inA(async () => {
+    await db.insertInto("order_fulfillments").values({ id: `ful_${old}`, order_id: old, status: "SUCCESS", tracking_company: "Delhivery", tracking_number: "AWBOLD0001", tracking_url: null, updated_at: new Date(T - 31 * 86_400_000).toISOString() }).execute();
+    ok(!(await TR.dueShipments({ now: T, limit: 500 })).some((d) => d.awb === "AWBOLD0001"), "a 31-day-old fulfilment is not first-polled");
+    await TR.markFetched("AWBMISS002", { orderId: (await TR.orderIdForAwb("AWBMISS002")), now: T });
+    ok((await TR.dueShipments({ now: T + 5 * 3_600_000, limit: 500 })).some((d) => d.awb === "AWBMISS002"), "re-polled inside its first 7 days");
+    ok(!(await TR.dueShipments({ now: T + 7 * 86_400_000 + 3_600_000, limit: 500 })).some((d) => d.awb === "AWBMISS002"), "not after 7 days");
+  });
 });
 
 await t("caches: saving settings forgets the API token; a new pickup PIN forgets the PIN answers; uninstall forgets both", async () => {
