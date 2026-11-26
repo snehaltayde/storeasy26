@@ -1,0 +1,11 @@
+{
+  "note": "drill:plugins stage copilot: the stub provider's answer for the starter store task (lib/ai/provider.js reads AI_STUB_DIR/<task>.json outside production only)",
+  "tokensIn": 1200,
+  "tokensOut": 600,
+  "output": {
+    "hero": { "title": "Good things, made simply", "subtitle": "A small range we make with care and pack the day you order." },
+    "featured_title": "Start here",
+    "text": { "title": "About us", "paragraphs": ["We keep our range small so every product gets our full attention."] },
+    "faq": { "title": "Questions", "items": [{ "q": "When will my order ship?", "a": "We pack orders within two working days." }] }
+  }
+}

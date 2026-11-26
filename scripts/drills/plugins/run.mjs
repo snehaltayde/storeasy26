@@ -21,6 +21,7 @@ const STAGE_FILES = [
   // p9: shiprocket
   "stage-shiprocket.mjs",
   // p9: ai-copilot
+  "stage-copilot.mjs",
 ];
 for (const file of STAGE_FILES) {
   const path = join(HERE, file);

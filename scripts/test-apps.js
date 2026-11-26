@@ -98,7 +98,7 @@ await t("catalog: checkCatalog() is [] with Trust badges (no scopes, up to 4 bad
     const ids = CAT.catalog().map((m) => m.id);
     eq(ids[0], "trust-badges", "catalog starts with trust-badges:");
     eq(ids.at(-1), "fixture-secrets", "catalog ends with the fixture:");
-    for (const id of ["reviews", "shiprocket", "whatsapp"]) ok(ids.includes(id), `catalog has ${id}`);
+    for (const id of ["reviews", "shiprocket", "whatsapp", "ai-copilot"]) ok(ids.includes(id), `catalog has ${id}`);
   }
 });
 
@@ -181,7 +181,7 @@ await t("empty store: every role reads an empty Installed list and the catalog",
     eq(r.body.installs.length, 0, `${caller} installs:`);
     {
       const ids = r.body.catalog.map((c) => c.id);
-      ok(ids[0] === "trust-badges" && ids.at(-1) === "fixture-secrets" && ["reviews", "shiprocket", "whatsapp"].every((id) => ids.includes(id)), `${caller} catalog: ${ids.join(",")}`);
+      ok(ids[0] === "trust-badges" && ids.at(-1) === "fixture-secrets" && ["reviews", "shiprocket", "whatsapp", "ai-copilot"].every((id) => ids.includes(id)), `${caller} catalog: ${ids.join(",")}`);
     }
     ok(r.body.catalog.every((c) => c.available && c.installId === null), `${caller} available`);
   }
