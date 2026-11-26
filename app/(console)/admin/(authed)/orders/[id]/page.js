@@ -17,6 +17,7 @@ import { OrderHeader } from "@/components/admin/orders/OrderHeader";
 import { OrderActions } from "@/components/admin/orders/OrderActions";
 import { OrderLines } from "@/components/admin/orders/OrderLines";
 import { OrderTimeline } from "@/components/admin/orders/OrderTimeline";
+import { LatePaymentBanner } from "@/components/admin/orders/LatePaymentBanner";
 import { tfetch } from "@/lib/console-request";
 
 export const dynamic = "force-dynamic";
@@ -75,6 +76,9 @@ export default async function AdminOrderDetail({ params }) {
         timeZone={timeZone}
         actions={<OrderActions orderId={order.id} role={role} can={can} paymentCaptured={rawOrder.payment_status === "paid"} />}
       />
+
+      {/* Phase 9 line 2: money captured for a replaced (cancelled) order */}
+      <LatePaymentBanner events={rawOrder.events} />
 
       {order.sync_error && order.status === ORDER_STATUS.SYNC_FAILED && (
         <div role="status" className="mb-4 rounded-card border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">

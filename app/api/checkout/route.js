@@ -35,7 +35,7 @@ import { baseFigures } from "@/lib/checkout/market-order";
 import { customerFromToken, CUSTOMER_COOKIE } from "@/lib/customers";
 import { subscriptionSettings } from "@/lib/subscriptions/pricing";
 import { renewalKey, RENEWAL_KEY_PREFIX, subscriptionById } from "@/lib/subscriptions/store";
-import { renewalProblem, unpaidRenewalAttempt, supersedeRenewalAttempt } from "@/lib/subscriptions/renewal";
+import { renewalProblem, unpaidRenewalAttempt, supersedeRenewalAttempt, PAYMENT_GOING_THROUGH } from "@/lib/subscriptions/renewal";
 import { HELD_CART_COOKIE, restoreHeldCart } from "@/lib/subscriptions/held-cart";
 import { db } from "@/lib/db";
 
@@ -222,6 +222,7 @@ const subscriptionOutsideBase = () =>
     },
     { status: 409 },
   );
+const paymentGoingThrough = () => NextResponse.json({ ok: false, code: "RENEWAL_PAYMENT_PENDING", error: PAYMENT_GOING_THROUGH }, { status: 409 });
 const renewalChanged = (problem) => NextResponse.json({ ok: false, code: "RENEWAL_CHANGED", error: problem }, { status: 409 });
 const STALE_RENEWAL = "This delivery changed: it was skipped, paid for, paused or swapped. Nothing was charged. Open your account to see your next delivery.";
 async function subscriptionGate(request, cart, market) {
@@ -405,6 +406,7 @@ export const POST = tenantHandler(async (request) => {
       if (!idempotencyKey) return NextResponse.json({ error: "idempotencyKey is required" }, { status: 400 });
       if (!cartId) return NextResponse.json({ error: "No cart session" }, { status: 400 });
       const cart = await getCart(cartId, { market });
+      if (cart.renewalStale) return renewalChanged(STALE_RENEWAL); // before "empty": its delivery's line just went
       if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
       if (!validate(contact, address)) return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
       if (!e164(contact.phone, ctx.country)) return phoneInvalid();
@@ -473,6 +475,7 @@ export const POST = tenantHandler(async (request) => {
       if (!validate(contact, address))
         return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
       if (!e164(contact.phone, ctx.country)) return phoneInvalid();
+      if (cart.renewalStale) return renewalChanged(STALE_RENEWAL); // before "empty": its delivery's line just went
       if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
       const gate = await subscriptionGate(request, cart, market);
       if (gate.response) return gate.response;
@@ -492,7 +495,11 @@ export const POST = tenantHandler(async (request) => {
         }
       }
 
-      if (staleAttempt && !(await supersedeRenewalAttempt(staleAttempt, key))) return conflictResponse();
+      if (staleAttempt) {
+        const replaced = await supersedeRenewalAttempt(staleAttempt, key);
+        if (replaced.pending) return paymentGoingThrough();
+        if (!replaced.ok) return conflictResponse();
+      }
       const order = await createOrder({
         cartId,
         cart,
@@ -563,6 +570,7 @@ export const POST = tenantHandler(async (request) => {
       if (!validate(contact, address))
         return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
       if (!e164(contact.phone, ctx.country)) return phoneInvalid();
+      if (cart.renewalStale) return renewalChanged(STALE_RENEWAL); // before "empty": its delivery's line just went
       if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
       const gate = await subscriptionGate(request, cart, market);
       if (gate.response) return gate.response;
@@ -576,7 +584,11 @@ export const POST = tenantHandler(async (request) => {
       // Phase 8 line 4: minted in the market's currency, in its minor units
       // (lib/money.js toMinor: USD cents, JPY whole yen).
       const currency = cart.currency || "INR";
-      if (staleAttempt && !(await supersedeRenewalAttempt(staleAttempt, key))) return conflictResponse();
+      if (staleAttempt) {
+        const replaced = await supersedeRenewalAttempt(staleAttempt, key);
+        if (replaced.pending) return paymentGoingThrough();
+        if (!replaced.ok) return conflictResponse();
+      }
       const rzOrder = await createRazorpayOrder({
         amountPaise: toMinor(terms.prepaid.total, currency),
         receipt: `cart_${cartId.slice(0, 12)}`,

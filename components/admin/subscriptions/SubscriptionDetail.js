@@ -17,7 +17,7 @@ import { dateText, productText } from "./SubscriptionTable";
 // or missed, with its order). Staff and up pause or cancel it for a customer,
 // with a reason that goes into the audit log.
 const NO_MANAGE = "Your role can look at subscriptions but not change them.";
-const CYCLE_WORDS = { due: "Due", ordered: "Ordered", skipped: "Skipped", missed: "Missed" };
+const CYCLE_WORDS = { due: "Due", ordered: "Ordered", skipped: "Skipped", skipped_off: "Skipped (subscriptions were off)", missed: "Missed" };
 
 export function SubscriptionDetail({ id, role, onClose }) {
   const router = useRouter();

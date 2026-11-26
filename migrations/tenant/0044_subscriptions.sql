@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS subscription_cycles (
   subscription_id TEXT NOT NULL,
   cycle INTEGER NOT NULL,
   due_at TEXT NOT NULL,
-  status TEXT NOT NULL,                -- due | ordered | skipped | missed
+  status TEXT NOT NULL,                -- due | ordered | skipped (the shopper) | skipped_off (no reminder: the plugin was off) | missed
   order_id TEXT UNIQUE,
   reminded_at TEXT,
   updated_at TEXT NOT NULL,
@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS subscription_cycles (
 
 -- a cart line is one-time (NULL) or subscribed every N days
 ALTER TABLE cart_items ADD COLUMN subscription_interval INTEGER;
+-- 1 = the line "Pay for this delivery" put in a renewal cart (removed once that delivery no longer stands)
+ALTER TABLE cart_items ADD COLUMN renewal INTEGER;
 -- a renewal cart: built by "Pay for this delivery" for one subscription's cycle
 ALTER TABLE carts ADD COLUMN subscription_id TEXT;
 ALTER TABLE carts ADD COLUMN subscription_cycle INTEGER;

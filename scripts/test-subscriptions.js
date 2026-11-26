@@ -291,7 +291,10 @@ async function adminCall(method, { body, query = "" } = {}) {
 }
 
 const razorpayCalls = [];
+const rzStatus = new Map(); // Razorpay order id → its status at Razorpay (default "created")
 globalThis.fetch = async (url, init) => {
+  const read = /^https:\/\/api\.razorpay\.com\/v1\/orders\/([^/?]+)$/.exec(String(url));
+  if (read && (init?.method ?? "GET") === "GET") return new Response(JSON.stringify({ id: decodeURIComponent(read[1]), status: rzStatus.get(decodeURIComponent(read[1])) ?? "created" }), { status: 200 });
   if (String(url).startsWith("https://api.razorpay.com/")) {
     const sent = JSON.parse(init.body);
     razorpayCalls.push(sent);
@@ -596,7 +599,7 @@ await t("one order per cycle even when two renewal checkouts race", async () => 
   const two = "sub-race-two";
   await inA(async () => {
     await libsql.execute({ sql: "INSERT INTO carts (id, coupon_code, created_at, updated_at, subscription_id, subscription_cycle) VALUES (?, NULL, ?, ?, ?, ?)", args: [two, new Date().toISOString(), new Date().toISOString(), s.id, s.cycle] });
-    await libsql.execute({ sql: "INSERT INTO cart_items (cart_id, variant_id, product_id, quantity, price_at_add, added_at, subscription_interval) VALUES (?, ?, ?, 1, 4999, ?, 30)", args: [two, s.variant_id, s.product_id, new Date().toISOString()] });
+    await libsql.execute({ sql: "INSERT INTO cart_items (cart_id, variant_id, product_id, quantity, price_at_add, added_at, subscription_interval, renewal) VALUES (?, ?, ?, 1, 4999, ?, 30, 1)", args: [two, s.variant_id, s.product_id, new Date().toISOString()] });
   });
   const q = (await postCheckout(one, { action: "quote" }, { who })).body.quote;
   const body = () => ({ action: "cod", idempotencyKey: key(), expectedTotal: q.cod.total, expectedShipping: q.cod.shipping });
@@ -770,19 +773,65 @@ await t("COD renewal: the shopper's own cart comes back with the answer; an aban
   NOW = START;
 });
 
-await t("a renewal cart left open after Skip is priced one-time and refused (409 RENEWAL_CHANGED); no second subscription", async () => {
+await t("a renewal cart left open after Skip: the place is refused (409 RENEWAL_CHANGED), the delivery's line goes and the cart is ordinary again; no second subscription", async () => {
   const { who, s } = await dueSub("2002");
   const cart = (await account("POST", { who, body: { action: "pay", id: s.id } })).cartId;
-  eq((await account("POST", { who, body: { action: "skip", id: s.id } })).status, 200, "skip in another tab");
-  const c = await cartGet(cart);
-  eq([c.renewal ?? null, c.renewalStale, c.items[0].subscription ?? null, c.items[0].discount, c.hasSubscription ?? false], [null, true, null, 0, false], "stale cart");
   const q = (await postCheckout(cart, { action: "quote" }, { who })).body.quote;
-  for (const action of ["cod", "razorpay_create"]) {
-    const r = await postCheckout(cart, { action, idempotencyKey: key(), expectedTotal: action === "cod" ? q.cod.total : q.prepaid.total, expectedShipping: action === "cod" ? q.cod.shipping : q.prepaid.shipping }, { who, drain: true });
-    eq([r.status, r.body.code], [409, "RENEWAL_CHANGED"], action);
-    ok(/skipped, paid for, paused or swapped/.test(r.body.error), r.body.error);
+  eq((await account("POST", { who, body: { action: "skip", id: s.id } })).status, 200, "skip in another tab");
+  const r = await postCheckout(cart, { action: "cod", idempotencyKey: key(), expectedTotal: q.cod.total, expectedShipping: q.cod.shipping }, { who, drain: true });
+  eq([r.status, r.body.code], [409, "RENEWAL_CHANGED"], "place on the stale cart");
+  ok(/skipped, paid for, paused or swapped/.test(r.body.error), r.body.error);
+  const marker = await inA(() => db.selectFrom("carts").select(["subscription_id", "subscription_cycle"]).where("id", "=", cart).executeTakeFirst());
+  eq([marker.subscription_id, marker.subscription_cycle], [null, null], "the marker cleared");
+  const c = await cartGet(cart);
+  eq([c.items.length, c.renewal ?? null, c.renewalStale ?? false], [0, null, false], "an ordinary, empty cart");
+  // Subscribe on the product page into the same cart: a subscription line, and checkout works
+  const add = await cartPost(cart, { action: "add", variantId: vid("2008"), quantity: 1, subscriptionInterval: 30 });
+  eq(add.body.items.map((i) => [num(i.variantId), i.subscription?.active, i.subscription?.renewal ?? false]), [["2008", true, false]], "subscribed as a sign-up");
+  eq(add.body.items[0].discount, Math.round(599 * 0.1), "priced as a subscription");
+  const placed = await placeCod(cart, who);
+  eq(placed.status, 200, `checkout works ${JSON.stringify(placed.body).slice(0, 140)}`);
+  const subs = await subsOf(who);
+  eq(subs.map((x) => num(x.variant_id)).sort(), ["2002", "2008"], "the new sign-up only (the skipped delivery made none)");
+  NOW = START;
+});
+
+await t("never paid twice: an online attempt Razorpay shows as attempted or paid is not replaced (plain words); a capture that still lands on a replaced order is flagged for a refund", async () => {
+  const { who, s } = await dueSub("2005");
+  const cart = (await account("POST", { who, body: { action: "pay", id: s.id } })).cartId;
+  const q = (await postCheckout(cart, { action: "quote" }, { who })).body.quote;
+  const rz = await postCheckout(cart, { action: "razorpay_create", idempotencyKey: key(), expectedTotal: q.prepaid.total, expectedShipping: q.prepaid.shipping }, { who });
+  for (const status of ["attempted", "paid"]) {
+    rzStatus.set(rz.body.razorpayOrderId, status);
+    const cod = await postCheckout(cart, { action: "cod", idempotencyKey: key(), expectedTotal: q.cod.total, expectedShipping: q.cod.shipping }, { who });
+    eq([cod.status, cod.body.code, cod.body.error], [409, "RENEWAL_PAYMENT_PENDING", "Your online payment for this delivery is still going through. Check back in a few minutes."], status);
+    eq((await orderRow(rz.body.orderId)).status, "pending_payment", `${status}: the online attempt stands`);
   }
-  eq((await subsOf(who)).length, 1, "a second subscription");
+  // Razorpay still shows it created: COD replaces it; then a capture lands on the cancelled order anyway
+  rzStatus.set(rz.body.razorpayOrderId, "created");
+  const cod = await postCheckout(cart, { action: "cod", idempotencyKey: key(), expectedTotal: q.cod.total, expectedShipping: q.cod.shipping }, { who, drain: true });
+  eq(cod.status, 200, "COD replaces it");
+  const { markOrderPaid } = await import("../lib/orders.js");
+  let threw = false;
+  try {
+    await inA(() => markOrderPaid(rz.body.orderId, { razorpayPaymentId: "pay_late1", source: "webhook" }));
+  } catch {
+    threw = true;
+  }
+  ok(threw, "a cancelled order is never marked paid");
+  await inA(() => markOrderPaid(rz.body.orderId, { razorpayPaymentId: "pay_late1", source: "webhook" })).catch(() => {}); // a redelivery
+  const events = (await inA(() => db.selectFrom("order_events").select(["meta"]).where("order_id", "=", rz.body.orderId).execute())).map((e) => JSON.parse(e.meta || "{}")).filter((m) => m.reason === "payment_on_replaced_order");
+  eq(events.map((m) => m.late_payment), ["pay_late1"], "one flag, once");
+  const mails = (await notes("payment_on_replaced_order")).filter((n) => n.subject.includes(rz.body.orderId));
+  eq(mails.length, 1, "one email to the founder");
+  ok(mails[0].body.startsWith("A payment arrived for a replaced order; refund it.") && mails[0].body.includes("pay_late1"), mails[0].body);
+  const { LatePaymentBanner } = await import("../components/admin/orders/LatePaymentBanner.js").catch(() => ({}));
+  if (LatePaymentBanner) {
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { createElement } = await import("react");
+    const html = renderToStaticMarkup(createElement(LatePaymentBanner, { events: [{ meta: events[0] }] }));
+    ok(html.includes("refund it") && html.includes("pay_late1") && html.includes("Refund"), html);
+  }
   NOW = START;
 });
 
@@ -808,6 +857,8 @@ await t("the plugin off longer than the grace, then on: the unreminded delivery 
   const after = await subRow(s.id);
   eq([after.status, after.missed_in_row, after.cycle], ["active", 0, s.cycle + 1], `no miss ${JSON.stringify(a)}`);
   ok(a.skipped >= 1, "skipped forward");
+  const cyc = await inA(() => db.selectFrom("subscription_cycles").select(["status"]).where("subscription_id", "=", s.id).where("cycle", "=", s.cycle).executeTakeFirst());
+  eq(cyc.status, "skipped_off", "its own status, not the shopper's skip");
   ok((await notes("subscription_reminder")).some((n) => n.recipient === who.email), "reminded for the next one");
 });
 
