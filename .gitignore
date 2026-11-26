@@ -62,3 +62,6 @@ platform.db
 
 # isolated drill runs (scripts/drills/run-isolated.mjs)
 /.drill-results/
+
+# production secrets handed to the owner
+.secrets/
