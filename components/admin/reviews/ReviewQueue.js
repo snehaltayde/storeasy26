@@ -115,8 +115,6 @@ export function ReviewQueue({ reviews, counts, products, filters, role, timeZone
           ))}
         </nav>
         <form method="get" action="/admin/reviews" className="w-full sm:w-64">
-          {status !== "pending" ? <input type="hidden" name="status" value={status} /> : null}
-          {rating ? <input type="hidden" name="rating" value={rating} /> : null}
           <select
             name="product"
             aria-label="Product"
