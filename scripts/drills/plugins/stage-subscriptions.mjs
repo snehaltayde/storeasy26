@@ -8,6 +8,21 @@
 // Cancel keeps it as cancelled; signed out, the API reads nothing. No card
 // details are ever entered. The stage sets up its own starting state.
 import { ORIGIN, rolesSql, shopper, stage } from "./lib.mjs";
+import { harnessPorts } from "../../design-harness.js";
+import { ROLES_PROFILE } from "../../seed-roles-store.js";
+
+// One plugin_sweep job per 10-minute window: an earlier stage's tick may have
+// spent this window's. Own starting state: this window's finished sweep job is
+// removed from the harness's platform database, so the next tick queues a fresh one.
+async function freshSweepWindow() {
+  const { createClient } = await import("@libsql/client");
+  const c = createClient({ url: `http://127.0.0.1:${harnessPorts(process.env, ROLES_PROFILE).sqld.platform}` });
+  try {
+    await c.execute({ sql: "DELETE FROM jobs WHERE type = 'plugin_sweep' AND idempotency_key = ? AND status IN ('done', 'dead', 'discarded')", args: [`plugin_sweep:${Math.floor(Date.now() / 600_000)}`] });
+  } finally {
+    c.close();
+  }
+}
 
 const EMAIL = "snehal@mediastic.in";
 const CONTACT = { email: EMAIL, phone: "9876500001", name: "Subscriptions Drill" };
@@ -126,6 +141,7 @@ stage("subscriptions", async (drill) => {
   await until(
     page,
     async () => {
+      await freshSweepWindow();
       await tick(page);
       const [[c]] = await rolesSql([{ sql: "SELECT status, reminded_at FROM subscription_cycles WHERE subscription_id = ? ORDER BY cycle DESC LIMIT 1", args: [sub.id] }]);
       return c?.status === "due" && Boolean(c.reminded_at);
