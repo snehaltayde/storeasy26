@@ -28,6 +28,7 @@ export const SHOPPER_ROUTES = Object.freeze([
   { path: "media/[id]", methods: ["GET"], class: "public-read", suite: "test-shopper-reads.js" },
   { path: "pincode", methods: ["GET"], class: "public-read", suite: "test-pincode.js", note: "Phase 8 line 1: a PIN's place and this store's public delivery facts; no shopper data" },
   { path: "market", methods: ["GET"], class: "public-read", suite: "test-markets.js", note: "Phase 8 line 4: stores the Ship to country in the _market cookie (this store's base or enabled markets only) and returns to a path on this site; no shopper data" },
+  { path: "parcel-updates", methods: ["POST"], class: "webhook", suite: "test-shiprocket.js", note: "Phase 9 line 4: Shiprocket tracking hints; the x-api-key header against this store's own key hash (401 otherwise); the body only names an AWB, Shiprocket is asked again" },
   { path: "track", methods: ["POST"], class: "collector", suite: null },
   { path: "exp", methods: ["POST"], class: "collector", suite: null },
   { path: "contact", methods: ["POST"], class: "collector", suite: "test-commerce.js" },

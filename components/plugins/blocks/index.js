@@ -11,6 +11,7 @@ import LinkList from "./LinkList";
 // p9: subscriptions
 // p9: whatsapp
 // p9: shiprocket
+import TrackingTimeline from "./TrackingTimeline";
 // p9: ai-copilot
 
 export const BLOCK_COMPONENTS = Object.freeze({
@@ -23,5 +24,6 @@ export const BLOCK_COMPONENTS = Object.freeze({
   // p9: subscriptions
   // p9: whatsapp
   // p9: shiprocket
+  tracking_timeline: TrackingTimeline,
   // p9: ai-copilot
 });

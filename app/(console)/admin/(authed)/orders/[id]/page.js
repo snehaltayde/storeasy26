@@ -17,6 +17,8 @@ import { OrderHeader } from "@/components/admin/orders/OrderHeader";
 import { OrderActions } from "@/components/admin/orders/OrderActions";
 import { OrderLines } from "@/components/admin/orders/OrderLines";
 import { OrderTimeline } from "@/components/admin/orders/OrderTimeline";
+import { ShipmentCard } from "@/components/admin/orders/ShipmentCard"; // Phase 9 line 4
+import { trackingForOrder } from "@/lib/shipments";
 import { tfetch } from "@/lib/console-request";
 
 export const dynamic = "force-dynamic";
@@ -49,11 +51,11 @@ export default async function AdminOrderDetail({ params }) {
 
   const { id } = await params;
   const role = actor.role;
-  const [rawOrder, projection, timeZone, shopifyUrl, codChannel] = await tfetch(async () => {
+  const [rawOrder, projection, timeZone, shopifyUrl, codChannel, shipment] = await tfetch(async () => {
     const o = await getOrder(id);
     // Phase 8 line 2: how the COD code was sent (SMS proves the phone, email only the email)
     const channel = o?.cod_verified_at ? await codCheckChannel(id).catch(() => null) : null;
-    return [o, o ? await getOrderProjection(id) : null, merchantTz(), o?.shopify_order_id ? shopifyAdminUrl({ order: o.shopify_order_id }) : null, channel];
+    return [o, o ? await getOrderProjection(id) : null, merchantTz(), o?.shopify_order_id ? shopifyAdminUrl({ order: o.shopify_order_id }) : null, channel, o ? await trackingForOrder(id).catch(() => null) : null];
   });
   if (!rawOrder) notFound();
   const order = redactOrderForRole(rawOrder, role);
@@ -101,6 +103,7 @@ export default async function AdminOrderDetail({ params }) {
           <OrderTimeline fulfillments={projection.fulfillments} refunds={projection.refunds} events={order.events} codVerifiedAt={order.cod_verified_at ?? null} codCheck={codCheckWords(codChannel)} currency={order.currency} refundCurrency={order.base_currency || order.currency} timeZone={timeZone} />
         </div>
         <aside aria-label="Customer and payment" className="min-w-0 space-y-4">
+          <ShipmentCard shipment={shipment} timeZone={timeZone} />
           <Card>
             <CardHeader>
               <CardTitle className="text-[1.125rem]">Customer</CardTitle>

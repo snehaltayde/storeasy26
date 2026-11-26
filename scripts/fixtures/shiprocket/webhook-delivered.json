@@ -1,0 +1,4 @@
+{ "awb": "__AWB__", "courier_name": "Delhivery Surface", "current_status": "DELIVERED", "current_status_id": 7, "shipment_status": "DELIVERED", "shipment_status_id": 7,
+  "current_timestamp": "2026-11-30 14:05:00", "order_id": "SE-1001", "sr_order_id": 123456, "awb_assigned_date": "2026-11-26 12:00:00", "pickup_scheduled_date": "2026-11-27 09:00:00",
+  "etd": "2026-12-01 18:00:00", "scans": [ { "date": "2026-11-30 14:05:00", "status": "DLVD", "activity": "Delivered", "location": "Bengaluru", "sr-status": "7", "sr-status-label": "DELIVERED" } ],
+  "is_return": 0, "channel_id": 1, "pod_status": "OTP Based Delivery", "pod": "Not Available" }

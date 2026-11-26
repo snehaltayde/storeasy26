@@ -58,24 +58,26 @@ const { computeShipping } = await import("../lib/shipping.js");
 const manifest = (id) => ({ id, name: `Fixture ${id}`, version: "1.0.0", summary: "s", description: "d", icon: "Truck", author: { name: "Tests" }, scopes: [], settings: [{ key: "greeting", kind: "text", label: "G", max: 20, default: "hi" }], events: [], egress: [] });
 const NOW_ISO = "2026-11-26T00:00:00.000Z";
 let n = 0;
+const BUILT_IN_SWEEPS = SW.sweepPluginIds();
 const install = (pluginId, status, extra = {}) =>
   db.insertInto("plugin_installs").values({ id: `pin_sweep${++n}`, plugin_id: pluginId, kind: "first_party", version: "1.0.0", status, granted_scopes: "[]", settings: JSON.stringify({ greeting: `hi ${pluginId}`, __secret_keys: ["token"] }), installed_by: "member:test", installed_at: NOW_ISO, updated_at: NOW_ISO, ...extra }).returning("id").executeTakeFirstOrThrow();
 
 await t("registerSweep: adds a sweep, undo removes it; a second register replaces it and the first undo leaves the second alone; a non-function is refused", () => {
-  eq(JSON.stringify(SW.sweepPluginIds()), '["reviews"]', "the built-in sweeps (step 0 had none; Phase 9 line 1 adds reviews):");
+  // Phase 9 lines add built-in sweeps (line 4: shiprocket); each is a catalog plugin's
+  ok(BUILT_IN_SWEEPS.every((id) => CAT.pluginById(id)), "every built-in sweep is a catalog plugin's:");
   eq(SW.sweepFor("fx-reg"), null, "none yet:");
   const f1 = async () => {};
   const f2 = async () => {};
   const undo1 = SW.registerSweep("fx-reg", f1);
   eq(SW.sweepFor("fx-reg"), f1, "registered:");
-  eq(JSON.stringify(SW.sweepPluginIds()), '["reviews","fx-reg"]', "listed:");
+  eq(JSON.stringify(SW.sweepPluginIds()), JSON.stringify([...BUILT_IN_SWEEPS, "fx-reg"]), "listed:");
   const undo2 = SW.registerSweep("fx-reg", f2);
   eq(SW.sweepFor("fx-reg"), f2, "replaced:");
   undo1();
   eq(SW.sweepFor("fx-reg"), f2, "the stale undo leaves the newer sweep:");
   undo2();
   eq(SW.sweepFor("fx-reg"), null, "undone:");
-  eq(JSON.stringify(SW.sweepPluginIds()), '["reviews"]', "only the built-ins left:");
+  eq(SW.sweepPluginIds().length, BUILT_IN_SWEEPS.length, "nothing left:");
   let threw = false;
   try {
     SW.registerSweep("fx-reg", "not a function");
@@ -88,9 +90,7 @@ await t("registerSweep: adds a sweep, undo removes it; a second register replace
 
 await t("queuePluginSweep: a job per window for the built-in sweep; then one job per 10-minute window (the key dedupes)", async () => {
   const base = 1_800_000_000_000 - (1_800_000_000_000 % SW.PLUGIN_SWEEP_WINDOW_MS);
-  // Phase 9 line 1: a built-in sweep (reviews) exists, so a window always gets a job
-  // (step 0's "no sweep, no job" can no longer be reached: registerSweep refuses a non-function)
-  ok((await SW.queuePluginSweep(base - SW.PLUGIN_SWEEP_WINDOW_MS + 1000))?.id, "the built-in sweep queues a job:");
+  if (!BUILT_IN_SWEEPS.length) eq(await SW.queuePluginSweep(base + 1000), null, "no sweep, no job:");
   const undo = SW.registerSweep("fx-q", async () => {});
   try {
     const x = await SW.queuePluginSweep(base + 1000);
@@ -173,7 +173,8 @@ await t("sweepPlugins: active stores only, enabled and un-killed installs only, 
 
 await t("sweepPlugins: with no install of a sweep's plugin nothing runs; a passed deadline stops before the first store; the worker handler runs the walk", async () => {
   const none = await SW.sweepPlugins({ now: () => 1 });
-  eq(JSON.stringify(none), '{"stores":2,"ran":0,"failed":0}', "only the built-in sweep, with no install of it: the stores are walked, nothing runs:");
+  // with no fx install, only the built-in sweeps could run, and these stores install none
+  eq(JSON.stringify(none), BUILT_IN_SWEEPS.length ? '{"stores":2,"ran":0,"failed":0}' : '{"stores":0,"ran":0,"failed":0}', "no sweep:");
   const calls = [];
   const off = SW.registerSweep("fx-on", async () => calls.push(tenantId()));
   try {

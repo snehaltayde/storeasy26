@@ -106,6 +106,8 @@ export const BLANKED_ENV = [
   // Not hosted, but a value from .env.local naming localhost would turn the
   // harness storefront into the marketing site.
   "PLATFORM_SITE_HOSTS",
+  // Phase 9 line 4: "live" would call Shiprocket; blank, the harness uses the stub
+  "SHIPROCKET_PROVIDER",
 ];
 
 // Read by the app and passed through to the harness on purpose. None of them
@@ -114,6 +116,7 @@ export const BLANKED_ENV = [
 // .env.example names a variable that is in neither list, so a new hosted key
 // can't slip through unblanked.
 export const KEPT_ENV = [
+  "SHIPROCKET_STUB_DIR", // Phase 9 line 4: where the local Shiprocket stub reads drill overlays
   "ANTHROPIC_API_KEY",
   "SIGNUP_STORE_DOMAIN", // self-serve signup: new stores get <slug>.<this>; the harness sets localhost
   "STORE_DB_DIR", // self-serve signup's file databases; the harness sets <data dir>/stores

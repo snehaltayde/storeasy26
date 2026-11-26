@@ -1,0 +1,7 @@
+{ "tracking_data": { "track_status": 1, "shipment_status": 10,
+  "shipment_track": [ { "awb_code": "__AWB__", "courier_name": "Delhivery Surface", "current_status": "RTO IN TRANSIT", "edd": null, "delivered_date": null, "rto_awb": "RTO__AWB__" } ],
+  "shipment_track_activities": [
+    { "date": "2026-12-02 11:00:00", "status": "RT-IT", "activity": "Return in transit to origin", "location": "Bengaluru_Nelamangala_H (Karnataka)", "sr-status": "46", "sr-status-label": "RTO IN TRANSIT" },
+    { "date": "2026-12-01 19:30:00", "status": "EOD-74", "activity": "Consignee refused to accept", "location": "Bengaluru_Koramangala_DC (Karnataka)", "sr-status": "21", "sr-status-label": "UNDELIVERED" }
+  ],
+  "track_url": "https://shiprocket.co/tracking/__AWB__", "etd": null } }
