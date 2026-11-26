@@ -11,7 +11,7 @@
 export const PRICES_CHECKED = "2026-11-26";
 const listing = (slug) => `https://apps.shopify.com/${slug}`;
 
-// The hero's bill, the apps section and the calculator share these lines: the
+// The hero's deck, the apps section and the calculator share these lines: the
 // kinds of app a Shopify store adds one by one, each with ONE well-known app's
 // lowest paid monthly plan as a standard estimate (owner's decision,
 // 2026-11-26, docs/DECISIONS.md). Rules for `price`, held by the suite:
@@ -73,15 +73,16 @@ export const NAV = {
 };
 
 export const HERO = {
+  eyebrow: "A storefront for your Shopify catalog",
   title: "The apps you rent, built in.",
   lede: "Your Shopify catalog gets its own fast storefront, with ratings, subscriptions, WhatsApp, offers, quizzes and an India-ready checkout inside it.",
   billTitle: "Apps a Shopify store adds one by one",
   billColumn: "With Storeasy",
   billMark: "Built in",
-  billApp: "App, typical price a month",
-  billSum: "Typical app bill, a month",
-  billFrom: "plans from",
-  billNoPlan: "one plan",
+  billPer: "/mo",
+  billSum: "Typical app bill",
+  billMore: "Every app price, with its source",
+  billNoPlan: "One plan",
   primary: "Create your store",
   secondary: "See what the apps cost",
 };

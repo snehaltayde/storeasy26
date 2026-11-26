@@ -230,6 +230,23 @@ await t("header: a floating pill with a Product menu and a small-screen sheet, b
   for (const item of L.NAV.items) ok(homeSrc.includes(`id="${item.href.slice(2)}"`), `the home has no section ${item.href}`);
 });
 
+await t("hero (v4b): one sans headline, a glass deck in place of the receipt, the whole bill still read out, and no pointer disc", async () => {
+  const home = await readFile(join(ROOT, "components/site/MarketingHome.js"), "utf8");
+  const css = await readFile(join(ROOT, "components/site/landing.css"), "utf8");
+  const motion = await readFile(join(ROOT, "components/site/MotionRoot.js"), "utf8");
+  ok(/\.mk \.mk-hero-title \{\s*font-family: var\(--font-geist-sans\)/.test(css), "the hero headline is not in the page's sans");
+  for (const gone of ["mk-receipt", "mk-paper", "mk-stamp", "mk-strike", "mk-cursor", 'data-pin~="bill"']) ok(!css.includes(gone) && !home.includes(gone) && !motion.includes(gone), `${gone} is still here`);
+  ok(/return null;/.test(motion) && !/<div/.test(motion), "the motion island draws something (the pointer disc is gone)");
+  const deck = home.slice(home.indexOf("function Deck("), home.indexOf("function Heading("));
+  ok(/data-deck=""/.test(deck) && /data-deck-queue=""/.test(deck) && /data-deck-built=""/.test(deck), "the deck has nothing for the motion island to turn");
+  ok(/<ul className="sr-only">\s*\{STACK\.map/.test(deck) && /<div aria-hidden="true">/.test(deck), "a screen reader does not get the whole bill once, in order");
+  ok(/typicalTotal\(\)/.test(deck) && /inr\(from\.price\)/.test(deck) && /href="#calculator"/.test(deck), "the deck's two figures are not the sourced total and the catalog's plan, or it does not lead to the sources");
+  ok(/function deck\(/.test(motion) && /pointerenter/.test(motion) && /cloneNode\(true\)/.test(motion) && /row\.remove\(\)/.test(motion), "the deck's loop cannot be held, or leaves its copies behind");
+  // at rest the panel shows the first features and the queue the apps after them
+  ok(/const QUEUE = \[\.\.\.STACK\.slice\(0, SHOWN\)\.reverse\(\), \.\.\.STACK\.slice\(SHOWN\)\.reverse\(\)\];/.test(home) && /const BUILT = \[\.\.\.STACK\]\.reverse\(\);/.test(home), "the deck's lists are not in the order its loop needs");
+  ok(/--n: 4;/.test(css.slice(css.indexOf(".mk-deck-built {"))) && /const SHOWN = 4;/.test(home), "the panel's window and SHOWN differ");
+});
+
 await t("artwork: every section has a picture, drawn in markup (no image file, no request), hidden from screen readers, its words from the scanned copy", async () => {
   const art = await readFile(join(ROOT, "components/site/LandingArt.js"), "utf8");
   const home = await readFile(join(ROOT, "components/site/MarketingHome.js"), "utf8");

@@ -4,7 +4,7 @@ import { platformConfigured } from "@/lib/platform/control";
 import StackCalculator from "./StackCalculator";
 import MotionRoot from "./MotionRoot";
 import { ArtApps, ArtCheckout, ArtControl, ArtCopilot, ArtDefs, ArtFilters, ArtGlobe, ArtSell, ArtShop, ArtStack, ArtStudio, ArtThemes, Glyph, TierBars } from "./LandingArt";
-import { STACK, HERO, YOURS, SELL, CALC, PRICING, SPEED, SAFETY, INDIA, GLOBAL, CLOSING, LINKS, claims, typicalRupees, typicalTotal } from "./landing-copy";
+import { ART, STACK, HERO, YOURS, SELL, CALC, PRICING, SPEED, SAFETY, INDIA, GLOBAL, CLOSING, LINKS, claims, typicalRupees, typicalTotal } from "./landing-copy";
 import "./landing.css";
 
 // The Storeasy landing page: "/" on a platform host (app/(storefront)/page.js).
@@ -17,7 +17,7 @@ import "./landing.css";
 // Look (v4): every section is a picture first (./LandingArt.js) with a few
 // words beside it. ./landing.css on the .mk tokens (app/marketing.css),
 // docs/UI.md.
-// Motion: the markup is the finished page (every line struck, every picture
+// Motion: the markup is the finished page (the deck resolved, every picture
 // drawn); MotionRoot rewinds it and plays it against the scroll, through the
 // data attributes below. With motion off or no script this is what is read.
 // Edge-safe: billing.js and its imports reach no node:* module but
@@ -50,59 +50,94 @@ const Tick = () => (
   </svg>
 );
 
-// The page's one bold thing: the app bill, as a paper receipt. Each rented app
-// carries a typical monthly price (STACK, sourced), is struck through and
-// answered by what Storeasy has in its place; the stamp lands, and the list
-// folds into the last lines: what the apps add up to, and Storeasy's own price
-// from the plan catalog. A list, not a table: each line has to fold shut.
-function Bill({ from }) {
-  const price = from ? `${HERO.billFrom} ${inr(from.price)}` : HERO.billNoPlan;
+// The page's one bold thing (v4b): the app bill as a dark glass deck. Rented
+// apps queue at the top with their typical monthly price (STACK, sourced) and
+// drop one by one into the Storeasy panel, where the built-in feature that
+// replaces each one lands; two figures close it, the typical bill crossed out
+// and the lowest plan from the catalog. The two lists are drawn so the picture
+// is true at rest: the panel holds the first four features, the queue the
+// three apps after them (both windows show the END of their list, and
+// MotionRoot slides the lists down, so both are written last-first). They are
+// decoration; the one list a screen reader gets is the whole bill, in order.
+const SHOWN = 4;
+const QUEUE = [...STACK.slice(0, SHOWN).reverse(), ...STACK.slice(SHOWN).reverse()];
+const BUILT = [...STACK].reverse();
+
+function Deck({ from }) {
   return (
-    <figure className="mk-receipt" aria-labelledby="bill-title">
-      <div className="mk-paper" data-paper="">
-        <div className="flex items-start justify-between gap-4">
-          <figcaption id="bill-title" className="max-w-[13rem] text-base leading-snug font-semibold text-mk-navy">
-            {HERO.billTitle}
-          </figcaption>
-          <span className="mk-stamp" data-stamp="">
-            {HERO.billMark}
-          </span>
+    <figure className="mk-deck" aria-labelledby="bill-title" data-deck="">
+      <div className="mk-deck-card">
+        <div className="mk-deck-head">
+          <figcaption id="bill-title">{HERO.billTitle}</figcaption>
         </div>
-        <div className="mk-line-grid mk-cols" data-cols="" aria-hidden="true">
-          <span className="col-span-2">{HERO.billApp}</span>
-          <span>{HERO.billColumn}</span>
-        </div>
-        <ul>
+        <ul className="sr-only">
           {STACK.map((row) => (
-            <li key={row.id} className="mk-line" data-line="">
-              <div className="mk-line-grid">
-                <span>
-                  <span className="mk-strike" data-strike="">
-                    {row.label}
-                  </span>
-                </span>
-                <span className="mk-amt">
-                  <span className="mk-strike" data-strike="">
-                    {rupees(typicalRupees(row))}
-                  </span>
-                </span>
-                <span className="mk-built" data-built="">
-                  <Tick />
-                  <span className="sr-only">{HERO.billColumn}: </span>
-                  {row.built}
-                </span>
-              </div>
+            <li key={row.id}>
+              {row.label}, {rupees(typicalRupees(row))} {CALC.unit}. {HERO.billColumn}: {row.built}.
             </li>
           ))}
         </ul>
-        <div className="mk-total" data-total="">
-          <p className="mk-total-was">
+        <div aria-hidden="true">
+          <div className="mk-deck-view mk-deck-queue">
+            <ul data-deck-queue="">
+              {QUEUE.map((row) => (
+                <li key={row.id}>
+                  <span className="mk-chip">
+                    <Glyph id={row.id} ink className="mk-glyph-sm" />
+                    <span className="truncate">{row.label}</span>
+                    <b>
+                      {rupees(typicalRupees(row))}
+                      <small>{HERO.billPer}</small>
+                    </b>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <i className="mk-deck-beam" />
+          <div className="mk-deck-panel">
+            <p>
+              {ART.stack}
+              <span className="mk-deck-mark">
+                <Tick />
+                {HERO.billMark}
+              </span>
+            </p>
+            <div className="mk-deck-view mk-deck-built">
+              <ul data-deck-built="">
+                {BUILT.map((row) => (
+                  <li key={row.id}>
+                    <Tick />
+                    <span className="truncate">{row.built}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+        <Link href="#calculator" className={`mk-deck-more ${onInk}`}>
+          {HERO.billMore}
+        </Link>
+        <div className="mk-deck-total">
+          <p>
             <span>{HERO.billSum}</span>
-            <s className="tabular-nums">{rupees(typicalTotal())}</s>
+            <span className="mk-deck-figure mk-deck-was">
+              {rupees(typicalTotal())}
+              <small aria-hidden="true">{HERO.billPer}</small>
+              <i aria-hidden="true" />
+            </span>
           </p>
-          <p className="mk-total-now">
-            <span>{HERO.billColumn}</span>
-            <span className="tabular-nums">{price}</span>
+          <svg aria-hidden="true" viewBox="0 0 32 16" className="mk-deck-arrow">
+            <path d="M1 8h29m-6-6 6 6-6 6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <p className="mk-deck-now">
+            <span>
+              {ART.stack} {from ? from.name : null}
+            </span>
+            <span className="mk-deck-figure">
+              {from ? inr(from.price) : HERO.billNoPlan}
+              {from ? <small aria-hidden="true">{HERO.billPer}</small> : null}
+            </span>
           </p>
         </div>
       </div>
@@ -232,37 +267,36 @@ export default async function MarketingHome() {
       <MotionRoot />
       <ArtDefs />
 
-      {/* 1. The bill. From 1024px the stage holds still while the receipt is worked through. */}
-      <section aria-labelledby="hero-title" className="mk-scene mk-stage mk-grain" data-scene="bill">
-        <div className="mk-pin">
-          <Aurora />
-          <div className={`${wrap} mk-hero`}>
-            <div className="mk-hero-copy">
-              <h1 id="hero-title" className="mk-hero-title text-balance text-white">
-                {words.map((word, i) => (
-                  <Fragment key={`${word}-${i}`}>
-                    <span className="mk-word">
-                      <span style={{ "--i": i }}>{word}</span>
-                    </span>{" "}
-                  </Fragment>
-                ))}
-              </h1>
-              <div>
-                <p className="mk-fade max-w-[32rem] text-[1.0625rem] leading-relaxed text-mk-on-ink sm:text-lg" style={{ "--d": "620ms" }}>
-                  {HERO.lede}
-                </p>
-                <div className="mk-fade mt-7 flex flex-wrap gap-3 sm:mt-8" style={{ "--d": "760ms" }}>
-                  <Link href="/signup" data-magnetic="" className={`mk-cta-light ${pill} ${onInk}`}>
-                    {HERO.primary}
-                  </Link>
-                  <Link href="#calculator" data-magnetic="" className={`mk-ghost ${pill} border border-white/30 text-white hover:border-white/60 hover:bg-white/10 ${onInk}`}>
-                    {HERO.secondary}
-                  </Link>
-                </div>
-              </div>
+      {/* 1. The bill: one block of words beside the deck, inside the header pill's own frame */}
+      <section aria-labelledby="hero-title" className="mk-stage mk-grain">
+        <Aurora />
+        <div className="mk-hero">
+          <div className="mk-hero-copy">
+            <p className="mk-eyebrow mk-fade">{HERO.eyebrow}</p>
+            <h1 id="hero-title" className="mk-hero-title text-balance text-white">
+              {words.map((word, i) => (
+                <Fragment key={`${word}-${i}`}>
+                  <span className="mk-word">
+                    <span className={i + 2 < words.length ? "" : "text-mk-sky"} style={{ "--i": i }}>
+                      {word}
+                    </span>
+                  </span>{" "}
+                </Fragment>
+              ))}
+            </h1>
+            <p className="mk-fade max-w-[33rem] text-[1.0625rem] leading-relaxed text-mk-on-ink sm:text-lg" style={{ "--d": "420ms" }}>
+              {HERO.lede}
+            </p>
+            <div className="mk-fade flex flex-wrap gap-3 pt-1" style={{ "--d": "540ms" }}>
+              <Link href="/signup" data-magnetic="" className={`mk-cta-light ${pill} ${onInk}`}>
+                {HERO.primary}
+              </Link>
+              <Link href="#calculator" data-magnetic="" className={`mk-ghost ${pill} border border-white/30 text-white hover:border-white/60 hover:bg-white/10 ${onInk}`}>
+                {HERO.secondary}
+              </Link>
             </div>
-            <Bill from={from} />
           </div>
+          <Deck from={from} />
         </div>
       </section>
 

@@ -3,6 +3,16 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-26 Landing v4b: the hero redone (owner feedback; choices on the owner's behalf)
+
+- **The owner said** the v4 hero "looks really bad" and the receipt "looks too cheap ... concept is good but application is not on point". Only the hero changed.
+- **Headline:** the page's sans (Geist, 600, 40 to 72px, -0.04em, 1.02 leading) in place of the display serif at up to 184px; the last two words in sky. The section headings below stay in the serif: the owner liked the rest of the page. Owner may ask for those in sans too.
+- **Layout:** one block (eyebrow, headline, lede, two buttons) centred against the picture, inside the header pill's own frame (76rem), so the headline starts under the logo. The hero is one screen; it is no longer a pinned, scrubbed scene.
+- **The receipt is gone.** In its place is a dark glass deck: a queue of rented apps with their typical monthly price drops, one app at a time, into a Storeasy panel where the built-in feature lands; below, the typical app bill crossed out beside the lowest plan from the catalog. Same data (`STACK`, `typicalTotal()`, `listPublicPlans()`), same link to the sources. A screen reader gets the whole bill once, as a list; the moving lists are decoration.
+- **Motion:** the loop is GSAP (held under the pointer and while the hero is off screen); the entrance and the cross-out are CSS. Reduced motion shows the finished deck: three queued apps, four built-in features, both figures.
+- **The pointer's companion disc was removed from the whole page.** It was the "stray dot" on the hero's second button. Buttons still lean towards the pointer.
+- **New copy:** the eyebrow "A storefront for your Shopify catalog". No new claim, no new dependency.
+
 ## 2026-11-26 Landing v4: other apps' prices on the page (owner approved)
 
 - **The owner asked for it:** "for the apps section give a standard estimate of apps, so that user know what they are saving". This replaces the earlier owner rule "no app prices on the page" (landing v1 to v3, where the founder typed every figure).

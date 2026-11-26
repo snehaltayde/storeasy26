@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
-// The landing page's motion island. It holds no words and draws one thing, the
-// pointer's companion disc. The page it finds is already finished
-// (components/site/landing.css draws every final state); this rewinds those
-// states and plays them against the scroll, through the markup's attributes:
-//   data-scene="bill"   the receipt: each line is struck and answered, the
-//                       stamp lands, the total arrives. From 1024px the stage
-//                       is pinned and the scroll scrubs it, then the lines fold
-//                       into the total; below that it plays once, in place
+// The landing page's motion island. It holds no words and draws nothing. The
+// page it finds is already finished (components/site/landing.css draws every
+// final state); this rewinds those states and plays them against the scroll,
+// through the markup's attributes:
+//   data-deck           the hero's deck: the queue of rented apps and the
+//                       panel of built-in features turn into loops, one app
+//                       dropping into the panel at a time
 //   data-scene="rail"   from 768px, pinned and slid sideways by the scroll
 //   data-path           the speed section's line, drawn as it arrives
 //   data-art            a picture (./LandingArt.js): its data-pop parts rise
@@ -20,12 +19,13 @@ import { useEffect, useRef } from "react";
 //   data-reveal         a block that fades up; data-draw a rule that draws;
 //                       data-clip a block wiped in from its lower edge
 //   data-magnetic       a button that leans towards a fine pointer
+// There is no pointer companion: the disc that followed the pointer read as a
+// stray dot on the page and was taken out (owner, 2026-11-26).
 // GSAP (ScrollTrigger, SplitText) and Lenis are fetched here and nowhere else,
 // after the page is up, so no store page and no other marketing page carries
 // them (docs/DECISIONS.md). Under prefers-reduced-motion nothing is fetched
 // and nothing starts.
 export default function MotionRoot() {
-  const disc = useRef(null);
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
     const home = document.querySelector("[data-mk-home]");
@@ -34,7 +34,7 @@ export default function MotionRoot() {
     let stop = () => {};
     Promise.all([import("gsap"), import("gsap/ScrollTrigger"), import("gsap/SplitText"), import("lenis")])
       .then(([{ gsap }, { ScrollTrigger }, { SplitText }, { default: Lenis }]) => {
-        if (!gone) stop = start({ gsap, ScrollTrigger, SplitText, Lenis, home, disc: disc.current });
+        if (!gone) stop = start({ gsap, ScrollTrigger, SplitText, Lenis, home });
       })
       .catch(() => {}); // the libraries did not arrive: the page stays as drawn
     return () => {
@@ -42,15 +42,14 @@ export default function MotionRoot() {
       stop();
     };
   }, []);
-  return <div ref={disc} aria-hidden="true" className="mk-cursor" />;
+  return null;
 }
 
-function start({ gsap, ScrollTrigger, SplitText, Lenis, home, disc }) {
+function start({ gsap, ScrollTrigger, SplitText, Lenis, home }) {
   gsap.registerPlugin(ScrollTrigger, SplitText);
-  // The header floats over the page (components/site/SiteNav.js), so a pinned
-  // scene takes the whole window; only the receipt has to stay clear of it.
+  // The header floats over the page (components/site/SiteNav.js), so the
+  // pinned rail takes the whole window.
   const head = 0;
-  const nav = document.querySelector("header")?.offsetHeight || 76;
 
   // Inertial scrolling, on GSAP's clock so the scrubbed scenes stay in step.
   const lenis = new Lenis({ lerp: 0.11, anchors: true, autoRaf: false }); // anchors land by each section's scroll-margin
@@ -60,11 +59,11 @@ function start({ gsap, ScrollTrigger, SplitText, Lenis, home, disc }) {
   gsap.ticker.lagSmoothing(0);
 
   const mm = gsap.matchMedia();
-  mm.add({ any: "(min-width: 1px)", desk: "(min-width: 1024px) and (min-height: 560px)", mid: "(min-width: 768px)", fine: "(hover: hover) and (pointer: fine)" }, (ctx) => {
-    const { desk, mid, fine } = ctx.conditions;
+  mm.add({ any: "(min-width: 1px)", mid: "(min-width: 768px)", fine: "(hover: hover) and (pointer: fine)" }, (ctx) => {
+    const { mid, fine } = ctx.conditions;
     home.dataset.motion = "on";
-    home.dataset.pin = [desk && "bill", mid && "rail"].filter(Boolean).join(" ");
-    const undo = [bill(gsap, ScrollTrigger, home, head, nav, desk), mid && rail(gsap, ScrollTrigger, home, head), path(gsap, home), art(gsap, home, mid), reveals(gsap, ScrollTrigger, SplitText, home), fine && pointer(gsap, disc)];
+    home.dataset.pin = mid ? "rail" : "";
+    const undo = [deck(gsap, ScrollTrigger, home), mid && rail(gsap, ScrollTrigger, home, head), path(gsap, home), art(gsap, home, mid), reveals(gsap, ScrollTrigger, SplitText, home), fine && pointer(gsap)];
     return () => {
       for (const fn of undo) if (fn) fn();
       delete home.dataset.motion;
@@ -82,53 +81,52 @@ function start({ gsap, ScrollTrigger, SplitText, Lenis, home, disc }) {
   };
 }
 
-// The receipt. Pinned: one scrubbed timeline, about half a step of scroll for
-// each line, then the fold. Not pinned: the same strikes, played once.
-// Opacity, never visibility: a screen reader reads the whole receipt at any
-// point of the scroll.
-function bill(gsap, ScrollTrigger, home, head, nav, pinned) {
-  const scene = home.querySelector('[data-scene="bill"]');
-  const receipt = scene.querySelector(".mk-receipt");
-  const paper = scene.querySelector("[data-paper]");
-  const lines = [...scene.querySelectorAll("[data-line]")];
-  const step = pinned ? 0.5 : 0.14;
-  const tl = gsap.timeline({
-    defaults: { ease: "power2.out" },
-    scrollTrigger: pinned ? { trigger: scene, start: `top ${head}px`, end: "bottom bottom", scrub: 0.6, invalidateOnRefresh: true } : { trigger: paper, start: "top 70%", once: true },
-  });
-  // Pinned, the first line strikes itself once the receipt has landed, to show
-  // what the scroll will do to the rest.
-  const first = pinned ? gsap.timeline({ delay: 1.7, defaults: { ease: "power2.out" } }) : tl;
-  lines.forEach((line, i) => {
-    const on = i === 0 ? first : tl;
-    const at = i === 0 ? 0 : (pinned ? i - 0.6 : i) * step;
-    on.fromTo(line.querySelectorAll("[data-strike]"), { "--s": 0, color: "#0b0656" }, { "--s": 1, color: "#676a8a", duration: 0.4, ease: "power2.inOut" }, at);
-    on.from(line.querySelector("[data-built]"), { opacity: 0, x: -12, duration: 0.35 }, at + 0.16);
-  });
-  const done = lines.length * step;
-  tl.from(scene.querySelector("[data-stamp]"), { opacity: 0, scale: 2.8, rotation: -30, duration: 0.4, ease: "power3.in" }, done);
-  tl.from(scene.querySelector("[data-total]"), { opacity: 0, y: 16, duration: 0.45 }, done + 0.15);
-  if (pinned) {
-    // The list folds into its last line: the bill is now one plan.
-    tl.to(lines, { height: 0, opacity: 0, duration: 0.9, ease: "power2.inOut", stagger: { each: 0.04, from: "end" } }, done + 1);
-    tl.to(scene.querySelector("[data-cols]"), { height: 0, paddingBottom: 0, opacity: 0, duration: 0.6, ease: "power2.inOut" }, "<0.5");
-    tl.to(paper, { rotation: -1.5, scale: 1.08, duration: 1.2, ease: "power2.inOut" }, done + 1);
-    tl.to({}, { duration: 0.7 });
-  }
-  if (!pinned) return undefined;
-  // Keep the whole slip inside a short pinned frame. Measured unfolded: a
-  // refresh puts the timeline back where the scroll is.
-  const fit = () => {
-    tl.progress(0);
-    receipt.style.removeProperty("--fit");
-    const room = window.innerHeight - nav - 40;
-    if (paper.offsetHeight > room) receipt.style.setProperty("--fit", (room / paper.offsetHeight).toFixed(3));
+// The hero's deck: its two windows become loops. Each list gets copies of the
+// rows its window shows put before it, so after one turn the window is back on
+// the same rows and the loop closes without a seam. Every 2.3s the queue's
+// last app drops out of it and the feature that replaces that app lands at the
+// top of the panel, lit for a moment. It holds still under the pointer and
+// while the hero is out of the window. The copies are taken away on the way out.
+function deck(gsap, ScrollTrigger, home) {
+  const figure = home.querySelector("[data-deck]");
+  if (!figure) return undefined;
+  const copies = [];
+  const reel = (list) => {
+    const rows = [...list.children];
+    const height = rows[0].offsetHeight;
+    const shown = Math.round(list.parentElement.clientHeight / height);
+    const lead = rows.slice(-shown).map((row) => row.cloneNode(true));
+    list.prepend(...lead);
+    copies.push(...lead);
+    return { list, height, shown, count: rows.length, all: [...lead, ...rows] };
   };
-  fit();
-  ScrollTrigger.addEventListener("refreshInit", fit);
+  const queue = reel(figure.querySelector("[data-deck-queue]"));
+  const built = reel(figure.querySelector("[data-deck-built]"));
+  const tl = gsap.timeline({ repeat: -1, delay: 2.6 });
+  for (let i = 0; i < queue.count; i++) {
+    const at = i * 2.3;
+    const landed = built.all[built.all.length - built.shown - 1 - i];
+    tl.to(queue.list, { y: (i + 1) * queue.height, duration: 0.7, ease: "power3.inOut" }, at);
+    tl.to(built.list, { y: (i + 1) * built.height, duration: 0.7, ease: "power3.inOut" }, at + 0.3);
+    tl.fromTo(landed, { "--lit": 1 }, { "--lit": 0, duration: 1.2, ease: "power2.out" }, at + 0.6);
+    tl.fromTo(landed.firstElementChild, { scale: 0 }, { scale: 1, duration: 0.5, ease: "back.out(2.6)" }, at + 0.6);
+  }
+  tl.to({}, { duration: 1.6 });
+  let seen = true;
+  let held = false;
+  const run = () => (seen && !held ? tl.play() : tl.pause());
+  const watch = ScrollTrigger.create({ trigger: figure, start: "top bottom", end: "bottom top", onToggle: (self) => ((seen = self.isActive), run()) });
+  const hold = () => ((held = true), run());
+  const free = () => ((held = false), run());
+  figure.addEventListener("pointerenter", hold);
+  figure.addEventListener("pointerleave", free);
   return () => {
-    ScrollTrigger.removeEventListener("refreshInit", fit);
-    receipt.style.removeProperty("--fit");
+    figure.removeEventListener("pointerenter", hold);
+    figure.removeEventListener("pointerleave", free);
+    watch.kill();
+    tl.kill();
+    gsap.set([queue.list, built.list], { clearProps: "transform" });
+    for (const row of copies) row.remove();
   };
 }
 
@@ -220,11 +218,8 @@ function reveals(gsap, ScrollTrigger, SplitText, home) {
   }
 }
 
-// A fine pointer: the disc follows it, swells over anything that can be
-// pressed, and the calls to action lean towards it and spring back.
-function pointer(gsap, disc) {
-  const x = gsap.quickTo(disc, "x", { duration: 0.35, ease: "power3.out" });
-  const y = gsap.quickTo(disc, "y", { duration: 0.35, ease: "power3.out" });
+// A fine pointer: the calls to action lean towards it and spring back.
+function pointer(gsap) {
   let held = null;
   const release = () => {
     if (held) gsap.to(held, { x: 0, y: 0, duration: 0.9, ease: "elastic.out(1, 0.45)", overwrite: true });
@@ -232,11 +227,7 @@ function pointer(gsap, disc) {
   };
   const onMove = (e) => {
     if (e.pointerType === "touch") return;
-    x(e.clientX);
-    y(e.clientY);
-    disc.dataset.on = "";
     const target = e.target instanceof Element ? e.target : null;
-    disc.dataset.over = !target ? "" : target.closest("input") ? "type" : target.closest("a, button, summary, select, label") ? "press" : "";
     const next = target ? target.closest("[data-magnetic]") : null;
     if (next !== held) release();
     held = next;
@@ -246,16 +237,11 @@ function pointer(gsap, disc) {
     const dy = e.clientY - (box.top + box.height / 2 - Number(gsap.getProperty(held, "y")));
     gsap.to(held, { x: dx * 0.3, y: dy * 0.4, duration: 0.5, ease: "power3.out", overwrite: true });
   };
-  const onLeave = () => {
-    delete disc.dataset.on;
-    release();
-  };
   document.addEventListener("pointermove", onMove, { passive: true });
-  document.documentElement.addEventListener("pointerleave", onLeave);
+  document.documentElement.addEventListener("pointerleave", release);
   return () => {
     document.removeEventListener("pointermove", onMove);
-    document.documentElement.removeEventListener("pointerleave", onLeave);
-    onLeave();
-    delete disc.dataset.over;
+    document.documentElement.removeEventListener("pointerleave", release);
+    release();
   };
 }
