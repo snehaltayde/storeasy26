@@ -431,6 +431,36 @@ await t("order page: Review links list one link per product with an unused invit
   ok((await html(React.createElement(WritePage, { searchParams: Promise.resolve({ done: "1" }) }))).includes(WORDS.WRITE_WORDS.thanks), "thanks");
 });
 
+await t("all-reviews page: 20 a page, newest first, Newer / Older links, and a page past the end is a 404", async () => {
+  await a.run(() => db.deleteFrom("reviews").where("product_id", "=", pa2.id).execute());
+  for (let i = 0; i < 45; i++) {
+    const at = new Date(NOW - i * 60_000).toISOString();
+    await a.run(() => db.insertInto("reviews").values({ id: `rev_pg${String(i).padStart(2, "0")}`, product_id: pa2.id, order_id: "o", invite_id: `rvi_pg${i}`, rating: 4, title: `Paged ${String(i).padStart(2, "0")}`, body: "x".repeat(20), display_name: "N", status: "approved", created_at: at, updated_at: at }).execute());
+  }
+  const page = async (n) => (await html(React.createElement(AllPage, { params: Promise.resolve({ handle: pa2.handle }), searchParams: Promise.resolve(n ? { page: String(n) } : {}) }))).replace(/<!-- -->/g, "");
+  const items = (h) => [...h.matchAll(/data-review=""/g)].length;
+  const titles = (h) => [...h.matchAll(/Paged (\d\d)/g)].map((m) => m[1]);
+  const p1 = await page(null);
+  eq(items(p1), 20, "page 1:");
+  eq(titles(p1)[0], "00", "newest first:");
+  ok(p1.includes(`/products/${pa2.handle}/reviews?page=2`) && !p1.includes("Newer") && p1.includes("Older") && p1.includes("Page 1 of 3"), "page 1 links");
+  const p2 = await page(2);
+  eq(items(p2), 20, "page 2:");
+  eq(titles(p2)[0], "20", "page 2 starts at the 21st:");
+  ok(p2.includes("Newer") && p2.includes("Older") && p2.includes(`reviews?page=1`) && p2.includes(`reviews?page=3`), "page 2 links");
+  const p3 = await page(3);
+  eq(items(p3), 5, "page 3:");
+  ok(p3.includes("Newer") && !p3.includes("Older"), "page 3 links");
+  let missing = false;
+  try {
+    await page(4);
+  } catch (e) {
+    missing = e instanceof NotFound;
+  }
+  ok(missing, "page 4 is a 404");
+  eq(items(await page("junk")), 20, "a junk page number reads as page 1:");
+});
+
 await t("JSON-LD: AggregateRating equals the approved set's count and mean over 200 random sets (pending, rejected, hidden ignored); numbers only", async () => {
   let seed = 7;
   const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
@@ -507,7 +537,29 @@ await t("sweep: with emails off nothing is sent; on, one email per due order (id
   ok(!n.body.includes("ord_ra1"), "no order id in the email");
   eq((await run(NOW + 7 * DAY + 2000)).orders, 0, "not twice:");
   eq((await notes(a, "ord_ra1")).length, 1, "one row:");
-  eq((await run(NOW + 30 * DAY)).orders, 0, "an invite due long ago is never mailed (catch-up window):");
+  // catch-up: a fresh invite whose send_after passed more than 3 days ago is never mailed
+  await placeOrder(a, { id: "ord_late", products: [pa2], email: "late.buyer@shopper.test" });
+  await fulfil(a, "ord_late", new Date(NOW).toISOString());
+  eq((await invitesOf(a, "ord_late"))[0].sent_at, null, "fresh, unsent:");
+  await run(NOW + 7 * DAY + 3 * DAY + 60_000);
+  eq((await notes(a, "ord_late")).length, 0, "due 3 days and a minute ago: never mailed (catch-up window):");
+  eq((await invitesOf(a, "ord_late"))[0].sent_at, null, "left unsent (still usable from the order page):");
+});
+
+await t("sweep cap: at most 50 orders a run, each with every one of its invites (an order is never split across runs)", async () => {
+  const ids = Array.from({ length: 52 }, (_, i) => `ord_cap${String(i).padStart(2, "0")}`);
+  for (const id of ids) {
+    await placeOrder(a, { id, products: [pa1, pa2, pa3], email: `${id}@shopper.test` });
+    await fulfil(a, id, new Date(NOW + 100 * DAY).toISOString());
+  }
+  const run = () => a.run(() => SWEEP.sweepReviews({ install: sweepInstall({}), now: NOW + 107 * DAY + 1000, log: () => {} }));
+  eq((await run()).orders, 50, "first run:");
+  const sentOf = async (id) => (await invitesOf(a, id)).filter((i) => i.sent_at).length;
+  const counts = await Promise.all(ids.map(sentOf));
+  ok(counts.every((n) => n === 0 || n === 3), `no order split: ${counts}`);
+  eq(counts.filter((n) => n === 3).length, 50, "fifty whole orders:");
+  for (const id of ids.filter((_, i) => counts[i] === 3)) eq((await notes(a, id))[0]?.body.match(/\/reviews\/write\?t=/g)?.length, 3, `${id} lists all three:`);
+  eq((await run()).orders, 2, "the rest next run:");
 });
 
 await t("opt-out: the signed link's button writes review_optouts (a tampered one refuses); the sweep then skips that address; the page shows the confirm button, never a write on GET", async () => {
@@ -562,6 +614,29 @@ await t("a store one migration behind (no 0040 tables) reads as empty: no stars,
   } finally {
     await old.cleanup();
   }
+});
+
+await t("no third-party pixels on /reviews/* (the signed token never reaches gtag or Meta): Pixels gates on the path, the review pages render no script, ?t= is stripped after render, referrer policy origin", async () => {
+  const { pixelsAllowed } = await import("../lib/track/no-pixels.js");
+  for (const p of ["/reviews/write", "/reviews/optout", "/reviews", "/reviews/write?t=x"]) eq(pixelsAllowed(p), false, `${p}:`);
+  for (const p of ["/", "/products/x", "/products/x/reviews", "/reviewsx", "/cart"]) eq(pixelsAllowed(p), true, `${p}:`);
+  const src = await readFile(join(ROOT, "components/analytics/Pixels.js"), "utf8");
+  ok(/const allowed = pixelsAllowed\(usePathname\(\)\)/.test(src) && /if \(!allowed\) return undefined;/.test(src) && src.indexOf("if (!allowed)") < src.indexOf("loadGtag(ga4Id)"), "Pixels bails before loading any tag");
+  const layout = await readFile(join(ROOT, "app/(storefront)/layout.js"), "utf8");
+  eq((layout.match(/googletagmanager|fbevents/g) || []).length, 0, "the layout loads no tag itself:");
+  const [inv] = await invitesOf(a, "ord_late");
+  const tok = await tokenFor(a, inv);
+  const optTok = await a.run(async () => TOK.optOutToken(await TOK.emailHash("late.buyer@shopper.test")));
+  for (const [label, el] of [["write", React.createElement(WritePage, { searchParams: Promise.resolve({ t: tok }) })], ["optout", React.createElement(OptOutPage, { searchParams: Promise.resolve({ t: optTok }) })]]) {
+    const h = await html(el);
+    ok(!/<script|googletagmanager|fbevents|gtag|fbq/.test(h), `${label}: no script or pixel`);
+  }
+  for (const f of ["app/(storefront)/reviews/write/page.js", "app/(storefront)/reviews/optout/page.js"]) {
+    const s = await readFile(join(ROOT, f), "utf8");
+    ok(s.includes('referrer: "origin"') && s.includes("<StripToken />"), `${f}: referrer origin and StripToken`);
+  }
+  const strip = await readFile(join(ROOT, "components/reviews/StripToken.js"), "utf8");
+  ok(strip.includes('searchParams.delete("t")') && strip.includes("history.replaceState"), "StripToken removes t");
 });
 
 // --- 7. banned copy -----------------------------------------------------------------

@@ -1,4 +1,5 @@
 import { tfetch } from "@/lib/storefront-request";
+import StripToken from "@/components/reviews/StripToken";
 import { verifyOptOutToken } from "@/lib/reviews/tokens";
 import { OPTOUT_WORDS } from "@/lib/reviews/words";
 
@@ -8,7 +9,7 @@ import { OPTOUT_WORDS } from "@/lib/reviews/words";
 // signed hash of the email, never the email itself.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Review emails", robots: { index: false }, referrer: "same-origin" };
+export const metadata = { title: "Review emails", robots: { index: false }, referrer: "origin" };
 
 export default async function ReviewOptOutPage({ searchParams }) {
   const sp = (await searchParams) ?? {};
@@ -16,6 +17,7 @@ export default async function ReviewOptOutPage({ searchParams }) {
   const valid = !sp.done && token ? await tfetch(() => verifyOptOutToken(token)) : null;
   return (
     <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
+      <StripToken />
       <h1 className="text-2xl font-extrabold tracking-tight">Review emails</h1>
       {sp.done ? (
         <p className="mt-3 text-sf-text-muted" data-optout-done="">

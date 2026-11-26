@@ -13,7 +13,8 @@ import { Distribution, ReviewItems } from "@/components/plugins/blocks/ReviewLis
 // first ("See all reviews" from the Reviews block). It answers only while
 // shoppers see that block: Reviews enabled, not turned off by Storeasy, and
 // its Reviews block Live (slotBlocks decides, as on the product page).
-// Otherwise, and for a product with no approved review, it is a 404.
+// Otherwise, for a product with no approved review, and for a page past the
+// last one, it is a 404.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,8 @@ async function load(handle, page) {
   const block = (await slotBlocks("storefront.pdp.below_fold", product)).find((b) => b.live && b.pluginId === "reviews" && b.blockId === "list");
   if (!block) return null;
   const stats = await productStats(product.id);
-  if (!stats.count) return null;
+  // no approved review, or a page past the last one: a 404
+  if (!stats.count || (page - 1) * PER_PAGE >= stats.count) return null;
   const replies = await showsReplies();
   const reviews = await approvedReviews(product.id, { limit: PER_PAGE, offset: (page - 1) * PER_PAGE, replies });
   return { product, stats, reviews };
