@@ -43,10 +43,36 @@ export const GET = tenantHandler(async (request) => {
 const MAX_BODY_BYTES = 256 * 1024;
 const tooBig = () => NextResponse.json({ error: "body too large" }, { status: 413 });
 
+// the raw body, read as a stream with a running limit (a chunked request with
+// no content-length can't get past it) → string | null when over the limit
+async function rawBody(request) {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_BODY_BYTES) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(size);
+  let at = 0;
+  for (const c of chunks) {
+    all.set(c, at);
+    at += c.byteLength;
+  }
+  return new TextDecoder().decode(all);
+}
+
 export const POST = tenantHandler(async (request) => {
   if (Number(request.headers.get("content-length") || 0) > MAX_BODY_BYTES) return tooBig();
-  const raw = await request.text();
-  if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES) return tooBig();
+  const raw = await rawBody(request);
+  if (raw === null) return tooBig();
   const given = String(request.headers.get("x-hub-signature-256") ?? "");
   const { app_secret: appSecret } = await installSecrets();
   if (!appSecret || !given || !timingSafeEqual(await hubSignature(String(appSecret), raw), given)) {

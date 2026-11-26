@@ -296,6 +296,18 @@ await t("consent route: GET shows this cart's live boxes (phone masked; nothing 
   ok(vias.length === 2 && vias.every((v) => v.revoked_via === "phone_changed"), JSON.stringify(vias));
 });
 
+await t("consent route: syncs have their own allowance (60 per 10 minutes), apart from ticks", async () => {
+  process.env.RATE_LIMIT_DISABLED = "0";
+  try {
+    const h = { "x-forwarded-for": "203.0.113.88" };
+    for (let i = 0; i < 12; i++) await hit("consent", "POST", { cookies: { [CART_COOKIE]: "cart_rl2" }, headers: h, body: { sync: true, phone: "9876500801" } });
+    const tick = await hit("consent", "POST", { cookies: { [CART_COOKIE]: "cart_rl2" }, headers: h, body: { purpose: "updates", granted: true, phone: "9876500801" } });
+    eq(tick.status, 200, "a tick after 12 syncs:");
+  } finally {
+    process.env.RATE_LIMIT_DISABLED = "1";
+  }
+});
+
 await t("consent route: 10 per 10 minutes", async () => {
   process.env.RATE_LIMIT_DISABLED = "0"; // the harness turns limits off
   let last;
@@ -400,6 +412,13 @@ await t("webhook: GET verify challenge (token match only); POST unsigned or tamp
   eq((await a.run(() => C.consentById(id)))?.revoked_at ?? null, null, "still live:");
   const big = JSON.stringify({ pad: "x".repeat(260 * 1024) });
   eq((await hit("webhook", "POST", { raw: big, headers: { "x-hub-signature-256": await W.hubSignature(APP_SECRET, big) } })).status, 413, "a body over 256 KB, even signed:");
+  // chunked, no content-length: the running limit still refuses it
+  const chunk = new TextEncoder().encode("x".repeat(64 * 1024));
+  let sentChunks = 0;
+  const stream = new ReadableStream({ pull(c) { if (sentChunks++ < 6) c.enqueue(chunk); else c.close(); } });
+  const chunked = await ROUTES.webhook.POST(new NextRequest(`http://${HOST_A}/api/whatsapp/webhook`, { method: "POST", headers: { host: HOST_A, "x-hub-signature-256": sig }, body: stream, duplex: "half" }), { params: Promise.resolve({}) });
+  eq(chunked.status, 413, "chunked over 256 KB:");
+  ok(sentChunks <= 6, "stopped reading at the limit");
   const okd = await hit("webhook", "POST", { raw, headers: { "x-hub-signature-256": sig } });
   eq(okd.status, 200, okd.text);
   eq((await a.run(() => C.consentById(id)))?.revoked_via, "whatsapp_stop", "revoked by STOP:");
@@ -455,9 +474,9 @@ async function seedCart(kind) {
     await db.insertInto("carts").values({ id: cart, coupon_code: null, created_at: isoAt(idle), updated_at: isoAt(idle) }).execute();
     if (kind !== "empty") await db.insertInto("cart_items").values({ cart_id: cart, variant_id: varGid, product_id: prodGid, quantity: 1, added_at: isoAt(idle) }).execute();
     const grant = (purpose, over = {}) => C.grantConsent({ purpose, phone, cartId: cart, source: "checkout", now: idle - 60_000, ...over });
-    if (["marketing", "fresh", "empty", "ordered", "cap", "shared_phone", "unproven"].includes(kind)) await grant("marketing");
-    // marketing goes only to a number on a placed order here: every case but "unproven" has one (another cart)
-    if (kind !== "unproven") await db.insertInto("orders").values({ id: `BL-WP${String(n).padStart(6, "0")}`, idempotency_key: `idem_wp_${n}`, cart_id: `cart_proof${n}`, email: `p${n}@wa.test`, phone, name: "Proof", total: 1, currency: "INR", status: "paid", created_at: isoAt(DAY - 30 * 86_400_000), updated_at: isoAt(DAY - 30 * 86_400_000) }).onConflict((oc) => oc.doNothing()).execute();
+    if (["marketing", "fresh", "empty", "ordered", "cap", "shared_phone", "first_time"].includes(kind)) await grant("marketing");
+    // a past order with this number on another cart (the first-time case has none, and still gets its reminder)
+    if (kind !== "first_time") await db.insertInto("orders").values({ id: `BL-WP${String(n).padStart(6, "0")}`, idempotency_key: `idem_wp_${n}`, cart_id: `cart_proof${n}`, email: `p${n}@wa.test`, phone, name: "Proof", total: 1, currency: "INR", status: "paid", created_at: isoAt(DAY - 30 * 86_400_000), updated_at: isoAt(DAY - 30 * 86_400_000) }).onConflict((oc) => oc.doNothing()).execute();
     if (kind === "updates_only") await grant("updates");
     if (kind === "revoked") {
       await grant("marketing");
@@ -470,12 +489,12 @@ async function seedCart(kind) {
       await db.insertInto("cart_items").values({ cart_id: `${cart}_twin`, variant_id: varGid, product_id: prodGid, quantity: 1, added_at: isoAt(idle) }).execute();
     }
   });
-  if (["marketing", "shared_phone"].includes(kind)) expected.add(`whatsapp_cart_reminder|${e164(phone)}|wa:cart_reminder:${cart}`);
+  if (["marketing", "shared_phone", "first_time"].includes(kind)) expected.add(`whatsapp_cart_reminder|${e164(phone)}|wa:cart_reminder:${cart}`);
   return { cart, kind };
 }
 
 const ORDER_CASES = ["none", "updates", "both", "marketing_only", "revoked", "other_cart", "other_phone", "customer_bound", "customer_vs_guest", "store_b"];
-const CART_CASES = ["none", "updates_only", "marketing", "revoked", "ordered", "fresh", "empty", "shared_phone", "unproven"];
+const CART_CASES = ["none", "updates_only", "marketing", "revoked", "ordered", "fresh", "empty", "shared_phone", "first_time"];
 const orders = [];
 for (let i = 0; i < 4; i++) for (const k of ORDER_CASES) orders.push(await seedOrder(k));
 const carts = [];
@@ -649,6 +668,30 @@ await t("nobody else: a consent revoked between the sweep's query and its send s
   const sent = await a.run(() => db.selectFrom("notifications").select("idempotency_key").where("idempotency_key", "in", ["wa:cart_reminder:cart_race_01", "wa:cart_reminder:cart_race_02"]).execute());
   same(sent.map((x) => x.idempotency_key), ["wa:cart_reminder:cart_race_01"], "only the first:");
   ok(out.logged.some(([e, why]) => e === "wa_skipped" && why === "no_consent"), "the second skipped: no consent");
+});
+
+await t("fairness: 60 older carts whose phone is at its weekly cap don't take the batch; a newer first-time cart still gets its reminder", async () => {
+  const T = DAY + 20 * 86_400_000;
+  const { sweepCarts, BATCH } = await import("../lib/plugins/first-party/whatsapp/sweep.js");
+  const r = await a.run(async () => {
+    const capped = "+919811122222";
+    for (const i of [1, 2]) await db.insertInto("notifications").values({ id: `ntf_fair${i}`, type: "whatsapp_cart_reminder", recipient: capped, subject: "WhatsApp", body: "x", status: "sent", error: null, provider_id: "whatsapp-stub", consent_class: "marketing", consent_ref: "mc_fair", idempotency_key: `fair:${i}`, created_at: isoAt(T - i * 86_400_000 - HOUR), sent_at: isoAt(T - i * 86_400_000 - HOUR) }).execute();
+    for (let i = 0; i < BATCH + 10; i++) {
+      const id = `cart_fair_${String(i).padStart(3, "0")}`;
+      const at = T - 6 * HOUR - i * 60_000;
+      await db.insertInto("carts").values({ id, coupon_code: null, created_at: isoAt(at), updated_at: isoAt(at) }).execute();
+      await db.insertInto("cart_items").values({ cart_id: id, variant_id: varGid, product_id: prodGid, quantity: 1, added_at: isoAt(at) }).execute();
+      await C.grantConsent({ purpose: "marketing", phone: capped, cartId: id, source: "checkout", now: at - 60_000 });
+    }
+    const at = T - 3 * HOUR;
+    await db.insertInto("carts").values({ id: "cart_fair_new", coupon_code: null, created_at: isoAt(at), updated_at: isoAt(at) }).execute();
+    await db.insertInto("cart_items").values({ cart_id: "cart_fair_new", variant_id: varGid, product_id: prodGid, quantity: 1, added_at: isoAt(at) }).execute();
+    await C.grantConsent({ purpose: "marketing", phone: "9811133333", cartId: "cart_fair_new", source: "checkout", now: at - 60_000 });
+    return sweepCarts({ install: { id: waA.id, settings: {} }, now: T, secrets: async () => ({}), fetch: async () => ({ ok: false }) });
+  });
+  eq(r.due, 1, `only the sendable cart is due: ${JSON.stringify(r)}`);
+  eq(r.sent, 1, "sent:");
+  ok(await a.run(async () => Boolean(await db.selectFrom("notifications").select("id").where("idempotency_key", "=", "wa:cart_reminder:cart_fair_new").executeTakeFirst())), "the newer cart's reminder");
 });
 
 await t("caps race: parallel marketing sends to one phone write one row (the count is inside the insert)", async () => {

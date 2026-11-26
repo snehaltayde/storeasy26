@@ -14,7 +14,8 @@ import { ConsentError, cartState, grantConsent, revokeConsent, syncCart } from "
 //        on this cart for another number is withdrawn
 //   Every POST answers the GET's shape.
 // The consent is bound to the cart cookie (and the signed-in shopper, if any),
-// never to an id in the body; no cart cookie → 400. 10 per 10 minutes.
+// never to an id in the body; no cart cookie → 400. Ticks 10 per 10 minutes;
+// syncs (withdraw only) 60 per 10 minutes, counted apart.
 // The words recorded are the server's own (lib/messaging/wording.js).
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,15 +29,17 @@ export const GET = storefrontHandler(async (request) => {
 
 export const POST = storefrontHandler(async (request) => {
   if (!sameOrigin(request)) return NextResponse.json({ error: "This request isn't allowed." }, { status: 403 });
-  const limited = await rateLimitAsync(request, { name: "wa-consent", limit: 10, windowMs: 10 * 60_000 });
+  const body = await request.json().catch(() => ({}));
+  // a sync only ever withdraws, and runs as the phone is typed: its own allowance
+  const sync = body?.sync === true;
+  const limited = await rateLimitAsync(request, sync ? { name: "wa-consent-sync", limit: 60, windowMs: 10 * 60_000 } : { name: "wa-consent", limit: 10, windowMs: 10 * 60_000 });
   if (limited) return limited;
   const cart = request.cookies.get(CART_COOKIE)?.value || null;
   if (!cart) return NextResponse.json({ error: "Add something to your cart first." }, { status: 400 });
   const customer = await customerFromToken(request.cookies.get(CUSTOMER_COOKIE)?.value).catch(() => null);
-  const body = await request.json().catch(() => ({}));
   const purpose = String(body?.purpose ?? "");
   try {
-    if (body?.sync === true) return answer(await syncCart(cart, body.phone, String(body.country || "IN")));
+    if (sync) return answer(await syncCart(cart, body.phone, String(body.country || "IN")));
     if (body?.granted === true) {
       await grantConsent({ purpose, phone: body.phone, country: String(body.country || "IN"), cartId: cart, customerId: customer?.id ?? null, source: "checkout" });
       return answer(await cartState(cart));
