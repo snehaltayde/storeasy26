@@ -17,14 +17,17 @@ export default function WhatsAppConsent({ phone, country = "IN" }) {
   const latest = useRef(granted);
   latest.current = granted;
 
+  // the box follows the click at once and goes back if the save fails
   async function save(purpose, on) {
     setError(null);
+    const was = latest.current[purpose] ?? null;
+    setGranted((g) => ({ ...g, [purpose]: on ? number : null }));
     try {
       const res = await fetch("/api/messaging/consent", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ purpose, granted: on, phone, country }) });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok) throw new Error(json.error || "That didn't save. Try again.");
-      setGranted((g) => ({ ...g, [purpose]: on ? number : null }));
     } catch (e) {
+      setGranted((g) => ({ ...g, [purpose]: was }));
       setError(e.message || "That didn't save. Try again.");
     }
   }
