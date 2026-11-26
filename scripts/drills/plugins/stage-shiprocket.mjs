@@ -126,11 +126,12 @@ stage("shiprocket", async (drill) => {
     rmSync(join(dir, `${awb}.json`), { force: true });
   }
 
-  // another order's page: not this shopper's, so no page and no tracking
-  const other = await page.goto(`${ORIGIN}/account/orders/${encodeURIComponent(otherId)}`, { waitUntil: "load" });
-  drill.check((await page.locator("[data-tracking]").count()) === 0, "another order's page shows no tracking", other?.status());
-  const guest = await page.goto(`${ORIGIN}/orders/${encodeURIComponent(orderId)}?t=bad`, { waitUntil: "load" });
-  drill.check(guest?.status() === 404 && (await page.locator("[data-tracking]").count()) === 0, "the guest order page with a bad link: 404, no tracking", guest?.status());
+  // another order's page: not this shopper's, so no page and no tracking (fetched with
+  // the shopper's cookies rather than opened, so the expected 404 isn't a console error)
+  const other = await page.request.get(`${ORIGIN}/account/orders/${encodeURIComponent(otherId)}`);
+  drill.check(!(await other.text()).includes("data-tracking"), "another order's page shows no tracking", other.status());
+  const guest = await page.request.get(`${ORIGIN}/orders/${encodeURIComponent(orderId)}?t=bad`);
+  drill.check(guest.status() === 404 && !(await guest.text()).includes("data-tracking"), "the guest order page with a bad link: 404, no tracking", guest.status());
 
   // the admin order view's shipment card
   await open(owner, `/admin/orders/${encodeURIComponent(orderId)}`);
