@@ -44,6 +44,9 @@ export const SUPPORT_PROBES = Object.freeze([
   { name: "apps/[id]/blocks", path: "apps/[id]/blocks", method: "GET", req: (ctx) => ({ params: { id: ctx.installId } }), keys: ["ok", "installStatus", "blocks", "previewPaths"] },
   // Phase 9 line 4: the Shiprocket webhook key's state (never the key or its hash)
   { name: "apps/[id]/parcel-key", path: "apps/[id]/parcel-key", method: "GET", req: (ctx) => ({ params: { id: ctx.installId } }), keys: ["ok", "set", "rotatedAt", "address", "addressWarning"] },
+  // Phase 9 line 3: the WhatsApp card (its access token and app secret are canaries; support sees phones masked)
+  { name: "apps/[id]/whatsapp", path: "apps/[id]/whatsapp", method: "GET", req: (ctx) => ({ params: { id: ctx.whatsappAppId } }), keys: ["ok", "connection", "templates", "vars", "caps", "log"] },
+  { name: "apps/[id]/whatsapp (another app)", path: "apps/[id]/whatsapp", method: "GET", req: (ctx) => ({ params: { id: ctx.appId } }), status: 404, keys: ["error", "code"], note: "only the WhatsApp install has this card" },
   { name: "bundles", path: "bundles", method: "GET", keys: ["ok", "bundles", "currency"] },
   { name: "catalog", path: "catalog", method: "GET", keys: ["ok", "products", "overrides", "collections", "shopify_admin"] },
   // P2-D: Phase 2's catalog views (lines 5 and 6)

@@ -844,6 +844,9 @@ flowStubs["./PincodeField"] = {
 // fetches, which this stand-in can't run; it renders nothing here (its copy is
 // still in the source scan, and scripts/test-addresses.js scans it too).
 flowStubs["./SavedAddressPicker"] = nothing;
+// Phase 9 line 3: the WhatsApp opt-ins save on each tick (a fetch), so the same:
+// a stand-in here; their words are in the source scan and test:whatsapp scans them.
+flowStubs["./WhatsAppConsent"] = nothing;
 for (const part of ["checkoutModel", "AddressStep", "PrepaidNudge", "PaymentStep", "OrderSummary", "CodOtpDialog", "useQuote", "placeOrder"]) {
   flowStubs[`./${part}`] = await loadComponent(sources.get(`components/checkout/${part}.js`), flowStubs);
 }
@@ -1344,6 +1347,7 @@ async function accountBadges(src = accountSrc) {
     "@/components/account/AccountAuth": nothing,
     "@/components/account/ProfileForm": nothing,
     "@/components/account/AddressBook": nothing,
+    "@/components/account/MessagingPrefs": nothing, // Phase 9 line 3: fetches its own state
     "@/lib/addresses": { listAddresses: async () => [] },
     "@/lib/tenant-request": { tfetch: inOwn },
     "@/lib/storefront-request": { tfetch: inOwn },

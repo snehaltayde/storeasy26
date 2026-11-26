@@ -13,6 +13,7 @@ import { ApiAccessCard } from "@/components/admin/apps/ApiAccessCard";
 import { PluginIcon } from "@/components/admin/apps/plugin-icon";
 import PlacementsCard from "@/components/admin/apps/PlacementsCard";
 import { ShiprocketCard } from "@/components/admin/apps/ShiprocketCard"; // Phase 9 line 4
+import { WhatsAppCard } from "@/components/admin/apps/WhatsAppCard";
 import { KILLED, KILLED_BODY, SEES_NOTHING, installState, shortDate } from "@/components/admin/apps/app-words";
 
 // /admin/apps/[id] (Phase 4 line 1): Overview (what it does, what it can see,
@@ -92,6 +93,8 @@ export function AppDetail({ install: initial, plugin, activity, role }) {
       {install.kind === "custom" && <ApiAccessCard install={install} role={role} />}
       {/* Phase 9 line 4: Shiprocket's tracking webhook */}
       {install.pluginId === "shiprocket" && <ShiprocketCard install={install} role={role} />}
+      {/* p9: whatsapp */}
+      {install.pluginId === "whatsapp" && install.status !== "uninstalled" && <WhatsAppCard install={install} role={role} />}
       {activity && <AppActivity rows={activity} />}
       <AppDangerZone install={install} role={role} onChanged={setInstall} />
     </div>

@@ -63,8 +63,9 @@ const install = (pluginId, status, extra = {}) =>
   db.insertInto("plugin_installs").values({ id: `pin_sweep${++n}`, plugin_id: pluginId, kind: "first_party", version: "1.0.0", status, granted_scopes: "[]", settings: JSON.stringify({ greeting: `hi ${pluginId}`, __secret_keys: ["token"] }), installed_by: "member:test", installed_at: NOW_ISO, updated_at: NOW_ISO, ...extra }).returning("id").executeTakeFirstOrThrow();
 
 await t("registerSweep: adds a sweep, undo removes it; a second register replaces it and the first undo leaves the second alone; a non-function is refused", () => {
-  // Phase 9 lines add built-in sweeps (line 4: shiprocket); each is a catalog plugin's
+  // Phase 9 lines add built-in sweeps (line 3: whatsapp, line 4: shiprocket); each is a catalog plugin's
   ok(BUILT_IN_SWEEPS.every((id) => CAT.pluginById(id)), "every built-in sweep is a catalog plugin's:");
+  ok(BUILT_IN_SWEEPS.every((id) => typeof SW.sweepFor(id) === "function"), "every built-in id has its sweep");
   eq(SW.sweepFor("fx-reg"), null, "none yet:");
   const f1 = async () => {};
   const f2 = async () => {};
