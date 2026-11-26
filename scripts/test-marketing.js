@@ -176,18 +176,42 @@ await t("brand and motion: the logo is on the shared header and footer with an a
   const layout = await readFile(join(ROOT, "app/(storefront)/layout.js"), "utf8");
   ok(/<body className="mk /.test(layout) && /<SiteFooter \/>/.test(layout), "the marketing body does not carry .mk or the shared footer");
   eq((layout.match(/className="mk /g) || []).length, 1, "only the marketing body carries .mk:");
-  const css = await readFile(join(ROOT, "app/marketing.css"), "utf8");
-  // every rule that sets a token or draws is under .mk or an mk- class; no store token is set
-  ok(!/(^|[\s{;])--(sf-|accent-|background|foreground|header-|hero-)[\w-]*\s*:/m.test(css), "marketing.css sets a store brand token");
-  ok(!/^\s*(:root|html|body)\b/m.test(css), "marketing.css styles the root, which stores share");
-  const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
-  ok(reduced.length > 100 && /animation: none !important/.test(reduced) && /transition: none !important/.test(reduced) && /\[data-reveal\][\s\S]*opacity: 1 !important/.test(reduced), "reduced motion does not stop the animations and show the content");
+  // the shared sheet rides in globals.css; the landing page's own sheet is loaded by the landing page only
+  const shared = await readFile(join(ROOT, "app/marketing.css"), "utf8");
+  const landing = await readFile(join(ROOT, "components/site/landing.css"), "utf8");
+  const home = await readFile(join(ROOT, "components/site/MarketingHome.js"), "utf8");
+  ok(/^import "\.\/landing\.css";$/m.test(home), "the landing page does not load its own stylesheet");
+  ok(!/landing\.css/.test(await readFile(join(ROOT, "app/globals.css"), "utf8")), "landing.css rides in globals.css, so every store page downloads it");
+  ok(shared.split("\n").length < 200, "app/marketing.css has grown: landing-only rules belong in components/site/landing.css");
+  for (const [name, css] of [["app/marketing.css", shared], ["components/site/landing.css", landing]]) {
+    // every rule that sets a token or draws is under .mk or an mk- class; no store token is set
+    ok(!/(^|[\s{;])--(sf-|accent-|background|foreground|header-|hero-)[\w-]*\s*:/m.test(css), `${name} sets a store brand token`);
+    ok(!/^\s*(:root|html|body)\b/m.test(css), `${name} styles the root, which stores share`);
+  }
+  const reduced = shared.slice(shared.indexOf("@media (prefers-reduced-motion: reduce)"));
+  ok(reduced.length > 100 && /\.mk \*,[\s\S]*animation: none !important/.test(reduced) && /transition: none !important/.test(reduced), "reduced motion does not stop the animations");
+  // the stylesheet draws the finished page: outside keyframes nothing but the pointer's disc starts hidden
+  const atRest = landing.replace(/@keyframes[^{]+\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, "");
+  eq((atRest.match(/opacity: 0;|visibility: hidden|display: none/g) || []).length - (atRest.match(/\.mk-cursor \{[^}]*opacity: 0;/g) || []).length, (atRest.match(/display: none/g) || []).length, "landing.css hides content at rest:");
+  for (const m of atRest.matchAll(/([^{}]+)\{[^{}]*display: none[^{}]*\}/g)) ok(/mk-cursor|mk-path-track|mk-rail-bar|mk-cols/.test(m[1]), `landing.css hides ${m[1].trim()}`);
   const motion = await readFile(join(ROOT, "components/site/MotionRoot.js"), "utf8");
   ok(/prefers-reduced-motion: reduce\)"\)\.matches\) return/.test(motion), "the motion island runs under reduced motion");
+  ok(motion.indexOf('prefers-reduced-motion: reduce)").matches) return') < motion.indexOf('import("gsap")'), "the motion libraries are fetched before reduced motion is checked");
   ok(/prefers-reduced-motion: reduce/.test(await readFile(join(ROOT, "components/site/StackCalculator.js"), "utf8")), "the calculator's count-up ignores reduced motion");
-  // no animation library came in with the redesign
+  // GSAP and Lenis (docs/DECISIONS.md) are fetched by the landing page's motion island and nowhere else: no store page carries them
   const pkg = JSON.parse(await readFile(join(ROOT, "package.json"), "utf8"));
-  for (const dep of ["framer-motion", "motion", "gsap", "lottie-web", "animejs", "three"]) ok(!pkg.dependencies?.[dep] && !pkg.devDependencies?.[dep], `${dep} was added`);
+  ok(pkg.dependencies?.gsap && pkg.dependencies?.lenis, "gsap and lenis are not dependencies");
+  for (const dep of ["framer-motion", "motion", "lottie-web", "animejs", "three"]) ok(!pkg.dependencies?.[dep] && !pkg.devDependencies?.[dep], `${dep} was added`);
+  ok(!/^import [^;]*["'](gsap|lenis)/m.test(motion) && /import\("gsap"\)/.test(motion) && /import\("lenis"\)/.test(motion), "the motion island must fetch gsap and lenis lazily, not import them at the top");
+  const { readdir } = await import("node:fs/promises");
+  const users = [];
+  for (const dir of ["app", "components", "lib"]) {
+    for (const f of await readdir(join(ROOT, dir), { recursive: true })) {
+      if (!/\.(js|jsx|ts|tsx|mjs)$/.test(f)) continue;
+      if (/["'](gsap|lenis)(\/[^"']*)?["']/.test(await readFile(join(ROOT, dir, f), "utf8"))) users.push(`${dir}/${f}`);
+    }
+  }
+  eq(JSON.stringify(users), JSON.stringify(["components/site/MotionRoot.js"]), "files that load gsap or lenis:");
 });
 
 await t("calculator: blanks count as nothing, bad input is named, monthly and yearly add up, the plan is compared in rupees", async () => {

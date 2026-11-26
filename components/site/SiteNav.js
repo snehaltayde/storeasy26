@@ -32,6 +32,10 @@ const ring = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visib
 // The lockup is 3.74:1; the width and height below keep that ratio at the
 // drawn size so next/image asks for a file no larger than the screen needs.
 // StoreImage is the app's one door to next/image (test:images).
+// Each className sets the height and the width together, as a pair per
+// breakpoint, and the pair from `sm` equals the attributes. With `w-auto` the
+// browser took the width from the resized file's own ratio (149px against the
+// attribute's 150), which next/image reports as "width or height modified".
 function Logo({ height, priority = false, className }) {
   return <StoreImage src="/brand/storeasy-by-mediastic.png" alt="Storeasy by mediaStic" width={Math.round(height * (1762 / 471))} height={height} priority={priority} className={className} />;
 }
@@ -41,7 +45,7 @@ export default function SiteNav() {
     <header className="sticky top-0 z-30 border-b border-mk-rule bg-white/85 backdrop-blur-xl">
       <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 sm:gap-6 sm:px-6">
         <Link href="/" className={`shrink-0 rounded-md ${ring}`}>
-          <Logo height={40} priority className="h-9 w-auto sm:h-10" />
+          <Logo height={40} priority className="h-9 w-[135px] object-contain sm:h-10 sm:w-[150px]" />
         </Link>
         <nav aria-label="Storeasy" className="no-scrollbar flex gap-1 overflow-x-auto text-sm font-medium">
           {LINKS.map((l) => (
@@ -65,7 +69,7 @@ export function SiteFooter() {
       <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
         <div className="flex flex-wrap items-start justify-between gap-x-12 gap-y-8">
           <Link href="/" className={`shrink-0 rounded-md ${ring}`}>
-            <Logo height={56} className="h-12 w-auto sm:h-14" />
+            <Logo height={56} className="h-12 w-[180px] object-contain sm:h-14 sm:w-[209px]" />
           </Link>
           <nav aria-label="Footer">
             <ul className="flex flex-wrap gap-x-7 gap-y-3 text-[0.9375rem] font-medium">

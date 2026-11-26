@@ -1,0 +1,678 @@
+/* The Storeasy landing page (components/site/MarketingHome.js): its surfaces,
+   layout and resting states. Loaded by that component, so only "/" carries it;
+   the tokens it reads (--mk-*) are in app/marketing.css, on the marketing
+   <body>. Plain CSS: nothing here goes through Tailwind.
+
+   The rule for motion: this file draws the finished page. Every receipt line
+   is struck, every block is shown, the rail is a grid. The motion island
+   (./MotionRoot.js, GSAP and Lenis) rewinds those states and plays them
+   against the scroll, and marks the page with data-motion and data-pin so the
+   two pinned scenes can take their height. With motion off, or no script,
+   nothing is hidden and nothing is pinned. docs/UI.md, "Platform marketing
+   site". */
+
+@layer theme, base, components, utilities;
+
+/* Display type. Unlayered: it has to win over `.mk h1` in app/marketing.css. */
+.mk .mk-hero-title {
+  font-size: clamp(3.25rem, min(10.2vw, 16.5svh), 11.5rem);
+  line-height: 0.92;
+  letter-spacing: -0.04em;
+}
+.mk .mk-h2 {
+  font-family: var(--mk-display);
+  font-weight: 400;
+  font-size: clamp(2.5rem, 6.2vw, 6.75rem);
+  line-height: 0.96;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+.mk .mk-h3 {
+  font-family: var(--mk-display);
+  font-weight: 400;
+  font-size: clamp(1.5rem, 2.1vw, 2.125rem);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+.mk .mk-closing {
+  font-size: clamp(2.75rem, 8.4vw, 9.5rem);
+  line-height: 0.94;
+  max-width: 14ch;
+}
+/* Lenis asks for an auto-height root while it runs; the marketing <html> is
+   h-full. The class is Lenis's own and exists only on the landing page. */
+.lenis:where(:root) {
+  height: auto;
+}
+
+@layer components {
+  .mk-home {
+    --mk-head: 4.0625rem; /* the sticky header; MotionRoot measures the real one */
+    --mk-gut: 1.25rem;
+    --mk-edge: max(var(--mk-gut), calc((100vw - 1680px) / 2 + var(--mk-gut)));
+    --mk-ease: cubic-bezier(0.16, 1, 0.3, 1);
+    overflow-x: clip;
+  }
+  @media (min-width: 640px) {
+    .mk-home {
+      --mk-gut: 2rem;
+    }
+  }
+  @media (min-width: 1024px) {
+    .mk-home {
+      --mk-gut: 3rem;
+    }
+  }
+  .mk-sec {
+    padding-block: clamp(5rem, 11vw, 11rem);
+  }
+
+  /* ---- surfaces ------------------------------------------------------- */
+  /* overflow: clip, not hidden: a pinned child has to stick to the page. */
+  .mk-stage,
+  .mk-surface,
+  .mk-note {
+    position: relative;
+    isolation: isolate;
+    overflow: clip;
+    color: #fff;
+  }
+  .mk-stage {
+    background: var(--mk-ink);
+  }
+  .mk-surface,
+  .mk-note {
+    background: var(--mk-surface);
+  }
+  .mk-note {
+    border-radius: 1.5rem;
+    padding: clamp(1.75rem, 3vw, 2.75rem);
+  }
+  /* A film grain over the navy surfaces (an inline SVG, no request). */
+  .mk-grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.22;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  /* The aurora: three soft lights drifting behind a navy stage. */
+  .mk-aurora {
+    position: absolute;
+    inset: -25% -10%;
+    z-index: -2;
+    pointer-events: none;
+  }
+  .mk-aurora i {
+    position: absolute;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    will-change: transform;
+    animation: mk-drift 19s ease-in-out infinite alternate;
+  }
+  .mk-aurora i:nth-child(1) {
+    width: 52%;
+    left: -6%;
+    top: -4%;
+    background: radial-gradient(circle, rgb(91 43 224 / 0.7) 0%, rgb(91 43 224 / 0) 66%);
+  }
+  .mk-aurora i:nth-child(2) {
+    width: 44%;
+    right: -4%;
+    top: 6%;
+    background: radial-gradient(circle, rgb(47 123 255 / 0.5) 0%, rgb(47 123 255 / 0) 64%);
+    animation-duration: 24s;
+    animation-delay: -7s;
+  }
+  .mk-aurora i:nth-child(3) {
+    width: 58%;
+    left: 28%;
+    bottom: -18%;
+    background: radial-gradient(circle, rgb(42 20 160 / 0.85) 0%, rgb(42 20 160 / 0) 66%);
+    animation-duration: 29s;
+    animation-direction: alternate-reverse;
+  }
+
+  /* ---- scenes: a tall section whose inner frame holds still ----------- */
+  .mk-pin {
+    position: relative;
+  }
+  .mk-home[data-pin~="bill"] [data-scene="bill"] {
+    height: calc(100svh - var(--mk-head) + 260vh);
+  }
+  .mk-home[data-pin~="rail"] [data-scene="rail"] {
+    height: calc(100svh - var(--mk-head) + var(--rail-run, 0px));
+    padding-block: 0;
+  }
+  .mk-home[data-pin~="bill"] [data-scene="bill"] > .mk-pin,
+  .mk-home[data-pin~="rail"] [data-scene="rail"] > .mk-pin {
+    position: sticky;
+    top: var(--mk-head);
+    height: calc(100svh - var(--mk-head));
+    overflow: clip;
+  }
+
+  /* ---- 1. the hero and its receipt ----------------------------------- */
+  .mk-hero {
+    display: grid;
+    gap: 3.5rem;
+    padding-block: 3.5rem 5rem;
+  }
+  .mk-hero-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2.25rem;
+  }
+  @media (min-width: 1024px) {
+    .mk-hero {
+      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+      gap: 3rem;
+      min-height: calc(100svh - var(--mk-head));
+      padding-block: clamp(1.25rem, 4.5svh, 4rem);
+    }
+    .mk-hero-copy {
+      justify-content: space-between;
+    }
+    .mk-receipt {
+      align-self: center;
+      justify-self: end;
+    }
+    /* Pinned: the row is the frame's height, whatever the receipt's own. */
+    .mk-home[data-pin~="bill"] .mk-hero {
+      grid-template-rows: minmax(0, 1fr);
+      height: 100%;
+      min-height: 0;
+    }
+  }
+  .mk-word {
+    display: inline-block;
+    overflow: hidden;
+    vertical-align: bottom;
+    padding-bottom: 0.14em;
+    margin-bottom: -0.14em;
+  }
+  .mk-word > span {
+    display: inline-block;
+    animation: mk-rise 1.15s var(--mk-ease) both;
+    animation-delay: calc(var(--i, 0) * 70ms + 100ms);
+  }
+  .mk-fade {
+    animation: mk-fade 1s var(--mk-ease) both;
+    animation-delay: var(--d, 0ms);
+  }
+  /* The receipt: white paper with a torn lower edge, set a little askew.
+     --fit is MotionRoot's, to keep the whole slip inside a short pinned frame. */
+  .mk-receipt {
+    width: min(100%, 33rem);
+    margin-inline: auto;
+    scale: var(--fit, 1);
+    filter: drop-shadow(0 36px 54px rgb(2 1 24 / 0.6));
+    animation: mk-arrive 1.3s var(--mk-ease) 0.3s both;
+  }
+  .mk-paper {
+    padding: 1.5rem 1.25rem 2.1rem;
+    border-radius: 6px 6px 0 0;
+    background: #fff;
+    color: var(--mk-text);
+    transform: rotate(1.4deg);
+    -webkit-mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 14px 100%;
+    mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 14px 100%;
+  }
+  .mk-stamp {
+    flex: none;
+    padding: 0.1rem 0.7rem 0.2rem;
+    border: 2px solid var(--mk-violet);
+    border-radius: 0.5rem;
+    color: var(--mk-violet);
+    font-family: var(--mk-display);
+    font-weight: 600;
+    font-size: 1.125rem;
+    white-space: nowrap;
+    transform: rotate(-7deg);
+  }
+  .mk-line-grid {
+    display: grid;
+    grid-template-columns: 10.75rem minmax(0, 1fr);
+    column-gap: 1rem;
+    align-items: baseline;
+  }
+  .mk-cols {
+    margin-top: 1.1rem;
+    padding-bottom: 0.45rem;
+    overflow: hidden;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--mk-muted);
+  }
+  .mk-line {
+    overflow: hidden;
+  }
+  .mk-line > .mk-line-grid {
+    padding-block: clamp(0.3rem, 0.9svh, 0.7rem);
+    border-top: 1px dashed rgb(11 6 86 / 0.24);
+    font-size: 0.875rem;
+    line-height: 1.4;
+  }
+  /* Struck through at rest; MotionRoot draws the line from --s: 0. */
+  .mk-strike {
+    --s: 1;
+    color: var(--mk-muted);
+    background: linear-gradient(var(--mk-violet), var(--mk-violet)) 0 58% / calc(var(--s) * 100%) 1.5px no-repeat;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+  .mk-built {
+    display: flex;
+    align-items: baseline;
+    gap: 0.45rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--mk-navy);
+  }
+  .mk-tick {
+    flex: none;
+    align-self: center;
+    width: 1rem;
+    height: 1rem;
+    padding: 0.2rem;
+    border-radius: 50%;
+    background: var(--mk-signature);
+    color: #fff;
+  }
+  .mk-total {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.25rem 1rem;
+    margin-top: 0.6rem;
+    padding: 0.95rem 1.1rem;
+    border-radius: 0.75rem;
+    background: var(--mk-signature);
+    color: #fff;
+    font-weight: 600;
+  }
+  /* Where MotionRoot is about to take over (a script can run and motion is
+     wanted), the receipt waits unstruck so it does not flip when the script
+     lands. If the script never does, the finished receipt shows itself. */
+  @media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+    .mk-home:not([data-motion]) :is([data-built], [data-stamp], [data-total]) {
+      animation: mk-wait 0.6s ease 3.5s both;
+    }
+    .mk-home:not([data-motion]) [data-strike] {
+      animation: mk-wait-strike 0.6s ease 3.5s both;
+    }
+  }
+  @media (max-width: 479px) {
+    .mk-cols {
+      display: none;
+    }
+    .mk-paper ul {
+      margin-top: 1rem;
+    }
+    .mk-line-grid {
+      grid-template-columns: minmax(0, 1fr);
+      row-gap: 0.2rem;
+    }
+    .mk-line > .mk-line-grid {
+      padding-block: 0.6rem;
+    }
+  }
+
+  /* ---- buttons -------------------------------------------------------- */
+  .mk-cta-light {
+    background: #fff;
+    color: var(--mk-navy);
+    box-shadow: 0 16px 36px -16px rgb(156 192 255 / 0.9);
+    transition: box-shadow 0.3s ease;
+  }
+  .mk-cta-light:hover {
+    box-shadow: 0 20px 44px -14px rgb(156 192 255 / 1);
+  }
+  .mk-ghost {
+    transition:
+      background-color 0.3s ease,
+      border-color 0.3s ease;
+  }
+  .mk-home [data-magnetic] {
+    will-change: transform;
+  }
+
+  /* ---- 2. a storefront that's yours ---------------------------------- */
+  .mk-row {
+    padding-bottom: clamp(2rem, 4vw, 3.75rem);
+  }
+  .mk-rule-ink {
+    height: 1px;
+    background: linear-gradient(90deg, var(--mk-sky), rgb(255 255 255 / 0.28) 45%, rgb(255 255 255 / 0.08));
+  }
+
+  /* ---- 3. the rail ---------------------------------------------------- */
+  /* At rest: swiped sideways on a phone, a grid from 768px. */
+  [data-scene="rail"] {
+    padding-block: clamp(5rem, 11vw, 9rem);
+  }
+  .mk-rail-intro,
+  .mk-rail-outro {
+    padding-inline: var(--mk-edge);
+  }
+  .mk-rail-list {
+    display: flex;
+    gap: 1.5rem;
+    margin-top: 3rem;
+    padding-inline: var(--mk-edge);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: var(--mk-edge);
+    scrollbar-width: none;
+  }
+  .mk-panel {
+    flex: none;
+    width: min(76vw, 21rem);
+    padding-top: 1.5rem;
+    border-top: 1px solid rgb(255 255 255 / 0.32);
+    scroll-snap-align: start;
+  }
+  .mk-rail-outro {
+    max-width: calc(46rem + var(--mk-edge));
+    margin-top: 3.5rem;
+    font-size: clamp(1.5rem, 2.6vw, 2.5rem);
+    line-height: 1.14;
+  }
+  .mk-rail-bar {
+    display: none;
+  }
+  @media (min-width: 768px) {
+    .mk-rail-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 3.5rem 2.5rem;
+      margin-top: 4.5rem;
+      overflow: visible;
+    }
+    .mk-panel {
+      width: auto;
+    }
+  }
+  @media (min-width: 1024px) {
+    .mk-rail-list {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  /* Driven by the scroll: one long row that MotionRoot slides to the left. */
+  .mk-home[data-pin~="rail"] [data-scene="rail"] > .mk-pin {
+    display: flex;
+    align-items: center;
+  }
+  .mk-home[data-pin~="rail"] .mk-rail {
+    display: flex;
+    flex: none;
+    align-items: flex-start;
+    gap: clamp(2.5rem, 4.5vw, 5rem);
+    width: max-content;
+    padding-inline: var(--mk-edge);
+    will-change: transform;
+  }
+  .mk-home[data-pin~="rail"] .mk-rail-intro {
+    flex: none;
+    width: min(44rem, 58vw);
+    padding: 0;
+  }
+  .mk-home[data-pin~="rail"] .mk-rail-list {
+    display: flex;
+    gap: inherit;
+    margin: 0;
+    padding: 0;
+  }
+  /* Each panel is a statement: the title at display size, set high and low
+     in turn so the row reads as a rhythm, not a shelf of cards. */
+  .mk-home[data-pin~="rail"] .mk-panel {
+    width: clamp(19rem, 27vw, 26rem);
+    padding-top: 1.75rem;
+  }
+  .mk-home[data-pin~="rail"] .mk-panel .mk-h3 {
+    font-size: clamp(2rem, 3.1vw, 3.25rem);
+    line-height: 1.02;
+    letter-spacing: -0.03em;
+  }
+  .mk-home[data-pin~="rail"] .mk-panel:nth-child(even) {
+    margin-top: clamp(3rem, 20svh, 11rem);
+  }
+  .mk-home[data-pin~="rail"] .mk-rail-outro {
+    flex: none;
+    align-self: center;
+    width: min(42rem, 60vw);
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+  .mk-home[data-pin~="rail"] .mk-rail-bar {
+    display: block;
+    position: absolute;
+    left: var(--mk-edge);
+    right: var(--mk-edge);
+    bottom: clamp(1.25rem, 4svh, 2.5rem);
+    height: 2px;
+    background: rgb(255 255 255 / 0.18);
+  }
+  .mk-rail-bar i {
+    display: block;
+    height: 100%;
+    background: #fff;
+    transform-origin: 0 50%;
+  }
+
+  /* ---- 5. speed: the path a page travels ------------------------------ */
+  .mk-path {
+    margin-block: clamp(3.5rem, 8vw, 7rem);
+  }
+  .mk-path-row {
+    position: relative;
+    margin-top: 2rem;
+  }
+  .mk-path-row ol {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .mk-path-row li {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  .mk-path-row li:nth-child(2) {
+    align-items: center;
+    text-align: center;
+  }
+  .mk-path-row li:nth-child(3) {
+    align-items: flex-end;
+    text-align: right;
+  }
+  .mk-path-label {
+    font-family: var(--mk-display);
+    font-size: clamp(0.9375rem, 2vw, 1.875rem);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: #fff;
+  }
+  .mk-path-track {
+    position: absolute;
+    top: calc(1.75rem - 1px);
+    left: 1.75rem;
+    right: 1.75rem;
+    height: 2px;
+    background: rgb(255 255 255 / 0.16);
+  }
+  /* Drawn at rest; MotionRoot draws it from nothing as the section arrives. */
+  .mk-path-track i {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    transform-origin: 0 50%;
+    background: linear-gradient(90deg, var(--mk-violet), var(--mk-blue), var(--mk-sky));
+  }
+  .mk-path-track i::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, #fff, transparent) -40% 0 / 22% 100% no-repeat;
+    animation: mk-streak 2.4s cubic-bezier(0.5, 0, 0.3, 1) infinite;
+  }
+  .mk-path-track b {
+    position: absolute;
+    top: 50%;
+    left: 100%;
+    width: 0.75rem;
+    height: 0.75rem;
+    margin: -0.375rem;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow:
+      0 0 0 6px rgb(156 192 255 / 0.22),
+      0 0 30px 8px rgb(47 123 255 / 0.9);
+  }
+  .mk-node {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 50%;
+    border: 1px solid var(--mk-sky);
+    background: var(--mk-navy);
+    color: var(--mk-sky);
+  }
+
+  /* ---- 7. the calculator's total ------------------------------------- */
+  .mk-sum {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-radius: 24px;
+    background: var(--mk-surface);
+    color: #fff;
+    box-shadow: 0 40px 70px -40px rgb(42 20 160 / 0.8);
+  }
+  .mk-sum::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    width: 80%;
+    aspect-ratio: 1;
+    right: -30%;
+    top: -40%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgb(47 123 255 / 0.55), rgb(47 123 255 / 0) 68%);
+    animation: mk-drift 16s ease-in-out infinite alternate;
+  }
+
+  /* ---- 8. the closing line ------------------------------------------- */
+  .mk-gradient-text {
+    background: var(--mk-signature);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    padding-bottom: 0.12em;
+  }
+
+  /* ---- what MotionRoot adds ------------------------------------------ */
+  /* A heading split into lines: each line rises out of its own mask. The
+     padding keeps descenders inside the mask at this tight leading. */
+  .mk-split-mask {
+    padding-block: 0.14em;
+    margin-block: -0.14em;
+  }
+  /* The pointer's companion on a fine pointer: an electric-blue disc, ringed
+     in white so it shows on paper and on navy, that opens into a halo over
+     anything that can be pressed. The system cursor stays. Shown only once
+     MotionRoot has seen the pointer move. */
+  .mk-cursor {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 60;
+    width: 0.75rem;
+    height: 0.75rem;
+    margin: -0.375rem 0 0 -0.375rem;
+    border-radius: 50%;
+    background: var(--mk-blue);
+    box-shadow: 0 0 0 1.5px rgb(255 255 255 / 0.9);
+    pointer-events: none;
+    opacity: 0;
+    transition:
+      opacity 0.3s ease,
+      background-color 0.3s ease,
+      box-shadow 0.3s ease,
+      scale 0.45s var(--mk-ease, ease);
+  }
+  .mk-cursor[data-on] {
+    opacity: 1;
+  }
+  .mk-cursor[data-over="press"] {
+    scale: 4;
+    background: rgb(47 123 255 / 0.16);
+    box-shadow: 0 0 0 0.4px var(--mk-blue);
+  }
+  .mk-cursor[data-over="type"] {
+    scale: 0;
+  }
+}
+
+@keyframes mk-drift {
+  from {
+    transform: translate3d(-5%, -4%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(7%, 6%, 0) scale(1.16);
+  }
+}
+@keyframes mk-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 110%, 0) rotate(6deg);
+  }
+}
+@keyframes mk-fade {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+  }
+}
+@keyframes mk-arrive {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14%, 0) rotate(7deg);
+  }
+}
+@keyframes mk-wait {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes mk-wait-strike {
+  from {
+    --s: 0;
+    color: var(--mk-navy);
+  }
+}
+@keyframes mk-streak {
+  to {
+    background-position: 140% 0;
+  }
+}
+
+/* Motion off (app/marketing.css stops every animation and transition on the
+   marketing site): MotionRoot does not start, so the page stays as drawn
+   above. Only the parts that exist for movement are taken away. */
+@media (prefers-reduced-motion: reduce) {
+  .mk-cursor,
+  .mk-path-track i::after {
+    display: none;
+  }
+}

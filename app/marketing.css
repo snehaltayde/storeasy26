@@ -1,8 +1,12 @@
-/* The Storeasy marketing site (platform hosts only): tokens, surfaces and
-   motion. Everything is scoped to `.mk`, which only the marketing <body>
-   carries (app/(storefront)/layout.js), so no store's brand tokens (--sf-*,
+/* The Storeasy marketing site (platform hosts only): the tokens and the few
+   rules every marketing page shares (page titles, the header and footer).
+   Everything is scoped to `.mk`, which only the marketing <body> carries
+   (app/(storefront)/layout.js), so no store's brand tokens (--sf-*,
    --accent-*, --background) are touched and no storefront rule changes.
-   Written down in docs/UI.md, "Platform marketing site". CSS only. */
+   This file rides in app/globals.css, so every page downloads it: keep it
+   small. The landing page's own surfaces and motion are in
+   components/site/landing.css, which only "/" loads.
+   Written down in docs/UI.md, "Platform marketing site". */
 
 .mk {
   /* Brand: the "storeasy by mediaStic" logo's own colours */
@@ -81,151 +85,7 @@
 }
 
 @layer components {
-  /* ---- surfaces ------------------------------------------------------- */
-  .mk-stage {
-    position: relative;
-    isolation: isolate;
-    overflow: hidden;
-    background: var(--mk-ink);
-    color: #fff;
-  }
-  .mk-surface {
-    position: relative;
-    isolation: isolate;
-    overflow: hidden;
-    background: var(--mk-surface);
-    color: #fff;
-  }
-  /* A film grain over the navy surfaces (an inline SVG, no request). */
-  .mk-grain::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    opacity: 0.22;
-    mix-blend-mode: overlay;
-    background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  }
-  /* The aurora: three soft lights drifting behind a navy surface. */
-  .mk-aurora {
-    position: absolute;
-    inset: -25% -10%;
-    z-index: -2;
-    pointer-events: none;
-  }
-  .mk-aurora i {
-    position: absolute;
-    aspect-ratio: 1;
-    border-radius: 50%;
-    will-change: transform;
-    animation: mk-drift 19s ease-in-out infinite alternate;
-  }
-  .mk-aurora i:nth-child(1) {
-    width: 52%;
-    left: -6%;
-    top: -4%;
-    background: radial-gradient(circle, rgb(91 43 224 / 0.7) 0%, rgb(91 43 224 / 0) 66%);
-  }
-  .mk-aurora i:nth-child(2) {
-    width: 44%;
-    right: -4%;
-    top: 6%;
-    background: radial-gradient(circle, rgb(47 123 255 / 0.5) 0%, rgb(47 123 255 / 0) 64%);
-    animation-duration: 24s;
-    animation-delay: -7s;
-  }
-  .mk-aurora i:nth-child(3) {
-    width: 58%;
-    left: 28%;
-    bottom: -18%;
-    background: radial-gradient(circle, rgb(42 20 160 / 0.85) 0%, rgb(42 20 160 / 0) 66%);
-    animation-duration: 29s;
-    animation-direction: alternate-reverse;
-  }
-  /* The same lights, pale, behind the paper sections' glass. */
-  .mk-wash {
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    overflow: hidden;
-    pointer-events: none;
-  }
-  .mk-wash i {
-    position: absolute;
-    aspect-ratio: 1;
-    border-radius: 50%;
-  }
-  .mk-wash i:nth-child(1) {
-    width: 46%;
-    left: -12%;
-    top: 8%;
-    background: radial-gradient(circle, rgb(91 43 224 / 0.16) 0%, rgb(91 43 224 / 0) 68%);
-  }
-  .mk-wash i:nth-child(2) {
-    width: 40%;
-    right: -10%;
-    top: 42%;
-    background: radial-gradient(circle, rgb(47 123 255 / 0.16) 0%, rgb(47 123 255 / 0) 68%);
-  }
-
-  /* ---- the hero: headline, bill -------------------------------------- */
-  .mk-word {
-    display: inline-block;
-    overflow: hidden;
-    vertical-align: bottom;
-    padding-bottom: 0.14em;
-    margin-bottom: -0.14em;
-  }
-  .mk-word > span {
-    display: inline-block;
-    animation: mk-rise 0.95s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-    animation-delay: calc(var(--i, 0) * 65ms + 120ms);
-  }
-  .mk-fade {
-    animation: mk-fade 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-    animation-delay: var(--d, 0ms);
-  }
-  .mk-bill {
-    border-radius: 22px;
-    border: 1px solid rgb(255 255 255 / 0.16);
-    background: linear-gradient(160deg, rgb(255 255 255 / 0.13), rgb(255 255 255 / 0.04));
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.2),
-      0 48px 90px -44px rgb(2 1 24 / 0.95);
-    -webkit-backdrop-filter: blur(20px) saturate(140%);
-    backdrop-filter: blur(20px) saturate(140%);
-  }
-  /* Each rented app is struck through, then marked "Built in". At rest (and
-     with motion off) the line is already drawn. */
-  .mk-strike {
-    color: var(--mk-on-ink);
-    background: linear-gradient(currentColor, currentColor) 0 56% / 100% 1px no-repeat;
-    animation: mk-strike 0.55s cubic-bezier(0.6, 0, 0.2, 1) both;
-    animation-delay: calc(var(--i, 0) * 140ms + 1000ms);
-  }
-  .mk-built {
-    animation: mk-pop 0.5s cubic-bezier(0.2, 1.3, 0.4, 1) both;
-    animation-delay: calc(var(--i, 0) * 140ms + 1260ms);
-  }
-  .mk-total {
-    position: relative;
-    overflow: hidden;
-    animation: mk-fade 0.7s ease both;
-    animation-delay: calc(var(--i, 0) * 140ms + 1400ms);
-  }
-  .mk-total::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(100deg, transparent 30%, rgb(91 43 224 / 0.2) 50%, transparent 70%);
-    transform: translateX(-120%);
-    animation: mk-sheen 1.4s ease-out both;
-    animation-delay: calc(var(--i, 0) * 140ms + 1900ms);
-    pointer-events: none;
-  }
-
-  /* ---- buttons -------------------------------------------------------- */
+  /* The primary button: the header's "Talk to us", the landing page's calls. */
   .mk-cta {
     position: relative;
     overflow: hidden;
@@ -235,193 +95,11 @@
     box-shadow: 0 14px 30px -14px rgb(91 43 224 / 0.75);
     transition:
       background-position 0.5s ease,
-      box-shadow 0.3s ease,
-      transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+      box-shadow 0.3s ease;
   }
   .mk-cta:hover {
     background-position: 100% 0;
     box-shadow: 0 18px 36px -14px rgb(47 123 255 / 0.8);
-  }
-  .mk-cta-light {
-    background: #fff;
-    color: var(--mk-navy);
-    box-shadow: 0 16px 36px -16px rgb(156 192 255 / 0.9);
-    transition:
-      box-shadow 0.3s ease,
-      transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-  .mk-cta-light:hover {
-    box-shadow: 0 20px 44px -14px rgb(156 192 255 / 1);
-  }
-  .mk-ghost {
-    transition:
-      background-color 0.3s ease,
-      border-color 0.3s ease,
-      transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-
-  /* ---- marquee of what is built in ----------------------------------- */
-  .mk-marquee {
-    overflow: hidden;
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
-    mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
-  }
-  .mk-marquee-track {
-    display: flex;
-    width: max-content;
-    animation: mk-marquee 56s linear infinite;
-  }
-  .mk-marquee:hover .mk-marquee-track,
-  .mk-band:has(.mk-pause input:checked) .mk-marquee-track {
-    animation-play-state: paused;
-  }
-  .mk-pause {
-    display: inline-grid;
-    place-items: center;
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 999px;
-    border: 1px solid var(--mk-edge);
-    color: var(--mk-navy);
-    cursor: pointer;
-  }
-  .mk-pause:has(input:focus-visible) {
-    outline: 2px solid var(--mk-blue);
-    outline-offset: 2px;
-  }
-  .mk-pause .mk-play,
-  .mk-pause:has(input:checked) .mk-hold {
-    display: none;
-  }
-  .mk-pause:has(input:checked) .mk-play {
-    display: block;
-  }
-
-  /* ---- glass bento with a light that follows the pointer -------------- */
-  .mk-glass {
-    position: relative;
-    isolation: isolate;
-    overflow: hidden;
-    border-radius: 20px;
-    border: 1px solid rgb(11 6 86 / 0.09);
-    background: rgb(255 255 255 / 0.74);
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.95),
-      0 26px 50px -36px rgb(11 6 86 / 0.42);
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
-    transition:
-      transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1),
-      box-shadow 0.4s ease,
-      border-color 0.4s ease;
-  }
-  .mk-glass::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background: radial-gradient(360px circle at var(--mx, 50%) var(--my, 0%), rgb(91 43 224 / 0.17), rgb(47 123 255 / 0.09) 42%, transparent 70%);
-    opacity: 0;
-    transition: opacity 0.4s ease;
-  }
-  .mk-glass:hover {
-    transform: translateY(-3px);
-    border-color: rgb(91 43 224 / 0.34);
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.95),
-      0 34px 60px -34px rgb(91 43 224 / 0.5);
-  }
-  .mk-glass:hover::before {
-    opacity: 1;
-  }
-  .mk-glass-dark {
-    border-radius: 20px;
-    border: 1px solid rgb(255 255 255 / 0.14);
-    background: rgb(255 255 255 / 0.06);
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14);
-    -webkit-backdrop-filter: blur(16px);
-    backdrop-filter: blur(16px);
-  }
-
-  /* ---- speed: content to Edge to shopper ------------------------------ */
-  .mk-flow {
-    position: relative;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .mk-flow::before,
-  .mk-flow::after {
-    content: "";
-    position: absolute;
-    top: 1.375rem;
-    left: 16.66%;
-    right: 16.66%;
-    height: 2px;
-    border-radius: 2px;
-  }
-  .mk-flow::before {
-    background: rgb(255 255 255 / 0.16);
-  }
-  .mk-flow::after {
-    background: linear-gradient(90deg, transparent, var(--mk-sky), #fff, var(--mk-sky), transparent) no-repeat;
-    background-size: 28% 100%;
-    background-position: -40% 0;
-    animation: mk-streak 2.6s cubic-bezier(0.5, 0, 0.3, 1) infinite;
-  }
-  .mk-node {
-    position: relative;
-    z-index: 1;
-    display: grid;
-    place-items: center;
-    width: 2.75rem;
-    height: 2.75rem;
-    margin-inline: auto;
-    border-radius: 999px;
-    border: 1px solid rgb(255 255 255 / 0.28);
-    background: var(--mk-navy);
-    color: var(--mk-sky);
-  }
-  .mk-node::after {
-    content: "";
-    position: absolute;
-    inset: -1px;
-    border-radius: inherit;
-    border: 1px solid var(--mk-sky);
-    opacity: 0;
-    animation: mk-ring 2.6s ease-out infinite;
-    animation-delay: calc(var(--i, 0) * 0.85s + 0.2s);
-  }
-
-  /* ---- the calculator's total ---------------------------------------- */
-  .mk-sum {
-    position: relative;
-    isolation: isolate;
-    overflow: hidden;
-    border-radius: 24px;
-    background: var(--mk-surface);
-    color: #fff;
-    box-shadow: 0 40px 70px -40px rgb(42 20 160 / 0.8);
-  }
-  .mk-sum::before {
-    content: "";
-    position: absolute;
-    z-index: -1;
-    width: 80%;
-    aspect-ratio: 1;
-    right: -30%;
-    top: -40%;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgb(47 123 255 / 0.55), rgb(47 123 255 / 0) 68%);
-    animation: mk-drift 16s ease-in-out infinite alternate;
-  }
-
-  /* ---- shared --------------------------------------------------------- */
-  .mk-gradient-text {
-    background: var(--mk-signature);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    padding-bottom: 0.08em;
   }
   .mk-hairline {
     height: 1px;
@@ -444,93 +122,15 @@
       animation-timeline: scroll(root);
     }
   }
-  .mk [data-magnetic],
-  .mk [data-parallax] {
-    will-change: transform;
-  }
-  .mk [data-parallax] {
-    transition: transform 0.12s linear;
-  }
 }
 
-/* Scroll reveals (components/site/MotionRoot.js). Only elements still below
-   the fold when the page starts are hidden, so nothing flashes and a page
-   without scripts shows everything. */
-.mk [data-reveal="pending"] {
-  opacity: 0;
-  transform: translate3d(0, 26px, 0);
-}
-.mk [data-reveal="in"] {
-  transition:
-    opacity 0.8s ease var(--d, 0ms),
-    transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0ms);
-}
-
-@keyframes mk-drift {
-  from {
-    transform: translate3d(-5%, -4%, 0) scale(1);
-  }
-  to {
-    transform: translate3d(7%, 6%, 0) scale(1.16);
-  }
-}
-@keyframes mk-rise {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 108%, 0) rotate(5deg);
-  }
-}
-@keyframes mk-fade {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 14px, 0);
-  }
-}
-@keyframes mk-strike {
-  from {
-    color: #fff;
-    background-size: 0% 1px;
-  }
-}
-@keyframes mk-pop {
-  from {
-    opacity: 0;
-    transform: translate3d(-10px, 0, 0) scale(0.9);
-  }
-}
-@keyframes mk-sheen {
-  to {
-    transform: translateX(120%);
-  }
-}
-@keyframes mk-marquee {
-  to {
-    transform: translate3d(-50%, 0, 0);
-  }
-}
-@keyframes mk-streak {
-  to {
-    background-position: 140% 0;
-  }
-}
-@keyframes mk-ring {
-  0% {
-    opacity: 0.9;
-    transform: scale(1);
-  }
-  60%,
-  100% {
-    opacity: 0;
-    transform: scale(1.7);
-  }
-}
 @keyframes mk-progress {
   to {
     transform: scaleX(1);
   }
 }
 
-/* Motion off: nothing moves and everything is shown in its final state. */
+/* Motion off: nothing moves on any marketing page. */
 @media (prefers-reduced-motion: reduce) {
   .mk *,
   .mk *::before,
@@ -538,37 +138,5 @@
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
-  }
-  .mk [data-reveal],
-  .mk [data-parallax],
-  .mk [data-magnetic] {
-    opacity: 1 !important;
-    transform: none !important;
-  }
-  .mk .mk-glass:hover {
-    transform: none;
-  }
-  .mk .mk-total::after,
-  .mk .mk-flow::after,
-  .mk .mk-node::after,
-  .mk .mk-pause {
-    display: none;
-  }
-  .mk .mk-marquee {
-    -webkit-mask-image: none;
-    mask-image: none;
-  }
-  .mk .mk-marquee-track {
-    width: auto;
-  }
-  .mk .mk-marquee-track > ul {
-    flex: 1 1 auto;
-    min-width: 0;
-    flex-wrap: wrap;
-    justify-content: center;
-    row-gap: 0.75rem;
-  }
-  .mk .mk-marquee-track > ul + ul {
-    display: none;
   }
 }
