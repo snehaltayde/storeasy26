@@ -70,6 +70,7 @@
     "test:support-reads": "node scripts/test-support-reads.js",
     "test:support-access": "node scripts/test-support-access.js",
     "test:apps": "node scripts/test-apps.js",
+    "test:reviews": "node scripts/test-reviews.js",
     "test:theme-format": "node scripts/test-theme-format.js",
     "test:theme-packages": "node scripts/test-theme-packages.js",
     "test:theme-render": "node scripts/test-theme-render.js",

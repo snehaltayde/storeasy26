@@ -243,6 +243,7 @@ async function productPageModule(tn) {
     "@/components/analytics/TrackEvent": { __esModule: true, default: (p) => (tracked.push(plain(p)), null) },
     "@/components/pdp/PdpLayouts": Pdp,
     "@/lib/repo": repo,
+    "@/lib/reviews/jsonld": await import("../lib/reviews/jsonld.js"), // Phase 9 line 1: the review rating (none: no Reviews install)
     "@/lib/content/resolve": {
       resolvedPdpPairs: (id, o) => getPdpPairs(id, o),
       resolvedPdpExtras: async () => [],

@@ -20,6 +20,7 @@ import {
   Rocket,
   Settings,
   ShoppingCart,
+  Star,
   Workflow,
 } from "lucide-react";
 import {
@@ -56,6 +57,7 @@ const ICONS = {
   insights: Lightbulb,
   automations: Workflow,
   apps: Puzzle, // Phase 4 line 1
+  reviews: Star, // Phase 9 line 1
   integrations: Plug,
   billing: CreditCard,
   settings: Settings,

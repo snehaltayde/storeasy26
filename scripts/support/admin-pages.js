@@ -16,6 +16,8 @@ export const ADMIN_PAGES = Object.freeze([
   { page: "analytics", action: "orders.read" },
   // Phase 4 line 1
   { page: "apps", action: "apps.read" },
+  // Phase 9 line 1
+  { page: "reviews", action: "reviews.read" },
   // Phase 5 line 1
   { page: "themes", action: "storefront.read" },
   { page: "themes/[id]", action: "storefront.read", params: { id: "$theme" }, note: "the fixture's Aurora package; an unknown id is a not-found (Phase 5 line 1)" },

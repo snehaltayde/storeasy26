@@ -10,6 +10,7 @@ import { abs, siteName } from "@/lib/site";
 import { tfetch } from "@/lib/storefront-request";
 import { storefrontMarket } from "@/lib/market-request";
 import { convertPrice } from "@/lib/markets";
+import { ldJson, reviewRating } from "@/lib/reviews/jsonld";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +60,9 @@ export async function generateMetadata({ params }) {
 // Product + BreadcrumbList structured data for rich results.
 // Phase 8 line 4: in the shopper's market (price and priceCurrency), the same
 // convertPrice the page and cart show; no market → exactly as before.
-function productJsonLd(product, brandName, market = null) {
+// Phase 9 line 1: aggregateRating (lib/reviews/jsonld.js reviewRating) only
+// when the Reviews stars are live and a review is approved; else none.
+function productJsonLd(product, brandName, market = null, aggregateRating = null) {
   const amt = (v) => String(market ? convertPrice(v ?? 0, market) : v ?? 0);
   const cur = market ? market.currency : product.currency || "INR";
   const offers =
@@ -93,6 +96,7 @@ function productJsonLd(product, brandName, market = null) {
       brand: { "@type": "Brand", name: product.display_vendor || brandName },
       url: abs(`/products/${product.handle}`),
       offers,
+      ...(aggregateRating ? { aggregateRating } : {}),
     },
     {
       "@context": "https://schema.org",
@@ -130,12 +134,13 @@ export default async function ProductPage({ params }) {
   });
   if (!product) notFound();
   const { market } = await tfetch(() => storefrontMarket());
+  const rating = await tfetch(() => reviewRating(product));
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd(product, brandName, market)) }}
+        dangerouslySetInnerHTML={{ __html: ldJson(productJsonLd(product, brandName, market, rating)) }}
       />
       <TrackEvent
         name="view_item"

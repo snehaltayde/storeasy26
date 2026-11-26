@@ -411,6 +411,16 @@ Each Phase 3 line fills only its own sub-heading.
 - Needs the design pass (`ui-designer`): the Markets tab cards, the footer picker, the checkout Country select and postal field, and the charged-in notes.
 
 
+
+## Reviews (Phase 9 line 1)
+
+- **Storefront blocks** (each starts Off; placed from Apps → Reviews): "Stars" under the price (`components/plugins/blocks/RatingSummary.js`: five stars filled to the average, "4.3", "(12 reviews)", links to `#reviews`); "Reviews" below the details (`ReviewList.js`, `id="reviews"`: the average large, the count, five distribution bars, the latest 10 approved reviews with stars, title, text, "Name · Verified buyer · date", the store's reply in a muted panel, "See all reviews"); "Review links" on the order page (`LinkList.js`: one "Review <product>" button per product not yet reviewed). Nothing renders while a product has no approved review.
+- **`/reviews/write?t=`**: product picture and title, rating radios (5 to 1, stars and words), Title (optional, 80), Your review (20 to 2,000), Name to show (prefilled "Priya S.", 40) with "We never show your email.", "Send review". No JavaScript needed. After: "Thanks. Your review will appear once the store has read it." A bad link: "This review link has already been used or has expired."
+- **`/reviews/optout?t=`**: one sentence and a "Don't ask me for reviews" button; then "Done. This store won't ask you for reviews again."
+- **`/products/[handle]/reviews`**: breadcrumb back to the product, the summary column, 20 reviews a page with Newer / Older.
+- **Console `/admin/reviews`** (nav "Reviews" under Orders; `components/admin/reviews/`): tabs Pending, Approved, Rejected, Hidden with counts; rating chips; a product select; rows with stars, title, text, name, "Verified buyer", product, date, and for staff and up the order link, email and reject reason; Approve / Reject / Hide / Restore for the row's state, Reply or Edit reply (a dialog, 1,000 characters), checkboxes and "Approve selected" / "Reject selected" on Pending (50 at most); Reject asks for an internal reason in a dialog. Support sees the rows only. Empty tabs say one sentence.
+- Needs the design pass (`ui-designer`): the three storefront blocks (stars, list, links), the write page form, the all-reviews page, the opt-out page and the review queue.
+
 ### Design sweep (Phase 8)
 
 - **Fields:** one storefront field utility, `sf-field` in `app/globals.css` (16px and 44px high on phones so iOS doesn't zoom, 14px and 40px from `sm`, the `sf-focus` ring plus a darker border). Used by the checkout Country select, PIN code and postal fields, address fields, Check delivery, the account address form and the footer's Ship to select. Text buttons use `sf-tap` (44px high on phones, flowing with the line from `sm`): Change, Pay online instead, Resend code, Change number, Sign in to use saved addresses, the address cards' Edit, Make default and Delete. `sf-focus-within` puts the shared ring on a whole radio card.

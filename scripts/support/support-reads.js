@@ -26,6 +26,9 @@ export const SUPPORT_PROBES = Object.freeze([
   { name: "themes/[id] (store B's theme)", path: "themes/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.bThemeId } }), status: 404, keys: ["error", "code"], note: "another store's theme is not on this store" },
   // Phase 4 line 1: the apps list and an install's page (support gets no activity)
   { name: "apps", path: "apps", method: "GET", keys: ["ok", "installs", "catalog"] },
+  // Phase 9 line 1: the review queue (support: no email, no order id, no reject reason)
+  { name: "reviews", path: "reviews", method: "GET", keys: ["ok", "reviews", "counts", "products"], inner: { counts: ["pending", "approved", "rejected", "hidden"] } },
+  { name: "reviews ?status=approved", path: "reviews", method: "GET", req: () => ({ query: "status=approved&rating=5" }), keys: ["ok", "reviews", "counts", "products"], inner: { counts: ["pending", "approved", "rejected", "hidden"] } },
   { name: "apps/[id]", path: "apps/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.appId } }), keys: ["ok", "install", "plugin"] },
   { name: "apps/[id] (secret app)", path: "apps/[id]", method: "GET", req: (ctx) => ({ params: { id: ctx.secretAppId } }), keys: ["ok", "install", "plugin"] },
   // Phase 4 line 3: an app's webhooks and deliveries (support gets no payloads,
