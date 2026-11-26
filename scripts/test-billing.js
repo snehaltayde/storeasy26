@@ -5,6 +5,17 @@
 // (plan ← override), tenant snapshot push + the degraded checkout gate, and
 // idempotent usage metering with pre-limit warnings.
 //   pnpm test:billing
+// The fixtures are dated October 2026 and each paid period is the event date + 30 days, so "in a
+// paid period" is judged against the suite's own clock, not the real calendar (the suite went red
+// when the real date passed 2026-11-25). Date.now is pinned; explicit nowMs arguments still win.
+const RealDateParse = Date.parse.bind(Date);
+const PINNED_NOW = RealDateParse("2026-11-25T12:00:00Z"); // the last day this suite was green on the real calendar
+const RealDate = Date;
+globalThis.Date = class extends RealDate {
+  constructor(...args) { super(...(args.length ? args : [PINNED_NOW])); }
+  static now() { return PINNED_NOW; }
+};
+
 import { readFile, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
