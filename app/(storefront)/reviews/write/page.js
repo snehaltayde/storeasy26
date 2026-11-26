@@ -7,10 +7,13 @@ import { FIELD_WORDS, WRITE_WORDS } from "@/lib/reviews/words";
 // page or invite email (?t=). A plain HTML form: it works with no JavaScript
 // (the browser checks the lengths; POST /api/reviews checks them again and
 // answers with a redirect back here). A used, expired, tampered or other-store
-// link gets one sentence that reveals nothing about the order.
+// link gets one sentence that reveals nothing about the order. Referrer policy
+// same-origin, not no-referrer: with no-referrer the browser sends Origin: null
+// on the form post, which the origin check refuses; other sites still get no
+// referrer (so never the link).
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Write a review", robots: { index: false }, referrer: "no-referrer" };
+export const metadata = { title: "Write a review", robots: { index: false }, referrer: "same-origin" };
 
 function Shell({ children }) {
   return <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">{children}</div>;

@@ -8,7 +8,7 @@ import { OPTOUT_WORDS } from "@/lib/reviews/words";
 // signed hash of the email, never the email itself.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Review emails", robots: { index: false }, referrer: "no-referrer" };
+export const metadata = { title: "Review emails", robots: { index: false }, referrer: "same-origin" };
 
 export default async function ReviewOptOutPage({ searchParams }) {
   const sp = (await searchParams) ?? {};
