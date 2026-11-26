@@ -101,7 +101,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 ## Phase 9: first-party plugins (roadmap Phase 6)
 
 - [x] A shopper who bought a product can leave a review through an invite link, an admin moderates it, and the product page shows stars and review structured data
-- [ ] A shopper can subscribe to a product and pause, skip, swap or cancel from their account
+- [x] A shopper can subscribe to a product and pause, skip, swap or cancel from their account
 - [x] A shopper who agreed to marketing messages gets WhatsApp order updates and an abandoned-cart reminder; nobody else does
 - [x] A shopper sees a delivery estimate and live tracking from Shiprocket on the order page
 - [x] A founder can ask the AI copilot for a starter store, product SEO and FAQs, or offer ideas, and gets drafts only, within a daily token budget and with no shopper data sent
