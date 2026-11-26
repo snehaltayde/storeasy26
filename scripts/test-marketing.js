@@ -64,13 +64,28 @@ console.log("— pricing (MK02: live catalog, no drift)");
 await t("pricing reads the SAME rows billing charges from — a version bump shows immediately", async () => {
   await B.ensureDefaultPlans();
   const before = await B.listPlans();
-  eq(before.find((p) => p.id === "starter").price, 99900);
-  await B.createPlanVersion("starter", { name: "Starter", price: 119900, features: { orders_per_month: 600, staff_seats: 5 } });
+  eq(before.find((p) => p.id === "starter").price, 999900);
+  await B.createPlanVersion("starter", { name: "Launch", price: 1199900, features: { orders_per_month: 1200, staff_seats: 5 } });
   const after = await B.listPlans();
   const starter = after.find((p) => p.id === "starter");
-  eq(starter.price, 119900, "new version serves:");
+  eq(starter.price, 1199900, "new version serves:");
   eq(starter.version, 2);
   eq(after.filter((p) => p.id === "starter").length, 1, "one ACTIVE version listed:");
+});
+
+await t("public tiers: Launch, Growth, Scale from the catalog, cheapest first, the internal free plan never listed; Enterprise has no price and both pages read it", async () => {
+  eq(B.DEFAULT_PLANS.map((p) => `${p.id}:${p.name}:${p.price}`).join(" "), "free:Free:0 starter:Launch:999900 growth:Growth:2499900 scale:Scale:6000000", "the catalog's defaults (whole paise):");
+  const listed = await B.listPublicPlans();
+  eq(listed.map((p) => p.name).join(","), "Launch,Growth,Scale", "listed, cheapest first:");
+  ok(listed.every((p) => p.price > 0 && Number.isInteger(p.price)), "a listed plan with no price");
+  ok((await B.listPlans()).some((p) => p.id === "free" && p.price === 0), "the internal free plan is gone: stores with no subscription are entitled to it");
+  eq(B.ENTERPRISE_PLAN.price, null, "Enterprise is priced:");
+  for (const f of ["components/site/MarketingHome.js", "app/(storefront)/pricing/page.js"]) {
+    const src = await readFile(join(here, "..", f), "utf8");
+    ok(/B\.listPublicPlans\(\)/.test(src) && /B\.ensureDefaultPlans\(\)/.test(src) && /B\.ENTERPRISE_PLAN/.test(src), `${f} does not read the public tiers and Enterprise from the catalog`);
+    ok(!/B\.listPlans\(\)/.test(src), `${f} lists every plan, the internal free one included`);
+  }
+  ok(/import LeadForm from "@\/components\/site\/LeadForm"/.test(await readFile(join(here, "../app/(storefront)/pricing/page.js"), "utf8")), "/pricing's Enterprise does not lead to the lead form");
 });
 
 console.log("— template gallery (MK03: honest)");
@@ -119,7 +134,7 @@ await t("every visible string on the landing page passes the banned-copy and cla
 });
 
 await t("the landing page's components hold no visible text outside landing-copy.js (so the scan above covers it)", async () => {
-  for (const f of ["components/site/MarketingHome.js", "components/site/StackCalculator.js", "components/site/MotionRoot.js"]) {
+  for (const f of ["components/site/MarketingHome.js", "components/site/StackCalculator.js", "components/site/MotionRoot.js", "components/site/LandingArt.js", "components/site/SiteNavBar.js"]) {
     const src = await readFile(join(ROOT, f), "utf8");
     const jsxText = [...src.replace(/\/\/.*$/gm, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "").matchAll(/>\s*([A-Za-z][^<>{}();=]*?)\s*</g)].map((m) => m[1]).filter((s) => /[a-z]{3}/i.test(s));
     eq(JSON.stringify(jsxText), "[]", `${f} JSX text:`);
@@ -156,15 +171,81 @@ await t("speed claims: the Edge runtime is real, the measured numbers name their
   ok(!/lighthouse|\b\d+% (faster|more|higher)|conversion|load(s)? in \d/i.test(all), "an invented speed or uplift claim");
 });
 
-await t("no social proof and no prices on the page: no testimonials, counts or app prices; Storeasy's price only from the plan catalog", async () => {
+await t("no social proof; another app's price appears only from the sourced list (vendor, plan, page, day read); Storeasy's price only from the plan catalog", async () => {
   const all = L.visibleStrings().join(" ");
-  ok(!/₹\s?\d|\$\s?\d|\b\d[\d,]* (merchants|stores|founders|brands|customers)\b|testimonial|trusted by/i.test(all), "a price or count in copy");
-  const home = await readFile(join(ROOT, "components/site/MarketingHome.js"), "utf8");
-  ok(/B\.listPlans\(\)/.test(home) && /B\.ensureDefaultPlans\(\)/.test(home), "the home doesn't read the plan catalog as /pricing does");
-  for (const f of ["components/site/MarketingHome.js", "components/site/StackCalculator.js", "components/site/landing-copy.js"]) {
-    const src = (await readFile(join(ROOT, f), "utf8")).replace(/\/\/.*$/gm, "");
-    ok(!/\b(99900|299900|999|2999)\b/.test(src), `${f} holds a plan price`);
+  ok(!/\b\d[\d,]* (merchants|stores|founders|brands|customers)\b|testimonial|trusted by/i.test(all), "a count or a testimonial in copy");
+  // no figure is written in the copy: every price a visitor sees is formatted from data
+  const money = /[₹$€£]\s?\d|\b(Rs\.?|INR|USD)\s?\d/i;
+  ok(!money.test(all), "a price written into the copy");
+  // the sourced list: every line has one app's public price, where it was read and when
+  eq(L.STACK.length, 12, "kinds of app (the copy says twelve):");
+  ok(/Twelve kinds of app/.test(L.CALC.stackCaption) && /Twelve kinds of app/.test(L.NAV.feature.body), "the copy's count of apps");
+  eq(new Set(L.STACK.map((r) => r.id)).size, L.STACK.length, "ids repeat:");
+  ok(/^\d{4}-\d{2}-\d{2}$/.test(L.PRICES_CHECKED) && !Number.isNaN(Date.parse(L.PRICES_CHECKED)), "PRICES_CHECKED is not a date");
+  for (const row of L.STACK) {
+    const p = row.price;
+    ok(p && typeof p === "object", `${row.id}: no price, so it must not be a line at all`);
+    ok(typeof p.vendor === "string" && p.vendor.trim() && typeof p.plan === "string" && p.plan.trim(), `${row.id}: no vendor or plan named`);
+    ok(typeof p.amount === "number" && Number.isFinite(p.amount) && p.amount > 0, `${row.id}: amount ${p.amount}`);
+    eq(p.currency, "INR", `${row.id} currency:`);
+    ok(/^https:\/\/[a-z0-9.-]+\.[a-z]{2,}\//.test(p.url || ""), `${row.id}: no source url`);
+    eq(p.checkedAt, L.PRICES_CHECKED, `${row.id} checkedAt:`);
+    ok(p.basis === "listing" ? p.url.startsWith("https://apps.shopify.com/") : p.basis === "vendor", `${row.id}: basis "${p.basis}" does not match its url`);
+    eq(JSON.stringify(Object.keys(p).sort()), JSON.stringify(["amount", "basis", "checkedAt", "currency", "plan", "url", "vendor"]), `${row.id} price fields:`);
   }
+  eq(new Set(L.STACK.map((r) => r.price.url)).size, L.STACK.length, "two lines share one source:");
+  // what the page shows is that list and nothing else
+  eq(JSON.stringify(L.typicalValues()), JSON.stringify(Object.fromEntries(L.STACK.map((r) => [r.id, String(Math.round(r.price.amount))]))), "the calculator's defaults:");
+  eq(L.typicalTotal(), L.STACK.reduce((n, r) => n + Math.round(r.price.amount), 0), "the bill's total:");
+  const copySrc = (await readFile(join(ROOT, "components/site/landing-copy.js"), "utf8")).replace(/\/\/.*$/gm, "");
+  eq((copySrc.match(/\bamount:/g) || []).length, L.STACK.length, "amounts written outside the sourced list:");
+  ok(!money.test(copySrc), "landing-copy.js writes a price as text");
+  const calc = await readFile(join(ROOT, "components/site/StackCalculator.js"), "utf8");
+  ok(/useState\(typicalValues\)/.test(calc) && /row\.price\.vendor/.test(calc), "the calculator does not start from the sourced list, or hides whose price it is");
+  const home = await readFile(join(ROOT, "components/site/MarketingHome.js"), "utf8");
+  ok(/href=\{row\.price\.url\}/.test(home) && /row\.price\.checkedAt/.test(home) && /row\.price\.vendor/.test(home) && /row\.price\.plan/.test(home), "the page does not show each price's vendor, plan, source and day");
+  for (const f of ["components/site/MarketingHome.js", "components/site/StackCalculator.js", "components/site/landing-copy.js", "components/site/LandingArt.js", "components/site/SiteNavBar.js", "components/site/SiteNav.js", "app/(storefront)/pricing/page.js"]) {
+    const src = (await readFile(join(ROOT, f), "utf8")).replace(/\/\/.*$/gm, "");
+    ok(!money.test(src), `${f} writes a price as text`);
+    ok(!/\b(999900|2499900|6000000|9,?999|24,?999|60,?000)\b/.test(src), `${f} holds a plan price`);
+  }
+});
+
+await t("header: a floating pill with a Product menu and a small-screen sheet, both disclosures that close on Escape and are inert when shut; its words pass the copy scan", async () => {
+  const nav = await readFile(join(ROOT, "components/site/SiteNav.js"), "utf8");
+  ok(/import SiteNavBar from "\.\/SiteNavBar"/.test(nav) && /<SiteNavBar>/.test(nav), "the header is not the nav island");
+  const bar = await readFile(join(ROOT, "components/site/SiteNavBar.js"), "utf8");
+  ok(/^"use client";/.test(bar), "the nav island is not a client component");
+  eq((bar.match(/aria-expanded=\{/g) || []).length, 2, "disclosure buttons:");
+  eq((bar.match(/aria-controls=\{/g) || []).length, 2, "buttons that name their panel:");
+  eq((bar.match(/inert=\{!/g) || []).length, 2, "panels inert when shut:");
+  ok(/e\.key !== "Escape"/.test(bar) && /\.current\?\.focus\(\)/.test(bar), "Escape does not close and return focus");
+  ok(/aria-label=\{sheetOpen \? NAV\.close : NAV\.menu\}/.test(bar), "the sheet's button has no name");
+  ok(/data-scrolled=/.test(bar) && /group-data-\[scrolled\]\/nav:max-w-/.test(bar), "the pill does not draw in on scroll");
+  ok(/aria-current=\{pathname === l\.href \? "page" : undefined\}/.test(bar), "the current page is not marked");
+  ok(!/["'](gsap|lenis)/.test(bar), "the header loads a motion library on every marketing page");
+  eq(L.NAV.items.length, 6);
+  for (const item of [...L.NAV.items, L.NAV.feature]) ok(/^\/#[a-z]+$/.test(item.href), `${item.href} is not a section of the home`);
+  const homeSrc = await readFile(join(ROOT, "components/site/MarketingHome.js"), "utf8");
+  for (const item of L.NAV.items) ok(homeSrc.includes(`id="${item.href.slice(2)}"`), `the home has no section ${item.href}`);
+});
+
+await t("artwork: every section has a picture, drawn in markup (no image file, no request), hidden from screen readers, its words from the scanned copy", async () => {
+  const art = await readFile(join(ROOT, "components/site/LandingArt.js"), "utf8");
+  const home = await readFile(join(ROOT, "components/site/MarketingHome.js"), "utf8");
+  for (const name of ["ArtStudio", "ArtThemes", "ArtFilters", "ArtCopilot", "ArtApps", "ArtSell", "ArtCheckout", "ArtGlobe", "ArtControl", "ArtStack", "ArtShop", "TierBars"]) {
+    ok(new RegExp(`export function ${name}\\(`).test(art), `${name} is not drawn`);
+    ok(new RegExp(`\\b${name}\\b`).test(home.slice(home.indexOf("export default"))) || new RegExp(`${name}[,\\s}]`).test(home.slice(home.indexOf("const BENTO"), home.indexOf("export default"))), `${name} is not on the page`);
+  }
+  ok(!/<img|next\/image|StoreImage|url\(["']?https?:|href=["']https?:/.test(art), "the artwork fetches a file");
+  const pictures = art.split(/^export function /m).slice(1).filter((f) => /^Art(?!Defs)/.test(f));
+  for (const f of pictures) ok(/aria-hidden="true"/.test(f), `${f.slice(0, 12)} is read out by a screen reader`);
+  ok(/data-art/.test(art) && /data-pop/.test(art) && /data-stroke/.test(art) && /data-grow/.test(art), "the artwork has nothing for the motion island to play");
+  const motion = await readFile(join(ROOT, "components/site/MotionRoot.js"), "utf8");
+  for (const a of ["data-art", "data-pop", "data-stroke", "data-grow"]) ok(motion.includes(`"${a}"`) || motion.includes(`[${a}]`), `MotionRoot does not play ${a}`);
+  // each rail panel and each small list names a picture that exists
+  for (const f of L.SELL.items) ok(new RegExp(`^  ${f.id}: \\(`, "m").test(art), `no picture for "${f.title}"`);
+  for (const f of [...L.YOURS.items, ...L.SELL.items, ...L.INDIA.items, ...L.SPEED.items, ...L.SAFETY.items, ...L.STACK]) ok(new RegExp(`\\b${f.id}: [A-Z]`).test(art), `no glyph for ${f.id}`);
 });
 
 await t("brand and motion: the logo is on the shared header and footer with an alt, the scheme is scoped to .mk, and reduced motion turns every animation off", async () => {
@@ -228,6 +309,12 @@ await t("calculator: blanks count as nothing, bad input is named, monthly and ye
   eq(L.stackTotals({ a: "100" }, 99900).difference, -899, "a plan dearer than the apps:");
   eq(L.stackTotals({ a: "₹49.50" }, null).plan, null, "no plan read:");
   eq(L.stackTotals({ a: "₹49.50" }).monthly, 49.5);
+  // the standard estimate against the cheapest listed plan, in rupees
+  const launch = B.DEFAULT_PLANS.find((p) => p.id === "starter").price;
+  const std = L.stackTotals(L.typicalValues(), launch);
+  eq(std.entered, L.STACK.length);
+  eq(std.monthly, L.typicalTotal());
+  eq(std.difference, L.typicalTotal() - launch / 100);
 });
 
 await t("the landing page reaches no node: module from the edge home (billing's imports included)", async () => {

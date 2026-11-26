@@ -110,11 +110,15 @@ await t("default plans seed idempotently; versions are immutable (change = new v
   await B.ensureDefaultPlans();
   await B.ensureDefaultPlans();
   const plans = await B.listPlans();
-  eq(plans.length, 3);
-  const v2 = await B.createPlanVersion("starter", { name: "Starter", price: 129900, features: { orders_per_month: 750, staff_seats: 5 } });
+  eq(plans.length, 4);
+  eq(plans.map((p) => `${p.id}:${p.name}:${p.price}`).join(" "), "free:Free:0 starter:Launch:999900 growth:Growth:2499900 scale:Scale:6000000", "the tiers, cheapest first:");
+  eq((await B.listPublicPlans()).map((p) => p.id).join(","), "starter,growth,scale", "the public pricing leaves the internal free plan out:");
+  eq([B.ENTERPRISE_PLAN.name, B.ENTERPRISE_PLAN.price, B.ENTERPRISE_PLAN.contact].join("|"), "Enterprise||/contact", "Enterprise has no price, only a way to talk:");
+  eq(await B.getPlan("enterprise"), null, "and no catalog row:");
+  const v2 = await B.createPlanVersion("starter", { name: "Launch", price: 1099900, features: { orders_per_month: 1200, staff_seats: 5 } });
   eq(v2.version, 2);
   const v1 = await B.getPlan("starter", 1);
-  eq(v1.price, 99900, "old version intact:");
+  eq(v1.price, 999900, "old version intact:");
   eq(v1.status, "retired", "old version retired for NEW subscribers:");
   eq((await B.getPlan("starter")).version, 2, "latest active wins:");
   await throws(() => B.createPlanVersion("starter", { name: "x", price: -5 }), /non-negative/);
@@ -204,7 +208,7 @@ await t("no subscription → free plan; subscription → pinned plan version", a
   const shop = await B.entitlementsFor("shop");
   eq(shop.plan, "starter");
   eq(shop.planVersion, 1, "pinned at the SOLD version, not latest:");
-  eq(shop.features.orders_per_month, 500, "v1 quota, not v2's 750:");
+  eq(shop.features.orders_per_month, 1000, "v1 quota, not v2's 1200:");
 });
 
 await t("operator override wins per-field, needs a reason, expires", async () => {
@@ -214,7 +218,7 @@ await t("operator override wins per-field, needs a reason, expires", async () =>
   eq(ent.features.orders_per_month, 9999, "override wins:");
   eq(ent.features.staff_seats, 5, "untouched fields keep plan values:");
   await B.setOverride("shop", { features: { orders_per_month: 1 }, reason: "expired test", expiresAt: "2020-01-01T00:00:00Z" });
-  eq((await B.entitlementsFor("shop")).features.orders_per_month, 500, "expired override ignored:");
+  eq((await B.entitlementsFor("shop")).features.orders_per_month, 1000, "expired override ignored:");
   await B.clearOverride("shop");
 });
 
@@ -257,7 +261,22 @@ await t("MRR counts active subscriptions at their monthly price", async () => {
   await seedProviderSub("rzsub_2", "growth");
   await B.applyBillingEvent(ev("subscription.activated", { id: "e10", rpSub: "rzsub_2", at: "2026-10-25T00:00:00Z" }));
   const o2 = await B.billingOverview();
-  eq(o2.mrr, 299900, "active growth counts:");
+  eq(o2.mrr, 2499900, "active growth counts:");
+});
+
+await t("migration 0020: a database still selling the first default price gets the new tier as the next version; a repriced plan is left alone", async () => {
+  const db = C.platformDb();
+  const sql = await readFile(join(here, "../migrations/platform/0020_plan_tiers.sql"), "utf8");
+  // growth as an older database holds it: version 1, on sale at the first price
+  await db.execute("UPDATE plans SET price = 299900 WHERE id = 'growth' AND version = 1");
+  const starterBefore = JSON.stringify((await B.listPlans({ activeOnly: false })).filter((p) => p.id === "starter").map((p) => [p.version, p.price, p.status]));
+  await db.executeMultiple(sql);
+  const growth = (await B.listPlans({ activeOnly: false })).filter((p) => p.id === "growth").sort((a, b) => b.version - a.version);
+  eq(JSON.stringify(growth.map((p) => [p.version, p.name, p.price, p.status])), JSON.stringify([[2, "Growth", 2499900, "active"], [1, "Growth", 299900, "retired"]]), "growth:");
+  eq(JSON.stringify(growth[0].features), JSON.stringify(B.DEFAULT_PLANS.find((p) => p.id === "growth").features), "the new version carries the catalog's limits:");
+  eq(JSON.stringify((await B.listPlans({ activeOnly: false })).filter((p) => p.id === "starter").map((p) => [p.version, p.price, p.status])), starterBefore, "starter was repriced by hand above: untouched:");
+  await db.executeMultiple(sql);
+  eq((await B.listPlans({ activeOnly: false })).filter((p) => p.id === "growth").length, 2, "running it again adds nothing:");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

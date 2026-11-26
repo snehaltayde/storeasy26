@@ -1,19 +1,15 @@
 import Link from "next/link";
 import StoreImage from "@/components/StoreImage";
+import SiteNavBar from "./SiteNavBar";
 
-// Marketing-site chrome (S44; rebranded 2026-11-26): the header and the
-// footer every platform-host page shares. Server components, zero client JS.
+// Marketing-site chrome (S44; rebranded 2026-11-26; header v4 the same day):
+// the header and the footer every platform-host page shares. The header is a
+// floating glass pill with a Product menu and a small-screen sheet; its moving
+// parts are the client island ./SiteNavBar.js and its words are NAV in
+// ./landing-copy.js. The footer is a server component with no client JS.
 // Colours are the .mk tokens in app/marketing.css; the logo is the
 // "storeasy by mediaStic" lockup (1762×471, transparent), drawn on paper only:
-// its navy wordmark has no dark-surface version.
-const LINKS = [
-  { href: "/pricing", label: "Pricing" },
-  { href: "/templates", label: "Templates" },
-  { href: "/integrations", label: "Integrations" },
-  { href: "/customers", label: "Customers" },
-  { href: "/trust", label: "Trust" },
-];
-
+// its navy wordmark has no dark-surface version, so the pill is always light.
 const FOOTER = [
   { href: "/pricing", label: "Pricing" },
   { href: "/templates", label: "Templates" },
@@ -42,24 +38,11 @@ function Logo({ height, priority = false, className }) {
 
 export default function SiteNav() {
   return (
-    <header className="sticky top-0 z-30 border-b border-mk-rule bg-white/85 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 sm:gap-6 sm:px-6">
-        <Link href="/" className={`shrink-0 rounded-md ${ring}`}>
-          <Logo height={40} priority className="h-9 w-[135px] object-contain sm:h-10 sm:w-[150px]" />
-        </Link>
-        <nav aria-label="Storeasy" className="no-scrollbar flex gap-1 overflow-x-auto text-sm font-medium">
-          {LINKS.map((l) => (
-            <Link key={l.href} href={l.href} className={`rounded-full px-3 py-1.5 whitespace-nowrap text-mk-body transition-colors hover:bg-mk-mist hover:text-mk-navy ${ring}`}>
-              {l.label}
-            </Link>
-          ))}
-        </nav>
-        <Link href="/contact" className={`mk-cta ml-auto shrink-0 rounded-full px-5 py-2.5 text-sm font-semibold ${ring}`}>
-          Talk to us
-        </Link>
-      </div>
-      <span aria-hidden="true" className="mk-progress" />
-    </header>
+    <SiteNavBar>
+      <Link href="/" className={`shrink-0 rounded-md ${ring}`}>
+        <Logo height={40} priority className="h-8 w-[120px] object-contain sm:h-10 sm:w-[150px]" />
+      </Link>
+    </SiteNavBar>
   );
 }
 

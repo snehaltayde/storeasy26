@@ -185,7 +185,7 @@ await t("list: 50 a page, newest first by default, with total, counts and the pl
   eq(r.body.counts.suspended, 1, "suspended");
   eq(r.body.counts.maintenance, 1, "maintenance");
   eq(r.body.counts.active, 55, "active");
-  ok(r.body.plans.some((p) => p.id === "starter" && p.name === "Starter"), "plans");
+  ok(r.body.plans.some((p) => p.id === "starter" && p.name === "Launch"), "plans");
   const p2 = await list("offset=50");
   eq(p2.body.stores.length, 7, "page two");
   eq(p2.body.offset, 50, "offset");
@@ -302,7 +302,7 @@ await t("detail: GET tenants/[id] holds the store page and the old fields, secre
   eq(d.store.owners.map((o) => o.email), [store.users.owner.email], "owner");
   ok(d.secretNames.includes("meta_capi_token") && d.secretNames.includes("order_link_secret"), `names: ${d.secretNames}`);
   eq(d.tenant.secretsPresent.meta_capi_token, true, "the old presence map");
-  eq(d.subscription && [d.subscription.plan, d.subscription.planName, d.subscription.status], ["starter", "Starter", "active"], "plan");
+  eq(d.subscription && [d.subscription.plan, d.subscription.planName, d.subscription.status], ["starter", "Launch", "active"], "plan");
   eq(d.live.reachable, true, "live");
   ok(d.live.repoHead && "behind" in d.live, "migrations");
   eq(d.support.open, true, "support open");

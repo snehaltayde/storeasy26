@@ -2,12 +2,15 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { STACK, CALC, stackTotals } from "./landing-copy";
+import { STACK, CALC, stackTotals, typicalRupees, typicalValues } from "./landing-copy";
+import { Glyph } from "./LandingArt";
 
-// The landing page's calculator island: the founder's own app bill, added up.
-// Plans come from the server (lib/platform/billing.js listPlans, the source
-// /pricing reads); nothing here holds a price, and every field starts empty.
-// Figures stay in this tab only. The totals count up to their new value; a
+// The landing page's calculator island: the app bill, added up. Each line
+// starts at the standard estimate for that kind of app (STACK in
+// ./landing-copy.js: one named app's lowest paid plan, with its source), and
+// the founder types over any of them. Storeasy's plans come from the server
+// (lib/platform/billing.js listPublicPlans, the source /pricing reads); no
+// price is written in this file. Figures stay in this tab only. The totals count up to their new value; a
 // screen reader gets the final figure once, and with motion off the figure
 // simply changes.
 const inr = (n) => `₹${Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
@@ -50,7 +53,9 @@ function Count({ value, className }) {
 
 export default function StackCalculator({ plans = [] }) {
   const uid = useId();
-  const [values, setValues] = useState({});
+  const [values, setValues] = useState(typicalValues);
+  const typical = useMemo(typicalValues, []);
+  const atTypical = STACK.every((row) => String(values[row.id] ?? "").trim() === typical[row.id]);
   const paid = plans.filter((p) => p.price > 0);
   const [planKey, setPlanKey] = useState(() => (paid[0] || plans[0])?.id ?? "");
   const plan = plans.find((p) => p.id === planKey) || null;
@@ -68,11 +73,15 @@ export default function StackCalculator({ plans = [] }) {
             const err = bad.has(row.id);
             const filled = !err && String(values[row.id] ?? "").trim() !== "";
             return (
-              <li key={row.id} className="grid grid-cols-[minmax(0,1fr)_9.5rem] items-center gap-x-4 gap-y-1 py-3.5 sm:grid-cols-[minmax(0,1fr)_11rem]">
+              <li key={row.id} className="grid grid-cols-[auto_minmax(0,1fr)_7.5rem] items-center gap-x-3.5 gap-y-1 py-3.5 sm:grid-cols-[auto_minmax(0,1fr)_11rem] sm:gap-x-4">
+                <Glyph id={row.id} />
                 <label htmlFor={id} className="min-w-0">
                   <span className="block text-[0.9375rem] font-semibold text-mk-navy">{row.label}</span>
                   <span className="block text-sm text-mk-body">
                     {CALC.builtAs} {row.built}
+                  </span>
+                  <span className="block text-xs text-mk-muted">
+                    {CALC.typical} {row.price.vendor}, {inr(typicalRupees(row))}
                   </span>
                 </label>
                 <div className="relative">
@@ -88,14 +97,14 @@ export default function StackCalculator({ plans = [] }) {
                     onChange={(e) => setValues((v) => ({ ...v, [row.id]: e.target.value }))}
                     aria-invalid={err || undefined}
                     aria-describedby={err ? `${id}-err` : `${id}-unit`}
-                    className={`h-12 w-full rounded-xl border bg-white pr-3.5 pl-8 text-right text-[0.9375rem] font-medium tabular-nums text-mk-navy transition-[border-color,box-shadow] duration-300 placeholder:font-normal placeholder:text-mk-muted ${err ? "border-mk-danger" : filled ? "border-mk-violet shadow-[0_10px_24px_-16px_rgb(91_43_224/0.9)]" : "border-mk-edge"} ${focus}`}
+                    className={`h-12 w-full rounded-xl border bg-white pr-3 pl-7 sm:pr-3.5 sm:pl-8 text-right text-[0.9375rem] font-medium tabular-nums text-mk-navy transition-[border-color,box-shadow] duration-300 placeholder:font-normal placeholder:text-mk-muted ${err ? "border-mk-danger" : filled ? "border-mk-violet shadow-[0_10px_24px_-16px_rgb(91_43_224/0.9)]" : "border-mk-edge"} ${focus}`}
                   />
                   <span id={`${id}-unit`} className="sr-only">
                     {CALC.unit}
                   </span>
                 </div>
                 {err && (
-                  <p id={`${id}-err`} className="col-span-2 text-sm text-mk-danger">
+                  <p id={`${id}-err`} className="col-span-3 text-sm text-mk-danger">
                     {CALC.invalid}
                   </p>
                 )}
@@ -103,9 +112,14 @@ export default function StackCalculator({ plans = [] }) {
             );
           })}
         </ul>
-        <button type="button" onClick={() => setValues({})} disabled={empty && t.invalid.length === 0} className={`mt-4 -ml-4 rounded-full px-4 py-2 text-sm font-semibold text-mk-violet transition-colors hover:bg-mk-mist disabled:cursor-not-allowed disabled:text-mk-muted disabled:hover:bg-transparent ${focus}`}>
-          {CALC.clear}
-        </button>
+        <div className="mt-4 -ml-4 flex flex-wrap gap-x-1">
+          <button type="button" onClick={() => setValues(typicalValues())} disabled={atTypical} className={`rounded-full px-4 py-2 text-sm font-semibold text-mk-violet transition-colors hover:bg-white disabled:cursor-not-allowed disabled:text-mk-muted disabled:hover:bg-transparent ${focus}`}>
+            {CALC.reset}
+          </button>
+          <button type="button" onClick={() => setValues({})} disabled={empty && t.invalid.length === 0} className={`rounded-full px-4 py-2 text-sm font-semibold text-mk-violet transition-colors hover:bg-white disabled:cursor-not-allowed disabled:text-mk-muted disabled:hover:bg-transparent ${focus}`}>
+            {CALC.clear}
+          </button>
+        </div>
       </fieldset>
 
       <div className="lg:sticky lg:top-24 lg:self-start">
@@ -141,7 +155,7 @@ export default function StackCalculator({ plans = [] }) {
                 <select id={`${uid}-plan`} value={planKey} onChange={(e) => setPlanKey(e.target.value)} className={`mt-2 h-12 w-full rounded-xl border border-white/30 bg-mk-navy px-3.5 text-[0.9375rem] text-white ${focusInk}`}>
                   {plans.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name}: {p.price === 0 ? CALC.free : `${inr(p.price / 100)} a ${p.interval}`}
+                      {p.name}: {`${inr(p.price / 100)} a ${p.interval}`}
                     </option>
                   ))}
                 </select>

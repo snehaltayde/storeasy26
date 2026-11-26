@@ -12,6 +12,10 @@ import { useEffect, useRef } from "react";
 //                       into the total; below that it plays once, in place
 //   data-scene="rail"   from 768px, pinned and slid sideways by the scroll
 //   data-path           the speed section's line, drawn as it arrives
+//   data-art            a picture (./LandingArt.js): its data-pop parts rise
+//                       into place, its data-stroke lines draw themselves and
+//                       its data-grow bars fill, once, as it reaches the window
+//                       (on the pinned rail: as the rail brings it in)
 //   data-split          a heading whose lines rise out of their masks
 //   data-reveal         a block that fades up; data-draw a rule that draws;
 //                       data-clip a block wiped in from its lower edge
@@ -43,8 +47,10 @@ export default function MotionRoot() {
 
 function start({ gsap, ScrollTrigger, SplitText, Lenis, home, disc }) {
   gsap.registerPlugin(ScrollTrigger, SplitText);
-  const head = document.querySelector("header")?.offsetHeight || 65;
-  home.style.setProperty("--mk-head", `${head}px`);
+  // The header floats over the page (components/site/SiteNav.js), so a pinned
+  // scene takes the whole window; only the receipt has to stay clear of it.
+  const head = 0;
+  const nav = document.querySelector("header")?.offsetHeight || 76;
 
   // Inertial scrolling, on GSAP's clock so the scrubbed scenes stay in step.
   const lenis = new Lenis({ lerp: 0.11, anchors: true, autoRaf: false }); // anchors land by each section's scroll-margin
@@ -58,7 +64,7 @@ function start({ gsap, ScrollTrigger, SplitText, Lenis, home, disc }) {
     const { desk, mid, fine } = ctx.conditions;
     home.dataset.motion = "on";
     home.dataset.pin = [desk && "bill", mid && "rail"].filter(Boolean).join(" ");
-    const undo = [bill(gsap, ScrollTrigger, home, head, desk), mid && rail(gsap, ScrollTrigger, home, head), path(gsap, home), reveals(gsap, ScrollTrigger, SplitText, home), fine && pointer(gsap, disc)];
+    const undo = [bill(gsap, ScrollTrigger, home, head, nav, desk), mid && rail(gsap, ScrollTrigger, home, head), path(gsap, home), art(gsap, home, mid), reveals(gsap, ScrollTrigger, SplitText, home), fine && pointer(gsap, disc)];
     return () => {
       for (const fn of undo) if (fn) fn();
       delete home.dataset.motion;
@@ -73,7 +79,6 @@ function start({ gsap, ScrollTrigger, SplitText, Lenis, home, disc }) {
     gsap.ticker.remove(tick);
     gsap.ticker.lagSmoothing(500, 33);
     lenis.destroy();
-    home.style.removeProperty("--mk-head");
   };
 }
 
@@ -81,7 +86,7 @@ function start({ gsap, ScrollTrigger, SplitText, Lenis, home, disc }) {
 // each line, then the fold. Not pinned: the same strikes, played once.
 // Opacity, never visibility: a screen reader reads the whole receipt at any
 // point of the scroll.
-function bill(gsap, ScrollTrigger, home, head, pinned) {
+function bill(gsap, ScrollTrigger, home, head, nav, pinned) {
   const scene = home.querySelector('[data-scene="bill"]');
   const receipt = scene.querySelector(".mk-receipt");
   const paper = scene.querySelector("[data-paper]");
@@ -97,7 +102,7 @@ function bill(gsap, ScrollTrigger, home, head, pinned) {
   lines.forEach((line, i) => {
     const on = i === 0 ? first : tl;
     const at = i === 0 ? 0 : (pinned ? i - 0.6 : i) * step;
-    on.fromTo(line.querySelector("[data-strike]"), { "--s": 0, color: "#0b0656" }, { "--s": 1, color: "#676a8a", duration: 0.4, ease: "power2.inOut" }, at);
+    on.fromTo(line.querySelectorAll("[data-strike]"), { "--s": 0, color: "#0b0656" }, { "--s": 1, color: "#676a8a", duration: 0.4, ease: "power2.inOut" }, at);
     on.from(line.querySelector("[data-built]"), { opacity: 0, x: -12, duration: 0.35 }, at + 0.16);
   });
   const done = lines.length * step;
@@ -116,7 +121,7 @@ function bill(gsap, ScrollTrigger, home, head, pinned) {
   const fit = () => {
     tl.progress(0);
     receipt.style.removeProperty("--fit");
-    const room = window.innerHeight - head - 40;
+    const room = window.innerHeight - nav - 40;
     if (paper.offsetHeight > room) receipt.style.setProperty("--fit", (room / paper.offsetHeight).toFixed(3));
   };
   fit();
@@ -137,7 +142,9 @@ function rail(gsap, ScrollTrigger, home, head) {
   size();
   ScrollTrigger.addEventListener("refreshInit", size);
   const scrollTrigger = { trigger: scene, start: `top ${head}px`, end: "bottom bottom", invalidateOnRefresh: true };
-  gsap.to(row, { x: () => -run(), ease: "none", scrollTrigger: { ...scrollTrigger, scrub: 0.5 } });
+  const slide = gsap.to(row, { x: () => -run(), ease: "none", scrollTrigger: { ...scrollTrigger, scrub: 0.5 } });
+  // Each panel's picture plays as the rail carries it into the window.
+  for (const el of scene.querySelectorAll("[data-art]")) draw(gsap, el, { trigger: el, containerAnimation: slide, start: "left 88%", once: true });
   gsap.fromTo(scene.querySelector("[data-rail-bar]"), { scaleX: 0 }, { scaleX: 1, ease: "none", scrollTrigger: { ...scrollTrigger, scrub: true } });
   return () => {
     ScrollTrigger.removeEventListener("refreshInit", size);
@@ -156,6 +163,32 @@ function path(gsap, home) {
   nodes.forEach((node, i) => {
     tl.from(node, { scale: 0.72, autoAlpha: 0.35, duration: 0.14, ease: "back.out(2.4)" }, Math.max(0, (i / (nodes.length - 1)) * 0.94 - 0.06));
   });
+}
+
+// One picture, played once: parts rise, bars fill, lines draw. The SVG parts
+// keep what GSAP leaves on them (their resting state); the HTML parts hand
+// their transform back to the stylesheet, which tilts and fans some of them.
+function draw(gsap, el, scrollTrigger) {
+  const all = (name) => [...el.querySelectorAll(`[${name}]`)];
+  const svg = (node) => node instanceof SVGElement && !(node instanceof SVGSVGElement);
+  const tl = gsap.timeline({ defaults: { ease: "power3.out" }, scrollTrigger });
+  const pops = all("data-pop");
+  const parts = pops.filter((node) => !svg(node));
+  const marks = pops.filter(svg);
+  if (parts.length) tl.from(parts, { autoAlpha: 0, y: 22, scale: 0.94, duration: 0.8, stagger: 0.06, clearProps: "transform,opacity,visibility" }, 0);
+  if (marks.length) tl.from(marks, { autoAlpha: 0, y: 8, duration: 0.6, stagger: 0.07 }, 0);
+  const bars = all("data-grow");
+  if (bars.length) tl.from(bars, { scaleX: 0, transformOrigin: (i, node) => (node.dataset.grow === "end" ? "100% 50%" : "0% 50%"), duration: 0.9, ease: "power2.inOut", stagger: 0.08 }, 0.25);
+  const lines = all("data-stroke");
+  if (lines.length) tl.fromTo(lines, { strokeDasharray: 1, strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 1.1, ease: "power2.inOut", stagger: 0.1 }, 0.3);
+}
+
+// Every picture still below the fold. On the pinned rail the rail plays its own.
+function art(gsap, home, railPinned) {
+  for (const el of home.querySelectorAll("[data-art]")) {
+    if (railPinned && el.closest('[data-scene="rail"]')) continue;
+    if (el.getBoundingClientRect().top > window.innerHeight * 0.92) draw(gsap, el, { trigger: el, start: "top 84%", once: true });
+  }
 }
 
 // What arrives as the page is read. Only what is still below the fold when

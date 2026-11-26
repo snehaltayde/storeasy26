@@ -171,30 +171,30 @@ await t("plans: a new version is validated (id, name, whole paise, interval, fea
   const bad = [
     [{ plan: "", spec: { name: "X", price: 100 } }, /plan id/],
     [{ plan: "Bad Id", spec: { name: "X", price: 100 } }, /plan id/],
-    [{ plan: "scale", spec: { name: "", price: 100 } }, /name/],
-    [{ plan: "scale", spec: { name: "Scale", price: 99.5 } }, /paise/],
-    [{ plan: "scale", spec: { name: "Scale", price: -1 } }, /paise/],
-    [{ plan: "scale", spec: { name: "Scale", price: 100, interval: "week" } }, /interval/],
-    [{ plan: "scale", spec: { name: "Scale", price: 100, features: { "Bad Key": 1 } } }, /lowercase/],
-    [{ plan: "scale", spec: { name: "Scale", price: 100, features: { seats: { nested: 1 } } } }, /number/],
-    [{ plan: "scale", spec: { name: "Scale", price: 100, features: [1] } }, /key\/value/],
+    [{ plan: "studio", spec: { name: "", price: 100 } }, /name/],
+    [{ plan: "studio", spec: { name: "Studio", price: 99.5 } }, /paise/],
+    [{ plan: "studio", spec: { name: "Studio", price: -1 } }, /paise/],
+    [{ plan: "studio", spec: { name: "Studio", price: 100, interval: "week" } }, /interval/],
+    [{ plan: "studio", spec: { name: "Studio", price: 100, features: { "Bad Key": 1 } } }, /lowercase/],
+    [{ plan: "studio", spec: { name: "Studio", price: 100, features: { seats: { nested: 1 } } } }, /number/],
+    [{ plan: "studio", spec: { name: "Studio", price: 100, features: [1] } }, /key\/value/],
   ];
   for (const [body, re] of bad) {
     const r = await op({ action: "plan_version", ...body });
     eq(r.status, 422, JSON.stringify(body));
     ok(re.test(r.body?.error || ""), `${JSON.stringify(body)}: ${r.body?.error}`);
   }
-  eq(Number((await db().execute("SELECT COUNT(*) n FROM plans WHERE id = 'scale'")).rows[0].n), 0, "nothing saved");
+  eq(Number((await db().execute("SELECT COUNT(*) n FROM plans WHERE id = 'studio'")).rows[0].n), 0, "nothing saved");
 });
 
 await t("plans: a valid version goes on sale, the previous one stops selling; audited with the operator", async () => {
   const since = new Date().toISOString();
-  const v1 = await op({ action: "plan_version", plan: "scale", spec: { name: "Scale", price: 499900, interval: "month", features: { orders_per_month: 20000, staff_seats: 30, priority_support: true } } });
+  const v1 = await op({ action: "plan_version", plan: "studio", spec: { name: "Studio", price: 499900, interval: "month", features: { orders_per_month: 20000, staff_seats: 30, priority_support: true } } });
   eq(v1.status, 200, v1.text.slice(0, 160));
   eq(v1.body.result.version, 1, "v1");
-  const v2 = await op({ action: "plan_version", plan: "scale", spec: { name: "Scale", price: 549900, features: { orders_per_month: 25000 } } });
+  const v2 = await op({ action: "plan_version", plan: "studio", spec: { name: "Studio", price: 549900, features: { orders_per_month: 25000 } } });
   eq(v2.body.result.version, 2, "v2");
-  const scale = v2.body.plans.filter((p) => p.id === "scale");
+  const scale = v2.body.plans.filter((p) => p.id === "studio");
   eq(scale.find((p) => p.version === 1).status, "retired", "v1 retired by v2");
   eq(scale.find((p) => p.version === 2).status, "active", "v2 on sale");
   const rows = await audited(since, "billing.plan_version", { tenant: null });
@@ -202,23 +202,23 @@ await t("plans: a valid version goes on sale, the previous one stops selling; au
 });
 
 await t("plans: retire a version: no new sales on it; a store pinned to it keeps it; counts follow", async () => {
-  // a store on scale v2 (inserted directly: paid starts need the provider)
+  // a store on studio v2 (inserted directly: paid starts need the provider)
   const now = new Date().toISOString();
-  await db().execute({ sql: "INSERT INTO subscriptions (id, tenant_id, plan_id, plan_version, status, created_at, updated_at) VALUES ('sub_pinned', ?, 'scale', 2, 'active', ?, ?)", args: [Bid, now, now] });
+  await db().execute({ sql: "INSERT INTO subscriptions (id, tenant_id, plan_id, plan_version, status, created_at, updated_at) VALUES ('sub_pinned', ?, 'studio', 2, 'active', ?, ?)", args: [Bid, now, now] });
   let r = await call("operator", "billing", "GET");
-  eq(r.body.plans.find((p) => p.id === "scale" && p.version === 2).subscribers, 1, "one subscriber");
+  eq(r.body.plans.find((p) => p.id === "studio" && p.version === 2).subscribers, 1, "one subscriber");
   const since = new Date().toISOString();
-  r = await op({ action: "retire", plan: "scale", version: 2 });
+  r = await op({ action: "retire", plan: "studio", version: 2 });
   eq(r.status, 200, r.text.slice(0, 160));
-  eq(r.body.plans.find((p) => p.id === "scale" && p.version === 2).status, "retired", "retired");
+  eq(r.body.plans.find((p) => p.id === "studio" && p.version === 2).status, "retired", "retired");
   await audited(since, "billing.plan_retired", { tenant: null });
-  eq((await op({ action: "retire", plan: "scale", version: 2 })).status, 422, "twice");
-  eq((await op({ action: "retire", plan: "scale", version: 9 })).status, 422, "unknown version");
-  eq(await B.getPlan("scale"), null, "no version of scale on sale");
-  const start = await op({ action: "start", tenant: A, plan: "scale" });
+  eq((await op({ action: "retire", plan: "studio", version: 2 })).status, 422, "twice");
+  eq((await op({ action: "retire", plan: "studio", version: 9 })).status, 422, "unknown version");
+  eq(await B.getPlan("studio"), null, "no version of studio on sale");
+  const start = await op({ action: "start", tenant: A, plan: "studio" });
   eq(start.status, 422, "cannot start a retired plan");
   const ent = await B.entitlementsFor(Bid);
-  eq(`${ent.plan}@${ent.planVersion}`, "scale@2", "pinned");
+  eq(`${ent.plan}@${ent.planVersion}`, "studio@2", "pinned");
   eq(ent.features.orders_per_month, 25000, "pinned features");
   await db().execute("DELETE FROM subscriptions WHERE id = 'sub_pinned'");
   await B.syncTenantBillingSnapshot(Bid);

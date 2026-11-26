@@ -47,11 +47,13 @@
 
 @layer components {
   .mk-home {
-    --mk-head: 4.0625rem; /* the sticky header; MotionRoot measures the real one */
+    --mk-nav: 4.75rem; /* the floating header's band (components/site/SiteNav.js) */
+    --mk-head: 0px; /* the header floats over the page, so a pinned scene takes the whole window */
     --mk-gut: 1.25rem;
     --mk-edge: max(var(--mk-gut), calc((100vw - 1680px) / 2 + var(--mk-gut)));
     --mk-ease: cubic-bezier(0.16, 1, 0.3, 1);
     overflow-x: clip;
+    margin-top: calc(-1 * var(--mk-nav)); /* the hero's stage runs up behind the floating header */
   }
   @media (min-width: 640px) {
     .mk-home {
@@ -85,8 +87,17 @@
     background: var(--mk-surface);
   }
   .mk-note {
-    border-radius: 1.5rem;
+    display: grid;
+    align-items: center;
+    gap: 1.5rem 3rem;
+    border-radius: 1.75rem;
     padding: clamp(1.75rem, 3vw, 2.75rem);
+  }
+  @media (min-width: 768px) {
+    .mk-note {
+      grid-template-columns: minmax(0, 1fr) auto;
+      padding-right: clamp(2.5rem, 6vw, 6rem);
+    }
   }
   /* A film grain over the navy surfaces (an inline SVG, no request). */
   .mk-grain::after {
@@ -159,7 +170,7 @@
   .mk-hero {
     display: grid;
     gap: 3.5rem;
-    padding-block: 3.5rem 5rem;
+    padding-block: calc(var(--mk-nav) + 2rem) 5rem;
   }
   .mk-hero-copy {
     display: flex;
@@ -170,8 +181,8 @@
     .mk-hero {
       grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
       gap: 3rem;
-      min-height: calc(100svh - var(--mk-head));
-      padding-block: clamp(1.25rem, 4.5svh, 4rem);
+      min-height: 100svh;
+      padding-block: calc(var(--mk-nav) + clamp(0.25rem, 2svh, 1.5rem)) clamp(1.25rem, 4.5svh, 4rem);
     }
     .mk-hero-copy {
       justify-content: space-between;
@@ -235,8 +246,8 @@
   }
   .mk-line-grid {
     display: grid;
-    grid-template-columns: 10.75rem minmax(0, 1fr);
-    column-gap: 1rem;
+    grid-template-columns: minmax(0, 9.5rem) 3.5rem minmax(0, 1fr);
+    column-gap: 0.75rem;
     align-items: baseline;
   }
   .mk-cols {
@@ -282,12 +293,26 @@
     background: var(--mk-signature);
     color: #fff;
   }
-  .mk-total {
+  /* The typical price of the app on that line: its own column, struck with it. */
+  .mk-amt {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .mk-total p {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
     justify-content: space-between;
     gap: 0.25rem 1rem;
+  }
+  .mk-total-was {
+    margin-bottom: 0.3rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--mk-on-ink);
+  }
+  .mk-total {
     margin-top: 0.6rem;
     padding: 0.95rem 1.1rem;
     border-radius: 0.75rem;
@@ -314,8 +339,11 @@
       margin-top: 1rem;
     }
     .mk-line-grid {
-      grid-template-columns: minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr) auto;
       row-gap: 0.2rem;
+    }
+    .mk-built {
+      grid-column: 1 / -1;
     }
     .mk-line > .mk-line-grid {
       padding-block: 0.6rem;
@@ -373,8 +401,6 @@
   .mk-panel {
     flex: none;
     width: min(76vw, 21rem);
-    padding-top: 1.5rem;
-    border-top: 1px solid rgb(255 255 255 / 0.32);
     scroll-snap-align: start;
   }
   .mk-rail-outro {
@@ -432,7 +458,9 @@
      in turn so the row reads as a rhythm, not a shelf of cards. */
   .mk-home[data-pin~="rail"] .mk-panel {
     width: clamp(19rem, 27vw, 26rem);
-    padding-top: 1.75rem;
+  }
+  .mk-home[data-pin~="rail"] .mk-a-sell {
+    width: clamp(11rem, 15vw, 15rem);
   }
   .mk-home[data-pin~="rail"] .mk-panel .mk-h3 {
     font-size: clamp(2rem, 3.1vw, 3.25rem);
@@ -621,6 +649,356 @@
   }
   .mk-cursor[data-over="type"] {
     scale: 0;
+  }
+}
+
+/* ---- the artwork (./LandingArt.js): every section's picture -------------
+   Drawn finished. MotionRoot brings each picture's parts in as it reaches
+   the window; what loops here (bob, caret, pulse, spin) is plain CSS, which
+   app/marketing.css stops under reduced motion. */
+@layer components {
+  .mk-art {
+    position: relative;
+  }
+  /* The ground a picture stands on, on paper: mist, two soft lights, a dot grid. */
+  .mk-a-pad,
+  .mk-bento-art {
+    position: relative;
+    isolation: isolate;
+    overflow: clip;
+    border-radius: 2rem;
+    background:
+      radial-gradient(120% 90% at 100% 0%, rgb(47 123 255 / 0.18), transparent 55%),
+      radial-gradient(90% 80% at 0% 100%, rgb(91 43 224 / 0.16), transparent 60%),
+      var(--mk-mist);
+  }
+  .mk-a-pad {
+    padding: clamp(1.1rem, 3.5vw, 3rem);
+  }
+  .mk-a-pad::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image: radial-gradient(rgb(11 6 86 / 0.14) 1px, transparent 1.5px);
+    background-size: 18px 18px;
+    -webkit-mask: linear-gradient(160deg, #000, transparent 65%);
+    mask: linear-gradient(160deg, #000, transparent 65%);
+  }
+  .mk-a-sig {
+    background: var(--mk-signature);
+  }
+  .mk-a-light {
+    background: linear-gradient(90deg, var(--mk-violet), var(--mk-blue), var(--mk-sky));
+  }
+  .mk-a-grip {
+    flex: none;
+    display: block;
+    width: 0.5rem;
+    height: 0.75rem;
+    background: radial-gradient(currentColor 1px, transparent 1.4px) 0 0 / 4px 4px;
+    opacity: 0.55;
+  }
+  .mk-a-dash {
+    fill: none;
+    stroke: var(--mk-edge);
+    stroke-width: 1.5;
+    stroke-dasharray: 3 4;
+    vector-effect: non-scaling-stroke;
+  }
+  /* the block in mid-drag over the studio's canvas */
+  .mk-a-drag {
+    position: absolute;
+    right: -0.25rem;
+    bottom: 2.5rem;
+    rotate: -4deg;
+  }
+  .mk-bob {
+    animation: mk-bob 4.5s ease-in-out infinite alternate;
+  }
+  .mk-bob-late {
+    animation-delay: -2.2s;
+  }
+  .mk-caret {
+    display: inline-block;
+    width: 2px;
+    height: 0.9rem;
+    vertical-align: middle;
+    background: var(--mk-violet);
+    animation: mk-blink 1.1s steps(2) infinite;
+  }
+  .mk-pulse {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    animation: mk-pulse 2.8s ease-out infinite;
+  }
+
+  /* glyphs beside a fact */
+  .mk-glyph {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.875rem;
+    background: linear-gradient(135deg, rgb(91 43 224 / 0.14), rgb(47 123 255 / 0.14));
+    color: var(--mk-violet);
+  }
+  .mk-glyph-ink {
+    background: rgb(255 255 255 / 0.08);
+    box-shadow: inset 0 0 0 1px rgb(156 192 255 / 0.35);
+    color: var(--mk-sky);
+  }
+  .mk-glyph-bare {
+    width: auto;
+    height: auto;
+    background: none;
+    color: inherit;
+  }
+  .mk-fact {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  /* 2. four smaller pictures under the studio */
+  .mk-bento-art {
+    display: grid;
+    align-items: center;
+    height: 15.5rem;
+    padding: 1.5rem;
+    border-radius: 1.5rem;
+    transition:
+      translate 0.5s var(--mk-ease),
+      box-shadow 0.5s ease;
+  }
+  .mk-bento:hover .mk-bento-art {
+    translate: 0 -6px;
+    box-shadow: 0 30px 50px -34px rgb(42 20 160 / 0.6);
+  }
+  .mk-a-fan {
+    display: grid;
+    place-items: center;
+    min-height: 10rem;
+  }
+  .mk-a-fan-card {
+    grid-area: 1 / 1;
+    width: 5.25rem;
+    padding: 0.4rem;
+    border: 1px solid var(--mk-rule);
+    border-radius: 0.75rem;
+    background: #fff;
+    box-shadow: 0 18px 30px -18px rgb(11 6 86 / 0.5);
+    transform: translate(calc(var(--n) * 2.3rem), calc(var(--n) * var(--n) * 0.3rem)) rotate(calc(var(--n) * 7deg));
+  }
+
+  /* 3. the rail's small pictures */
+  .mk-a-sell {
+    display: block;
+    width: 10rem;
+    height: auto;
+    overflow: visible;
+  }
+
+  /* 4. checkout on a phone */
+  .mk-a-checkout {
+    display: grid;
+    place-items: center;
+  }
+  .mk-a-phone {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: min(100%, 17.5rem);
+    padding: 1rem 1.1rem 1.25rem;
+    border: 1px solid var(--mk-rule);
+    border-radius: 2rem;
+    background: #fff;
+    box-shadow:
+      0 0 0 6px rgb(11 6 86 / 0.06),
+      0 50px 80px -40px rgb(11 6 86 / 0.55);
+  }
+  .mk-a-radio {
+    flex: none;
+    display: block;
+    width: 0.9rem;
+    height: 0.9rem;
+    border: 1.5px solid var(--mk-edge);
+    border-radius: 50%;
+  }
+  .mk-a-radio[data-on] {
+    border: 0.3rem solid var(--mk-violet);
+  }
+  .mk-a-side {
+    position: absolute;
+  }
+  .mk-a-side-top {
+    top: -1.25rem;
+    right: 0;
+  }
+  .mk-a-side-low {
+    bottom: 22%;
+    left: 0;
+  }
+  .mk-a-globe {
+    position: relative;
+    justify-self: center;
+    width: clamp(9rem, 15vw, 11.5rem);
+    aspect-ratio: 1;
+  }
+  .mk-a-coin {
+    --orbit: clamp(4.4rem, 7.4vw, 5.7rem);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    margin: -1rem;
+    border-radius: 50%;
+    background: #fff;
+    color: var(--mk-navy);
+    font-size: 0.875rem;
+    font-weight: 600;
+    box-shadow: 0 8px 18px -8px rgb(2 1 24 / 0.7);
+    transform: rotate(calc(var(--n) * 90deg + 35deg)) translateX(var(--orbit)) rotate(calc(var(--n) * -90deg - 35deg));
+  }
+
+  /* 5. the two measured figures */
+  .mk-stat {
+    display: grid;
+    align-content: start;
+    gap: 0.75rem;
+    padding: clamp(1.25rem, 2.4vw, 2rem);
+    border-radius: 1.5rem;
+    background: rgb(255 255 255 / 0.06);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.14);
+  }
+  .mk .mk-stat-figure {
+    width: fit-content;
+    font-size: clamp(3rem, 6vw, 5.5rem);
+    line-height: 0.95;
+    background: linear-gradient(90deg, #fff, var(--mk-sky));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* 7. twelve tiles drawn into one */
+  .mk-a-stack {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(1.75rem, 5vw, 4rem) auto;
+    align-items: center;
+  }
+  .mk-a-tile {
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    border: 1px solid var(--mk-rule);
+    border-radius: 1rem;
+    background: #fff;
+    color: var(--mk-muted);
+    box-shadow: 0 12px 24px -18px rgb(11 6 86 / 0.5);
+  }
+  .mk-a-wires {
+    width: 100%;
+    height: 72%;
+    overflow: visible;
+  }
+  .mk-a-one {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: clamp(6.5rem, 12vw, 9.5rem);
+    aspect-ratio: 1;
+    border-radius: 1.75rem;
+    box-shadow: 0 30px 50px -24px rgb(91 43 224 / 0.8);
+  }
+  .mk-a-cap {
+    grid-column: 1 / -1;
+    margin-top: 1.25rem;
+    text-align: center;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--mk-muted);
+  }
+
+  /* 8. plans */
+  .mk-plan {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: clamp(1.5rem, 2.2vw, 2.25rem);
+    border: 1px solid var(--mk-rule);
+    border-radius: 1.75rem;
+    background: #fff;
+    transition:
+      translate 0.5s var(--mk-ease),
+      box-shadow 0.5s ease,
+      border-color 0.3s ease;
+  }
+  .mk-plan:hover {
+    translate: 0 -6px;
+    border-color: var(--mk-violet);
+    box-shadow: 0 40px 60px -44px rgb(42 20 160 / 0.7);
+  }
+  .mk-plan-ink {
+    isolation: isolate;
+    overflow: clip;
+    border-color: transparent;
+    background: var(--mk-surface);
+    color: #fff;
+  }
+
+  /* 9. the shopfront */
+  .mk-a-shop {
+    display: grid;
+    place-items: center;
+    width: min(100%, 21rem);
+    aspect-ratio: 12 / 11;
+    margin-inline: auto;
+  }
+  .mk-a-ring {
+    position: absolute;
+    inset: 6%;
+    border: 1px dashed rgb(91 43 224 / 0.4);
+    border-radius: 50%;
+    animation: mk-spin 44s linear infinite;
+  }
+  .mk-a-ring-wide {
+    inset: -7%;
+    border-color: rgb(47 123 255 / 0.3);
+    animation-duration: 66s;
+    animation-direction: reverse;
+  }
+}
+
+@keyframes mk-bob {
+  from {
+    translate: 0 -5px;
+  }
+  to {
+    translate: 0 5px;
+  }
+}
+@keyframes mk-blink {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes mk-pulse {
+  from {
+    box-shadow: 0 0 0 0 rgb(47 123 255 / 0.55);
+  }
+  to {
+    box-shadow: 0 0 0 28px rgb(47 123 255 / 0);
+  }
+}
+@keyframes mk-spin {
+  to {
+    rotate: 360deg;
   }
 }
 
