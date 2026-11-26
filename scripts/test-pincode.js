@@ -413,20 +413,18 @@ console.log("— boundaries");
 // anything else (fs, path, crypto …) fails.
 const EDGE_NODE = new Set(["node:async_hooks", "node:buffer"]);
 // Follows relative and "@/" imports (static and dynamic) from the storefront's
-// entry files; packages are not followed, but a node: one is a failure.
-// `lazyNodeOk` (the order confirmation page only): below a lazy `await
-// import()` a node: module is allowed. That page renders on the Edge runtime
-// (the storefront layout's `runtime = "edge"`), and lib/orders.js reaches
-// customers, notifications and the jobs queue only through lazy imports inside
-// server-side functions the page never calls, the pattern the account pages
-// already use. data/ and the pincode server side stay forbidden everywhere.
-async function walk(file, seen = new Map(), from = null, { lazyNodeOk = false, lazy = false } = {}) {
-  const key = `${file}|${lazy}`;
+// entry files; packages are not followed, but a node: one is a failure. A lazy
+// `await import()` is part of the page's bundle too, so it gets no exemption:
+// the order confirmation and account pages render on the Edge runtime (the
+// storefront layout's `runtime = "edge"`) and never reach node:*.
+// data/ and the pincode server side stay forbidden everywhere.
+async function walk(file, seen = new Map(), from = null) {
+  const key = file;
   if (seen.has(key)) return seen;
   seen.set(key, from);
   const text = await readFile(file, "utf8");
-  for (const [whole, spec] of text.matchAll(/(?:from\s+|import\s*\(\s*|^\s*import\s+)["']([^"']+)["']/gm)) {
-    ok(!spec.startsWith("node:") || EDGE_NODE.has(spec) || lazy, `${relative(ROOT, file)} imports ${spec}`);
+  for (const [, spec] of text.matchAll(/(?:from\s+|import\s*\(\s*|^\s*import\s+)["']([^"']+)["']/gm)) {
+    ok(!spec.startsWith("node:") || EDGE_NODE.has(spec), `${relative(ROOT, file)} imports ${spec}`);
     let base;
     if (spec.startsWith("@/")) base = join(ROOT, spec.slice(2));
     else if (spec.startsWith(".")) base = resolve(dirname(file), spec);
@@ -436,42 +434,41 @@ async function walk(file, seen = new Map(), from = null, { lazyNodeOk = false, l
       ok(!/[/\\]data[/\\]/.test(base), `${relative(ROOT, file)} imports ${spec}`);
       continue;
     }
-    await walk(hit, seen, file, { lazyNodeOk, lazy: lazy || (lazyNodeOk && /import\s*\(/.test(whole)) });
+    await walk(hit, seen, file);
   }
   return seen;
 }
 
-await t("the storefront layout, product and checkout pages never reach data/, the pincode server side or node:*; the confirmation page only through lazy server-side imports", async () => {
-  const strict = ["app/(storefront)/layout.js", "app/(storefront)/checkout/page.js", "app/(storefront)/products/[handle]/page.js"];
+await t("the storefront layout, product, checkout, confirmation and account pages never reach data/, the pincode server side or node:*, lazy imports included", async () => {
+  const strict = ["app/(storefront)/layout.js", "app/(storefront)/checkout/page.js", "app/(storefront)/products/[handle]/page.js", "app/(storefront)/checkout/confirmation/[orderId]/page.js", "app/(storefront)/account/page.js"];
   const files = new Set();
   const check = (seen) => {
     for (const [key, from] of seen) {
-      const f = relative(ROOT, key.slice(0, key.lastIndexOf("|")));
+      const f = relative(ROOT, key);
       files.add(f);
       ok(!f.startsWith("data/"), `${f} is in data/`);
       ok(!["lib/pincode/index.js", "lib/pincode/offline.js"].includes(f), `${f} reached from ${relative(ROOT, from || "")}`);
     }
   };
   for (const e of strict) check(await walk(join(ROOT, e)));
-  check(await walk(join(ROOT, "app/(storefront)/checkout/confirmation/[orderId]/page.js"), new Map(), null, { lazyNodeOk: true }));
   for (const must of ["components/checkout/PincodeField.js", "components/pdp/DeliveryCheck.js", "lib/delivery-estimate.js", "lib/pincode/client.js", "components/checkout/DeliveryEstimate.js"]) ok(files.has(must), `the walk never reached ${must} (${files.size} files)`);
 });
 
-await t("the lazy exemption is narrow: a static node: import under the confirmation page still fails", async () => {
+await t("the walk catches node: below a lazy import as well as a static one", async () => {
   let threw = false;
   const tmp = join(ROOT, "scripts/fixtures/.walk-probe.js");
   const { writeFile, rm } = await import("node:fs/promises");
-  await writeFile(tmp, 'import { x } from "./.walk-probe-b.js";\n');
+  await writeFile(tmp, 'export const y = () => import("./.walk-probe-b.js");\n');
   await writeFile(join(ROOT, "scripts/fixtures/.walk-probe-b.js"), 'import { createHash } from "node:crypto";\nexport const x = 1;\n');
   try {
-    await walk(tmp, new Map(), null, { lazyNodeOk: true });
+    await walk(tmp);
   } catch {
     threw = true;
   } finally {
     await rm(tmp, { force: true });
     await rm(join(ROOT, "scripts/fixtures/.walk-probe-b.js"), { force: true });
   }
-  ok(threw, "a static node:crypto import passed");
+  ok(threw, "a node:crypto import below a lazy import passed");
 });
 
 await t("an existing store's shipping JSON is unchanged by the form's new blank fields", () => {
