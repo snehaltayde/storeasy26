@@ -49,7 +49,10 @@ export async function generateMetadata() {
   if (isPlatformSiteHost((await headers()).get("host"))) {
     return {
       title: { default: "Storeasy — fast, branded storefronts on your Shopify catalog", template: "%s · Storeasy" },
-      description: "Launch a fast, branded storefront on your existing Shopify catalog — themes, offers, releases and analytics included.",
+      description: "A fast storefront on your existing Shopify catalog, with ratings, subscriptions, WhatsApp updates, offers, quizzes and COD checkout built in.",
+      openGraph: { type: "website", title: "Storeasy — fast, branded storefronts on your Shopify catalog", description: "A fast storefront on your existing Shopify catalog, with the apps your store rents built in." },
+      twitter: { card: "summary", title: "Storeasy — fast, branded storefronts on your Shopify catalog" },
+      robots: { index: true, follow: true },
     };
   }
   if (isGated(await requestResolution())) {
@@ -279,8 +282,13 @@ export default async function RootLayout({ children }) {
     return (
       <html lang="en" className={`${Geist.variable} ${GeistMono.variable} ${Fraunces.variable} h-full`}>
         <body className="flex min-h-full flex-col bg-white text-zinc-900 antialiased">
+          <a href="#main" className="sr-only rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50">
+            Skip to content
+          </a>
           <SiteNav />
-          <main className="flex-1">{children}</main>
+          <main id="main" className="flex-1">
+            {children}
+          </main>
           <footer className="border-t border-zinc-100 bg-zinc-50">
             <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-8 text-xs text-zinc-500 sm:px-6">
               <span className="font-bold text-zinc-800">Storeasy</span>

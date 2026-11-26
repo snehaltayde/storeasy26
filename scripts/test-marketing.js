@@ -102,6 +102,113 @@ await t("leads store with the SEPARATE marketing opt-in defaulting to 0", async 
   eq(Number(rows[1].marketing_consent), 1, "explicit opt-in stored:");
 });
 
+console.log("— landing page (platform home: claims, copy, calculator)");
+
+const L = await import("../components/site/landing-copy.js");
+const { scanText, BANNED } = await import("../lib/copy/banned-copy.js");
+const ROOT = join(here, "..");
+
+await t("every visible string on the landing page passes the banned-copy and claims scan", async () => {
+  const texts = L.visibleStrings();
+  ok(texts.length > 80, `only ${texts.length} strings read`);
+  const hits = texts.flatMap((s) => scanText(s).map((h) => `${h.rule} (${h.match}) in "${s.slice(0, 60)}"`));
+  eq(hits.join("\n"), "", "findings:");
+  // the scan bites: a planted claim is found
+  ok(scanText("Rated #1, guaranteed").length >= 2, "the scan found nothing in a planted claim");
+  ok(BANNED.length > 10);
+});
+
+await t("the landing page's components hold no visible text outside landing-copy.js (so the scan above covers it)", async () => {
+  for (const f of ["components/site/MarketingHome.js", "components/site/StackCalculator.js"]) {
+    const src = await readFile(join(ROOT, f), "utf8");
+    const jsxText = [...src.replace(/\/\/.*$/gm, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "").matchAll(/>\s*([A-Za-z][^<>{}();=]*?)\s*</g)].map((m) => m[1]).filter((s) => /[a-z]{3}/i.test(s));
+    eq(JSON.stringify(jsxText), "[]", `${f} JSX text:`);
+    for (const h of scanText(src.replace(/\/\/.*$/gm, ""), { claims: true })) ok(!/claim:/.test(h.rule), `${f}: ${h.rule} (${h.match})`);
+  }
+});
+
+await t("every feature claim is a ticked line of docs/FEATURES.md or names a file that exists", async () => {
+  const features = await readFile(join(ROOT, "docs/FEATURES.md"), "utf8");
+  const ticked = features.split("\n").filter((l) => l.startsWith("- [x]"));
+  const { existsSync } = await import("node:fs");
+  const list = L.claims();
+  ok(list.length >= 24, `only ${list.length} claims`);
+  for (const c of list) {
+    ok(c.ticked || c.file, `"${c.title}" names no source`);
+    if (c.ticked) ok(ticked.some((l) => l.includes(c.ticked)), `"${c.title}": no ticked line holds "${c.ticked}"`);
+    if (c.file) ok(existsSync(join(ROOT, c.file)), `"${c.title}": ${c.file} is missing`);
+  }
+  // the 16 things the page sells are all there
+  const all = L.visibleStrings().join(" \n ");
+  for (const w of ["verified buyers", "pause, skip, swap or cancel", "WhatsApp", "Shiprocket", "AI copilot", "buy X get Y", "free gifts", "coupons", "collection", "Cart nudges", "quizzes", "filters", "drag-and-drop", "five flagship themes", "upload a theme package", "one-time code", "PIN code", "saved address", "currency", "API tokens", "Webhooks"]) ok(all.toLowerCase().includes(w.toLowerCase()), `missing "${w}"`);
+});
+
+await t("speed claims: the Edge runtime is real, the measured numbers name their suites, no invented scores", async () => {
+  const layout = await readFile(join(ROOT, "app/(storefront)/layout.js"), "utf8");
+  ok(/export const runtime = "edge"/.test(layout), "storefront layout is not edge");
+  ok(/localFont/.test(await readFile(join(ROOT, "app/fonts/fonts.js"), "utf8")), "fonts are not self-hosted");
+  const theme = await readFile(join(ROOT, "scripts/test-theme-render.js"), "utf8");
+  ok(/median of 15/.test(theme) && /median of 15/.test(L.SPEED.measured[0].body), "theme timing context differs");
+  const slots = await readFile(join(ROOT, "scripts/test-plugin-slots.js"), "utf8");
+  ok(/n = 25/.test(slots) && /median of 25/.test(L.SPEED.measured[1].body), "slot timing context differs");
+  ok(/not field data/.test(L.SPEED.measuredNote));
+  const all = L.visibleStrings().join(" ");
+  ok(!/lighthouse|\b\d+% (faster|more|higher)|conversion|load(s)? in \d/i.test(all), "an invented speed or uplift claim");
+});
+
+await t("no social proof and no prices on the page: no testimonials, counts or app prices; Storeasy's price only from the plan catalog", async () => {
+  const all = L.visibleStrings().join(" ");
+  ok(!/₹\s?\d|\$\s?\d|\b\d[\d,]* (merchants|stores|founders|brands|customers)\b|testimonial|trusted by/i.test(all), "a price or count in copy");
+  const home = await readFile(join(ROOT, "components/site/MarketingHome.js"), "utf8");
+  ok(/B\.listPlans\(\)/.test(home) && /B\.ensureDefaultPlans\(\)/.test(home), "the home doesn't read the plan catalog as /pricing does");
+  for (const f of ["components/site/MarketingHome.js", "components/site/StackCalculator.js", "components/site/landing-copy.js"]) {
+    const src = (await readFile(join(ROOT, f), "utf8")).replace(/\/\/.*$/gm, "");
+    ok(!/\b(99900|299900|999|2999)\b/.test(src), `${f} holds a plan price`);
+  }
+});
+
+await t("calculator: blanks count as nothing, bad input is named, monthly and yearly add up, the plan is compared in rupees", async () => {
+  const e = L.stackTotals({});
+  eq(e.entered, 0);
+  eq(e.monthly, 0);
+  const r = L.stackTotals({ ratings: "1,500", whatsapp: " 2000 ", quiz: "", search: "abc", builder: "-5" }, 99900);
+  eq(r.entered, 2);
+  eq(r.monthly, 3500);
+  eq(r.yearly, 42000);
+  eq(r.invalid.join(","), "search,builder");
+  eq(r.plan, 999);
+  eq(r.difference, 2501);
+  eq(L.stackTotals({ a: "100" }, 99900).difference, -899, "a plan dearer than the apps:");
+  eq(L.stackTotals({ a: "₹49.50" }, null).plan, null, "no plan read:");
+  eq(L.stackTotals({ a: "₹49.50" }).monthly, 49.5);
+});
+
+await t("the landing page reaches no node: module from the edge home (billing's imports included)", async () => {
+  const nodeImport = /(?:from\s+|import\s*\(\s*|import\s+|require\s*\(\s*)["'](node:[^"']+|fs|path|crypto|child_process|os|module|url|async_hooks|worker_threads|stream|buffer|util|events)["']/g;
+  const { existsSync } = await import("node:fs");
+  const local = (from, spec) => {
+    const p = spec.startsWith("@/") ? join(ROOT, spec.slice(2)) : join(dirname(join(ROOT, from)), spec);
+    for (const c of [p, `${p}.js`, join(p, "index.js")]) if (/\.js$/.test(c) && existsSync(c)) return c.slice(ROOT.length + 1);
+    return null;
+  };
+  const queue = ["components/site/MarketingHome.js"];
+  const seen = new Set();
+  const hits = new Set();
+  while (queue.length) {
+    const f = queue.shift();
+    if (seen.has(f)) continue;
+    seen.add(f);
+    const src = await readFile(join(ROOT, f), "utf8");
+    for (const m of src.matchAll(nodeImport)) hits.add(`${f}: ${m[1]}`);
+    for (const m of src.matchAll(/(?:from\s*|import\s*\(\s*|^import\s+)["']((?:\.|@\/)[^"']+)["']/gm)) {
+      const r = local(f, m[1]);
+      if (r) queue.push(r);
+    }
+  }
+  ok(seen.has("lib/platform/billing.js"), "billing.js not reached");
+  eq(JSON.stringify([...hits]), JSON.stringify(["lib/tenant-context.js: node:async_hooks"]), "node imports reached:");
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 for (const f of dbs) await rm(join(here, "..", f), { force: true });
 process.exit(fail ? 1 : 0);
