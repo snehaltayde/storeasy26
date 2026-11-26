@@ -66,3 +66,7 @@ Date: 2026-11-26. Audited on `main` at `9d7e1c5d` (Phase 9 step 0 and lines 1–
 - Real Meta, Shiprocket, Anthropic and Razorpay runs, and the Rich Results Test (in `MANUAL-CHECKS.md`).
 - Browser markup (covered by the Phase 9 `drill:all`).
 - **Origin checks on shopper POST routes** when sibling store subdomains are same-site. Older than Phase 9; logged in `docs/FEATURES.md` Later.
+
+## Phase 9 browser suite
+
+`drill:all` at `64f33263` (2026-11-26, 3,816 s; every Phase 9 plugin and the design sweep, before the audit fixes) passed every drill, including `plugins` (reviews, subscriptions, WhatsApp, Shiprocket, copilot stages). The audit fixes (`39389352`) then passed `pnpm typecheck`, the full `pnpm test`, `drill:plugins` and `drill:sf-styles`; they touch only privacy erase, consent caps and the `/m/stop` page, which those cover.
