@@ -21,7 +21,7 @@ export function ReviewItems({ reviews = [] }) {
             {r.title ? <p className="font-semibold text-sf-text">{r.title}</p> : null}
           </div>
           <p className="mt-2 whitespace-pre-line text-sm text-sf-text-body">{r.body}</p>
-          <p className="mt-2 text-xs text-sf-text-faint">
+          <p className="mt-2 text-xs text-sf-text-subtle">
             {r.name} · Verified buyer{r.date ? ` · ${dateText(r.date)}` : ""}
           </p>
           {r.reply ? (
@@ -43,11 +43,11 @@ export function Distribution({ distribution = [], count = 0 }) {
         const pct = count ? Math.round((d.count / count) * 100) : 0;
         return (
           <li key={d.stars} className="flex items-center gap-2 text-xs text-sf-text-muted">
-            <span className="w-12 shrink-0">{d.stars} {d.stars === 1 ? "star" : "stars"}</span>
+            <span className="w-14 shrink-0">{d.stars} {d.stars === 1 ? "star" : "stars"}</span>
             <span className="h-2 flex-1 overflow-hidden rounded-full bg-sf-surface-muted" aria-hidden="true">
               <span className="block h-full rounded-full bg-sf-accent" style={{ width: `${pct}%` }} />
             </span>
-            <span className="w-8 shrink-0 text-right">{d.count}</span>
+            <span className="w-8 shrink-0 text-right tabular-nums">{d.count}</span>
           </li>
         );
       })}
@@ -63,7 +63,7 @@ export default function ReviewList({ average, count = 0, distribution = [], revi
       <div className="mt-4 grid gap-6 sm:grid-cols-[14rem_1fr]">
         <div>
           <p className="flex items-center gap-2">
-            <span className="text-3xl font-semibold text-sf-text">{average}</span>
+            <span className="text-3xl font-semibold tabular-nums text-sf-text">{average}</span>
             <Stars value={Number(average)} size={18} label={`${average} out of 5 stars`} />
           </p>
           <p className="mt-1 text-sm text-sf-text-muted">
@@ -76,7 +76,7 @@ export default function ReviewList({ average, count = 0, distribution = [], revi
         <div>
           <ReviewItems reviews={reviews} />
           {seeAll ? (
-            <Link href={seeAll} className="mt-4 inline-block text-sm font-semibold text-sf-accent-text underline" data-review-see-all="">
+            <Link href={seeAll} className="sf-focus sf-tap mt-2 rounded-sf-small text-sm font-semibold text-sf-accent-text underline" data-review-see-all="">
               See all reviews
             </Link>
           ) : null}

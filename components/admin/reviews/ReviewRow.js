@@ -32,20 +32,20 @@ export function StarsLine({ rating }) {
 export function ReviewRow({ review: r, role, timeZone, selected, onSelect, onAction, onReply, busy }) {
   const date = new Date(r.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: timeZone || "UTC" });
   return (
-    <li className="flex gap-3 px-4 py-4" data-review-row={r.id} data-review-status={r.status}>
-      {onSelect && roleAllows(role, "reviews.moderate") ? <Checkbox checked={selected} onCheckedChange={(v) => onSelect(r.id, v === true)} aria-label={`Select the review by ${r.name}`} className="mt-1" /> : null}
-      <div className="min-w-0 flex-1 space-y-1.5">
+    <li className="flex gap-3 px-3 py-4 sm:px-4" data-review-row={r.id} data-review-status={r.status}>
+      {onSelect && roleAllows(role, "reviews.moderate") ? <Checkbox checked={selected} onCheckedChange={(v) => onSelect(r.id, v === true)} aria-label={`Select the review by ${r.name}`} className="mt-1 size-5 md:size-4" /> : null}
+      <div className="min-w-0 flex-1 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <StarsLine rating={r.rating} />
           {r.title ? <p className="font-medium text-foreground">{r.title}</p> : null}
         </div>
-        <p className="whitespace-pre-line text-sm text-foreground">{r.body}</p>
+        <p className="whitespace-pre-line break-words text-sm text-foreground">{r.body}</p>
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           <span>{r.name}</span>
           <Badge variant="success">Verified buyer</Badge>
           <span>·</span>
           {r.productHandle ? (
-            <a href={`/products/${r.productHandle}`} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+            <a href={`/products/${r.productHandle}`} target="_blank" rel="noreferrer" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm underline underline-offset-2">
               {r.productTitle}
             </a>
           ) : (
@@ -56,7 +56,7 @@ export function ReviewRow({ review: r, role, timeZone, selected, onSelect, onAct
           {r.orderId ? (
             <>
               <span>·</span>
-              <Link href={`/admin/orders/${r.orderId}`} className="underline underline-offset-2" data-review-order="">
+              <Link href={`/admin/orders/${r.orderId}`} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm underline underline-offset-2" data-review-order="">
                 Order
               </Link>
             </>
@@ -78,13 +78,13 @@ export function ReviewRow({ review: r, role, timeZone, selected, onSelect, onAct
         <div className="flex flex-wrap gap-2 pt-1">
           {(STATE_ACTIONS[r.status] || []).map(([action, label]) => (
             <RoleGate key={action} role={role} action="reviews.moderate" mode={HIDE}>
-              <Button size="sm" variant={action === "approve" || action === "restore" ? "default" : "outline"} disabled={busy} onClick={() => onAction(action, [r.id])} data-review-action={action}>
+              <Button size="sm" className="h-11 md:h-7" variant={action === "approve" || action === "restore" ? "default" : "outline"} disabled={busy} onClick={() => onAction(action, [r.id])} data-review-action={action}>
                 {label}
               </Button>
             </RoleGate>
           ))}
           <RoleGate role={role} action="reviews.moderate" mode={HIDE}>
-            <Button size="sm" variant="ghost" disabled={busy} onClick={() => onReply(r)} data-review-action="reply">
+            <Button size="sm" className="h-11 md:h-7" variant="ghost" disabled={busy} onClick={() => onReply(r)} data-review-action="reply">
               {r.reply ? "Edit reply" : "Reply"}
             </Button>
           </RoleGate>

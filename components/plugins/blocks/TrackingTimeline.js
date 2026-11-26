@@ -9,7 +9,7 @@ export const TRACK_ORIGIN = "https://shiprocket.co/tracking/";
 export default function TrackingTimeline({ status, headline, expected, courier, awb, steps = [] }) {
   if (!status || !headline) return null;
   return (
-    <section data-tracking={status} aria-labelledby="tracking-title" className="rounded-sf-card border border-sf-border-soft p-4 text-sm">
+    <section data-tracking={status} aria-labelledby="tracking-title" className="rounded-sf-card border border-sf-border-soft p-4 text-sm sm:p-5">
       <h2 id="tracking-title" className="text-xs font-semibold uppercase tracking-wide text-sf-text-subtle">
         Tracking
       </h2>
@@ -22,7 +22,7 @@ export default function TrackingTimeline({ status, headline, expected, courier, 
         </p>
       ) : null}
       {steps.length ? (
-        <ol data-tracking-steps className="mt-3 space-y-2 border-l border-sf-border pl-4">
+        <ol data-tracking-steps className="mt-4 space-y-3 border-l-2 border-sf-border pl-4">
           {steps.map((s, i) => (
             <li key={`${s.at}-${i}`} data-tracking-step>
               <p className="text-sf-text">{s.activity || "Update"}</p>
@@ -34,9 +34,9 @@ export default function TrackingTimeline({ status, headline, expected, courier, 
         </ol>
       ) : null}
       {awb ? (
-        <p className="mt-3 text-xs text-sf-text-subtle">
+        <p className="mt-4 flex flex-wrap items-center gap-x-1 text-xs text-sf-text-subtle">
           {courier ? `${courier} · ` : ""}
-          <a href={`${TRACK_ORIGIN}${encodeURIComponent(awb)}`} target="_blank" rel="noopener noreferrer nofollow" data-tracking-link className="font-semibold text-sf-accent-text underline">
+          <a href={`${TRACK_ORIGIN}${encodeURIComponent(awb)}`} target="_blank" rel="noopener noreferrer nofollow" data-tracking-link className="sf-focus sf-tap rounded-sf-small font-semibold text-sf-accent-text underline">
             Track with the courier
           </a>
         </p>

@@ -13,7 +13,8 @@ import { formatMoney } from "@/lib/format";
 // automatically.
 const dateText = (iso) => (iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : "");
 const STATUS = { active: "Active", paused: "Paused", cancelled: "Cancelled" };
-const btn = "rounded-sf-small border border-sf-border px-3 py-1.5 text-xs font-semibold text-sf-text-body transition hover:border-sf-border-hover disabled:opacity-50";
+const btn = "sf-focus min-h-11 rounded-sf-small border border-sf-border px-3 py-1.5 text-xs font-semibold text-sf-text-body transition hover:border-sf-border-hover disabled:opacity-50 sm:min-h-0";
+const pick = "sf-field mt-1 block max-w-full rounded-sf-small border border-sf-border bg-sf-surface px-2 py-1";
 
 async function post(body) {
   const res = await fetch("/api/account/subscriptions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -60,12 +61,12 @@ function Subscription({ s, intervals, quantityMax, reload }) {
   const live = s.status !== "cancelled";
   const intervalChoices = [...new Set([...intervals, s.interval])].sort((a, b) => a - b);
   return (
-    <li className="rounded-sf-card border border-sf-border p-4 text-sm" data-subscription={s.id} data-subscription-status={s.status}>
+    <li className="rounded-sf-card border border-sf-border p-4 text-sm sm:p-5" data-subscription={s.id} data-subscription-status={s.status}>
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           <p className="font-medium">
             {s.handle ? (
-              <Link href={`/products/${s.handle}`} className="hover:underline">
+              <Link href={`/products/${s.handle}`} className="sf-focus rounded-sf-small hover:underline">
                 {s.productTitle}
               </Link>
             ) : (
@@ -81,7 +82,7 @@ function Subscription({ s, intervals, quantityMax, reload }) {
       </div>
 
       {live && (
-        <p className="mt-2 text-sf-text-body">
+        <p className="mt-3 text-sf-text-body">
           {s.status === "paused" ? (
             <>Paused{s.pausedUntil ? ` until ${dateText(s.pausedUntil)}` : " until you resume"}.</>
           ) : (
@@ -97,12 +98,12 @@ function Subscription({ s, intervals, quantityMax, reload }) {
           )}
         </p>
       )}
-      {live && s.next && !s.next.available && <p className="mt-1 text-xs text-sf-warning-strong">This product is sold out right now. You can swap it or skip this delivery.</p>}
+      {live && s.next && !s.next.available && <p className="mt-2 rounded-sf-small bg-sf-surface-muted p-2 text-xs text-sf-warning-strong">This product is sold out right now. You can swap it or skip this delivery.</p>}
 
       {live && (
         <div className="mt-3 flex flex-wrap gap-2">
           {s.payable && (
-            <button type="button" disabled={busy} className="rounded-sf-small bg-sf-accent px-3 py-1.5 text-xs font-bold text-sf-on-accent disabled:opacity-50" data-subscription-pay onClick={() => run({ action: "pay" }, (d) => (window.location.href = d.redirect || "/checkout"))}>
+            <button type="button" disabled={busy} className="sf-focus min-h-11 rounded-sf-small bg-sf-accent px-3 py-1.5 text-xs font-bold text-sf-on-accent transition hover:bg-sf-accent-hover disabled:opacity-50 sm:min-h-0" data-subscription-pay onClick={() => run({ action: "pay" }, (d) => (window.location.href = d.redirect || "/checkout"))}>
               Pay for this delivery
             </button>
           )}
@@ -134,9 +135,9 @@ function Subscription({ s, intervals, quantityMax, reload }) {
 
       {panel === "pause" && (
         <div className="mt-3 flex flex-wrap items-end gap-2 rounded-sf-control bg-sf-surface-muted p-3">
-          <label className="text-xs">
+          <label className="text-sm sm:text-xs">
             Pause until (leave empty to pause until you resume)
-            <input type="date" value={until} onChange={(e) => setUntil(e.target.value)} className="mt-1 block rounded-sf-small border border-sf-border bg-sf-surface px-2 py-1" />
+            <input type="date" value={until} onChange={(e) => setUntil(e.target.value)} className={pick} />
           </label>
           <button type="button" disabled={busy} className={btn} data-subscription-pause-confirm onClick={() => run({ action: "pause", until: until || null })}>
             Pause subscription
@@ -146,14 +147,14 @@ function Subscription({ s, intervals, quantityMax, reload }) {
       {panel === "swap" && (
         <div className="mt-3 flex flex-wrap items-end gap-2 rounded-sf-control bg-sf-surface-muted p-3">
           {options == null ? (
-            <p className="text-xs text-sf-text-subtle">Loading…</p>
+            <p className="text-xs text-sf-text-subtle" role="status">Loading…</p>
           ) : options.length === 0 ? (
             <p className="text-xs text-sf-text-subtle">There's nothing to swap to right now.</p>
           ) : (
             <>
-              <label className="text-xs">
+              <label className="text-sm sm:text-xs">
                 Swap to (from the next delivery, at today&rsquo;s price)
-                <select value={swapTo} onChange={(e) => setSwapTo(e.target.value)} className="mt-1 block max-w-full rounded-sf-small border border-sf-border bg-sf-surface px-2 py-1" data-subscription-swap-to>
+                <select value={swapTo} onChange={(e) => setSwapTo(e.target.value)} className={pick} data-subscription-swap-to>
                   <option value="">Choose…</option>
                   {options.map((o) => (
                     <option key={o.variantId} value={o.variantId}>
@@ -171,9 +172,9 @@ function Subscription({ s, intervals, quantityMax, reload }) {
       )}
       {panel === "change" && (
         <div className="mt-3 flex flex-wrap items-end gap-2 rounded-sf-control bg-sf-surface-muted p-3">
-          <label className="text-xs">
+          <label className="text-sm sm:text-xs">
             Every
-            <select value={interval} onChange={(e) => setIntervalDays(Number(e.target.value))} className="mt-1 block rounded-sf-small border border-sf-border bg-sf-surface px-2 py-1" data-subscription-interval>
+            <select value={interval} onChange={(e) => setIntervalDays(Number(e.target.value))} className={pick} data-subscription-interval>
               {intervalChoices.map((d) => (
                 <option key={d} value={d}>
                   {d} days
@@ -181,9 +182,9 @@ function Subscription({ s, intervals, quantityMax, reload }) {
               ))}
             </select>
           </label>
-          <label className="text-xs">
+          <label className="text-sm sm:text-xs">
             Quantity
-            <select value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} className="mt-1 block rounded-sf-small border border-sf-border bg-sf-surface px-2 py-1" data-subscription-quantity>
+            <select value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} className={pick} data-subscription-quantity>
               {Array.from({ length: quantityMax }, (_, i) => i + 1).map((q) => (
                 <option key={q} value={q}>
                   {q}
@@ -198,8 +199,8 @@ function Subscription({ s, intervals, quantityMax, reload }) {
       )}
       {panel === "cancel" && (
         <div className="mt-3 rounded-sf-control bg-sf-surface-muted p-3">
-          <p className="text-xs">Cancel this subscription? No more deliveries will be due. Orders you already placed aren&rsquo;t changed.</p>
-          <div className="mt-2 flex gap-2">
+          <p className="text-sm sm:text-xs">Cancel this subscription? No more deliveries will be due. Orders you already placed aren&rsquo;t changed.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" disabled={busy} className={`${btn} text-sf-danger`} data-subscription-cancel-confirm onClick={() => run({ action: "cancel" })}>
               Yes, cancel it
             </button>
@@ -210,7 +211,7 @@ function Subscription({ s, intervals, quantityMax, reload }) {
         </div>
       )}
       {error && (
-        <p role="alert" className="mt-2 text-xs text-sf-danger">
+        <p role="alert" className="mt-2 text-sm text-sf-danger sm:text-xs">
           {error}
         </p>
       )}

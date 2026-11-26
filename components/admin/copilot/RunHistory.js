@@ -16,14 +16,14 @@ export function RunHistory({ history }) {
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium">{r.label}</span>
             {STATUS[r.status] ? <Badge variant={STATUS[r.status][1]}>{STATUS[r.status][0]}</Badge> : null}
-            <span className="text-muted-foreground">
+            <span className="text-muted-foreground tabular-nums">
               {r.by} · {fmtDate(r.createdAt)} · {Number(r.tokens || 0).toLocaleString("en-IN")} tokens
             </span>
           </div>
           {r.refs?.length ? (
             <div className="flex flex-wrap gap-x-3 gap-y-1">
               {r.refs.map((ref) => (
-                <Link key={`${ref.kind}:${ref.id}`} href={ref.href} data-read-control className="text-primary underline-offset-4 hover:underline">
+                <Link key={`${ref.kind}:${ref.id}`} href={ref.href} data-read-control className="inline-flex min-h-11 items-center rounded-sm text-primary underline-offset-4 hover:underline md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
                   {ref.label}
                 </Link>
               ))}

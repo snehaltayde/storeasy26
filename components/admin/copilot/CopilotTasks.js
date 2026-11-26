@@ -107,13 +107,13 @@ export function CopilotTasks({ initial, role }) {
                 {pending === "install" ? "Installing…" : "Install"}
               </Button>
             </RoleGate>
-            <Link href="/admin/apps" data-read-control className="text-sm text-primary underline-offset-4 hover:underline">
+            <Link href="/admin/apps" data-read-control className="inline-flex min-h-11 items-center rounded-sm text-sm text-primary underline-offset-4 hover:underline md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
               See it in Apps
             </Link>
           </CardContent>
         </Card>
         {notice ? (
-          <Alert variant="destructive" className="mt-4">
+          <Alert role="alert" variant="destructive" className="mt-4">
             <AlertDescription>{notice.text}</AlertDescription>
           </Alert>
         ) : null}
@@ -143,14 +143,14 @@ export function CopilotTasks({ initial, role }) {
         ) : null}
 
         {notice ? (
-          <Alert variant={notice.tone === "error" ? "destructive" : "default"} data-copilot-notice={notice.tone}>
+          <Alert role={notice.tone === "error" ? "alert" : "status"} variant={notice.tone === "error" ? "destructive" : "default"} data-copilot-notice={notice.tone}>
             <AlertDescription>
               <p>{notice.text}</p>
               {notice.removed.length ? <p className="mt-1 text-muted-foreground">{notice.removed.join(" ")}</p> : null}
               {notice.refs.length ? (
                 <span className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
                   {notice.refs.map((ref) => (
-                    <Link key={`${ref.kind}:${ref.id}`} href={ref.href} data-read-control data-copilot-draft={ref.kind} className="font-medium text-primary underline-offset-4 hover:underline">
+                    <Link key={`${ref.kind}:${ref.id}`} href={ref.href} data-read-control data-copilot-draft={ref.kind} className="inline-flex min-h-11 items-center rounded-sm font-medium text-primary underline-offset-4 hover:underline md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
                       {ref.kind === "offer" ? `${ref.label} (off, try it in the simulator)` : `Open ${ref.label} in the editor`}
                     </Link>
                   ))}
@@ -162,13 +162,13 @@ export function CopilotTasks({ initial, role }) {
 
         <div className="grid gap-4 lg:grid-cols-3">
           {TASK_CARDS.map((t) => (
-            <Card key={t.task} data-copilot-task={t.task}>
+            <Card key={t.task} data-copilot-task={t.task} className="h-full">
               <CardHeader>
                 <CardTitle>{t.title}</CardTitle>
                 <CardDescription>{t.description}</CardDescription>
               </CardHeader>
               {can[t.task] ? (
-                <CardContent className="space-y-3">
+                <CardContent className="mt-auto space-y-3">
                   {t.task === "product_seo" ? <ProductPicker products={products} selected={chosen} onChange={setChosen} /> : null}
                   <Button type="button" onClick={() => run(t.task)} disabled={Boolean(blocked) || pending !== null || (t.task === "product_seo" && !chosen.length)} data-copilot-run={t.task}>
                     {pending === t.task ? "Writing drafts…" : "Write drafts"}

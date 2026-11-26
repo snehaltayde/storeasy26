@@ -44,7 +44,7 @@ export function SubscriptionTable({ rows, status, role }) {
             href={f.status ? `/admin/subscriptions?status=${f.status}` : "/admin/subscriptions"}
             aria-current={status === f.status ? "page" : undefined}
             data-read-control=""
-            className={cn("rounded-md px-3 py-1.5 text-sm", status === f.status ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground")}
+            className={cn("inline-flex min-h-11 items-center rounded-md px-3 text-sm md:min-h-8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background", status === f.status ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground")}
           >
             {f.label}
           </Link>
@@ -55,7 +55,7 @@ export function SubscriptionTable({ rows, status, role }) {
         columns={columns}
         rows={rows}
         rowActions={(r) => (
-          <button type="button" data-subscription-open={r.id} data-read-control="" onClick={() => setOpen(r.id)} className="text-sm font-medium text-primary underline-offset-4 hover:underline">
+          <button type="button" data-subscription-open={r.id} data-read-control="" onClick={() => setOpen(r.id)} className="inline-flex min-h-11 items-center rounded-sm text-sm font-medium text-primary underline-offset-4 hover:underline md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
             View
           </button>
         )}

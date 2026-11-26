@@ -17,7 +17,7 @@ export default function RatingSummary({ average, count = 0, link }) {
     </>
   );
   return link ? (
-    <a href={link} className="inline-flex items-center gap-2 text-sm hover:underline" aria-label={words} data-rating-summary="">
+    <a href={link} className="sf-focus -my-2 inline-flex min-h-11 items-center gap-2 rounded-sf-small py-2 text-sm hover:underline sm:my-0 sm:min-h-0 sm:py-0" aria-label={words} data-rating-summary="">
       {inner}
     </a>
   ) : (

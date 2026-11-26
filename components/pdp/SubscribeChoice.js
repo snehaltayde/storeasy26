@@ -36,20 +36,20 @@ export default function SubscribeChoice({ productId, variantId, price, currency 
 
   if (!offer || unitPrice == null) return null;
   const save = offer.percent > 0 ? ` and save ${offer.percent}%` : "";
-  const box = (on) => `flex cursor-pointer items-start gap-3 rounded-sf-control border px-4 py-3 text-sm transition ${on ? "border-sf-inverse bg-sf-surface" : "border-sf-border bg-sf-surface hover:border-sf-border-hover"}`;
+  const box = (on) => `sf-focus-within flex min-h-11 cursor-pointer items-start gap-3 rounded-sf-control border px-4 py-3 text-sm transition ${on ? "border-sf-inverse bg-sf-surface ring-1 ring-sf-inverse" : "border-sf-border bg-sf-surface hover:border-sf-border-hover"}`;
   return (
     <fieldset className="mt-6 space-y-2" data-subscribe-choice>
       <legend className="mb-2 text-sm font-semibold text-sf-text-body">How would you like it?</legend>
       <label className={box(mode === "once")}>
-        <input type="radio" name="purchase-mode" value="once" checked={mode === "once"} onChange={() => setMode("once")} className="mt-0.5" />
+        <input type="radio" name="purchase-mode" value="once" checked={mode === "once"} onChange={() => setMode("once")} className="mt-0.5 size-4 accent-current" />
         <span className="flex-1">One-time</span>
-        <span className="font-semibold">{formatMoney(price, currency)}</span>
+        <span className="font-semibold tabular-nums">{formatMoney(price, currency)}</span>
       </label>
       <label className={box(mode === "subscribe")}>
-        <input type="radio" name="purchase-mode" value="subscribe" checked={mode === "subscribe"} onChange={() => setMode("subscribe")} className="mt-0.5" data-subscribe-radio />
+        <input type="radio" name="purchase-mode" value="subscribe" checked={mode === "subscribe"} onChange={() => setMode("subscribe")} className="mt-0.5 size-4 accent-current" data-subscribe-radio />
         <span className="flex-1">
           <span className="block">
-            Subscribe{save}: <span className="font-semibold" data-subscribe-price>{formatMoney(unitPrice, currency)}</span> every{" "}
+            Subscribe{save}: <span className="font-semibold tabular-nums" data-subscribe-price>{formatMoney(unitPrice, currency)}</span> every{" "}
             <select
               aria-label="Delivery every"
               value={interval ?? ""}
@@ -57,7 +57,7 @@ export default function SubscribeChoice({ productId, variantId, price, currency 
                 setInterval(Number(e.target.value));
                 setMode("subscribe");
               }}
-              className="rounded-sf-small border border-sf-border bg-sf-surface px-1.5 py-0.5"
+              className="sf-field mt-1 min-h-11 rounded-sf-small border border-sf-border bg-sf-surface px-2 py-1 sm:mt-0 sm:min-h-0"
               data-subscribe-interval
             >
               {offer.intervals.map((d) => (
@@ -67,7 +67,7 @@ export default function SubscribeChoice({ productId, variantId, price, currency 
               ))}
             </select>
           </span>
-          <span className="mt-1 block text-xs text-sf-text-subtle">You pay for each delivery when it&rsquo;s due. Nothing is charged automatically.</span>
+          <span className="mt-2 block text-xs text-sf-text-subtle">You pay for each delivery when it&rsquo;s due. Nothing is charged automatically.</span>
         </span>
       </label>
     </fieldset>

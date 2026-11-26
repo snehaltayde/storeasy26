@@ -30,20 +30,20 @@ function TemplateRow({ t, role, busy, onSave, onApprove }) {
   useEffect(() => setDraft({ body: t.body, provider_template: t.providerTemplate, language: t.language }), [t.body, t.providerTemplate, t.language]);
   const id = `wa-${t.kind}`;
   return (
-    <li className="space-y-2 rounded-md border p-3" data-wa-template={t.kind} data-wa-status={t.status}>
+    <li className="space-y-3 rounded-md border p-3" data-wa-template={t.kind} data-wa-status={t.status}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium">{t.words}</span>
         {t.marketing && <Badge variant="outline">Marketing</Badge>}
         <Badge variant={KIND_TONE[t.status] ?? "secondary"}>{t.status === "approved" ? "Approved" : "Draft"}</Badge>
-        <span className="ml-auto flex gap-2">
+        <span className="flex gap-2 sm:ml-auto">
           <RoleGate role={role} action="apps.manage" reason={NO_MANAGE}>
-            <Button size="sm" variant="outline" onClick={() => setEditing((v) => !v)} data-wa-edit={t.kind}>
+            <Button size="sm" className="h-11 md:h-7" variant="outline" onClick={() => setEditing((v) => !v)} data-wa-edit={t.kind}>
               <Pencil aria-hidden="true" /> Edit
             </Button>
           </RoleGate>
           {t.status !== "approved" && (
             <RoleGate role={role} action="apps.manage" reason={NO_MANAGE}>
-              <Button size="sm" onClick={() => onApprove(t.kind)} disabled={busy === `approve:${t.kind}`} data-wa-approve={t.kind}>
+              <Button size="sm" className="h-11 md:h-7" onClick={() => onApprove(t.kind)} disabled={busy === `approve:${t.kind}`} data-wa-approve={t.kind}>
                 <Check aria-hidden="true" /> Approve
               </Button>
             </RoleGate>
@@ -63,14 +63,14 @@ function TemplateRow({ t, role, busy, onSave, onApprove }) {
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="space-y-1">
               <Label htmlFor={`${id}-name`}>Meta template name</Label>
-              <Input id={`${id}-name`} value={draft.provider_template} onChange={(e) => setDraft({ ...draft, provider_template: e.target.value })} />
+              <Input className="h-11 md:h-8" id={`${id}-name`} value={draft.provider_template} onChange={(e) => setDraft({ ...draft, provider_template: e.target.value })} />
             </div>
             <div className="space-y-1">
               <Label htmlFor={`${id}-lang`}>Language</Label>
-              <Input id={`${id}-lang`} value={draft.language} onChange={(e) => setDraft({ ...draft, language: e.target.value })} />
+              <Input className="h-11 md:h-8" id={`${id}-lang`} value={draft.language} onChange={(e) => setDraft({ ...draft, language: e.target.value })} />
             </div>
           </div>
-          <Button size="sm" type="submit" disabled={busy === `save:${t.kind}`}>
+          <Button size="sm" type="submit" className="h-11 md:h-7" disabled={busy === `save:${t.kind}`}>
             Save as draft
           </Button>
         </form>
@@ -162,16 +162,16 @@ export function WhatsAppCard({ install, role }) {
           {view.log.length ? (
             <ul className="divide-y text-sm" data-wa-log>
               {view.log.map((m) => (
-                <li key={m.id} className="flex flex-wrap gap-x-3 py-1.5" data-wa-log-kind={m.kind}>
+                <li key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 py-2" data-wa-log-kind={m.kind}>
                   <span className="font-medium">{view.templates.find((t) => t.kind === m.kind)?.words ?? m.kind}</span>
                   <span className="font-mono">{m.to}</span>
-                  <span>{STATUS_WORDS[m.status] ?? m.status}</span>
-                  <span className="ml-auto text-muted-foreground">{shortDate(m.at)}</span>
+                  <Badge variant={m.status === "failed" ? "destructive" : m.status === "sent" ? "success" : "secondary"}>{STATUS_WORDS[m.status] ?? m.status}</Badge>
+                  <span className="text-muted-foreground tabular-nums sm:ml-auto">{shortDate(m.at)}</span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-muted-foreground">No messages yet.</p>
+            <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">No messages yet. Order updates and reminders you send show here.</p>
           )}
         </section>
       </CardContent>

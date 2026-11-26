@@ -22,12 +22,12 @@ export function ShipmentCard({ shipment, timeZone }) {
   if (!shipment) return null;
   const [words, tone] = SHIPMENT_WORDS[shipment.status] || SHIPMENT_WORDS.in_transit;
   const rows = [
-    ["AWB", shipment.awb],
+    ["AWB", <span key="awb" className="font-mono">{shipment.awb}</span>],
     ["Courier", shipment.courier || "—"],
     ["Shiprocket says", shipment.statusLabel || "—"],
     ["Expected", shipment.etd ? orderTime(shipment.etd, timeZone) : "—"],
     ...(shipment.deliveredAt ? [["Delivered", orderTime(shipment.deliveredAt, timeZone)]] : []),
-    ...(shipment.returnAwb ? [["Return AWB", shipment.returnAwb]] : []),
+    ...(shipment.returnAwb ? [["Return AWB", <span key="rawb" className="font-mono">{shipment.returnAwb}</span>]] : []),
     ["Last checked", shipment.fetchedAt ? orderTime(shipment.fetchedAt, timeZone) : "—"],
   ];
   const last = shipment.scans.at(-1);
@@ -41,11 +41,11 @@ export function ShipmentCard({ shipment, timeZone }) {
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <Badge variant={tone}>{words}</Badge>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
           {rows.map(([k, v]) => (
             <div key={k} className="contents">
               <dt className="text-muted-foreground">{k}</dt>
-              <dd className="min-w-0 break-words">{v}</dd>
+              <dd className="min-w-0 break-words tabular-nums">{v}</dd>
             </div>
           ))}
         </dl>

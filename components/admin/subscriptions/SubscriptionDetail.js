@@ -68,9 +68,10 @@ export function SubscriptionDetail({ id, role, onClose }) {
             {error}
           </p>
         )}
+        {!s && !error ? <p className="px-4 text-sm text-muted-foreground" role="status">Loading the subscription…</p> : null}
         {s && (
           <div className="space-y-5 px-4 pb-6 text-sm">
-            <dl className="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-2">
+            <dl className="grid grid-cols-[6.5rem_1fr] gap-x-3 gap-y-2 sm:grid-cols-[8rem_1fr]">
               <dt className="text-muted-foreground">Status</dt>
               <dd>
                 <StatusBadge kind="subscription" status={s.status} />
@@ -78,11 +79,11 @@ export function SubscriptionDetail({ id, role, onClose }) {
               <dt className="text-muted-foreground">Next due</dt>
               <dd>{s.status === "cancelled" ? "—" : s.status === "paused" ? (s.pausedUntil ? `Paused until ${dateText(s.pausedUntil)}` : "Paused until resumed") : dateText(s.nextDueAt)}</dd>
               <dt className="text-muted-foreground">Next amount</dt>
-              <dd>{s.next ? <MoneyCell amount={s.next.amount} currency={s.next.currency} /> : "—"} <span className="text-muted-foreground">(today's price)</span></dd>
+              <dd className="min-w-0 break-words">{s.next ? <MoneyCell amount={s.next.amount} currency={s.next.currency} /> : "—"} <span className="text-muted-foreground">(today's price)</span></dd>
               <dt className="text-muted-foreground">Customer</dt>
               <dd>{s.customer ? `${s.customer.name ? `${s.customer.name} · ` : ""}${s.customer.email}` : s.pii_redacted ? "Hidden for your role" : "No longer linked"}</dd>
               <dt className="text-muted-foreground">First order</dt>
-              <dd className="font-mono text-xs">{s.originOrderId}</dd>
+              <dd className="break-all font-mono text-xs">{s.originOrderId}</dd>
               {s.cancelReason && (
                 <>
                   <dt className="text-muted-foreground">Cancel reason</dt>
@@ -94,16 +95,16 @@ export function SubscriptionDetail({ id, role, onClose }) {
             <section aria-label="History">
               <h3 className="mb-2 font-medium">History</h3>
               {s.history.length === 0 ? (
-                <p className="text-muted-foreground">No renewals yet.</p>
+                <p className="rounded-md border border-dashed p-3 text-muted-foreground">No renewals yet. Each delivery that comes due is listed here.</p>
               ) : (
                 <ul className="divide-y rounded-md border">
                   {s.history.map((c) => (
-                    <li key={c.cycle} className="flex flex-wrap items-center gap-3 px-3 py-2">
-                      <span className="w-16 text-muted-foreground">#{c.cycle}</span>
+                    <li key={c.cycle} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5">
+                      <span className="w-10 font-mono text-muted-foreground tabular-nums">#{c.cycle}</span>
                       <span className="flex-1">
                         {CYCLE_WORDS[c.status] || c.status} · due {dateText(c.dueAt)}
                       </span>
-                      {c.orderId && <span className="font-mono text-xs">{c.orderId}</span>}
+                      {c.orderId && <span className="break-all font-mono text-xs">{c.orderId}</span>}
                       {c.total && <MoneyCell amount={c.total.amount} currency={c.total.currency} />}
                     </li>
                   ))}
@@ -114,7 +115,7 @@ export function SubscriptionDetail({ id, role, onClose }) {
             {s.status !== "cancelled" && (
               <section aria-label="Change for the customer" className="space-y-3">
                 {!acting ? (
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {s.status === "active" && (
                       <RoleGate role={role} action="subscriptions.manage" reason={NO_MANAGE}>
                         <Button variant="outline" data-subscription-action="pause" onClick={() => setActing("pause")}>
@@ -132,7 +133,7 @@ export function SubscriptionDetail({ id, role, onClose }) {
                   <div className="space-y-2 rounded-md border p-3">
                     <Label htmlFor="sub-reason">{acting === "pause" ? "Why pause it?" : "Why cancel it?"} The customer's request, for example. This goes into the audit log.</Label>
                     <Textarea id="sub-reason" value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} />
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Button variant={acting === "cancel" ? "destructive" : "default"} disabled={busy || !reason.trim()} onClick={act} data-subscription-confirm={acting}>
                         {acting === "pause" ? "Pause subscription" : "Cancel subscription"}
                       </Button>

@@ -82,15 +82,15 @@ export default function WhatsAppConsent({ phone, country = "IN" }) {
 
   const view = consentBoxes({ live, number, syncedFor, stale });
   return (
-    <fieldset className="mt-4 space-y-2" data-wa="consent">
+    <fieldset className="mt-4 space-y-1 sm:space-y-2" data-wa="consent">
       <legend className="sr-only">WhatsApp messages</legend>
       {PURPOSES.map((p) => (
-        <label key={p} className="flex items-start gap-2 text-sm text-sf-text-subtle">
+        <label key={p} className="flex min-h-11 cursor-pointer items-start gap-3 py-1.5 text-sm text-sf-text-subtle sm:min-h-0 sm:gap-2 sm:py-0">
           <input
             type="checkbox"
             name={`wa-${p}`}
             data-wa-consent={p}
-            className="sf-focus mt-0.5 size-4"
+            className="sf-focus mt-0.5 size-5 shrink-0 sm:size-4"
             checked={view.boxes[p].checked}
             disabled={view.boxes[p].disabled}
             onChange={(e) => save(p, e.target.checked)}
@@ -99,13 +99,13 @@ export default function WhatsAppConsent({ phone, country = "IN" }) {
         </label>
       ))}
       {view.savedFor && (
-        <p className="text-xs text-sf-text-faint" data-wa-saved-for>
+        <p className="text-xs text-sf-text-subtle" data-wa-saved-for>
           Saved for {view.savedFor}.
         </p>
       )}
-      {view.needPhone && <p className="text-xs text-sf-text-faint">Add your phone number above to choose WhatsApp messages.</p>}
+      {view.needPhone && <p className="text-xs text-sf-text-subtle">Add your phone number above to choose WhatsApp messages.</p>}
       {error && (
-        <p role="alert" className="text-xs text-sf-danger">
+        <p role="alert" className="text-sm text-sf-danger sm:text-xs">
           {error}
         </p>
       )}

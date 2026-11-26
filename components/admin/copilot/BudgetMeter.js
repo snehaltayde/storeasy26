@@ -14,7 +14,7 @@ export function BudgetMeter({ usage }) {
   return (
     <div className="space-y-2" data-copilot-meter={usage ? usage.spent : ""}>
       <Progress value={pct} aria-label="Today's AI budget used" />
-      <p className="text-sm text-muted-foreground">{budgetWords(usage)}</p>
+      <p className="text-sm tabular-nums text-muted-foreground">{budgetWords(usage)}</p>
     </div>
   );
 }

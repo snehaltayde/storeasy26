@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { MessageSquareText } from "lucide-react";
 import { EmptyState } from "@/components/kit/empty-state";
 import { RoleGate } from "@/components/kit/role-gate";
 import { useToast } from "@/components/kit/toast";
@@ -50,8 +51,8 @@ export function reviewsHref({ status = "pending", rating = null, product = null 
   const s = q.toString();
   return `/admin/reviews${s ? `?${s}` : ""}`;
 }
-const tabClass = (on) => `-mb-px border-b-2 pb-2 text-sm font-medium ${on ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`;
-const chipClass = (on) => `rounded-full border px-3 py-1 text-xs ${on ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:text-foreground"}`;
+const tabClass = (on) => `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background -mb-px inline-flex min-h-11 items-center border-b-2 text-sm font-medium md:min-h-9 ${on ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`;
+const chipClass = (on) => `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background inline-flex min-h-11 items-center rounded-full border px-3 text-xs md:min-h-8 ${on ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:text-foreground"}`;
 
 export function ReviewQueue({ reviews, counts, products, filters, role, timeZone }) {
   const router = useRouter();
@@ -99,10 +100,10 @@ export function ReviewQueue({ reviews, counts, products, filters, role, timeZone
 
   return (
     <div className="space-y-4">
-      <nav aria-label="Review states" className="flex gap-6 border-b border-border">
+      <nav aria-label="Review states" className="flex gap-5 overflow-x-auto border-b border-border sm:gap-6">
         {TABS.map(([key, label]) => (
           <Link key={key} href={reviewsHref({ status: key, rating, product })} data-read-control data-reviews-tab={key} aria-current={status === key ? "page" : undefined} className={tabClass(status === key)}>
-            {label} <span className="ml-1 text-xs text-muted-foreground">{counts[key] ?? 0}</span>
+            {label} <span className="ml-1 font-mono text-xs tabular-nums text-muted-foreground">{counts[key] ?? 0}</span>
           </Link>
         ))}
       </nav>
@@ -120,7 +121,7 @@ export function ReviewQueue({ reviews, counts, products, filters, role, timeZone
             aria-label="Product"
             defaultValue={product || ""}
             onChange={(e) => router.push(reviewsHref({ status, rating, product: e.target.value || null }))}
-            className="h-11 w-full rounded-md border border-input bg-background px-3 text-base md:h-8 md:text-sm"
+            className="h-11 w-full rounded-md border border-input bg-background px-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:h-8 md:text-sm"
             data-read-control
           >
             <option value="">Every product</option>
@@ -135,18 +136,18 @@ export function ReviewQueue({ reviews, counts, products, filters, role, timeZone
 
       {bulkable && selected.size > 0 ? (
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm" data-reviews="bulk-bar">
-          <span>{selected.size} selected</span>
+          <span className="font-medium" role="status">{selected.size} selected</span>
           <RoleGate role={role} action="reviews.moderate" mode="hide">
-            <Button size="sm" disabled={busy || selected.size > BULK_MAX} onClick={() => act("approve", [...selected])} data-reviews="bulk-approve">
+            <Button size="sm" className="h-11 md:h-7" disabled={busy || selected.size > BULK_MAX} onClick={() => act("approve", [...selected])} data-reviews="bulk-approve">
               Approve selected
             </Button>
           </RoleGate>
           <RoleGate role={role} action="reviews.moderate" mode="hide">
-            <Button size="sm" variant="outline" disabled={busy || selected.size > BULK_MAX} onClick={() => act("reject", [...selected])} data-reviews="bulk-reject">
+            <Button size="sm" variant="outline" className="h-11 md:h-7" disabled={busy || selected.size > BULK_MAX} onClick={() => act("reject", [...selected])} data-reviews="bulk-reject">
               Reject selected
             </Button>
           </RoleGate>
-          {selected.size > BULK_MAX ? <span className="text-destructive">Choose at most {BULK_MAX} at a time.</span> : null}
+          {selected.size > BULK_MAX ? <span role="alert" className="text-destructive">Choose at most {BULK_MAX} at a time.</span> : null}
         </div>
       ) : null}
 
@@ -159,7 +160,7 @@ export function ReviewQueue({ reviews, counts, products, filters, role, timeZone
           </ul>
         </Card>
       ) : (
-        <EmptyState title={EMPTY[status] || EMPTY.pending} />
+        <EmptyState icon={MessageSquareText} title={EMPTY[status] || EMPTY.pending} />
       )}
 
       <AlertDialog open={!!rejecting} onOpenChange={(o) => !o && setRejecting(null)}>

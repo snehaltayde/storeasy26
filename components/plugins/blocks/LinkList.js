@@ -7,7 +7,7 @@ export default function LinkList({ links = [] }) {
     <ul className="flex flex-wrap gap-2" data-link-list="">
       {links.map((l, i) => (
         <li key={i}>
-          <a href={l.href} className="inline-block rounded-sf-button border border-sf-border px-3 py-2 text-sm font-semibold text-sf-text hover:bg-sf-surface-muted">
+          <a href={l.href} className="sf-focus inline-flex min-h-11 items-center rounded-sf-button border border-sf-border px-4 py-2 text-sm font-semibold text-sf-text transition hover:bg-sf-surface-muted">
             {l.label}
           </a>
         </li>

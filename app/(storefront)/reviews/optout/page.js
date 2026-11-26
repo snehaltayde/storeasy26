@@ -16,7 +16,7 @@ export default async function ReviewOptOutPage({ searchParams }) {
   const token = typeof sp.t === "string" ? sp.t : "";
   const valid = !sp.done && token ? await tfetch(() => verifyOptOutToken(token)) : null;
   return (
-    <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
+    <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6 sm:py-12">
       <StripToken />
       <h1 className="text-2xl font-extrabold tracking-tight">Review emails</h1>
       {sp.done ? (
@@ -28,7 +28,7 @@ export default async function ReviewOptOutPage({ searchParams }) {
           <input type="hidden" name="kind" value="optout" />
           <input type="hidden" name="t" value={token} />
           <p className="text-sf-text-muted">{OPTOUT_WORDS.ask}</p>
-          <button type="submit" className="mt-4 rounded-sf-control bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent hover:bg-sf-accent-hover" data-optout-confirm="">
+          <button type="submit" className="sf-focus mt-4 min-h-11 w-full rounded-sf-control bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent transition hover:bg-sf-accent-hover sm:w-auto" data-optout-confirm="">
             Don&apos;t ask me for reviews
           </button>
         </form>

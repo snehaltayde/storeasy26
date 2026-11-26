@@ -18,7 +18,7 @@ export const metadata = { title: "Write a review", robots: { index: false }, ref
 
 function Shell({ children }) {
   return (
-    <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
+    <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6 sm:py-12">
       <StripToken />
       {children}
     </div>
@@ -51,8 +51,8 @@ export default async function WriteReviewPage({ searchParams }) {
   }
   const { product, suggestedName } = opened;
   const errs = new Set(String(sp.err || "").split(",").filter(Boolean));
-  const field = "mt-1 w-full rounded-sf-control border border-sf-border bg-sf-surface px-3 py-2 text-sm text-sf-text";
-  const note = (k) => (errs.has(k) ? <p className="mt-1 text-xs font-semibold text-sf-danger">{FIELD_WORDS[k]}</p> : null);
+  const field = "sf-field mt-1 w-full rounded-sf-control border border-sf-border bg-sf-surface px-3 py-2 text-sf-text";
+  const note = (k) => (errs.has(k) ? <p className="mt-1 text-sm font-semibold text-sf-danger sm:text-xs" role="alert">{FIELD_WORDS[k]}</p> : null);
   return (
     <Shell>
       <h1 className="text-2xl font-extrabold tracking-tight">Write a review</h1>
@@ -73,10 +73,10 @@ export default async function WriteReviewPage({ searchParams }) {
         <input type="hidden" name="t" value={token} />
         <fieldset>
           <legend className="text-sm font-semibold text-sf-text">Your rating</legend>
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             {[5, 4, 3, 2, 1].map((n) => (
-              <label key={n} className="inline-flex cursor-pointer items-center gap-1.5 rounded-sf-control border border-sf-border px-3 py-2 text-sm has-[:checked]:border-sf-accent has-[:checked]:font-semibold">
-                <input type="radio" name="rating" value={n} required className="accent-current" />
+              <label key={n} className="sf-focus-within inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-sf-control border border-sf-border px-3 py-2 text-sm transition hover:border-sf-border-hover has-[:checked]:border-sf-inverse has-[:checked]:font-semibold has-[:checked]:ring-1 has-[:checked]:ring-sf-inverse">
+                <input type="radio" name="rating" value={n} required className="size-4 accent-current" />
                 <span aria-hidden="true" className="text-sf-accent-text">
                   {"★".repeat(n)}
                 </span>
@@ -107,7 +107,7 @@ export default async function WriteReviewPage({ searchParams }) {
           <span className="mt-1 block text-xs font-normal text-sf-text-muted">{WRITE_WORDS.privacy}</span>
           {note("display_name")}
         </label>
-        <button type="submit" className="rounded-sf-control bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent hover:bg-sf-accent-hover">
+        <button type="submit" className="sf-focus min-h-11 w-full rounded-sf-control bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent transition hover:bg-sf-accent-hover sm:w-auto">
           Send review
         </button>
       </form>

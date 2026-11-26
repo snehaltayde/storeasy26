@@ -60,8 +60,8 @@ export default async function ProductReviewsPage({ params, searchParams }) {
   const distribution = [5, 4, 3, 2, 1].map((stars) => ({ stars, count: stats.distribution[stars] ?? 0 }));
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-      <nav className="mb-5 text-sm text-sf-text-faint">
-        <Link href={`/products/${product.handle}`} className="hover:text-sf-text-muted">
+      <nav className="mb-5 text-sm text-sf-text-subtle">
+        <Link href={`/products/${product.handle}`} className="sf-focus rounded-sf-small hover:text-sf-text-muted">
           {product.title}
         </Link>{" "}
         / <span className="text-sf-text-muted">Reviews</span>
@@ -70,7 +70,7 @@ export default async function ProductReviewsPage({ params, searchParams }) {
       <div className="mt-6 grid gap-8 sm:grid-cols-[14rem_1fr]">
         <div>
           <p className="flex items-center gap-2">
-            <span className="text-3xl font-semibold text-sf-text">{avg}</span>
+            <span className="text-3xl font-semibold tabular-nums text-sf-text">{avg}</span>
             <Stars value={Number(avg)} size={18} label={`${avg} out of 5 stars`} />
           </p>
           <p className="mt-1 text-sm text-sf-text-muted">
@@ -83,9 +83,9 @@ export default async function ProductReviewsPage({ params, searchParams }) {
         <div data-review-list="">
           {reviews.length ? <ReviewItems reviews={reviews.map((r) => ({ ...r, date: r.date.slice(0, 10) }))} /> : <p className="text-sm text-sf-text-muted">No more reviews.</p>}
           {pages > 1 ? (
-            <div className="mt-5 flex items-center gap-4 text-sm">
+            <div className="mt-5 flex flex-wrap items-center gap-x-4 text-sm">
               {page > 1 ? (
-                <Link href={`/products/${product.handle}/reviews?page=${page - 1}`} className="font-semibold text-sf-accent-text underline">
+                <Link href={`/products/${product.handle}/reviews?page=${page - 1}`} className="sf-focus sf-tap rounded-sf-small font-semibold text-sf-accent-text underline">
                   Newer
                 </Link>
               ) : null}
@@ -93,7 +93,7 @@ export default async function ProductReviewsPage({ params, searchParams }) {
                 Page {page} of {pages}
               </span>
               {page < pages ? (
-                <Link href={`/products/${product.handle}/reviews?page=${page + 1}`} className="font-semibold text-sf-accent-text underline">
+                <Link href={`/products/${product.handle}/reviews?page=${page + 1}`} className="sf-focus sf-tap rounded-sf-small font-semibold text-sf-accent-text underline">
                   Older
                 </Link>
               ) : null}
