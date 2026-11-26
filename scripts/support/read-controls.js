@@ -23,6 +23,8 @@ export const READ_CONTROLS = [
   { path: "components/admin/apps/DeliveriesTable.js", reason: "the Status and Event filters re-ask GET /api/admin/apps/[id]/webhooks with a query, and View opens the delivery's payload (already read) in a dialog; no write", marks: 3 },
   { path: "components/admin/apps/WebhooksCard.js", reason: "Try again re-asks GET /api/admin/apps/[id]/webhooks after a failed read", marks: 1 },
   // Phase 4 line 1: Apps
+  // Phase 9 line 2: subscriptions
+  { path: "components/admin/subscriptions/SubscriptionTable.js", reason: "the All / Active / Paused / Cancelled filter is links to /admin/subscriptions with a ?status query, and View opens the row's detail sheet (GET /api/admin/subscriptions?id, subscriptions.read); no write", marks: 2 },
   // Phase 5 line 1
   { path: "components/admin/themes/ThemeDetail.js", reason: "Download package is a link to GET /api/admin/themes/[id]?download (storefront.read); no write", marks: 1 },
   { path: "components/admin/themes/ThemeDraftBar.js", reason: "Preview opens the founder preview of the draft theme (POST /api/admin/preview-session create + showDesign, storefront.read, which writes no store content) in a new tab", marks: 1 },

@@ -43,6 +43,7 @@ export function SubscriptionTable({ rows, status, role }) {
             key={f.label}
             href={f.status ? `/admin/subscriptions?status=${f.status}` : "/admin/subscriptions"}
             aria-current={status === f.status ? "page" : undefined}
+            data-read-control=""
             className={cn("rounded-md px-3 py-1.5 text-sm", status === f.status ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground")}
           >
             {f.label}
@@ -54,7 +55,7 @@ export function SubscriptionTable({ rows, status, role }) {
         columns={columns}
         rows={rows}
         rowActions={(r) => (
-          <button type="button" data-subscription-open={r.id} onClick={() => setOpen(r.id)} className="text-sm font-medium text-primary underline-offset-4 hover:underline">
+          <button type="button" data-subscription-open={r.id} data-read-control="" onClick={() => setOpen(r.id)} className="text-sm font-medium text-primary underline-offset-4 hover:underline">
             View
           </button>
         )}
