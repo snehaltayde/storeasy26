@@ -98,6 +98,12 @@ export const ADMIN_ROUTES = Object.freeze([
   { path: "help", method: "GET", action: "settings.read" },
   { path: "insights", method: "GET", action: "storefront.read" },
   { path: "insights", method: "POST", action: "storefront.write", probe: { body: {} } },
+  // Phase 9 line 5: the AI copilot (each task's run needs its own action; the
+  // probe store has no copilot installed, so an allowed run is refused 409)
+  { path: "copilot", method: "GET", action: "storefront.read" },
+  { path: "copilot", method: "POST", variant: "starter", action: "storefront.write", probe: { body: { task: "starter" } } },
+  { path: "copilot", method: "POST", variant: "product_seo", action: "storefront.write", probe: { body: { task: "product_seo", productIds: [] } } },
+  { path: "copilot", method: "POST", variant: "offer_ideas", action: "offers.write", probe: { body: { task: "offer_ideas" } } },
   { path: "integrations", method: "GET", action: "settings.read" },
   { path: "integrations", method: "POST", variant: "revoke", action: "settings.write", probe: { body: { action: "revoke", provider: "" } } },
   { path: "integrations", method: "POST", variant: "test", action: "settings.read", crossOrigin: "read", probe: { body: { action: "test", provider: "" } } },

@@ -94,6 +94,7 @@ const SKIP_DIRS = new Set([
   "lib/platform",
   "lib/onboarding", // the console's onboarding steps (Phase 1 line 3): founder words, never a shopper's
   "lib/ai",
+  "lib/copy", // the banned-copy rules themselves (Phase 9 line 5 moved them from scripts/support), not copy
   ...MARKETING_ROUTES.map((r) => `app/(storefront)/${r}`),
   // Console and machine-to-machine APIs
   ...["admin", "platform", "connect", "jobs", "shopify", "razorpay", "preview", "health", "leads"].map((d) => `app/api/${d}`),

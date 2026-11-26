@@ -1,0 +1,12 @@
+{
+  "note": "drill:plugins stage copilot: the stub's answer for offer ideas (the 40% one is over the cap and is dropped)",
+  "tokensIn": 1300,
+  "tokensOut": 400,
+  "output": {
+    "offers": [
+      { "kind": "COUPON", "title": "Copilot welcome ten", "code": "COPILOT10", "percent": 10, "min_qty": null, "buy": null, "target": null, "reason": "A small first-order thank you." },
+      { "kind": "TIERED_QTY", "title": "Copilot two or more", "code": null, "percent": 10, "min_qty": 2, "buy": null, "target": "p1", "reason": "Rewards buying a second one." },
+      { "kind": "COUPON", "title": "Copilot too much", "code": "COPILOT40", "percent": 40, "min_qty": null, "buy": null, "target": null, "reason": "Over the cap." }
+    ]
+  }
+}

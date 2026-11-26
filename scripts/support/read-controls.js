@@ -76,6 +76,9 @@ export const READ_CONTROLS = [
   // Phase 2 line 9: analytics and insights
   { path: "components/admin/analytics/AnalyticsTables.js", reason: "the 7/30/90-day links only change ?days= on the analytics page, and Try again reloads it (GETs)", marks: 2 },
   { path: "components/admin/analytics/CsvButton.js", reason: "CSV builds a file in the browser from the aggregated rows on screen; nothing is sent", marks: 1 },
+  // Phase 9 line 5: the copilot (support gets no run button, no picker and no Install)
+  { path: "components/admin/copilot/CopilotTasks.js", reason: "Try again re-reads GET /api/admin/copilot; \"See it in Apps\" and each draft link open another console page", marks: 3 },
+  { path: "components/admin/copilot/RunHistory.js", reason: "each run's draft links open the editor or the offer page", marks: 1 },
   { path: "components/admin/insights/InsightsList.js", reason: "Try again re-reads GET /api/admin/insights; \"Show the numbers\" opens a <details>; \"Open in editor\" is a link to the editor", marks: 3 },
   { path: "components/admin/experiments/ExperimentsList.js", reason: "the status tabs (and their list, which Radix makes focusable) filter the loaded experiments; Try again re-renders the page (router.refresh(), a GET)", marks: 3 },
   { path: "components/admin/experiments/AnalysisPanel.js", reason: "\"Open in editor\" after keeping a variant is a link to the editor", marks: 1 },

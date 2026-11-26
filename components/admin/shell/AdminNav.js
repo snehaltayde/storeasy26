@@ -12,6 +12,7 @@ import {
   Image as ImageIcon,
   LayoutDashboard,
   Lightbulb,
+  Sparkles,
   ListChecks,
   MessageCircleQuestionMark,
   Package,
@@ -54,6 +55,7 @@ const ICONS = {
   bundles: Boxes,
   experiments: FlaskConical,
   insights: Lightbulb,
+  copilot: Sparkles, // Phase 9 line 5
   automations: Workflow,
   apps: Puzzle, // Phase 4 line 1
   integrations: Plug,

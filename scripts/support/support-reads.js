@@ -62,6 +62,8 @@ export const SUPPORT_PROBES = Object.freeze([
   { name: "sync", path: "sync", method: "GET", keys: ["ok", "sync"] },
   { name: "theme", path: "theme", method: "GET", keys: ["ok", "kits", "theme", "upgradeAvailable", "design"] },
   { name: "insights", path: "insights", method: "GET", keys: ["ok", "configured", "model", "budget", "insights"] },
+  // Phase 9 line 5: the copilot page's data (support gets no run buttons: can is all false)
+  { name: "copilot", path: "copilot", method: "GET", keys: ["ok", "state", "can", "products", "history"], inner: { state: ["provider", "model", "configured", "reason", "installed", "enabled", "installId", "killed", "ledgerReady", "usage"], can: ["starter", "product_seo", "offer_ideas"] } },
   { name: "media ?archived=include", path: "media", method: "GET", req: () => ({ query: "archived=include" }), keys: ["ok", "media", "limits"] },
   { name: "media ?view=library", path: "media", method: "GET", req: () => ({ query: "view=library" }), keys: ["ok", "items", "nextCursor", "counts"] },
   { name: "media PUT usage", path: "media", method: "PUT", req: (ctx) => ({ body: { id: ctx.mediaId } }), keys: ["ok", "usage"] },

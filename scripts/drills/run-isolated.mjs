@@ -243,6 +243,11 @@ export function drillEnv(base, worktree, ports) {
     // Phase 8 line 1: the pincode route reads the hand-written fixture
     // (lib/pincode/offline.js ignores this in production)
     PINCODE_DATA_FILE: join(worktree, "scripts", "fixtures", "pincodes-sample.json"),
+    // Phase 9 line 5: the copilot runs on the stub provider, answering from
+    // scripts/fixtures/ai/<task>.json (lib/ai/provider.js refuses the stub in
+    // production; insights stays "not set up" on the stub)
+    AI_PROVIDER: "stub",
+    AI_STUB_DIR: join(worktree, "scripts", "fixtures", "ai"),
   };
 }
 
