@@ -58,7 +58,13 @@ const PRODUCTS = [
   { title: "Mango Bar", description: "Real mango, pressed into a bar." },
 ];
 
-const store = await H.makeRoleStore({ name: "copilot", a: { products: PRODUCTS, collections: [{ productIds: ["gid://shopify/Product/9101", "gid://shopify/Product/9102", "gid://shopify/Product/9103"] }] } });
+// store B's own canaries: never in store A's prompts
+const B_CANARY = { product: "Bluefinch Granola", description: "bluefinchdescriptioncanary", email: "bluefinch.buyer@example.net", name: "Bettina Bluefinch" };
+const store = await H.makeRoleStore({
+  name: "copilot",
+  a: { products: PRODUCTS, collections: [{ productIds: ["gid://shopify/Product/9101", "gid://shopify/Product/9102", "gid://shopify/Product/9103"] }] },
+  b: { products: [{ title: B_CANARY.product, description: B_CANARY.description }] },
+});
 const { a, b, call } = store;
 const ids = await a.run(async () => (await libsql.execute("SELECT id FROM products ORDER BY id")).rows.map((r) => String(r.id)));
 
@@ -71,6 +77,26 @@ await a.run(async () => {
   });
   await libsql.execute({ sql: "INSERT INTO events (event_id, name, url, payload, created_at) VALUES ('ev_canary', 'search', ?, ?, ?)", args: [`/search?q=${CANARY.term}`, JSON.stringify({ search_term: CANARY.term }), at] });
 });
+
+await b.run(() => libsql.execute({ sql: "INSERT INTO customers (id, email, name, phone, created_at) VALUES ('cus_b', ?, ?, '9123456780', ?)", args: [B_CANARY.email, B_CANARY.name, new Date().toISOString()] }));
+
+// a policy page (legal text): no task may ever touch it
+const POLICY = await a.run(async () => {
+  const documents = await import("../lib/documents/service.js");
+  const { emptyBody } = await import("../lib/registry/index.js");
+  const body = emptyBody("page");
+  body.meta = { ...body.meta, slug: "refund-policy", title: "Refund policy" };
+  return (await documents.createDocument({ type: "page", body, actor: "merchant:test" })).document.id;
+});
+const untouchedDocs = () =>
+  a.run(async () => (await libsql.execute("SELECT id, type, revision, draft_hash, published_hash, published_version_id FROM documents WHERE id <> 'doc_home' AND type <> 'product_content' ORDER BY id")).rows.map((r) => JSON.stringify(r)).join("\n"));
+const homeLive = () =>
+  a.run(async () => ({
+    release: JSON.stringify((await libsql.execute("SELECT * FROM release_state")).rows),
+    home: JSON.stringify((await libsql.execute("SELECT (SELECT published_version_id FROM documents WHERE id = 'doc_home') AS live_version")).rows),
+    publish: Number((await libsql.execute("SELECT count(*) AS n FROM publish_log")).rows[0].n),
+  }));
+const DOCS_BEFORE = await untouchedDocs();
 
 // ---- a scripted stub: answers per task, counts calls --------------------------------------
 const answers = {
@@ -197,6 +223,34 @@ await t("provider: the Anthropic request — max_tokens is the whole output (thi
   }
 });
 
+await t("insights: a Claude model id is sent only to Anthropic; OpenAI and Gemini get their own AI_MODEL", async () => {
+  const saved = { ...process.env };
+  const sent = [];
+  try {
+    process.env.AI_PROVIDER = "anthropic";
+    process.env.ANTHROPIC_API_KEY = "sk-test";
+    eq(INS.insightsCallModel(), "claude-haiku-5-5", "anthropic:");
+    for (const [prov, key] of [["openai", "OPENAI_API_KEY"], ["gemini", "GEMINI_API_KEY"]]) {
+      process.env.AI_PROVIDER = prov;
+      process.env[key] = "k";
+      process.env.AI_MODEL = `${prov}-own-model`;
+      eq(INS.insightsCallModel(), null, `${prov} gets no insights model:`);
+      P.__setFetch(async (url, init) => {
+        sent.push({ url, body: JSON.parse(init.body) });
+        throw new TypeError("fetch failed");
+      });
+      await a.run(() => INS.generateInsights()).catch(() => {});
+      const last = sent.at(-1);
+      ok(last && !JSON.stringify(last).includes("claude"), `${prov}: no Claude id sent`);
+      ok(prov === "openai" ? last.body.model === "openai-own-model" : last.url.includes("gemini-own-model"), `${prov} uses AI_MODEL`);
+    }
+  } finally {
+    P.__setFetch(null);
+    for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];
+    Object.assign(process.env, saved);
+  }
+});
+
 await t("insights on the provider: same model default (claude-haiku-5-5, AI_INSIGHTS_MODEL checked), not configured on the stub", () => {
   eq(INS.AI_MODEL(), "claude-haiku-5-5", "default:");
   process.env.AI_INSIGHTS_MODEL = "bad id with spaces";
@@ -208,6 +262,18 @@ await t("insights on the provider: same model default (claude-haiku-5-5, AI_INSI
 });
 
 // ---- prompt guard ----------------------------------------------------------------------------
+await t("prompt guard: phones in any grouping are scrubbed and refused (987-654-3210, 98 7654 3210, (987) 654-3210, 98765-432-10, +91-9876-543-210, 919876543210, 098765 43210, 022 2345 6789), and catalog numbers are not", () => {
+  const phones = ["Call 987-654-3210", "WhatsApp 98 7654 3210", "ring (987) 654-3210", "phone: 98765-432-10", "+91-9876-543-210", "919876543210", "098765 43210", "landline 022 2345 6789", "+91 98765 43210", "9876543210", "+44 20 7946 0958", "dial 98765.43210"];
+  for (const raw of phones) {
+    ok(G.findPii(raw).includes("a phone number"), `found: ${raw}`);
+    const s = G.scrubText(raw);
+    eq(G.findPii(s), [], `scrubbed clean: ${raw} -> ${s}`);
+    ok(!/\d{3}/.test(s.replace(/\[phone removed\]/g, "")), `no digits left: ${s}`);
+  }
+  for (const raw of ["ravi＠gmail.com", "ravi@gmail", "DM instagram.com/ravi_shop"]) ok(G.findPii(raw).length && !G.findPii(G.scrubText(raw)).length, `caught and scrubbed: ${raw}`);
+  for (const fine of ['{"price":1299,"title":"Oat Crunch 500 g","ref":"p1"}', "Pack of 12, 2024 edition, 100% cotton, ships in 3-4 days", "sizes 6 7 8 9 10", '{"tokens":{"accent":"#84cc16"}}']) eq(G.findPii(fine), [], `not a phone: ${fine}`);
+});
+
 await t("prompt guard: scrubText removes email, Indian and E.164 phones and handles; assertOutgoingClean refuses each shape, an order id and a forbidden value", () => {
   const s = G.scrubText(PRODUCTS[0].description);
   ok(!/@/.test(s) && !/98765/.test(s), `scrubbed: ${s}`);
@@ -270,8 +336,10 @@ await t("product SEO and FAQs on 2 products: product_content drafts with seo_tit
   eq(await counts(), before, "nothing published:");
 });
 
+let LIVE0 = null;
 await t("starter store: a home draft (hero, featured products, text, FAQ) when home has no unpublished edits; with edits it is kept in Earlier versions only", async () => {
   const before = await counts();
+  LIVE0 = await homeLive();
   eq(await a.run(async () => (await libsql.execute("SELECT count(*) AS n FROM documents WHERE id = 'doc_home'")).rows[0].n), 0, "this store has no home page yet:");
   const r0 = await call("owner", "copilot", "POST", { body: { task: "starter" } });
   eq([r0.status, r0.body.refs[0]?.applied], [200, true], `no home: the starter is its first draft (${r0.text})`);
@@ -298,6 +366,7 @@ await t("starter store: a home draft (hero, featured products, text, FAQ) when h
   eq([draftAfter.draft_hash, Number(draftAfter.revision)], [draftBefore.draft_hash, Number(draftBefore.revision)], "the draft is untouched:");
   await a.run(() => libsql.execute("UPDATE documents SET published_hash = NULL WHERE id = 'doc_home'"));
   eq(await counts(), before, "nothing published:");
+  eq(await homeLive(), LIVE0, "home's live rows (release state, live version, publish log) are unchanged:");
 });
 
 await t("offer ideas: created with enabled = 0 and config.source copilot; 35% off and a BXGY over 30% are dropped and named; staff may run it", async () => {
@@ -347,6 +416,19 @@ await t("zero PII: every body the provider was sent holds no email, phone, handl
     eq(G.findPii(text, { forbidden: Object.values(CANARY) }), [], `${b.task}:`);
     for (const v of [...Object.values(CANARY), "help@oat.example", "98765 43210", "@oatcrunch", "gid://shopify"]) ok(!text.includes(v), `${b.task} holds ${v}`);
   }
+});
+
+await t("store B's products and customers never reach store A's prompts; legal and policy documents are untouched by every task", async () => {
+  for (const b of P.stubCalls()) for (const v of Object.values(B_CANARY)) ok(!`${b.system}${b.user}`.includes(v), `${b.task} holds B's ${v}`);
+  eq(await untouchedDocs(), DOCS_BEFORE, "every other document (the refund policy included) is as it was:");
+  ok(DOCS_BEFORE.includes(POLICY), "the policy page was in the snapshot");
+});
+
+await t("usage: copilot tokens are metered as ai_copilot_tokens, never insights' ai_tokens", async () => {
+  const { usageTotals, periodOf } = await import("../lib/platform/billing.js");
+  const totals = await usageTotals(a.id, periodOf());
+  ok(totals.ai_copilot_tokens > 0, `copilot: ${totals.ai_copilot_tokens}`);
+  eq(totals.ai_tokens ?? 0, 0, "insights' budget untouched:");
 });
 
 await t("a prompt that would carry PII is refused before the provider and before any reservation (ai_prompt_refused)", async () => {
