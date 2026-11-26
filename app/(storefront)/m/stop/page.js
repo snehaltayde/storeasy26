@@ -1,17 +1,21 @@
 import { verifyStopToken } from "@/lib/messaging/consent";
 import { tfetch } from "@/lib/storefront-request";
+import StripToken from "@/components/reviews/StripToken";
 
 // Phase 9 line 3: the opt-out link in every WhatsApp message. GET shows the
 // choice; the button POSTs to /api/messaging/stop, which revokes. The signed
 // token is the only proof and the page shows nothing about the person.
+// P9-C: no pixels on /m/ (lib/track/no-pixels.js), referrer origin, and ?t=
+// is stripped from the address bar after render.
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Stop WhatsApp messages", robots: { index: false } };
+export const metadata = { title: "Stop WhatsApp messages", robots: { index: false }, referrer: "origin" };
 
 export default async function StopPage({ searchParams }) {
   const { t, done, bad } = await searchParams;
   const valid = !done && !bad && t ? Boolean(await tfetch(() => verifyStopToken(String(t)))) : false;
   return (
     <div className="mx-auto max-w-md px-4 py-10 sm:px-6 sm:py-16" data-wa="stop">
+      <StripToken />
       <div className="rounded-sf-card border border-sf-border p-6 sm:p-8">
         <h1 className="text-xl font-bold">WhatsApp messages</h1>
         {done ? (

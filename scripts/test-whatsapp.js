@@ -331,6 +331,35 @@ await t("consent route: 10 per 10 minutes", async () => {
   eq(last.status, 429, "the 12th:");
 });
 
+await t("consent route (P9-B): marketing ticks cap at 3 per IP per day across carts and 2 carts per phone per 7 days; past a cap the reply is the same and no row is written", async () => {
+  const mk = (cart, phone, ip) => hit("consent", "POST", { cookies: { [CART_COOKIE]: cart }, headers: { "x-forwarded-for": ip }, body: { purpose: "marketing", granted: true, phone } });
+  const rowsFor = (where) => a.run(() => db.selectFrom("messaging_consents").select(["cart_id"]).where("purpose", "=", "marketing").where(...where).execute());
+  process.env.RATE_LIMIT_DISABLED = "0";
+  try {
+    // the IP cap: 3 carts, 3 phones from one IP; the 4th tick writes nothing
+    for (const i of [1, 2, 3]) eq((await mk(`cart_ipcap${i}`, `98765009${i}0`, "203.0.113.91")).body.marketing, true, `tick ${i}:`);
+    const fourth = await mk("cart_ipcap4", "9876500940", "203.0.113.91");
+    same([fourth.status, fourth.body], [200, { ok: true, updates: false, marketing: false, phone: null }], "the 4th from that IP:");
+    eq((await rowsFor(["cart_id", "=", "cart_ipcap4"])).length, 0, "no row for the 4th:");
+    eq((await mk("cart_ipcap5", "9876500950", "203.0.113.92")).body.marketing, true, "another IP still ticks:");
+  } finally {
+    process.env.RATE_LIMIT_DISABLED = "1";
+  }
+  // the phone cap: one number on 2 carts this week; a 3rd cart (any IP) writes nothing
+  const P = "9876500960";
+  for (const i of [1, 2]) eq((await mk(`cart_phcap${i}`, P, `203.0.113.10${i}`)).body.marketing, true, `phone cart ${i}:`);
+  eq((await mk("cart_phcap1", P, "203.0.113.109")).body.marketing, true, "the same cart again is fine:");
+  const third = await mk("cart_phcap3", P, "203.0.113.103");
+  same([third.status, third.body], [200, { ok: true, updates: false, marketing: false, phone: null }], "a 3rd cart:");
+  same((await rowsFor(["phone_e164", "=", "+919876500960"])).map((r) => r.cart_id).sort(), ["cart_phcap1", "cart_phcap2"], "rows:");
+  // revoking doesn't reset it; a week on it does
+  await hit("consent", "POST", { cookies: { [CART_COOKIE]: "cart_phcap2" }, body: { purpose: "marketing", granted: false } });
+  eq((await mk("cart_phcap4", P, "203.0.113.104")).body.marketing, false, "after an untick:");
+  eq(await a.run(() => C.marketingPhoneCapped({ phone: P, cartId: "cart_phcap4", now: Date.now() + 8 * 86_400_000 })), false, "8 days on:");
+  // an updates tick isn't capped
+  eq((await hit("consent", "POST", { cookies: { [CART_COOKIE]: "cart_phcap3" }, body: { purpose: "updates", granted: true, phone: P } })).body.updates, true, "updates still ticks:");
+});
+
 // a shopper account in A (session written as lib/customers.js does)
 const sha = (s) => createHash("sha256").update(s).digest("hex");
 async function shopper(t, email, phone) {
@@ -768,6 +797,20 @@ await t("privacy erase: the person's consents (by phone and by account) are dele
   const left = await a.run(() => db.selectFrom("messaging_consents").select("id").where((eb) => eb.or([eb("customer_id", "=", asha.id), eb("phone_e164", "in", ["+919876500100", "+919876500600"])])).execute());
   eq(left.length, 0, "deleted:");
   eq(await a.run(() => C.liveConsent({ purpose: "updates", phone: "+919876500100", customerId: asha.id })), null, "no live consent:");
+});
+
+await t("privacy erase (P9-A): an email-only erase clears the WhatsApp rows sent to the order's phone; another phone's row stays", async () => {
+  await a.run(async () => {
+    await db.insertInto("orders").values({ id: "BL-WERASE02", idempotency_key: "idem_werase2", cart_id: "cart_erase_z", email: "wa-erase2@wa.test", phone: "98765 00977", name: "Rani", total: 799, currency: "INR", status: "paid", created_at: isoAt(DAY), updated_at: isoAt(DAY) }).execute();
+    const row = (id, to) => ({ id, type: "whatsapp_order_confirmed", recipient: to, subject: "WhatsApp", body: "Hi Rani, order BL-WERASE02 (₹799) is confirmed: https://x/o?t=sig https://x/m/stop?t=sig", status: "sent", error: null, provider_id: "whatsapp-stub", consent_class: "transactional", consent_ref: "mc_erase2", idempotency_key: `erase2:${id}`, created_at: isoAt(DAY), sent_at: isoAt(DAY) });
+    await db.insertInto("notifications").values([row("ntf_erase2a", "+919876500977"), row("ntf_erase2b", "+919876500978")]).execute();
+  });
+  await a.run(() => redactCustomer({ email: "wa-erase2@wa.test" }));
+  const rows = await a.run(() => db.selectFrom("notifications").select(["id", "recipient", "body"]).where("idempotency_key", "like", "erase2:%").orderBy("id").execute());
+  same(rows.map((r) => r.recipient), ["redacted", "+919876500978"], "recipients:");
+  ok(!/Rani|BL-WERASE02|799|t=sig/.test(rows[0].body), `scrubbed body: ${rows[0].body}`);
+  ok(rows[1].body.includes("Rani"), "the other phone's row is untouched");
+  await a.run(() => db.deleteFrom("notifications").where("idempotency_key", "like", "erase2:%").execute());
 });
 
 // --- 10. the card as support: phones masked, no secrets --------------------------------------

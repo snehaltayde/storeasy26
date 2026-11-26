@@ -616,10 +616,10 @@ await t("a store one migration behind (no 0040 tables) reads as empty: no stars,
   }
 });
 
-await t("no third-party pixels on /reviews/* (the signed token never reaches gtag or Meta): Pixels gates on the path, the review pages render no script, ?t= is stripped after render, referrer policy origin", async () => {
+await t("no third-party pixels on /reviews/* or /m/* (the signed token never reaches gtag or Meta): Pixels gates on the path, the review pages render no script, ?t= is stripped after render, referrer policy origin", async () => {
   const { pixelsAllowed } = await import("../lib/track/no-pixels.js");
-  for (const p of ["/reviews/write", "/reviews/optout", "/reviews", "/reviews/write?t=x"]) eq(pixelsAllowed(p), false, `${p}:`);
-  for (const p of ["/", "/products/x", "/products/x/reviews", "/reviewsx", "/cart"]) eq(pixelsAllowed(p), true, `${p}:`);
+  for (const p of ["/reviews/write", "/reviews/optout", "/reviews", "/reviews/write?t=x", "/m/stop", "/m/stop?t=x", "/m"]) eq(pixelsAllowed(p), false, `${p}:`);
+  for (const p of ["/", "/products/x", "/products/x/reviews", "/reviewsx", "/cart", "/men", "/products/m/stop"]) eq(pixelsAllowed(p), true, `${p}:`);
   const src = await readFile(join(ROOT, "components/analytics/Pixels.js"), "utf8");
   ok(/const allowed = pixelsAllowed\(usePathname\(\)\)/.test(src) && /if \(!allowed\) return undefined;/.test(src) && src.indexOf("if (!allowed)") < src.indexOf("loadGtag(ga4Id)"), "Pixels bails before loading any tag");
   const layout = await readFile(join(ROOT, "app/(storefront)/layout.js"), "utf8");
@@ -631,7 +631,7 @@ await t("no third-party pixels on /reviews/* (the signed token never reaches gta
     const h = await html(el);
     ok(!/<script|googletagmanager|fbevents|gtag|fbq/.test(h), `${label}: no script or pixel`);
   }
-  for (const f of ["app/(storefront)/reviews/write/page.js", "app/(storefront)/reviews/optout/page.js"]) {
+  for (const f of ["app/(storefront)/reviews/write/page.js", "app/(storefront)/reviews/optout/page.js", "app/(storefront)/m/stop/page.js"]) {
     const s = await readFile(join(ROOT, f), "utf8");
     ok(s.includes('referrer: "origin"') && s.includes("<StripToken />"), `${f}: referrer origin and StripToken`);
   }

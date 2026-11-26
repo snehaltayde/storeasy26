@@ -5,7 +5,7 @@ import { sameOrigin } from "@/lib/origin-check";
 import { CART_COOKIE } from "@/lib/cart";
 import { CUSTOMER_COOKIE, customerFromToken } from "@/lib/customers";
 import { maskPhone } from "@/lib/checkout/cod-otp";
-import { ConsentError, cartState, grantConsent, revokeConsent, syncCart } from "@/lib/messaging/consent";
+import { ConsentError, cartState, grantConsent, marketingPhoneCapped, revokeConsent, syncCart } from "@/lib/messaging/consent";
 
 // Phase 9 line 3: the checkout's WhatsApp boxes (components/checkout/WhatsAppConsent.js).
 //   GET  → { ok, updates, marketing, phone }: what is live on this cart (phone masked)
@@ -16,6 +16,9 @@ import { ConsentError, cartState, grantConsent, revokeConsent, syncCart } from "
 // The consent is bound to the cart cookie (and the signed-in shopper, if any),
 // never to an id in the body; no cart cookie → 400. Ticks 10 per 10 minutes;
 // syncs (withdraw only) 60 per 10 minutes, counted apart.
+// P9-B: a marketing tick is also capped at 3 per IP per day (across carts) and
+// a phone at 2 carts' marketing consents per 7 days; past either cap the tick
+// answers as usual and writes nothing.
 // The words recorded are the server's own (lib/messaging/wording.js).
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +44,11 @@ export const POST = storefrontHandler(async (request) => {
   try {
     if (sync) return answer(await syncCart(cart, body.phone, String(body.country || "IN")));
     if (body?.granted === true) {
+      if (purpose === "marketing") {
+        const country = String(body.country || "IN");
+        const capped = (await rateLimitAsync(request, { name: "wa-consent-marketing-day", limit: 3, windowMs: 86_400_000 })) || (await marketingPhoneCapped({ phone: body.phone, country, cartId: cart }));
+        if (capped) return answer(await cartState(cart));
+      }
       await grantConsent({ purpose, phone: body.phone, country: String(body.country || "IN"), cartId: cart, customerId: customer?.id ?? null, source: "checkout" });
       return answer(await cartState(cart));
     }
