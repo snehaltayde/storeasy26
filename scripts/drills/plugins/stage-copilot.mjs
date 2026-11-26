@@ -8,6 +8,10 @@
 // the page with no run button.
 import { ORIGIN, open, rolesSql, shopper, signIn, stage } from "./lib.mjs";
 
+// the roles store's fixture pictures don't exist; Next's image route would 404
+const GIF = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
+const stubImages = (page) => page.context().route("**/_next/image**", (route) => route.fulfill({ status: 200, contentType: "image/gif", body: GIF }));
+
 const meter = async (page) => Number(await page.locator("[data-copilot-meter]").first().getAttribute("data-copilot-meter")) || 0;
 
 stage("copilot", async (drill) => {
@@ -24,6 +28,7 @@ stage("copilot", async (drill) => {
   drill.check(pdpBefore.status === 200, "the product page opens for a shopper (200)", pdpBefore.status);
 
   const owner = await signIn(drill, "owner");
+  await stubImages(owner);
   drill.check((await open(owner, "/admin/copilot")) === 200, "owner: /admin/copilot opens (200)");
   await owner.locator("[data-copilot-install]").waitFor();
   drill.check(true, "owner: the page is an install prompt until the copilot is installed");
@@ -48,10 +53,13 @@ stage("copilot", async (drill) => {
 
   const href = await owner.locator('[data-copilot-draft="product"]').first().getAttribute("href");
   const editor = await signIn(drill, "owner");
+  await stubImages(editor);
   drill.check((await open(editor, href)) === 200, "the editor opens the first product's draft (200)", href);
-  const titleField = editor.locator('input[value^="Copilot drill title"]');
-  await titleField.first().waitFor({ timeout: 30_000 }).catch(() => {});
-  drill.check((await titleField.count()) > 0, "the editor shows the drafted search title");
+  const titleField = editor.getByLabel("Search title", { exact: true }).first();
+  await titleField.waitFor({ timeout: 30_000 }).catch(() => {});
+  const shown = (await titleField.count()) ? await titleField.inputValue().catch(() => "") : "";
+  drill.check(/^Copilot drill title/.test(shown), "the editor shows the drafted search title", shown);
+  if (await titleField.count()) await titleField.scrollIntoViewIfNeeded().catch(() => {});
   await drill.shoot(editor, "copilot-editor");
   await editor.context().close();
 
