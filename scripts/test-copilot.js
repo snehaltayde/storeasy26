@@ -262,8 +262,8 @@ await t("insights on the provider: same model default (claude-haiku-5-5, AI_INSI
 });
 
 // ---- prompt guard ----------------------------------------------------------------------------
-await t("prompt guard: phones in any grouping are scrubbed and refused (987-654-3210, 98 7654 3210, (987) 654-3210, 98765-432-10, +91-9876-543-210, 919876543210, 098765 43210, 022 2345 6789), and catalog numbers are not", () => {
-  const phones = ["Call 987-654-3210", "WhatsApp 98 7654 3210", "ring (987) 654-3210", "phone: 98765-432-10", "+91-9876-543-210", "919876543210", "098765 43210", "landline 022 2345 6789", "+91 98765 43210", "9876543210", "+44 20 7946 0958", "dial 98765.43210"];
+await t("prompt guard: phones in any grouping, with / _ · en and em dashes, zero-width spaces and Devanagari, Bengali or Tamil digits, are scrubbed and refused; a price range with decimals is not (987-654-3210, 98 7654 3210, (987) 654-3210, 98765-432-10, +91-9876-543-210, 919876543210, 098765 43210, 022 2345 6789), and catalog numbers are not", () => {
+  const phones = ["Call 987-654-3210", "WhatsApp 98 7654 3210", "ring (987) 654-3210", "phone: 98765-432-10", "+91-9876-543-210", "919876543210", "098765 43210", "landline 022 2345 6789", "+91 98765 43210", "9876543210", "+44 20 7946 0958", "dial 98765.43210", "98765/43210", "98765\u201343210", "98765\u200B43210", "98765_43210", "98765\u00B743210", "98765\u201443210", "\u096F\u096E\u096D\u096C\u096B\u096A\u0969\u0968\u0967\u0966", "\u09EF\u09EE\u09ED\u09EC\u09EB\u09EA\u09E9\u09E8\u09E7\u09E6", "\u0BEF\u0BEE\u0BED\u0BEC\u0BEB\u0BEA\u0BE9\u0BE8\u0BE7\u0BE6"];
   for (const raw of phones) {
     ok(G.findPii(raw).includes("a phone number"), `found: ${raw}`);
     const s = G.scrubText(raw);
@@ -271,7 +271,10 @@ await t("prompt guard: phones in any grouping are scrubbed and refused (987-654-
     ok(!/\d{3}/.test(s.replace(/\[phone removed\]/g, "")), `no digits left: ${s}`);
   }
   for (const raw of ["ravi＠gmail.com", "ravi@gmail", "DM instagram.com/ravi_shop"]) ok(G.findPii(raw).length && !G.findPii(G.scrubText(raw)).length, `caught and scrubbed: ${raw}`);
-  for (const fine of ['{"price":1299,"title":"Oat Crunch 500 g","ref":"p1"}', "Pack of 12, 2024 edition, 100% cotton, ships in 3-4 days", "sizes 6 7 8 9 10", '{"tokens":{"accent":"#84cc16"}}']) eq(G.findPii(fine), [], `not a phone: ${fine}`);
+  for (const fine of ['{"price":1299,"title":"Oat Crunch 500 g","ref":"p1"}', "Pack of 12, 2024 edition, 100% cotton, ships in 3-4 days", "sizes 6 7 8 9 10", '{"tokens":{"accent":"#84cc16"}}', "Price range 799.00 - 999.00", "Rs 7,999.50 to 9,999.00"]) {
+    eq(G.findPii(fine), [], `not a phone: ${fine}`);
+    eq(G.scrubText(fine), fine, `passes through unchanged: ${fine}`);
+  }
 });
 
 await t("prompt guard: scrubText removes email, Indian and E.164 phones and handles; assertOutgoingClean refuses each shape, an order id and a forbidden value", () => {
