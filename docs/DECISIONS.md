@@ -3,6 +3,16 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-26 Phase 9 first-party plugins plan (on the owner's behalf)
+
+- **Schema:** five additive tenant migrations in merge order: 0040 reviews, 0041 shipment tracking, 0042 WhatsApp consents and templates, 0043 AI usage ledger, 0044 subscriptions. No platform migration.
+- **Permissions:** new `reviews.read` (support and up), `reviews.moderate` (staff and up), `subscriptions.read` (support and up), `subscriptions.manage` (staff and up). Plugin settings, templates and secrets stay under `apps.manage`; the copilot reuses `storefront.write` and `offers.write`. Outside apps get none of this data.
+- **Reviews:** verified buyers only through a signed, single-use, 60-day invite link; only approved reviews show or count in structured data; invite emails are off by default with an opt-out; photos are deferred.
+- **Subscriptions:** a scheduled re-order paid at each renewal checkout (no auto-debit, no Razorpay Subscriptions), base market only, discount locked at signup, no stacking with other line offers. Auto-debit is your call later.
+- **WhatsApp:** two explicit opt-ins (order updates; offers and cart reminders), re-checked at send time, with frequency caps, quiet hours and opt-out; templates send only after you approve them. Real provider: Meta Cloud API.
+- **Shiprocket:** only the delivery estimate and courier reachability, only when you choose it; fees and COD stay yours; webhooks are checked by key and then refetched.
+- **AI copilot:** default model `claude-sonnet-5-5` via a provider interface; drafts only; catalog and brand data only, with the prompt checked for personal data; a daily token budget per store; generated copy passes the claims scan; operator kill switch.
+
 ## 2026-11-26 Phase 8 audit fixes P8-A, P8-B, P8-C (on the owner's behalf)
 
 - **P8-A, email cap counted from `notifications`, no migration:** `sendCodOtp` caps email-channel sends at 5 per recipient address per hour (`EMAIL_SENDS`), counting `notifications` rows of type `cod_otp` whose `lower(trim(recipient))` is the address, since an hour ago (the `type` prefix of `idx_notifications_type_status`). Sound after redaction: `redactSentCodes` only rewrites `body`, never `recipient`. A capped send is the phone cap's path (same reply, no message, an `unmatchable()` hash, the same dummy `cod_otps` write). A hashed-email column (0040) was not needed. The one case that resets the count is `redactCustomer` scrubbing that person's rows, at their own request.
