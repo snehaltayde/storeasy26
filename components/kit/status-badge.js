@@ -51,6 +51,12 @@ export const STATUS_WORDS = Object.freeze({
     live: ["Live", "success"],
     draft: ["In your draft", "warning"],
   }),
+  // Phase 9 line 2: lib/subscriptions/store.js STATUSES
+  subscription: Object.freeze({
+    active: ["Active", "success"],
+    paused: ["Paused", "warning"],
+    cancelled: ["Cancelled", "muted"],
+  }),
 });
 
 // An offer's or bundle's state from its row: { enabled, starts_at, ends_at }.

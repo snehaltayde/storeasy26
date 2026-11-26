@@ -156,6 +156,9 @@ export const ADMIN_ROUTES = Object.freeze([
   { path: "shopify/connect", method: "POST", action: "settings.write", probe: { body: { shop: "" } } },
   // F3: lists the caller's own memberships (line 2 checks the body)
   { path: "stores", method: "GET", action: "storefront.read" },
+  // Phase 9 line 2: subscriptions (the probe's id is no subscription: a 404 past the gate)
+  { path: "subscriptions", method: "GET", action: "subscriptions.read" },
+  { path: "subscriptions", method: "POST", action: "subscriptions.manage", probe: { body: { action: "cancel", id: "sub_0000000000000000", reason: "probe" } } },
   // Phase 3 line 5 (decision 5): the store's support access, its history and ending it
   { path: "support-access", method: "GET", action: "audit.read" },
   { path: "support-access", method: "POST", action: "team.manage", probe: { body: { action: "bogus" } } },

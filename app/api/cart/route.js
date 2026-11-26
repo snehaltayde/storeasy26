@@ -14,6 +14,7 @@ import {
   setCoupon,
   clearCart,
 } from "@/lib/cart";
+import { productSubscribeOffer } from "@/lib/subscriptions/pricing";
 
 export const runtime = "edge";
 
@@ -31,7 +32,11 @@ const COOKIE_OPTS = {
   secure: process.env.NODE_ENV === "production",
 };
 
+// Phase 9 line 2: GET ?subscribe=<product id> answers the product page's
+// subscribe choice (prices from the server; null when it can't be offered).
 export const GET = storefrontHandler(async (request) => {
+  const product = new URL(request.url).searchParams.get("subscribe");
+  if (product != null) return NextResponse.json({ offer: await productSubscribeOffer(product.slice(0, 200), { market: requestMarket(request).market }) });
   const id = request.cookies.get(CART_COOKIE)?.value;
   const cart = await cartFor(request)(id);
   return NextResponse.json(cart);
@@ -58,7 +63,8 @@ export const POST = storefrontHandler(async (request) => {
   try {
     switch (body.action) {
       case "add":
-        await addItem(id, body.variantId, body.quantity ?? 1);
+        // Phase 9 line 2: only the interval is read; the server decides whether it applies
+        await addItem(id, body.variantId, body.quantity ?? 1, { subscriptionInterval: body.subscriptionInterval ?? null, market: requestMarket(request).market });
         break;
       case "add_many":
         await addItems(id, body.items, { requireAvailable: Boolean(body.requireAvailable) });

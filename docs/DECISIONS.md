@@ -3,6 +3,21 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-26 Phase 9 line 2: subscriptions (on the owner's behalf)
+
+- **Schema (0044, additive):** `subscriptions` (discount percent locked at signup, `cycle` = the next delivery's number, UNIQUE origin order + line), `subscription_cycles` (one row per cycle, `order_id` UNIQUE), `cart_items.subscription_interval`, `carts.subscription_id` / `subscription_cycle`. Every read of the new columns goes through `hasColumns`. The origin order is cycle 1 and gets no cycle row (two subscribed lines in one order would share an `order_id`).
+- **Permissions:** the account API is the `_customer` cookie's own rows only (ownership in the WHERE; another shopper's id is the same 404 as a missing one and the row is never touched); the console reads with `subscriptions.read` (support gets no customer name, email or cancel reason) and pauses or cancels with `subscriptions.manage` and a required reason, audited as `subscriptions.pause` / `subscriptions.cancel`.
+- **One order per cycle:** a renewal cart's order is placed under the server's own idempotency key `sub:<id>:<cycle>` (`orders.idempotency_key` is UNIQUE), so racing checkouts give one order and a 409; a key the page sends that starts with `sub:` is refused (400). "Pay for this delivery" reuses the cycle's renewal cart. An unpaid online attempt stays that cycle's order: the shopper reopens the same payment, and the sweep marks the cycle missed after the grace days.
+- **Orders are bound to the signed-in shopper** (`createOrder({ customerId })`, a small change in `lib/orders.js`) only for carts with a subscribed line or a renewal; every other order still binds by the email claim at sign-in.
+- **Rounding:** the subscriber discount rounds per unit (`Math.round(price × percent / 100)`) times the quantity, so the product page's "₹X" × quantity is exactly the cart line.
+- **An exclusive coupon** switches the subscriber discount off with the other line offers (as for a bundle). The line still subscribes at its locked percent and the drawer says "your code replaces the subscriber discount".
+- **When a line counts as subscribed:** plugin installed, enabled and not killed (flag read as `isKilled` does), the interval offered, the product eligible (all, or a tag; matched case-insensitively), the base market. Otherwise it is priced one-time and the drawer says so; an add with anything else stores one-time and is never refused. A renewal line keeps its subscription's percent and interval even if the store's settings changed since.
+- **The renewal figure** (reminder email, account "Next delivery", console "Next amount") is the renewal cart's pricing through the checkout's payment terms at the PIN code of the subscription's first order: online payment when the store takes it, else cash on delivery. It equals the checkout total for that method and PIN code that day.
+- **Renewal cart:** "Pay for this delivery" moves the cart cookie to a cart holding only that delivery; the shopper's previous cart stays in the database but is no longer the one in the drawer.
+- **Due window:** a delivery is payable, and the sweep marks it due and sends one reminder, from `reminder_days` before its due date; after `grace_days` past it, it is missed and the next is scheduled; two misses in a row pause it with an email. Resume after a due date has passed makes it due now. Skip resets the miss count.
+- **Settings are plain plugin settings:** five booleans for the intervals, `eligible` all/tag plus a tag, whole-number ranges from the plan. Icon "Puzzle" (the manifest's fixed icon list has no repeat icon).
+- **Dependencies:** none added.
+
 ## 2026-11-26 Phase 9 first-party plugins plan (on the owner's behalf)
 
 - **Schema:** five additive tenant migrations in merge order: 0040 reviews, 0041 shipment tracking, 0042 WhatsApp consents and templates, 0043 AI usage ledger, 0044 subscriptions. No platform migration.

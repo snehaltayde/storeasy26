@@ -48,8 +48,9 @@ export function CartProvider({ children, initialCart }) {
   }, []);
 
   const addItem = useCallback(
-    async (variantId, quantity = 1) => {
-      const next = await mutate({ action: "add", variantId, quantity }, { openDrawer: true });
+    // Phase 9 line 2: subscriptionInterval (days) or null for one-time; the server decides whether it applies
+    async (variantId, quantity = 1, { subscriptionInterval = null } = {}) => {
+      const next = await mutate({ action: "add", variantId, quantity, ...(subscriptionInterval ? { subscriptionInterval } : {}) }, { openDrawer: true });
       const it = next?.items?.find((i) => i.variantId === variantId);
       if (it) {
         track("add_to_cart", {

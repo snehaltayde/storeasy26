@@ -32,6 +32,10 @@ import { requestMarket, MARKET_COOKIE_OPTS } from "@/lib/market-request";
 import { MARKET_COOKIE, marketForCountry, marketShipping, marketPaymentConfig, baseCountry, baseCurrency, countryName, postalCodeValid } from "@/lib/markets";
 import { RAZORPAY_CURRENCIES } from "@/lib/money";
 import { baseFigures } from "@/lib/checkout/market-order";
+import { customerFromToken, CUSTOMER_COOKIE } from "@/lib/customers";
+import { subscriptionSettings } from "@/lib/subscriptions/pricing";
+import { renewalKey, RENEWAL_KEY_PREFIX, subscriptionById } from "@/lib/subscriptions/store";
+import { renewalProblem } from "@/lib/subscriptions/renewal";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -197,6 +201,39 @@ const otpError = (e) =>
     { status: e.code === "COD_OTP_COOLDOWN" || e.code === "COD_OTP_CART_CAP" ? 429 : e.code === "COD_OTP_UNAVAILABLE" ? 503 : 409 },
   );
 
+// Phase 9 line 2: a renewal cart's order is placed under its cycle's own key
+// (orders.idempotency_key is UNIQUE), so a cycle gets one order however many
+// checkouts race for it; every other cart keeps the page's key.
+const orderKey = (cart, key) => (cart?.renewal ? renewalKey(cart.renewal.subscriptionId, cart.renewal.cycle) : key);
+const reservedKey = (key) => typeof key === "string" && key.startsWith(RENEWAL_KEY_PREFIX);
+
+// Phase 9 line 2: a cart with a subscribed line (or a renewal) needs a
+// signed-in shopper and the base market; a renewal must still be this
+// shopper's, payable, and hold exactly its line. → { customerId } or { response }
+async function subscriptionGate(request, cart, market) {
+  if (!cart?.hasSubscription && !cart?.renewal) return { customerId: null };
+  const customer = await customerFromToken(request.cookies.get(CUSTOMER_COOKIE)?.value);
+  if (!customer)
+    return { response: NextResponse.json({ ok: false, code: "SIGN_IN_TO_SUBSCRIBE", error: "Sign in to subscribe", signIn: "/account?return=%2Fcheckout" }, { status: 401 }) };
+  if (market)
+    return {
+      response: NextResponse.json(
+        {
+          ok: false,
+          code: "SUBSCRIPTION_BASE_MARKET",
+          error: `Subscriptions are only available for delivery in ${countryName(baseCountry(storeConfig()))}. Remove the subscription from your cart, or change the country.`,
+        },
+        { status: 409 },
+      ),
+    };
+  if (cart.renewal) {
+    const sub = await subscriptionById(cart.renewal.subscriptionId);
+    const problem = renewalProblem(cart, sub, customer.id, await subscriptionSettings());
+    if (problem) return { response: NextResponse.json({ ok: false, code: "RENEWAL_CHANGED", error: problem }, { status: 409 }) };
+  }
+  return { customerId: customer.id };
+}
+
 // P1-RATES: never charge an amount the shopper wasn't shown (lib/checkout-price.js).
 // The refusal also carries the server's cart and rates, which the checkout page
 // already hands this shopper, so the UI redraws the summary and the button from
@@ -306,6 +343,8 @@ export const POST = tenantHandler(async (request) => {
   const cartId = cartIdFrom(request);
   const body = await request.json().catch(() => ({}));
   const { action, contact, address, idempotencyKey } = body;
+  // Phase 9 line 2: the "sub:" keys are the server's own (orderKey above)
+  if (reservedKey(idempotencyKey)) return NextResponse.json({ error: "idempotencyKey is invalid" }, { status: 400 });
 
   // Phase 8 line 2: the quote is asked for as the PIN code changes (60 a
   // minute); sending a code has its own cap (10 per IP per 15 minutes) and its
@@ -364,9 +403,11 @@ export const POST = tenantHandler(async (request) => {
       if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
       if (!validate(contact, address)) return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
       if (!e164(contact.phone, ctx.country)) return phoneInvalid();
+      const gate = await subscriptionGate(request, cart, market);
+      if (gate.response) return gate.response;
       const terms = termsFor(cart, address, market);
       if (!terms.cod.available) return codUnavailable(terms);
-      const bind = { cartId, key: String(idempotencyKey), phone: contact.phone, amount: terms.cod.total, currency: cart.currency || "INR", cart };
+      const bind = { cartId, key: String(orderKey(cart, idempotencyKey)), phone: contact.phone, amount: terms.cod.total, currency: cart.currency || "INR", cart };
       try {
         if (action === "cod_otp_verify") return NextResponse.json({ ok: true, ...(await verifyCodOtp({ ...bind, challengeId: body.challengeId, code: body.code })) });
         if (!terms.cod.otpRequired) return NextResponse.json({ ok: true, required: false });
@@ -407,7 +448,8 @@ export const POST = tenantHandler(async (request) => {
       await applyEstimate(shipping, pincodeFor(market, address));
 
       const terms = termsFor(cart, address, market);
-      const dup = await dedupByKey(idempotencyKey, cartId, cart, terms.cod.total);
+      const key = orderKey(cart, idempotencyKey);
+      const dup = await dedupByKey(key, cartId, cart, terms.cod.total);
       if (dup instanceof NextResponse) return dup;
       if (dup) {
         // Finish what the first request started: it may have died before
@@ -422,6 +464,8 @@ export const POST = tenantHandler(async (request) => {
         return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
       if (!e164(contact.phone, ctx.country)) return phoneInvalid();
       if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
+      const gate = await subscriptionGate(request, cart, market);
+      if (gate.response) return gate.response;
       // Phase 8 line 2: the quote hides COD here, so the route refuses it too.
       if (!terms.cod.available) return codUnavailable(terms);
       // P1-RATES: never store an amount the shopper wasn't shown.
@@ -431,7 +475,7 @@ export const POST = tenantHandler(async (request) => {
       let challenge = null;
       if (terms.cod.otpRequired) {
         try {
-          challenge = await requireVerified({ challengeId: body.challengeId, cartId, key: String(idempotencyKey), phone: contact.phone, amount: terms.cod.total, currency: cart.currency || "INR", cart });
+          challenge = await requireVerified({ challengeId: body.challengeId, cartId, key: String(key), phone: contact.phone, amount: terms.cod.total, currency: cart.currency || "INR", cart });
         } catch (e) {
           if (e instanceof CodOtpError) return otpError(e);
           throw e;
@@ -444,10 +488,11 @@ export const POST = tenantHandler(async (request) => {
         contact,
         address: withCountry(address, ctx),
         paymentMethod: "cod",
-        idempotencyKey,
+        idempotencyKey: key,
         shipping,
         consent: request.cookies.get(CONSENT_COOKIE)?.value || null,
         codVerifiedAt: challenge?.verified_at || null,
+        customerId: gate.customerId,
       });
       if (challenge) await consumeChallenge(challenge.id, order.id);
       slog(order.deduped ? "order_deduped" : "order_created", {
@@ -492,7 +537,8 @@ export const POST = tenantHandler(async (request) => {
       const paymentDiscount = terms.prepaid.discount;
       // Dedup BEFORE creating a Razorpay order, so a retry reopens the SAME
       // payment instead of minting a parallel one.
-      const dup = await dedupByKey(idempotencyKey, cartId, cart, terms.prepaid.total);
+      const key = orderKey(cart, idempotencyKey);
+      const dup = await dedupByKey(key, cartId, cart, terms.prepaid.total);
       if (dup instanceof NextResponse) return dup;
       if (dup) return await razorpayResponse(dup, dup.razorpay_order_id, true);
 
@@ -501,6 +547,8 @@ export const POST = tenantHandler(async (request) => {
         return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
       if (!e164(contact.phone, ctx.country)) return phoneInvalid();
       if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
+      const gate = await subscriptionGate(request, cart, market);
+      if (gate.response) return gate.response;
       // P1-RATES: the Razorpay order is minted for the amount on the Pay button,
       // or not at all.
       const changed = priceCheck(body, cart, shipping, shippingConfig, terms, paymentDiscount);
@@ -522,12 +570,13 @@ export const POST = tenantHandler(async (request) => {
         contact,
         address: withCountry(address, ctx),
         paymentMethod: "razorpay",
-        idempotencyKey,
+        idempotencyKey: key,
         razorpayOrderId: rzOrder.id,
         shipping,
         paymentDiscount,
         base: baseFigures({ cart, market, shippingTotal: shipping.total, paymentDiscount, paymentConfig: storeConfig()?.payment_config ?? null }),
         consent: request.cookies.get(CONSENT_COOKIE)?.value || null,
+        customerId: gate.customerId,
       });
       slog(order.deduped ? "order_deduped" : "order_created", {
         order_id: order.id,

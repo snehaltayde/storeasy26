@@ -1344,6 +1344,7 @@ async function accountBadges(src = accountSrc) {
     "@/components/account/AccountAuth": nothing,
     "@/components/account/ProfileForm": nothing,
     "@/components/account/AddressBook": nothing,
+    "@/components/account/SubscriptionList": nothing, // Phase 9 line 2: a client list from its own API
     "@/lib/addresses": { listAddresses: async () => [] },
     "@/lib/tenant-request": { tfetch: inOwn },
     "@/lib/storefront-request": { tfetch: inOwn },
@@ -1394,7 +1395,7 @@ await t("PIN code and delivery copy (Phase 8 line 1) is shopper language", async
 });
 
 await t("cart API: a failed change leaves no error text in the response", async () => {
-  const route = await loadRoute("cart", { "@/lib/cart": cartLib });
+  const route = await loadRoute("cart", { "@/lib/cart": cartLib, "@/lib/subscriptions/pricing": await import("../lib/subscriptions/pricing.js") });
   const cartId = await inOwn(async () => {
     const id = `cart-${Math.random()}`;
     await createCart(id);

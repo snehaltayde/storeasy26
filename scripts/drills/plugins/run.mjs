@@ -15,6 +15,7 @@ const STAGE_FILES = [
   "stage-baseline.mjs",
   // p9: reviews
   // p9: subscriptions
+  "stage-subscriptions.mjs",
   // p9: whatsapp
   // p9: shiprocket
   // p9: ai-copilot

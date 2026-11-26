@@ -5,6 +5,7 @@ import { formatMoney } from "@/lib/format";
 import AccountAuth from "@/components/account/AccountAuth";
 import ProfileForm from "@/components/account/ProfileForm";
 import AddressBook from "@/components/account/AddressBook";
+import SubscriptionList from "@/components/account/SubscriptionList";
 import { listAddresses } from "@/lib/addresses";
 import { tfetch } from "@/lib/storefront-request";
 
@@ -86,6 +87,7 @@ export default async function AccountPage({ searchParams }) {
       </section>
 
       {/* account: subscriptions */}
+      <SubscriptionList />
 
       <div className="mt-8">
         <AddressBook initial={addresses} />

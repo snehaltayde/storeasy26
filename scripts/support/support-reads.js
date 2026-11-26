@@ -95,6 +95,9 @@ export const SUPPORT_PROBES = Object.freeze([
   { name: "releases preview", path: "releases", method: "POST", variant: "preview", req: () => ({ body: { action: "preview" } }), status: 409, keys: ["error", "code"], note: "a documents store previews from the editor (STORE_USES_DOCUMENTS)" },
   { name: "returns", path: "returns", method: "GET", keys: ["ok", "returns"] },
   { name: "stores", path: "stores", method: "GET", keys: ["ok", "stores", "current"] },
+  // Phase 9 line 2: subscriptions (support gets no customer details; an unknown id is a 404)
+  { name: "subscriptions", path: "subscriptions", method: "GET", keys: ["ok", "subscriptions"] },
+  { name: "subscriptions ?id", path: "subscriptions", method: "GET", req: () => ({ query: "id=sub_0000000000000000" }), status: 404, keys: ["error"], note: "no such subscription" },
   // Phase 7 line 1: a Storeasy flagship by its slug (first-party data, the same on every store) and its file
   { name: "themes/[id] (a flagship slug)", path: "themes/[id]", method: "GET", req: () => ({ params: { id: "bloom" } }), keys: ["ok", "package", "content", "tokens"] },
   { name: "themes/[id] (a flagship slug) ?download", path: "themes/[id]", method: "GET", req: () => ({ params: { id: "bloom" }, query: "download=1" }), keys: ["format", "id", "name", "version", "author", "description", "base", "tokens", "surfaces", "templates", "styles"], note: "the flagship package file itself" },

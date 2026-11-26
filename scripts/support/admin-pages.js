@@ -55,4 +55,5 @@ export const ADMIN_PAGES = Object.freeze([
   { page: "settings/markets", action: "settings.write" }, // Phase 8 line 4: admin and owner only
   { page: "settings/sync", action: "settings.read" },
   { page: "settings/tracking", action: "settings.read" },
+  { page: "subscriptions", action: "subscriptions.read", note: "Phase 9 line 2: support reads the list with customer details redacted; pause and cancel need subscriptions.manage" },
 ]);

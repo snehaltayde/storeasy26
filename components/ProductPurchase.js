@@ -6,6 +6,7 @@ import { formatMoney, discountPercent } from "@/lib/format";
 import { useMoney } from "@/components/MarketContext";
 import StickyBuyBar from "@/components/pdp/StickyBuyBar";
 import DeliveryCheck from "@/components/pdp/DeliveryCheck";
+import SubscribeChoice from "@/components/pdp/SubscribeChoice";
 
 // Phase 4 line 2: underPrice and underAtc are server-rendered plugin slots
 // (components/plugins/PluginSlot.js) passed in by the PDP layouts.
@@ -32,6 +33,8 @@ export default function ProductPurchase({ product, underPrice = null, underAtc =
     return init;
   });
   const [qty, setQty] = useState(1);
+  // Phase 9 line 2: { interval, unitPrice } from SubscribeChoice (server prices); interval null = one-time
+  const [plan, setPlan] = useState({ interval: null, unitPrice: null });
   const [added, setAdded] = useState(false);
   const [adding, setAdding] = useState(false);
   const optionsRef = useRef(null);
@@ -126,7 +129,7 @@ export default function ProductPurchase({ product, underPrice = null, underAtc =
     setAdding(true);
     try {
       // Server derives price/title/image from the catalog by variant GID.
-      await addItem(currentVariant.id, qty);
+      await addItem(currentVariant.id, qty, { subscriptionInterval: plan.interval });
       setAdded(true);
     } finally {
       setAdding(false);
@@ -196,6 +199,10 @@ export default function ProductPurchase({ product, underPrice = null, underAtc =
         </div>
       )}
 
+      {!market && (
+        <SubscribeChoice productId={product.id} variantId={currentVariant?.id ?? null} price={price} currency={currency} onChange={setPlan} />
+      )}
+
       {showOptions && !currentVariant && (
         <p className="mt-4 rounded-sf-control bg-sf-warning-surface px-4 py-3 text-sm text-sf-warning-strong">
           This combination isn&rsquo;t available — struck-through values don&rsquo;t exist together. Pick a different option.
@@ -256,7 +263,7 @@ export default function ProductPurchase({ product, underPrice = null, underAtc =
         title={title}
         image={currentVariant?.image_url || featured_image}
         variantLabel={variantLabel}
-        price={price}
+        price={plan.interval && plan.unitPrice != null ? plan.unitPrice : price}
         compareAt={compareAt}
         currency={currency}
         state={adding ? "adding" : added && available && currentVariant ? "view" : unchosen ? "choose" : !available ? "soldout" : "add"}

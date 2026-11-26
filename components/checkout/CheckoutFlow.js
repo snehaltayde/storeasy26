@@ -228,6 +228,16 @@ export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeNam
                   Edit
                 </button>
               </div>
+              {/* Phase 9 line 2: a subscription needs an account; nothing is charged automatically */}
+              {(cart.hasSubscription || cart.renewal) && (
+                <p data-subscription-note className="mt-4 rounded-sf-control bg-sf-surface-muted px-4 py-3 text-sm text-sf-text-body">
+                  {cart.renewal ? "You're paying for your next subscription delivery." : "This order starts a subscription. You pay for each delivery when it's due."} Nothing is charged automatically.{" "}
+                  Subscriptions need you to be signed in.{" "}
+                  <Link href="/account?return=%2Fcheckout" className="font-medium text-sf-accent-text underline">
+                    Sign in
+                  </Link>
+                </p>
+              )}
               <ul className="mt-4 divide-y divide-sf-border-soft">
                 {cart.items.map((it) => (
                   <li key={it.variantId} className="flex items-center gap-3 py-3">
@@ -236,7 +246,10 @@ export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeNam
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{it.title}</p>
-                      <p className="text-xs text-sf-text-subtle">Qty {it.quantity}</p>
+                      <p className="text-xs text-sf-text-subtle">
+                        Qty {it.quantity}
+                        {it.subscription?.active ? ` · every ${it.subscription.interval} days${it.subscription.percent && it.subscription.applied ? `, ${it.subscription.percent}% off` : ""}` : ""}
+                      </p>
                     </div>
                     <span className="text-sm font-semibold">{formatMoney(it.lineTotal, cart.currency)}</span>
                   </li>

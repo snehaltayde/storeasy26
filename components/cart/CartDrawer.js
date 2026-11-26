@@ -221,6 +221,14 @@ export default function CartDrawer() {
                   {it.variantTitle && it.variantTitle !== "Default Title" && (
                     <p className="text-xs text-sf-text-subtle">{it.variantTitle}</p>
                   )}
+                  {/* Phase 9 line 2: a subscribed line, or one now priced one-time (the server decides) */}
+                  {it.subscription && (
+                    <p data-line-subscription={it.subscription.active ? "on" : "off"} className="text-xs text-sf-text-subtle">
+                      {it.subscription.active
+                        ? `Every ${it.subscription.interval} days${it.subscription.percent ? (it.subscription.applied ? ` · ${it.subscription.percent}% off` : " · your code replaces the subscriber discount") : ""}`
+                        : "Subscription not available: one-time price"}
+                    </p>
+                  )}
                   {tierNudge?.variantId === it.variantId && (
                     <button
                       type="button"

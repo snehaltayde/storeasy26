@@ -20,6 +20,7 @@
 
 export const SHOPPER_ROUTES = Object.freeze([
   { path: "account", methods: ["GET", "POST"], class: "shopper", suite: "test-shopper-reads.js" },
+  { path: "account/subscriptions", methods: ["GET", "POST"], class: "shopper", suite: "test-subscriptions.js", note: "Phase 9 line 2: the _customer cookie's own subscriptions only; another shopper's id is a 404" },
   { path: "cart", methods: ["GET", "POST"], class: "shopper", suite: "test-shopper-reads.js" },
   { path: "checkout", methods: ["POST"], class: "shopper", suite: "test-shopper-reads.js" },
   { path: "search", methods: ["GET"], class: "public-read", suite: "test-shopper-reads.js" },
