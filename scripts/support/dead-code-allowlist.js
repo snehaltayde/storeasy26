@@ -5,6 +5,7 @@
 // Kept apart from the guard so parallel lines each append rows; when appends
 // conflict, keep both sides.
 export const ALLOWLIST = [
+  { path: "scripts/fixtures/ai/", reason: "the stub AI provider's answers for drill:plugins (Phase 9 line 5): lib/ai/provider.js reads AI_STUB_DIR/<task>.json, a path drillEnv builds at run time, which the walk cannot see" },
   { path: "components/ui/README.md", reason: "the folder's notes for people (the shadcn copy-in rules); Markdown is read, never imported" },
   { path: "lib/types/", reason: "TypeScript contracts that pnpm typecheck checks through tsconfig.json's include; JS modules adopt them one at a time, so nothing imports them yet" },
   { path: "app/fonts/geist/", reason: "self-hosted woff2 files: loaded by url() in app/fonts/fonts.css and next/font/local src paths in app/fonts/fonts.js, which the walk does not read; test:fonts checks each is referenced and exists" },
