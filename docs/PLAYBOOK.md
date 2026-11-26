@@ -8,11 +8,10 @@ orchestrating a phase. Keep it under about 80 lines: merge, reword or delete bef
 - A slice that adds a guard gets a reviewer brief with this escape list, and the guard's self-test a case
   per escape: marks on an ancestor, faked marks, content revealed after a click, submits from outside a
   form (`form=`, `formaction`, Enter), test-only reach, stale allowlist rows, folder rows hiding one file.
-- Plan disjoint file lists for parallel builders and name the shared files with append-only anchors
-  (`package.json`, `run-isolated.mjs`, `admin-routes.js`); conflicts are resolved by keeping both sides,
-  never by loosening a test. Tests on a shared list check membership, not position (Phase 3's "nav ends
-  with Operations" broke on every later append); one named line pins the final order. After resolving a
-  conflicted rebase, rerun lint and the unit suite before the merge.
+- Plan disjoint file lists and append-only anchors for parallel builders, and the step-0 contract turns
+  every test that pins a shared list (plugins, primitives, sweeps, nav) into a membership check first:
+  Phase 9's five lines each pinned the same lists and every merge conflicted. Stack finished parallel lines
+  on one integration branch in merge order and run one full verify there, not one per line.
 - A slice that touches shared storefront, order, nav, registry or documents code has `pnpm test` written into
   its builder's brief: Phase 4 (seven render suites, the nav count) and Phase 5 (the nav count again in two
   suites, the documents API shapes) each found these only at the merge check.
@@ -35,6 +34,9 @@ orchestrating a phase. Keep it under about 80 lines: merge, reword or delete bef
   Phase 7's cart nudges needed three review rounds because each fix was tested the way it was built.
 - First-party content (theme copy, seed pages) runs the banned-copy scan in its suite, and reads of a new
   column go through `hasColumns`: both slipped past Phase 7 line 1's builder and were caught in review.
+- Builders never narrow a planned feature to close a review finding (Phase 9 WhatsApp first dropped
+  first-time cart reminders); they fix within the floor or record the risk, and each writes its verify
+  logs to its own path (two Phase 9 builders overwrote each other's scratch logs).
 - Merge only on the verdict: chain `git merge` on `steelthread-verify`'s own exit, never after a `tail` or
   `grep` of its output (Phase 5's contract merged before its one failed suite was read).
 - "Drafts only" covers every document a button publishes: a publish that takes more than one document lists
@@ -49,14 +51,12 @@ orchestrating a phase. Keep it under about 80 lines: merge, reword or delete bef
   `test:console-kit` and `test:console-shell`: a console URL literal (even a `?scope=` in a comment)
   tripped the boundary scanner, and an unlisted `data-read-control` failed three Phase 3 merges, each
   time only in the session's full run. Split URL literals; give every read mark a reasoned row.
-- Drills use ids, `data-*` hooks or `exact: true`, and wait for the row they read, not the table: after
+- Drills check a not-found page by its words (a `loading.js` route streams it with 200), and use ids, `data-*` hooks or `exact: true`, and wait for the row they read, not the table: after
   design passes, Phase 2 and 3 drills failed six times at merge on two "Open an incident" buttons, a
   label matching two fields, an old 404 wording, a sign split from its amount, and rows still loading.
 - Storefront drill stages set the consent cookie and stub `/_next/image` (fixture pictures 404), filter only
   the refusal statuses they cause on purpose, and set up their own starting state, never the previous
   stage's (Phase 5's banner, pictures and 422; Phase 6's open stage changed the accent the design stage read).
-- A route with a `loading.js` streams, so `notFound()` arrives with status 200: drills check the not-found
-  page's words, not the status (the offers and apps drills both failed on this).
 - A new credential or cross-host path runs its browser drill in the builder's own check: the support-access
   entry passed every unit test while real Chromium never posted the form (`rel=noreferrer` sent
   `Origin: null`, and the CSP's `form-action 'self'` blocked the store host).
