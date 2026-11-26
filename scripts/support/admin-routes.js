@@ -62,6 +62,12 @@ export const ADMIN_ROUTES = Object.freeze([
   // Phase 4 line 2: where an app's blocks show (a missing install: the gate, then 404)
   { path: "apps/[id]/blocks", method: "GET", action: "apps.read", probe: { params: { id: "pin_0000000000000000" } } },
   { path: "apps/[id]/blocks", method: "POST", action: "apps.manage", probe: { params: { id: "pin_0000000000000000" }, body: { block: "badges", state: "live" } } },
+  // Phase 9 line 3: the WhatsApp card (a missing install: the gate, then 404)
+  { path: "apps/[id]/whatsapp", method: "GET", action: "apps.read", probe: { params: { id: "pin_0000000000000000" } } },
+  ...[
+    ["template", { kind: "order_confirmed", body: "x {link} {stop}" }],
+    ["approve", "order_confirmed"],
+  ].map(([v, arg]) => ({ path: "apps/[id]/whatsapp", method: "POST", variant: v, action: "apps.manage", probe: { params: { id: "pin_0000000000000000" }, body: { [v]: arg } } })),
   { path: "audit", method: "GET", action: "audit.read" },
   { path: "automations", method: "GET", action: "settings.read" },
   { path: "automations", method: "POST", action: "settings.write", probe: { body: {} } },

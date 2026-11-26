@@ -39,6 +39,9 @@ export const SUPPORT_PROBES = Object.freeze([
   { name: "brand-step", path: "brand-step", method: "GET", keys: ["ok", "brandStep", "palettes", "themes", "current", "themeLayouts", "design", "storeOpen", "canEditDescription", "descriptionMax"], inner: { current: ["themeId", "paletteId", "logo", "description"] }, note: "themes, current.themeId, themeLayouts: Phase 7 line 1, the onboarding theme picker" },
   // Phase 4 line 2: an app's placements (ctx.installId: Trust badges, which test-support-reads installs)
   { name: "apps/[id]/blocks", path: "apps/[id]/blocks", method: "GET", req: (ctx) => ({ params: { id: ctx.installId } }), keys: ["ok", "installStatus", "blocks", "previewPaths"] },
+  // Phase 9 line 3: the WhatsApp card (its access token and app secret are canaries; support sees phones masked)
+  { name: "apps/[id]/whatsapp", path: "apps/[id]/whatsapp", method: "GET", req: (ctx) => ({ params: { id: ctx.whatsappAppId } }), keys: ["ok", "connection", "templates", "vars", "caps", "log"] },
+  { name: "apps/[id]/whatsapp (another app)", path: "apps/[id]/whatsapp", method: "GET", req: (ctx) => ({ params: { id: ctx.appId } }), status: 404, keys: ["error", "code"], note: "only the WhatsApp install has this card" },
   { name: "bundles", path: "bundles", method: "GET", keys: ["ok", "bundles", "currency"] },
   { name: "catalog", path: "catalog", method: "GET", keys: ["ok", "products", "overrides", "collections", "shopify_admin"] },
   // P2-D: Phase 2's catalog views (lines 5 and 6)

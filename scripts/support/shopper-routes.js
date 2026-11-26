@@ -70,6 +70,11 @@ export const SHOPPER_ROUTES = Object.freeze([
   { path: "jobs/tick", methods: ["GET", "POST"], class: "job", suite: "test-first-sync.js" },
   { path: "health", methods: ["GET"], class: "job", suite: null },
   ...["me", "products", "products/[handle]", "collections", "offers", "orders", "orders/[id]"].map((p) => ({ path: `apps/v1/${p}`, methods: ["GET"], class: "app-token", suite: "test-app-tokens.js" })),
+  // Phase 9 line 3: WhatsApp consent, opt-out and Meta's webhook
+  { path: "messaging/consent", methods: ["POST"], class: "shopper", suite: "test-whatsapp.js", note: "bound to the cart cookie (and the _customer cookie); never an id in the body" },
+  { path: "account/messaging", methods: ["GET", "POST"], class: "shopper", suite: "test-whatsapp.js", note: "the signed-in shopper's own consents; signed out → 401" },
+  { path: "messaging/stop", methods: ["POST"], class: "token", suite: "test-whatsapp.js", note: "the signed stop token (a consent id, no PII)" },
+  { path: "whatsapp/webhook", methods: ["GET", "POST"], class: "webhook", suite: "test-whatsapp.js", note: "X-Hub-Signature-256 over the raw body with the app secret; GET is Meta's verify challenge" },
   { path: "[...unmatched]", methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], class: "public-read", suite: "test-api-unmatched.js", note: "an /api/* path with no route: 404 JSON, open or closed store" },
 ]);
 
@@ -109,6 +114,7 @@ export const STOREFRONT_PAGES = Object.freeze([
   { page: "templates", class: "public", sweep: "public" },
   { page: "trust", class: "public", sweep: "public" },
   { page: "verticals/[vertical]", class: "public", sweep: "public" },
+  { page: "m/stop", class: "public", sweep: "public", note: "Phase 9 line 3: the WhatsApp opt-out; the signed token only, shows nothing about the person" },
 ]);
 
 // Every other entry file under app/ outside (console)/ and api/admin/: routes
@@ -119,4 +125,5 @@ export const APP_ENTRIES = Object.freeze([
   { file: "manifest.webmanifest/route.js", methods: ["GET"], class: "public", note: "the PWA manifest: name, tagline, brand colours" },
   { file: "sitemap.js", methods: [], class: "public", note: "published pages and products only; empty for a closed store" },
   { file: "robots.js", methods: [], class: "public" },
+  { file: "(storefront)/cart/r/[token]/route.js", methods: ["GET"], class: "public", note: "Phase 9 line 3: a WhatsApp cart reminder link; the signed token (a consent id) restores that cart into the cart cookie" },
 ]);

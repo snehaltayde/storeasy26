@@ -3,6 +3,20 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-26 Phase 9 line 3: WhatsApp messages, consent-gated (on the owner's behalf)
+
+- **Schema (0042, additive):** `messaging_consents`, `whatsapp_templates`, `whatsapp_reminders` and `idx_notifications_recipient`, as the plan. One live consent per binding (cart and/or customer) and purpose: a new phone revokes the old row (`revoked_via` "replaced"), so a typo'd number never stays covered. `phone_hash` is an HMAC of the E.164 number keyed with the store's link secret (`|whatsapp`), so no consent can be written in production without a link secret (fail closed, 503). Revoked rows stay until a privacy erase deletes them.
+- **Permissions:** no new action. The card's GET is `apps.read` (support sees phones masked, never the message text); template edit and approve are `apps.manage`; caps, delay and secrets are the manifest's own settings (already `apps.manage`). Shopper routes: the consent POST binds to the cart cookie (and the `_customer` cookie) only; the account route is the signed-in shopper's own (401 signed out); stop and cart-restore are signed-token only; the webhook is signature only.
+- **The internal topic:** `lib/plugins/topics.js` gains `FIRST_PARTY_INTERNAL` (internal topic → first-party plugin ids, today `order.delivery_updated` → `whatsapp`) and the manifest check accepts an internal topic only for a plugin on that list. `SUBSCRIBABLE` and the custom-app topic check are unchanged, so an outside app still can't subscribe (test:whatsapp checks a custom app, a fixture manifest and a second `whatsapp` manifest).
+- **Every message carries `{stop}`:** a sixth fixed field beside the plan's five; a template without `{link}` and `{stop}` can't be saved, so no message goes out without the signed opt-out link.
+- **Tokens:** stop and cart-restore tokens are `<consent id>.<exp>.<HMAC>` (no phone, no email, no cart id); stop lasts 400 days, cart 7 days. The cart link looks the cart up through the consent; a consent erased since makes the link open the home page.
+- **STOP:** the stop link, an inbound "STOP" (also STOP ALL, UNSUBSCRIBE, CANCEL) and privacy erase revoke every WhatsApp consent for that phone, both purposes.
+- **Sends:** `sendGated()` is the only path out; it re-reads the consent, the template, quiet hours and caps at send time. The notifications row (key `wa:<kind>:<orderId>` or `wa:cart_reminder:<cartId>`) is written before the provider call and is the once-only claim; a provider failure leaves a failed row and is not retried (the cart is marked reminded). Order updates are not capped and not held by quiet hours; marketing counts queued and sent rows over a rolling 24 h and 7 days per phone, and a rolling 24 h for the store's cap.
+- **Abandoned cart:** idle is the later of the cart's `updated_at` and the consent's `granted_at`; carts idle over 7 days are skipped; 50 a window; quiet hours, the store cap, no provider or an unapproved template stop the window's walk.
+- **Meta:** Cloud API v27.0 `POST /<phone-number-id>/messages` with a template, its body parameters positional in the order the fields first appear in the preview; `X-Hub-Signature-256` is `sha256=` + hex HMAC-SHA256 of the raw body with the app secret (developers.facebook.com, read 2026-11-26). The verify token is a fourth secret setting.
+- **`order.delivery_updated` payload:** WhatsApp reads the status from `data.delivery.status` (or `data.status`) and sends only for `delivered`; line 4 emits it in that shape.
+- **Step 0's sweep suite:** `test:plugin-sweeps` now measures its fixtures beside the built-in sweeps (WhatsApp is the first), since "no built-in sweep" was step 0's state, not a rule.
+
 ## 2026-11-26 Phase 9 first-party plugins plan (on the owner's behalf)
 
 - **Schema:** five additive tenant migrations in merge order: 0040 reviews, 0041 shipment tracking, 0042 WhatsApp consents and templates, 0043 AI usage ledger, 0044 subscriptions. No platform migration.

@@ -56,26 +56,31 @@ const { estimateFor } = await import("../lib/delivery/estimate-source.js");
 const { computeShipping } = await import("../lib/shipping.js");
 
 const manifest = (id) => ({ id, name: `Fixture ${id}`, version: "1.0.0", summary: "s", description: "d", icon: "Truck", author: { name: "Tests" }, scopes: [], settings: [{ key: "greeting", kind: "text", label: "G", max: 20, default: "hi" }], events: [], egress: [] });
+// Phase 9 lines add built-in sweeps (WhatsApp first); the fixture checks below
+// are about the fixtures, measured beside whatever is built in.
+const BUILT = SW.sweepPluginIds();
+const fixtureIds = () => SW.sweepPluginIds().filter((id) => !BUILT.includes(id));
 const NOW_ISO = "2026-11-26T00:00:00.000Z";
 let n = 0;
 const install = (pluginId, status, extra = {}) =>
   db.insertInto("plugin_installs").values({ id: `pin_sweep${++n}`, plugin_id: pluginId, kind: "first_party", version: "1.0.0", status, granted_scopes: "[]", settings: JSON.stringify({ greeting: `hi ${pluginId}`, __secret_keys: ["token"] }), installed_by: "member:test", installed_at: NOW_ISO, updated_at: NOW_ISO, ...extra }).returning("id").executeTakeFirstOrThrow();
 
 await t("registerSweep: adds a sweep, undo removes it; a second register replaces it and the first undo leaves the second alone; a non-function is refused", () => {
-  eq(SW.sweepPluginIds().length, 0, "no built-in sweep in step 0:");
+  eq(fixtureIds().length, 0, "no fixture sweep yet:");
+  ok(BUILT.every((id) => typeof SW.sweepFor(id) === "function"), "every built-in id has its sweep");
   eq(SW.sweepFor("fx-reg"), null, "none yet:");
   const f1 = async () => {};
   const f2 = async () => {};
   const undo1 = SW.registerSweep("fx-reg", f1);
   eq(SW.sweepFor("fx-reg"), f1, "registered:");
-  eq(JSON.stringify(SW.sweepPluginIds()), '["fx-reg"]', "listed:");
+  eq(JSON.stringify(fixtureIds()), '["fx-reg"]', "listed:");
   const undo2 = SW.registerSweep("fx-reg", f2);
   eq(SW.sweepFor("fx-reg"), f2, "replaced:");
   undo1();
   eq(SW.sweepFor("fx-reg"), f2, "the stale undo leaves the newer sweep:");
   undo2();
   eq(SW.sweepFor("fx-reg"), null, "undone:");
-  eq(SW.sweepPluginIds().length, 0, "nothing left:");
+  eq(fixtureIds().length, 0, "nothing left:");
   let threw = false;
   try {
     SW.registerSweep("fx-reg", "not a function");
@@ -88,7 +93,8 @@ await t("registerSweep: adds a sweep, undo removes it; a second register replace
 
 await t("queuePluginSweep: nothing while no plugin has a sweep; then one job per 10-minute window (the key dedupes)", async () => {
   const base = 1_800_000_000_000 - (1_800_000_000_000 % SW.PLUGIN_SWEEP_WINDOW_MS);
-  eq(await SW.queuePluginSweep(base + 1000), null, "no sweep, no job:");
+  // with no sweep at all nothing is queued; a built-in sweep queues every window
+  if (!BUILT.length) eq(await SW.queuePluginSweep(base + 1000), null, "no sweep, no job:");
   const undo = SW.registerSweep("fx-q", async () => {});
   try {
     const x = await SW.queuePluginSweep(base + 1000);
@@ -171,7 +177,8 @@ await t("sweepPlugins: active stores only, enabled and un-killed installs only, 
 
 await t("sweepPlugins: nothing registered walks nothing; a passed deadline stops before the first store; the worker handler runs the walk", async () => {
   const none = await SW.sweepPlugins({ now: () => 1 });
-  eq(JSON.stringify(none), '{"stores":0,"ran":0,"failed":0}', "no sweep:");
+  // no fixture sweep: nothing runs (a built-in sweep's plugin isn't installed in these stores)
+  eq(JSON.stringify(none), BUILT.length ? '{"stores":2,"ran":0,"failed":0}' : '{"stores":0,"ran":0,"failed":0}', "no sweep:");
   const calls = [];
   const off = SW.registerSweep("fx-on", async () => calls.push(tenantId()));
   try {

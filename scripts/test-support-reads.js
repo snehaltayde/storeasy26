@@ -292,6 +292,19 @@ await a.run(async () => {
   await tdb.updateTable("plugin_deliveries").set({ status: "delivered", attempts: 1, last_status: 200, delivered_at: new Date().toISOString() }).execute();
 });
 
+// Phase 9 line 3: WhatsApp in A, its access token and app secret canaries, and
+// one recorded message to the fixture order's phone (masked for support)
+CNY.waAccessToken = "cnywatoken0";
+CNY.waAppSecret = "cnywaappsec0";
+SECRET_KEYS.push("waAccessToken", "waAppSecret");
+const waApp = await call("owner", "apps", "POST", { body: { install: { pluginId: "whatsapp", scopes: ["orders.read"] } } });
+await call("owner", "apps/[id]", "POST", { params: { id: waApp.body?.install?.id }, body: { settings: { phone_number_id: "1065403522", access_token: CNY.waAccessToken, app_secret: CNY.waAppSecret } } });
+await a.run(async () => {
+  const { db: tdb } = await import("../lib/db.js");
+  const at = new Date().toISOString();
+  await tdb.insertInto("notifications").values({ id: "ntf_supwa0000000000001", type: "whatsapp_order_confirmed", recipient: `+91${CNY.orderPhone}`, subject: "WhatsApp", body: "fixture", status: "sent", error: null, provider_id: "whatsapp-stub", consent_class: "transactional", consent_ref: null, idempotency_key: "wa:order_confirmed:sup", created_at: at, sent_at: at }).execute();
+});
+
 // Phase 5 line 1: Aurora uploaded in A; a theme in B whose name and description are canaries
 const auroraText = await readFile(join(ROOT, "scripts/fixtures/themes/aurora.theme.json"), "utf8");
 const themeA = await call("owner", "themes", "POST", { body: JSON.parse(auroraText) });
@@ -308,6 +321,7 @@ const CTX = {
   themeId: themeA.body?.package?.id ?? null,
   bThemeId: themeB.body?.package?.id ?? null,
   appId: appA.body?.install?.id ?? null,
+  whatsappAppId: waApp.body?.install?.id ?? null,
   secretAppId: secretApp.body?.install?.id ?? null,
   webhookAppId: hookA.body?.install?.id ?? null,
   bWebhookAppId: hookB.body?.install?.id ?? null,

@@ -411,6 +411,14 @@ Each Phase 3 line fills only its own sub-heading.
 - Needs the design pass (`ui-designer`): the Markets tab cards, the footer picker, the checkout Country select and postal field, and the charged-in notes.
 
 
+## WhatsApp messages (Phase 9 line 3)
+
+- **Checkout** (`components/checkout/WhatsAppConsent.js`, under the address fields): two unticked boxes, "Send my order updates on WhatsApp" and "Also send me offers and cart reminders on WhatsApp" (`data-wa-consent`). Disabled with "Add your phone number above to choose WhatsApp messages." until the phone is valid; each tick saves at once; changing the phone clears the ticks.
+- **/account** (`components/account/MessagingPrefs.js`, last on the page): "WhatsApp messages", "For +91 ••••••1234" (or a phone field when the account has none) and the same two boxes as toggles.
+- **/m/stop**: one card, "Stop all order updates, offers and cart reminders on WhatsApp from this store?" and "Stop messages"; then "Done. We won't send you any more WhatsApp messages…"; a bad link says how else to stop.
+- **App page → WhatsApp card** (`components/admin/apps/WhatsAppCard.js`, `data-apps="whatsapp"`): the connection line (test mode, connected, or not connected and why); Templates, one row each with Marketing and Draft/Approved badges, Edit (message, Meta template name, language; "Save as draft") and Approve (owner and admin; RoleGate'd for staff and support); Limits in one sentence; Messages, the last 50 (kind, phone masked for support, status, date).
+- Needs the design pass (`ui-designer`): the checkout boxes, the account section, the stop page and the WhatsApp card.
+
 ### Design sweep (Phase 8)
 
 - **Fields:** one storefront field utility, `sf-field` in `app/globals.css` (16px and 44px high on phones so iOS doesn't zoom, 14px and 40px from `sm`, the `sf-focus` ring plus a darker border). Used by the checkout Country select, PIN code and postal fields, address fields, Check delivery, the account address form and the footer's Ship to select. Text buttons use `sf-tap` (44px high on phones, flowing with the line from `sm`): Change, Pay online instead, Resend code, Change number, Sign in to use saved addresses, the address cards' Edit, Make default and Delete. `sf-focus-within` puts the shared ring on a whole radio card.

@@ -16,6 +16,7 @@ const STAGE_FILES = [
   // p9: reviews
   // p9: subscriptions
   // p9: whatsapp
+  "stage-whatsapp.mjs",
   // p9: shiprocket
   // p9: ai-copilot
 ];

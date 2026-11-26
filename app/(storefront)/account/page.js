@@ -5,6 +5,7 @@ import { formatMoney } from "@/lib/format";
 import AccountAuth from "@/components/account/AccountAuth";
 import ProfileForm from "@/components/account/ProfileForm";
 import AddressBook from "@/components/account/AddressBook";
+import MessagingPrefs from "@/components/account/MessagingPrefs";
 import { listAddresses } from "@/lib/addresses";
 import { tfetch } from "@/lib/storefront-request";
 
@@ -96,6 +97,7 @@ export default async function AccountPage({ searchParams }) {
       </section>
 
       {/* account: messaging */}
+      <MessagingPrefs />
     </div>
   );
 }
