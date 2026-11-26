@@ -5,8 +5,6 @@ orchestrating a phase. Keep it under about 80 lines: merge, reword or delete bef
 
 ## Building
 
-- A plan that assumes something runs (a seed, a drill, a script) lists running it once as a first check;
-  Phase 0's drill line read the code and missed a seed that crashed on retired modules, costing three rounds.
 - A slice that adds a guard gets a reviewer brief with this escape list, and the guard's self-test a case
   per escape: marks on an ancestor, faked marks, content revealed after a click, submits from outside a
   form (`form=`, `formaction`, Enter), test-only reach, stale allowlist rows, folder rows hiding one file.
@@ -18,9 +16,9 @@ orchestrating a phase. Keep it under about 80 lines: merge, reword or delete bef
 - A slice that touches shared storefront, order, nav, registry or documents code has `pnpm test` written into
   its builder's brief: Phase 4 (seven render suites, the nav count) and Phase 5 (the nav count again in two
   suites, the documents API shapes) each found these only at the merge check.
-- Lines cut from a sibling's unmerged commit (to overlap work) rebase onto each sibling as it lands, in
-  merge order, and a reviewer confirms no sibling fix was dropped (Phase 4 line 4 was cut before line 3's
-  review fixes and would have reverted them).
+- Overlapping lines take main in merge order, and code conflicts are resolved by hand against each side's
+  final version; only docs and append lists take "keep both" (Phase 8 broke `test-copy` and a drill list that
+  way). A branch with many commits over one file takes one `git merge main`, not a per-commit rebase.
 - A drill stage the builder "wrote but did not run" is unverified code: Phase 4's webhooks stage needed
   three rounds (no catalog, checkout's confirm-the-total 409, the sign-in rate limit) at merge time.
 - A migration number reserved in the plan goes to whichever branch merges first: Phase 3 reserved 0016
@@ -30,6 +28,8 @@ orchestrating a phase. Keep it under about 80 lines: merge, reword or delete bef
   sweeps every nav page per role and width, and Phase 6's studio contract broke it on main unseen.
 - Parallel lines that share client state (one store, one document) get one named owner in the plan and the
   other line reuses it: both Phase 6 reviews found two live `doc_design` stores, once per line.
+- A money line's plan lists every read of the money it changes (refunds, returns, reports, webhooks, push),
+  not only the charge: Phase 8's markets passed 1,000 carts yet stored refunds in the wrong currency.
 - A feature that shows money to shoppers (nudges, totals, prices) gets, in its plan, a brute-force test that
   completes every suggestion the way a shopper would (whole units, real products) and checks the engine:
   Phase 7's cart nudges needed three review rounds because each fix was tested the way it was built.
@@ -62,11 +62,10 @@ orchestrating a phase. Keep it under about 80 lines: merge, reword or delete bef
   `Origin: null`, and the CSP's `form-action 'self'` blocked the store host).
 - While a full verify runs in a worktree, reviewers there run nothing: suites share file databases in the
   worktree root, and a reviewer's `test-copy` run moved them mid-verify (`SQLITE_READONLY_DBMOVED`).
-- Guards and allowlists read the real thing, never a hand list or a regex over source: route methods come
-  from importing the module, animation utilities from the package's CSS, imports from a walk of the files.
-  Reviewers found a blind spot in every hand-written guard in Phase 0.
-- Load-only failures come from ordering and timing: order history by time then `rowid` (never a random id),
-  and wait on a real signal (a port, a settled save), never fixed ticks or sleeps (flags, editor-store 409).
+- Guards read the real thing (imports by walking files, routes by importing them), and a failing guard is
+  never loosened to pass: Phase 8 line 1 exempted lazy imports and hid an Edge-rule break already on main.
+- Load- and date-only failures come from time: order history by time then `rowid`, wait on a real signal,
+  and pin the clock in any suite whose fixtures compare against now (`test-billing` failed once 26 Nov came).
 - Browser drills reseed and wipe the checkout they run in, so they run only through `pnpm drill:<name>`
   (a throwaway worktree at HEAD, its own ports and data; the drills refuse anywhere else). Commit before
   a drill run: uncommitted code is not what it tests.
