@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/jobs/tick",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/jobs/sync-shopify",
       "schedule": "0 3 * * *"
     },
