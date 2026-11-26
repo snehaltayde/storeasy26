@@ -103,6 +103,9 @@ export const SPEED = {
     { title: "Self-hosted fonts", body: "Fonts are served with the store, with no request to a font service.", file: "app/fonts/fonts.js" },
     { title: "Optimised images", body: "Product photos from Shopify are resized and compressed for each screen.", file: "components/StoreImage.js" },
   ],
+  // The speed band's moving picture: the same path the four items above describe.
+  flowTitle: "How a page reaches a shopper",
+  flow: ["Cached content", "Edge runtime", "Shopper's screen"],
   measuredTitle: "Measured in our test suite",
   measured: [
     { title: "Theme layer", body: "An uploaded theme package added about 2 ms to a page layout render (median of 15 renders).", file: "scripts/test-theme-render.js" },
@@ -146,6 +149,7 @@ export const CLOSING = {
   body: "Sign up, connect your Shopify store, pick a theme and open when checkout is ready.",
   primary: "Create your store",
   secondary: "See pricing",
+  pause: "Pause the moving list",
   more: "More about Storeasy",
   sources: "Where each claim comes from",
   sourcesLede: "Each feature on this page is a ticked line in our feature list, ticked only once its tests passed, or a named part of the code.",

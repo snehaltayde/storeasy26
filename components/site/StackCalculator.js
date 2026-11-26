@@ -1,14 +1,52 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { STACK, CALC, stackTotals } from "./landing-copy";
 
-// The landing page's one client island: the founder's own app bill, added up.
+// The landing page's calculator island: the founder's own app bill, added up.
 // Plans come from the server (lib/platform/billing.js listPlans, the source
-// /pricing reads); nothing here holds a price. Figures stay in this tab only.
+// /pricing reads); nothing here holds a price, and every field starts empty.
+// Figures stay in this tab only. The totals count up to their new value; a
+// screen reader gets the final figure once, and with motion off the figure
+// simply changes.
 const inr = (n) => `₹${Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
-const focus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-700";
+const focus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mk-blue";
+const focusInk = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
+
+function useCountUp(target) {
+  const [shown, setShown] = useState(target);
+  const last = useRef(target);
+  useEffect(() => {
+    const start = last.current;
+    if (start === target) return undefined;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      last.current = target;
+      setShown(target);
+      return undefined;
+    }
+    const began = performance.now();
+    let frame = requestAnimationFrame(function step(now) {
+      const p = Math.min(1, (now - began) / 650);
+      const value = p === 1 ? target : start + (target - start) * (1 - Math.pow(1 - p, 3));
+      last.current = value;
+      setShown(value);
+      if (p !== 1) frame = requestAnimationFrame(step);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [target]);
+  return shown;
+}
+
+function Count({ value, className }) {
+  const shown = useCountUp(value);
+  return (
+    <dd className={className}>
+      <span aria-hidden="true">{inr(shown === value ? value : Math.round(shown))}</span>
+      <span className="sr-only">{inr(value)}</span>
+    </dd>
+  );
+}
 
 export default function StackCalculator({ plans = [] }) {
   const uid = useId();
@@ -21,21 +59,26 @@ export default function StackCalculator({ plans = [] }) {
   const empty = t.entered === 0;
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-12">
+    <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-14">
       <fieldset className="min-w-0">
         <legend className="sr-only">{CALC.legend}</legend>
-        <ul className="divide-y divide-zinc-200 border-y border-zinc-200">
+        <ul className="divide-y divide-mk-rule border-y border-mk-rule">
           {STACK.map((row) => {
             const id = `${uid}-${row.id}`;
             const err = bad.has(row.id);
+            const filled = !err && String(values[row.id] ?? "").trim() !== "";
             return (
-              <li key={row.id} className="grid grid-cols-[minmax(0,1fr)_9.5rem] items-center gap-x-4 gap-y-1 py-3 sm:grid-cols-[minmax(0,1fr)_11rem]">
+              <li key={row.id} className="grid grid-cols-[minmax(0,1fr)_9.5rem] items-center gap-x-4 gap-y-1 py-3.5 sm:grid-cols-[minmax(0,1fr)_11rem]">
                 <label htmlFor={id} className="min-w-0">
-                  <span className="block text-[0.9375rem] font-semibold text-zinc-900">{row.label}</span>
-                  <span className="block text-sm text-zinc-600">{CALC.builtAs} {row.built}</span>
+                  <span className="block text-[0.9375rem] font-semibold text-mk-navy">{row.label}</span>
+                  <span className="block text-sm text-mk-body">
+                    {CALC.builtAs} {row.built}
+                  </span>
                 </label>
                 <div className="relative">
-                  <span aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 font-mono text-sm text-zinc-500">₹</span>
+                  <span aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-sm text-mk-muted">
+                    ₹
+                  </span>
                   <input
                     id={id}
                     inputMode="decimal"
@@ -45,14 +88,14 @@ export default function StackCalculator({ plans = [] }) {
                     onChange={(e) => setValues((v) => ({ ...v, [row.id]: e.target.value }))}
                     aria-invalid={err || undefined}
                     aria-describedby={err ? `${id}-err` : `${id}-unit`}
-                    className={`h-11 w-full rounded-lg border bg-white pr-3 pl-7 text-right font-mono text-sm tabular-nums text-zinc-900 placeholder:font-sans placeholder:text-zinc-500 ${err ? "border-red-700" : "border-zinc-300"} ${focus}`}
+                    className={`h-12 w-full rounded-xl border bg-white pr-3.5 pl-8 text-right text-[0.9375rem] font-medium tabular-nums text-mk-navy transition-[border-color,box-shadow] duration-300 placeholder:font-normal placeholder:text-mk-muted ${err ? "border-mk-danger" : filled ? "border-mk-violet shadow-[0_10px_24px_-16px_rgb(91_43_224/0.9)]" : "border-mk-edge"} ${focus}`}
                   />
                   <span id={`${id}-unit`} className="sr-only">
                     {CALC.unit}
                   </span>
                 </div>
                 {err && (
-                  <p id={`${id}-err`} className="col-span-2 text-sm text-red-700">
+                  <p id={`${id}-err`} className="col-span-2 text-sm text-mk-danger">
                     {CALC.invalid}
                   </p>
                 )}
@@ -60,57 +103,57 @@ export default function StackCalculator({ plans = [] }) {
             );
           })}
         </ul>
-        <button type="button" onClick={() => setValues({})} disabled={empty && t.invalid.length === 0} className={`mt-4 -ml-4 rounded-full px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-400 disabled:hover:bg-transparent ${focus}`}>
+        <button type="button" onClick={() => setValues({})} disabled={empty && t.invalid.length === 0} className={`mt-4 -ml-4 rounded-full px-4 py-2 text-sm font-semibold text-mk-violet transition-colors hover:bg-mk-mist disabled:cursor-not-allowed disabled:text-mk-muted disabled:hover:bg-transparent ${focus}`}>
           {CALC.clear}
         </button>
       </fieldset>
 
-      <div className="lg:sticky lg:top-20 lg:self-start">
-        <div className="rounded-2xl bg-zinc-950 p-6 text-white" aria-live="polite">
+      <div className="lg:sticky lg:top-24 lg:self-start">
+        <div className="mk-sum mk-grain p-7 sm:p-8" aria-live="polite">
           {empty ? (
-            <p className="text-[0.9375rem] text-zinc-300">{CALC.empty}</p>
+            <p className="text-lg leading-relaxed text-white">{CALC.empty}</p>
           ) : (
-            <dl className="space-y-4">
+            <dl className="space-y-5">
               <div>
-                <dt className="text-sm text-zinc-300">{CALC.monthly}</dt>
-                <dd className="mt-1 font-mono text-4xl font-semibold tabular-nums tracking-tight text-lime-400">{inr(t.monthly)}</dd>
+                <dt className="text-sm text-mk-on-ink">{CALC.monthly}</dt>
+                <Count value={t.monthly} className="mt-1 text-5xl font-semibold tracking-tight tabular-nums text-white" />
               </div>
               <div>
-                <dt className="text-sm text-zinc-300">{CALC.yearly}</dt>
-                <dd className="mt-1 font-mono text-xl tabular-nums">{inr(t.yearly)}</dd>
+                <dt className="text-sm text-mk-on-ink">{CALC.yearly}</dt>
+                <Count value={t.yearly} className="mt-1 text-2xl font-medium tabular-nums text-white" />
               </div>
             </dl>
           )}
 
-          <div className="mt-6 border-t border-white/15 pt-5">
+          <div className="mt-7 border-t border-white/20 pt-6">
             {plans.length === 0 ? (
-              <p className="text-sm text-zinc-300">
+              <p className="text-sm text-mk-on-ink">
                 {CALC.noPlans}{" "}
-                <Link href="/pricing" className={`font-semibold text-white underline underline-offset-4 ${focus} focus-visible:outline-lime-400`}>
+                <Link href="/pricing" className={`rounded font-semibold text-white underline underline-offset-4 ${focusInk}`}>
                   {CALC.seePricing}
                 </Link>
               </p>
             ) : (
               <>
-                <label htmlFor={`${uid}-plan`} className="text-sm text-zinc-300">
+                <label htmlFor={`${uid}-plan`} className="text-sm text-mk-on-ink">
                   {CALC.plan}
                 </label>
-                <select id={`${uid}-plan`} value={planKey} onChange={(e) => setPlanKey(e.target.value)} className={`mt-1.5 h-11 w-full rounded-lg border border-white/20 bg-zinc-900 px-3 text-sm text-white ${focus} focus-visible:outline-lime-400`}>
+                <select id={`${uid}-plan`} value={planKey} onChange={(e) => setPlanKey(e.target.value)} className={`mt-2 h-12 w-full rounded-xl border border-white/30 bg-mk-navy px-3.5 text-[0.9375rem] text-white ${focusInk}`}>
                   {plans.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}: {p.price === 0 ? CALC.free : `${inr(p.price / 100)} a ${p.interval}`}
                     </option>
                   ))}
                 </select>
-                <dl className="mt-4 space-y-2 text-sm">
+                <dl className="mt-5 space-y-2.5 text-[0.9375rem]">
                   <div className="flex items-baseline justify-between gap-4">
-                    <dt className="text-zinc-300">{CALC.planCost}</dt>
-                    <dd className="font-mono tabular-nums">{inr(t.plan)}</dd>
+                    <dt className="text-mk-on-ink">{CALC.planCost}</dt>
+                    <dd className="font-medium tabular-nums text-white">{inr(t.plan)}</dd>
                   </div>
                   {!empty && (
                     <div className="flex items-baseline justify-between gap-4">
-                      <dt className="text-zinc-300">{t.difference >= 0 ? CALC.difference : CALC.over}</dt>
-                      <dd className="font-mono tabular-nums text-white">{inr(Math.abs(t.difference))}</dd>
+                      <dt className="text-mk-on-ink">{t.difference >= 0 ? CALC.difference : CALC.over}</dt>
+                      <Count value={Math.abs(t.difference)} className="font-semibold tabular-nums text-white" />
                     </div>
                   )}
                 </dl>
@@ -118,8 +161,8 @@ export default function StackCalculator({ plans = [] }) {
             )}
           </div>
         </div>
-        <p className="mt-4 text-sm font-semibold text-zinc-900">{CALC.estimate}</p>
-        <p className="mt-1 text-sm text-zinc-600">{CALC.shopifyStays}</p>
+        <p className="mt-5 text-sm font-semibold text-mk-navy">{CALC.estimate}</p>
+        <p className="mt-1 text-sm text-mk-body">{CALC.shopifyStays}</p>
       </div>
     </div>
   );

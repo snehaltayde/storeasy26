@@ -119,7 +119,7 @@ await t("every visible string on the landing page passes the banned-copy and cla
 });
 
 await t("the landing page's components hold no visible text outside landing-copy.js (so the scan above covers it)", async () => {
-  for (const f of ["components/site/MarketingHome.js", "components/site/StackCalculator.js"]) {
+  for (const f of ["components/site/MarketingHome.js", "components/site/StackCalculator.js", "components/site/MotionRoot.js"]) {
     const src = await readFile(join(ROOT, f), "utf8");
     const jsxText = [...src.replace(/\/\/.*$/gm, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "").matchAll(/>\s*([A-Za-z][^<>{}();=]*?)\s*</g)].map((m) => m[1]).filter((s) => /[a-z]{3}/i.test(s));
     eq(JSON.stringify(jsxText), "[]", `${f} JSX text:`);
@@ -165,6 +165,29 @@ await t("no social proof and no prices on the page: no testimonials, counts or a
     const src = (await readFile(join(ROOT, f), "utf8")).replace(/\/\/.*$/gm, "");
     ok(!/\b(99900|299900|999|2999)\b/.test(src), `${f} holds a plan price`);
   }
+});
+
+await t("brand and motion: the logo is on the shared header and footer with an alt, the scheme is scoped to .mk, and reduced motion turns every animation off", async () => {
+  const { existsSync } = await import("node:fs");
+  ok(existsSync(join(ROOT, "public/brand/storeasy-by-mediastic.png")), "the logo file is missing");
+  const nav = await readFile(join(ROOT, "components/site/SiteNav.js"), "utf8");
+  ok(/import StoreImage from "@\/components\/StoreImage"/.test(nav) && /<StoreImage src="\/brand\/storeasy-by-mediastic\.png" alt="Storeasy by mediaStic" width=\{[^}]+\} height=\{height\}/.test(nav), "the logo is not a sized next/image (through StoreImage) with its alt");
+  ok(/export default function SiteNav/.test(nav) && /export function SiteFooter/.test(nav) && (nav.match(/<Logo /g) || []).length === 2, "the logo is not on both the header and the footer");
+  const layout = await readFile(join(ROOT, "app/(storefront)/layout.js"), "utf8");
+  ok(/<body className="mk /.test(layout) && /<SiteFooter \/>/.test(layout), "the marketing body does not carry .mk or the shared footer");
+  eq((layout.match(/className="mk /g) || []).length, 1, "only the marketing body carries .mk:");
+  const css = await readFile(join(ROOT, "app/marketing.css"), "utf8");
+  // every rule that sets a token or draws is under .mk or an mk- class; no store token is set
+  ok(!/(^|[\s{;])--(sf-|accent-|background|foreground|header-|hero-)[\w-]*\s*:/m.test(css), "marketing.css sets a store brand token");
+  ok(!/^\s*(:root|html|body)\b/m.test(css), "marketing.css styles the root, which stores share");
+  const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
+  ok(reduced.length > 100 && /animation: none !important/.test(reduced) && /transition: none !important/.test(reduced) && /\[data-reveal\][\s\S]*opacity: 1 !important/.test(reduced), "reduced motion does not stop the animations and show the content");
+  const motion = await readFile(join(ROOT, "components/site/MotionRoot.js"), "utf8");
+  ok(/prefers-reduced-motion: reduce\)"\)\.matches\) return/.test(motion), "the motion island runs under reduced motion");
+  ok(/prefers-reduced-motion: reduce/.test(await readFile(join(ROOT, "components/site/StackCalculator.js"), "utf8")), "the calculator's count-up ignores reduced motion");
+  // no animation library came in with the redesign
+  const pkg = JSON.parse(await readFile(join(ROOT, "package.json"), "utf8"));
+  for (const dep of ["framer-motion", "motion", "gsap", "lottie-web", "animejs", "three"]) ok(!pkg.dependencies?.[dep] && !pkg.devDependencies?.[dep], `${dep} was added`);
 });
 
 await t("calculator: blanks count as nothing, bad input is named, monthly and yearly add up, the plan is compared in rupees", async () => {

@@ -25,7 +25,7 @@ import { isPlatformSiteHost } from "@/lib/platform-site";
 import { curtainPalette, curtainTitle } from "@/lib/maintenance";
 import { storeCurtain } from "@/lib/storefront-request";
 import { headers } from "next/headers";
-import SiteNav from "@/components/site/SiteNav";
+import SiteNav, { SiteFooter } from "@/components/site/SiteNav";
 import Link from "next/link";
 import PreviewBridgeMount from "@/components/preview/PreviewBridge";
 import PreviewBanner, { PreviewMain } from "@/components/PreviewBanner";
@@ -281,28 +281,15 @@ export default async function RootLayout({ children }) {
   if (isPlatformSiteHost((await headers()).get("host"))) {
     return (
       <html lang="en" className={`${Geist.variable} ${GeistMono.variable} ${Fraunces.variable} h-full`}>
-        <body className="flex min-h-full flex-col bg-white text-zinc-900 antialiased">
-          <a href="#main" className="sr-only rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50">
+        <body className="mk flex min-h-full flex-col bg-white antialiased">
+          <a href="#main" className="sr-only rounded-full bg-mk-navy px-4 py-2 text-sm font-semibold text-white focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50">
             Skip to content
           </a>
           <SiteNav />
           <main id="main" className="flex-1">
             {children}
           </main>
-          <footer className="border-t border-zinc-100 bg-zinc-50">
-            <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-8 text-xs text-zinc-500 sm:px-6">
-              <span className="font-bold text-zinc-800">Storeasy</span>
-              <Link href="/pricing" className="hover:text-zinc-900">Pricing</Link>
-              <Link href="/templates" className="hover:text-zinc-900">Templates</Link>
-              <Link href="/integrations" className="hover:text-zinc-900">Integrations</Link>
-              <Link href="/trust" className="hover:text-zinc-900">Trust & security</Link>
-              <Link href="/contact" className="hover:text-zinc-900">Contact</Link>
-              <span className="ml-auto flex gap-4">
-                <Link href="/legal/terms" className="hover:text-zinc-900">Terms</Link>
-                <Link href="/legal/privacy" className="hover:text-zinc-900">Privacy</Link>
-              </span>
-            </div>
-          </footer>
+          <SiteFooter />
         </body>
       </html>
     );
