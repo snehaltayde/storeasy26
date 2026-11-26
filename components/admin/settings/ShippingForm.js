@@ -201,8 +201,8 @@ export function ShippingForm({ initial, role }) {
         <CardContent className="space-y-3">
           {sh.zones.length === 0 && <p className="text-sm text-muted-foreground">No zones. Every pincode pays the same.</p>}
           {sh.zones.map((z, i) => (
-            <div key={i} className="space-y-1">
-              <div className="grid grid-cols-2 gap-2 rounded-md border border-dashed border-border p-2 sm:grid-cols-[1fr_1fr_100px_100px_auto] sm:items-center sm:border-0 sm:p-0">
+            <div key={i} className="space-y-2 rounded-md border border-dashed border-border p-2 sm:space-y-1 sm:border-0 sm:p-0 [&_input]:h-11 sm:[&_input]:h-8">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_100px_100px_auto] sm:items-center">
                 <Input className="col-span-2 sm:col-span-1" aria-label={`Zone ${i + 1} name`} placeholder="Name, like Remote" disabled={readOnly} value={z.label} onChange={(e) => zone(i, { label: e.target.value })} />
                 <Input
                   aria-label={`Zone ${i + 1} pincode starts`}
@@ -234,7 +234,7 @@ export function ShippingForm({ initial, role }) {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="col-span-2 justify-self-end sm:col-span-1"
+                  className="col-span-2 size-11 justify-self-end sm:col-span-1 sm:size-9"
                   aria-label={`Remove zone ${z.label || i + 1}`}
                   disabled={readOnly}
                   onClick={() => setState((s) => ({ ...s, shipping: { ...s.shipping, zones: s.shipping.zones.filter((_, j) => j !== i) } }))}
@@ -242,7 +242,7 @@ export function ShippingForm({ initial, role }) {
                   <X aria-hidden />
                 </Button>
               </div>
-              <div className="flex flex-wrap items-center gap-2 pl-0.5">
+              <div className="grid grid-cols-2 items-center gap-2 pl-0.5 sm:flex sm:flex-wrap">
                 <Input
                   aria-label={`Zone ${i + 1} delivery days, at least`}
                   placeholder="Days, at least"
@@ -250,7 +250,7 @@ export function ShippingForm({ initial, role }) {
                   disabled={readOnly}
                   value={z.deliveryDays.min}
                   onChange={(e) => zone(i, { deliveryDays: { ...z.deliveryDays, min: e.target.value } })}
-                  className="w-32 font-mono"
+                  className="font-mono sm:w-32"
                 />
                 <Input
                   aria-label={`Zone ${i + 1} delivery days, at most`}
@@ -259,9 +259,9 @@ export function ShippingForm({ initial, role }) {
                   disabled={readOnly}
                   value={z.deliveryDays.max}
                   onChange={(e) => zone(i, { deliveryDays: { ...z.deliveryDays, max: e.target.value } })}
-                  className="w-32 font-mono"
+                  className="font-mono sm:w-32"
                 />
-                <label className="flex items-center gap-2 text-sm text-foreground">
+                <label className="col-span-2 flex min-h-11 items-center gap-3 text-sm text-foreground sm:min-h-0 sm:gap-2">
                   <Checkbox
                     aria-label={`Zone ${i + 1} cash on delivery`}
                     disabled={readOnly}

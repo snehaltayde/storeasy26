@@ -97,7 +97,7 @@ export function MarketsForm({ initial, role }) {
                   <CardDescription>Shoppers shipping to these countries see prices and pay in {m.currency || "this currency"}. No cash on delivery.</CardDescription>
                 </div>
                 {!readOnly && (
-                  <Button type="button" variant="ghost" size="sm" onClick={() => remove(i)} aria-label={`Remove market ${i + 1}`}>
+                  <Button type="button" variant="ghost" size="sm" className="size-11 shrink-0 md:size-9" onClick={() => remove(i)} aria-label={`Remove market ${i + 1}`}>
                     <Trash2 aria-hidden className="size-4" />
                   </Button>
                 )}
@@ -131,10 +131,10 @@ export function MarketsForm({ initial, role }) {
                     ))}
                   </select>
                 </Field>
-                <div className="space-y-1.5 self-end text-sm" data-market-example>
+                <div className="space-y-1.5 self-end rounded-card border border-dashed border-border bg-muted px-4 py-3 text-sm" data-market-example>
                   {market ? (
                     <p>
-                      A {formatMoney(EXAMPLE_PRICE, base.currency)} product shows as <strong>{formatMoney(convertPrice(EXAMPLE_PRICE, market), m.currency)}</strong>.
+                      A {formatMoney(EXAMPLE_PRICE, base.currency)} product shows as <strong className="text-base font-semibold tabular-nums">{formatMoney(convertPrice(EXAMPLE_PRICE, market), m.currency)}</strong>.
                     </p>
                   ) : (
                     <p className="text-muted-foreground">Enter a rate to see a price example.</p>
@@ -146,16 +146,16 @@ export function MarketsForm({ initial, role }) {
                 <Field id={`${p}-free`} label={`Free shipping from (${m.currency || "currency"})`} hint="Leave empty for no free shipping.">
                   <Input id={`${p}-free`} inputMode="decimal" disabled={readOnly} value={m.freeThreshold} onChange={set(i, "freeThreshold")} placeholder="100" aria-describedby={`${p}-free-hint`} />
                 </Field>
-                <label className="flex items-start gap-2 text-sm md:col-span-2">
-                  <input type="checkbox" className="mt-0.5" disabled={readOnly} checked={m.international} onChange={set(i, "international")} data-market-international />
+                <label className="flex min-h-11 items-start gap-3 py-2 text-sm md:col-span-2 md:min-h-0 md:py-0">
+                  <input type="checkbox" className="mt-0.5 size-4" disabled={readOnly} checked={m.international} onChange={set(i, "international")} data-market-international />
                   <span>International payments are on in my Razorpay account</span>
                 </label>
-                <label className="flex items-start gap-2 text-sm md:col-span-2">
-                  <input type="checkbox" className="mt-0.5" disabled={readOnly} checked={m.enabled} onChange={set(i, "enabled")} data-market-enabled />
+                <label className="flex min-h-11 items-start gap-3 py-2 text-sm md:col-span-2 md:min-h-0 md:py-0">
+                  <input type="checkbox" className="mt-0.5 size-4" disabled={readOnly} checked={m.enabled} onChange={set(i, "enabled")} data-market-enabled />
                   <span>Sell in this market (shoppers can choose it)</span>
                 </label>
                 {stale && (
-                  <p className="flex items-start gap-2 text-sm text-warning-foreground md:col-span-2" data-market-stale>
+                  <p className="flex items-start gap-2 rounded-card border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-foreground md:col-span-2" data-market-stale>
                     <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
                     This rate is more than {STALE_RATE_DAYS} days old. Check it still covers your costs.
                   </p>
@@ -164,6 +164,12 @@ export function MarketsForm({ initial, role }) {
             </Card>
           );
         })}
+
+        {state.markets.length === 0 && (
+          <p data-markets="empty" className="rounded-card border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+            {readOnly ? "No other markets are set up." : "You only sell in your own market. Add a market to show prices and take payment in another currency."}
+          </p>
+        )}
 
         {!readOnly && (
           <Button type="button" variant="outline" onClick={add} disabled={!initial.currencies.length}>

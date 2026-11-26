@@ -94,7 +94,7 @@ export function SecretField({ id, label, isSet, value, onChange, disabled = fals
 // with the same id as htmlFor.
 export function Field({ id, label, hint = null, error = null, children, className = "" }) {
   return (
-    <div className={`space-y-1.5 ${className}`}>
+    <div className={`space-y-1.5 [&_input:not([type=checkbox])]:h-11 md:[&_input:not([type=checkbox])]:h-8 ${className}`}>
       <Label htmlFor={id}>{label}</Label>
       {children}
       {hint && (
@@ -113,4 +113,4 @@ export function Field({ id, label, hint = null, error = null, children, classNam
 
 // A native select styled like Input (the phone's own picker; no portal).
 export const SELECT_CLASS =
-  "h-8 w-full min-w-0 rounded-md border border-input bg-muted px-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30";
+  "h-11 w-full min-w-0 rounded-md border border-input bg-muted px-2.5 text-base text-foreground md:h-8 md:text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30";

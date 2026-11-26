@@ -219,7 +219,7 @@ export function CheckoutForm({ initial, role }) {
                 </select>
               </Field>
             )}
-            <div data-settings="payment-example" className="space-y-1 text-sm text-muted-foreground md:col-span-2">
+            <div data-settings="payment-example" className="space-y-1 rounded-card border border-dashed border-border bg-muted px-4 py-3 text-sm text-muted-foreground md:col-span-2">
               {checked.ok ? example.map((line) => <p key={line}>{line}</p>) : checked.errors.map((line) => <p key={line} className="text-destructive">{line}</p>)}
             </div>
           </CardContent>

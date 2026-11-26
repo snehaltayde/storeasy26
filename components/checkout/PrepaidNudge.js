@@ -9,9 +9,9 @@ export default function PrepaidNudge({ nudge, currency, onPayOnline }) {
   const sentence = nudgeSentence(nudge, currency);
   if (!sentence) return null;
   return (
-    <div data-checkout="prepaid-nudge" className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-sf-small bg-sf-surface-muted px-3 py-2 text-xs">
+    <div data-checkout="prepaid-nudge" className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-sf-small bg-sf-surface-muted px-3 py-2 text-sm sm:text-xs">
       <span className="text-sf-text-muted">{sentence}</span>
-      <button type="button" onClick={onPayOnline} className="font-semibold text-sf-accent-text hover:underline">
+      <button type="button" onClick={onPayOnline} className="sf-focus sf-tap rounded-sf-small font-semibold text-sf-accent-text hover:underline">
         Pay online instead
       </button>
     </div>

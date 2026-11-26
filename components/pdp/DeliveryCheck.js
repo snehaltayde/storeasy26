@@ -70,18 +70,18 @@ export default function DeliveryCheck({ currency = "INR" }) {
           onChange={(e) => setPin(e.target.value)}
           aria-invalid={error ? true : undefined}
           aria-describedby="delivery-check-result"
-          className="min-w-0 flex-1 rounded-sf-control border border-sf-border px-3 py-2 text-sm outline-none focus:border-sf-border-hover"
+          className="sf-field min-w-0 flex-1 rounded-sf-control border border-sf-border px-3 py-2"
         />
-        <button type="submit" disabled={busy} className="rounded-sf-control border border-sf-border px-4 py-2 text-sm font-semibold text-sf-text-body transition hover:border-sf-border-hover disabled:opacity-60">
+        <button type="submit" disabled={busy} className="sf-focus min-h-11 rounded-sf-control border border-sf-border px-4 py-2 text-sm font-semibold sm:min-h-10 text-sf-text-body transition hover:border-sf-border-hover disabled:opacity-60">
           Check
         </button>
       </form>
       <div id="delivery-check-result" aria-live="polite" className="mt-2 space-y-1 text-sm">
-        {error && <p className="text-xs text-sf-danger">{error}</p>}
+        {error && <p className="text-sm text-sf-danger sm:text-xs">{error}</p>}
         {answer && (
           <>
-            {answer.found === true && <p className="text-sf-text-body">{answer.city}, {answer.state}</p>}
-            {answer.found === false && <p className="text-xs text-sf-text-subtle">{NOT_FOUND}</p>}
+            {answer.found === true && <p className="font-medium text-sf-text">{answer.city}, {answer.state}</p>}
+            {answer.found === false && <p className="text-sm text-sf-text-subtle sm:text-xs">{NOT_FOUND}</p>}
             <DeliveryEstimate estimate={answer.estimate} timeZone={answer.timeZone} />
             {answer.cod != null && (
               <p data-delivery-cod={answer.cod ? "yes" : "no"} className="text-sf-text-muted">

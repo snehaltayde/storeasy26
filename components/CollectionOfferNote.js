@@ -8,7 +8,7 @@ export default function CollectionOfferNote({ titles }) {
   return (
     <ul className="mt-3 flex flex-wrap gap-2" data-collection-offer-note>
       {list.map((t, i) => (
-        <li key={i} className="rounded-sf-card border border-sf-border bg-sf-surface px-3 py-1 text-sm font-semibold text-sf-accent-text">
+        <li key={i} className="rounded-full border border-sf-border bg-sf-surface-muted px-3 py-1 text-sm font-semibold text-sf-accent-text">
           {t}
         </li>
       ))}

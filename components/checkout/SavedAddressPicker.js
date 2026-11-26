@@ -123,37 +123,37 @@ export default function SavedAddressPicker({ form, onAddress }) {
       {state.loaded && !state.signedIn && (
         <p className="text-sm text-sf-text-muted">
           Have an account?{" "}
-          <Link href="/account?return=/checkout" className="font-medium text-sf-accent-text underline">
+          <Link href="/account?return=/checkout" className="sf-focus sf-tap rounded-sf-small font-medium text-sf-accent-text underline">
             Sign in to use saved addresses
           </Link>
         </p>
       )}
       {state.signedIn && state.list.length > 0 && (
         <fieldset>
-          <legend className="mb-2 text-xs font-medium text-sf-text-subtle">Saved addresses</legend>
+          <legend className="mb-2 text-sm font-semibold text-sf-text">Saved addresses</legend>
           <div className="space-y-2">
             {state.list.map((a) => (
-              <label key={a.id} className={`flex cursor-pointer gap-3 rounded-sf-card border p-3 text-sm ${picked?.id === a.id ? "border-sf-border-hover" : "border-sf-border"}`}>
-                <input type="radio" name="saved-address" value={a.id} checked={picked?.id === a.id} onChange={() => choose(a)} className="mt-1" />
+              <label key={a.id} className={`sf-focus-within flex min-h-11 cursor-pointer gap-3 rounded-sf-card border p-3 text-sm ${picked?.id === a.id ? "border-sf-inverse ring-1 ring-sf-inverse" : "border-sf-border"}`}>
+                <input type="radio" name="saved-address" value={a.id} checked={picked?.id === a.id} onChange={() => choose(a)} className="mt-1 size-4 accent-sf-inverse" />
                 <span className="min-w-0">
                   <span className="font-semibold">{a.label || a.name}</span>
-                  {a.is_default && <span className="ml-2 text-xs text-sf-text-faint">Default</span>}
+                  {a.is_default && <span className="ml-2 rounded-sf-2xs bg-sf-surface-sunken px-1.5 py-0.5 text-sf-3xs font-bold uppercase text-sf-text-subtle">Default</span>}
                   <span className="block text-sf-text-muted">
                     {[a.line1, a.line2, `${a.city}, ${a.state} ${a.pincode}`].filter(Boolean).join(", ")}
                   </span>
                 </span>
               </label>
             ))}
-            <label className={`flex cursor-pointer gap-3 rounded-sf-card border p-3 text-sm ${picked ? "border-sf-border" : "border-sf-border-hover"}`}>
-              <input type="radio" name="saved-address" value="new" checked={!picked} onChange={useNew} />
+            <label className={`sf-focus-within flex min-h-11 cursor-pointer items-center gap-3 rounded-sf-card border p-3 text-sm ${picked ? "border-sf-border" : "border-sf-inverse ring-1 ring-sf-inverse"}`}>
+              <input type="radio" name="saved-address" value="new" checked={!picked} onChange={useNew} className="size-4 accent-sf-inverse" />
               <span className="font-semibold">Use a new address</span>
             </label>
           </div>
         </fieldset>
       )}
       {state.signedIn && !picked && (
-        <label className="mt-3 flex items-center gap-2 text-sm">
-          <input type="checkbox" name="save-address" checked={save} onChange={(e) => setSave(e.target.checked)} />
+        <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-3 text-sm sm:min-h-0">
+          <input type="checkbox" name="save-address" className="size-4 accent-sf-inverse" checked={save} onChange={(e) => setSave(e.target.checked)} />
           Save this address to my account
         </label>
       )}

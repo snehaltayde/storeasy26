@@ -23,7 +23,7 @@ export default function OrderSummary({ cart, shipping, grandTotal, paymentDiscou
           .map((o) => (
             <div key={o.id} className="flex justify-between gap-3 text-sf-accent-text">
               <span className="leading-snug">{o.label}</span>
-              <span className="whitespace-nowrap font-medium">−{formatMoney(o.amount, cart.currency)}</span>
+              <span className="whitespace-nowrap font-medium tabular-nums">−{formatMoney(o.amount, cart.currency)}</span>
             </div>
           ))}
         {cart.gifts.map((g) => (
@@ -52,7 +52,7 @@ export default function OrderSummary({ cart, shipping, grandTotal, paymentDiscou
       </div>
       <div className="flex items-center justify-between pt-3">
         <span className="font-semibold">Total</span>
-        <span className="text-lg font-bold">{formatMoney(grandTotal, cart.currency)}</span>
+        <span className="text-xl font-bold tabular-nums">{formatMoney(grandTotal, cart.currency)}</span>
       </div>
       {/* Phase 8 line 4: a market's shopper is told the currency before paying */}
       {cart.market ? (

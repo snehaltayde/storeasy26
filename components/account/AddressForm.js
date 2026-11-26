@@ -4,7 +4,7 @@ import { useState } from "react";
 
 // Add or edit one saved address (Phase 8 line 3). The same fields and rules as
 // checkout (lib/addresses.js validateAddress); the server checks again.
-const input = "mt-1 w-full rounded-sf-control border border-sf-border px-3 py-2 text-sm outline-none focus:border-sf-border-hover";
+const input = "sf-field mt-1 w-full rounded-sf-control border border-sf-border px-3 py-2";
 
 const FIELDS = [
   { key: "label", label: "Label (optional, e.g. Home)", maxLength: 30, half: true },
@@ -35,7 +35,7 @@ export default function AddressForm({ initial = BLANK_ADDRESS, showDefault = fal
       <div className="grid gap-3 sm:grid-cols-2">
         {FIELDS.map((f) => (
           <label key={f.key} className={`block ${f.full ? "sm:col-span-2" : ""}`}>
-            <span className="text-xs font-semibold text-sf-text-muted">{f.label}</span>
+            <span className="text-xs font-medium text-sf-text-subtle">{f.label}</span>
             <input
               className={input}
               name={f.key}
@@ -49,16 +49,16 @@ export default function AddressForm({ initial = BLANK_ADDRESS, showDefault = fal
         ))}
       </div>
       {showDefault && (
-        <label className="mt-3 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={makeDefault} onChange={(e) => setMakeDefault(e.target.checked)} />
+        <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-3 text-sm sm:min-h-0">
+          <input type="checkbox" className="size-4 accent-sf-inverse" checked={makeDefault} onChange={(e) => setMakeDefault(e.target.checked)} />
           Make this my default address
         </label>
       )}
-      <div className="mt-4 flex gap-3">
-        <button type="submit" disabled={busy || !addressFilled(a)} className="rounded-sf-control bg-sf-inverse px-5 py-2.5 text-sm font-semibold text-sf-on-inverse hover:bg-sf-inverse-hover disabled:opacity-50">
+      <div className="mt-4 flex flex-wrap gap-3">
+        <button type="submit" disabled={busy || !addressFilled(a)} className="sf-focus min-h-11 rounded-sf-control bg-sf-inverse px-5 py-2.5 text-sm font-semibold text-sf-on-inverse hover:bg-sf-inverse-hover disabled:opacity-50">
           {busy ? "Saving…" : "Save address"}
         </button>
-        <button type="button" onClick={onCancel} className="rounded-sf-control border border-sf-border-strong px-5 py-2.5 text-sm font-semibold hover:bg-sf-surface-muted">
+        <button type="button" onClick={onCancel} className="sf-focus min-h-11 rounded-sf-control border border-sf-border-strong px-5 py-2.5 text-sm font-semibold hover:bg-sf-surface-muted">
           Cancel
         </button>
       </div>

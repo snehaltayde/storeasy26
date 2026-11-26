@@ -46,14 +46,14 @@ export default function AddressBook({ initial = [] }) {
       <div className="flex items-center justify-between">
         <h2 id="addresses-heading" className="text-sm font-bold">Addresses</h2>
         {editing === null && list.length < MAX_ADDRESSES && (
-          <button type="button" onClick={() => setEditing("new")} className="text-xs font-semibold text-sf-accent-text hover:underline">
+          <button type="button" onClick={() => setEditing("new")} className="sf-focus sf-tap rounded-sf-small text-sm font-semibold text-sf-accent-text hover:underline">
             Add an address
           </button>
         )}
       </div>
       {msg && <p role="status" className={`mt-3 rounded-sf-small px-3 py-2 text-sm ${msg.ok ? "bg-sf-success-surface text-sf-success" : "bg-sf-danger-surface text-sf-danger"}`}>{msg.text}</p>}
       {list.length === 0 && editing === null && <p className="mt-3 text-sm text-sf-text-subtle">No saved addresses yet. Save one here or at checkout to fill it in with one tap next time.</p>}
-      {list.length >= MAX_ADDRESSES && <p className="mt-3 text-xs text-sf-text-faint">You have {MAX_ADDRESSES} saved addresses, the most you can keep. Delete one to add another.</p>}
+      {list.length >= MAX_ADDRESSES && <p className="mt-3 text-sm text-sf-text-subtle">You have {MAX_ADDRESSES} saved addresses, the most you can keep. Delete one to add another.</p>}
       {editing === "new" && (
         <div className="mt-4">
           <AddressForm showDefault={list.length > 0} busy={busy} onSave={save} onCancel={() => setEditing(null)} />
@@ -71,30 +71,30 @@ export default function AddressBook({ initial = [] }) {
                 <span className="font-semibold">{a.label || a.name}</span>
                 {a.is_default && <span className="rounded-sf-2xs bg-sf-surface-sunken px-1.5 py-0.5 text-sf-3xs font-bold uppercase text-sf-text-subtle">Default</span>}
               </div>
-              {a.label && <p className="mt-1">{a.name}</p>}
+              {a.label && <p className="mt-1 text-sf-text-body">{a.name}</p>}
               <p className="text-sf-text-muted">{addressLines(a)}</p>
               <p className="text-sf-text-muted">{a.phone}</p>
               {confirming === a.id ? (
                 <div className="mt-3 rounded-sf-small bg-sf-surface-muted p-3">
                   <p>Delete this address? Past orders keep their copy.</p>
-                  <div className="mt-2 flex gap-3">
-                    <button type="button" disabled={busy} onClick={() => run({ action: "address_delete", id: a.id }, () => { setConfirming(null); setMsg({ ok: true, text: "Address deleted." }); })} className="text-xs font-semibold text-sf-danger hover:underline">
+                  <div className="mt-1 flex gap-5">
+                    <button type="button" disabled={busy} onClick={() => run({ action: "address_delete", id: a.id }, () => { setConfirming(null); setMsg({ ok: true, text: "Address deleted." }); })} className="sf-focus sf-tap rounded-sf-small text-sm font-semibold text-sf-danger hover:underline">
                       Delete
                     </button>
-                    <button type="button" onClick={() => setConfirming(null)} className="text-xs font-semibold hover:underline">
+                    <button type="button" onClick={() => setConfirming(null)} className="sf-focus sf-tap rounded-sf-small text-sm font-semibold hover:underline">
                       Keep it
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="mt-3 flex flex-wrap gap-4 text-xs font-semibold">
-                  <button type="button" onClick={() => setEditing(a.id)} className="text-sf-accent-text hover:underline">Edit</button>
+                <div className="mt-2 flex flex-wrap gap-x-5 text-sm font-semibold">
+                  <button type="button" onClick={() => setEditing(a.id)} className="sf-focus sf-tap rounded-sf-small text-sf-accent-text hover:underline">Edit</button>
                   {!a.is_default && (
-                    <button type="button" disabled={busy} onClick={() => run({ action: "address_default", id: a.id }, () => setMsg({ ok: true, text: "Default address changed." }))} className="text-sf-accent-text hover:underline">
+                    <button type="button" disabled={busy} onClick={() => run({ action: "address_default", id: a.id }, () => setMsg({ ok: true, text: "Default address changed." }))} className="sf-focus sf-tap rounded-sf-small text-sf-accent-text hover:underline">
                       Make default
                     </button>
                   )}
-                  <button type="button" onClick={() => setConfirming(a.id)} className="text-sf-text-faint hover:text-sf-danger">Delete</button>
+                  <button type="button" onClick={() => setConfirming(a.id)} className="sf-focus sf-tap rounded-sf-small text-sf-text-subtle hover:text-sf-danger">Delete</button>
                 </div>
               )}
             </li>

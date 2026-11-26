@@ -24,8 +24,8 @@ export default function PaymentStep({ cart, method, onMethod, razorpayEnabled, c
         )}
         {codShown && (
         <div>
-        <label className={`flex cursor-pointer items-start gap-3 rounded-sf-card border p-4 ${method === "cod" ? "border-sf-inverse ring-1 ring-sf-inverse" : "border-sf-border"}`}>
-          <input type="radio" name="method" checked={method === "cod"} onChange={() => onMethod("cod")} className="mt-1" />
+        <label className={`sf-focus-within flex min-h-11 cursor-pointer items-start gap-3 rounded-sf-card border p-4 ${method === "cod" ? "border-sf-inverse ring-1 ring-sf-inverse" : "border-sf-border"}`}>
+          <input type="radio" name="method" checked={method === "cod"} onChange={() => onMethod("cod")} className="mt-1 size-4 accent-sf-inverse" />
           <div>
             <p className="text-sm font-semibold">
               Cash on Delivery
@@ -40,7 +40,7 @@ export default function PaymentStep({ cart, method, onMethod, razorpayEnabled, c
         </div>
         )}
         <label
-          className={`flex cursor-pointer items-start gap-3 rounded-sf-card border p-4 ${
+          className={`sf-focus-within flex min-h-11 cursor-pointer items-start gap-3 rounded-sf-card border p-4 ${
             method === "razorpay" ? "border-sf-inverse ring-1 ring-sf-inverse" : "border-sf-border"
           } ${razorpayEnabled ? "" : "opacity-50"}`}
         >
@@ -50,13 +50,13 @@ export default function PaymentStep({ cart, method, onMethod, razorpayEnabled, c
             checked={method === "razorpay"}
             disabled={!razorpayEnabled}
             onChange={() => onMethod("razorpay")}
-            className="mt-1"
+            className="mt-1 size-4 accent-sf-inverse"
           />
           <div>
             <p className="text-sm font-semibold">
               Pay online <span className="font-normal text-sf-text-faint">· card / UPI / netbanking</span>
               {razorpayEnabled && save > 0 && (
-                <span data-checkout="prepaid-save" className="ml-2 rounded-full bg-sf-surface-muted px-2 py-0.5 text-xs font-semibold text-sf-accent-text">
+                <span data-checkout="prepaid-save" className="ml-2 inline-block whitespace-nowrap rounded-full bg-sf-surface-muted px-2 py-0.5 text-xs font-semibold text-sf-accent-text">
                   Save {formatMoney(save, cart.currency)}
                 </span>
               )}
@@ -71,13 +71,13 @@ export default function PaymentStep({ cart, method, onMethod, razorpayEnabled, c
       {error && <p role="alert" className="mt-4 rounded-sf-control bg-sf-danger-surface px-4 py-3 text-sm text-sf-danger">{error}</p>}
 
       <div className="mt-6 flex gap-3">
-        <button onClick={onBack} disabled={placing} className="rounded-sf-control border border-sf-border-strong px-5 py-3 text-sm font-semibold hover:bg-sf-surface-muted disabled:opacity-50">
+        <button onClick={onBack} disabled={placing} className="sf-focus min-h-11 rounded-sf-control border border-sf-border-strong px-5 py-3 text-sm font-semibold hover:bg-sf-surface-muted disabled:opacity-50">
           Back
         </button>
         <button
           onClick={() => onPlace()}
           disabled={placing || nothingToPay}
-          className="flex-1 rounded-sf-control bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent transition hover:bg-sf-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
+          className="sf-focus min-h-11 flex-1 rounded-sf-control bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent transition hover:bg-sf-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
         >
           {placing
             ? "Processing…"
@@ -99,7 +99,7 @@ export default function PaymentStep({ cart, method, onMethod, razorpayEnabled, c
           {policies.map((p, i) => (
             <span key={p.href}>
               {i > 0 && (i === policies.length - 1 ? " and " : ", ")}
-              <a href={p.href} target="_blank" rel="noopener" className="underline hover:text-sf-text-muted">
+              <a href={p.href} target="_blank" rel="noopener" className="sf-focus underline hover:text-sf-text-muted">
                 {p.label}
               </a>
             </span>

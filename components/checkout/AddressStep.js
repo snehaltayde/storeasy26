@@ -55,7 +55,7 @@ export default function AddressStep({ form, valid, onAddress, onContinue, countr
                   onChange={(e) =>
                     onAddress({ [f.key]: e.target.value }, "typed")
                   }
-                  className="w-full rounded-sf-control border border-sf-border px-3 py-2.5 text-sm outline-none focus:border-sf-border-hover"
+                  className="w-full sf-field rounded-sf-control border border-sf-border px-3 py-2"
                 />
               </div>
             ))}
@@ -75,7 +75,7 @@ export default function AddressStep({ form, valid, onAddress, onContinue, countr
             autoComplete="country"
             value={form.country_code}
             onChange={(e) => onAddress({ country_code: e.target.value }, "typed")}
-            className="w-full rounded-sf-control border border-sf-border bg-sf-surface px-3 py-2.5 text-sm outline-none focus:border-sf-border-hover"
+            className="w-full sf-field rounded-sf-control border border-sf-border bg-sf-surface px-3 py-2"
           >
             {countries.map((c) => (
               <option key={c.country} value={c.country}>
@@ -103,7 +103,7 @@ export default function AddressStep({ form, valid, onAddress, onContinue, countr
               autoComplete="postal-code"
               value={form.pincode}
               onChange={(e) => onAddress({ pincode: e.target.value }, "typed")}
-              className="w-full rounded-sf-control border border-sf-border px-3 py-2.5 text-sm outline-none focus:border-sf-border-hover"
+              className="w-full sf-field rounded-sf-control border border-sf-border px-3 py-2"
             />
           </div>
           {fields(false)}
@@ -112,7 +112,7 @@ export default function AddressStep({ form, valid, onAddress, onContinue, countr
       <button
         onClick={onContinue}
         disabled={!valid}
-        className="mt-6 w-full rounded-sf-control bg-sf-inverse px-6 py-3 text-sm font-semibold text-sf-on-inverse transition hover:bg-sf-inverse-hover disabled:cursor-not-allowed disabled:bg-sf-surface-disabled"
+        className="sf-focus mt-6 min-h-11 w-full rounded-sf-control bg-sf-inverse px-6 py-3 text-sm font-semibold text-sf-on-inverse transition hover:bg-sf-inverse-hover disabled:cursor-not-allowed disabled:bg-sf-surface-disabled"
       >
         Continue to review
       </button>

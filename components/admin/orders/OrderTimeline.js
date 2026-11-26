@@ -83,7 +83,7 @@ export function OrderTimeline({ fulfillments = [], refunds = [], events = [], co
         </CardHeader>
         <CardContent>
           {codVerifiedAt && codCheck && (
-            <p data-order="cod-verified" className="mb-3 text-sm text-foreground">
+            <p data-order="cod-verified" className="mb-4 rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground">
               {codCheck} <span className="text-xs text-muted-foreground">{orderTime(codVerifiedAt, timeZone)}</span>
             </p>
           )}

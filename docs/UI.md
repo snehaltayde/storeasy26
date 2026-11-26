@@ -410,3 +410,12 @@ Each Phase 3 line fills only its own sub-heading.
 - **Order pages:** "Charged in USD" under the total on the confirmation and account order pages of a market order.
 - Needs the design pass (`ui-designer`): the Markets tab cards, the footer picker, the checkout Country select and postal field, and the charged-in notes.
 
+
+### Design sweep (Phase 8)
+
+- **Fields:** one storefront field utility, `sf-field` in `app/globals.css` (16px and 44px high on phones so iOS doesn't zoom, 14px and 40px from `sm`, the `sf-focus` ring plus a darker border). Used by the checkout Country select, PIN code and postal fields, address fields, Check delivery, the account address form and the footer's Ship to select. Text buttons use `sf-tap` (44px high on phones, flowing with the line from `sm`): Change, Pay online instead, Resend code, Change number, Sign in to use saved addresses, the address cards' Edit, Make default and Delete. `sf-focus-within` puts the shared ring on a whole radio card.
+- **Radio cards:** payment methods and saved addresses use the same selected look (inverse border plus a 1px ring), 44px minimum, native radios at 16px in the inverse colour. "Default" is the same small caps badge at checkout as in /account.
+- **Code dialog:** scrolls inside the overlay on a short screen (keyboard open), clears the bottom safe-area inset, labels the field in body text, 48px code field with the shared ring, the server's error in a danger panel, 44px Resend and Change number.
+- **Money:** the summary's total is 20px tabular, offer and online-discount lines tabular; the "Save ₹128" pill never wraps. Messages under the PIN field are 14px on phones, 12px from `sm`.
+- **Console:** settings fields and selects are 44px high and 16px on phones (the shared `Field` and `SELECT_CLASS`), 32px from `md`. Shipping: each zone is one bordered block on a phone (both rows), days side by side, 44px remove button and COD check. Markets: an empty state ("You only sell in your own market…"), the price example in a dashed panel with the converted price larger, the stale-rate warning in a tinted panel, 44px checkboxes and remove button. Checkout card: the worked example in the same dashed panel as Shipping. Bundle schedule error is 14px medium. Order timeline: "Phone confirmed by code" is a bordered panel at the top of the card.
+- Unchanged: copy, `data-*` attributes, behaviour, data and permissions. The OTP field keeps `autocomplete="one-time-code"`.

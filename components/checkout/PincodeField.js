@@ -98,7 +98,7 @@ export default function PincodeField({ form, onAddress, children }) {
           onBlur={() => setTouched(true)}
           aria-invalid={badFormat ? true : undefined}
           aria-describedby="checkout-pincode-note"
-          className="w-full rounded-sf-control border border-sf-border px-3 py-2.5 text-sm outline-none focus:border-sf-border-hover sm:w-1/2"
+          className="w-full sf-field rounded-sf-control border border-sf-border px-3 py-2 sm:w-1/2"
         />
         <div
           id="checkout-pincode-note"
@@ -108,7 +108,7 @@ export default function PincodeField({ form, onAddress, children }) {
           {message && (
             <p
               data-pincode-message
-              className={`text-xs ${badFormat ? "text-sf-danger" : "text-sf-text-subtle"}`}
+              className={`text-sm sm:text-xs ${badFormat ? "text-sf-danger" : "text-sf-text-subtle"}`}
             >
               {message}
             </p>
@@ -121,12 +121,12 @@ export default function PincodeField({ form, onAddress, children }) {
           )}
         </div>
         {chip && (
-          <p data-pincode-place className="mt-2 text-sm text-sf-text-body">
+          <p data-pincode-place className="mt-1 text-sm text-sf-text-body">
             {place.city}, {place.state} ·{" "}
             <button
               type="button"
               onClick={() => setEditPlace(true)}
-              className="font-semibold text-sf-accent-text underline"
+              className="sf-focus sf-tap rounded-sf-small px-1 font-semibold text-sf-accent-text underline"
             >
               Change
             </button>

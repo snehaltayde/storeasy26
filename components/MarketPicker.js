@@ -12,14 +12,14 @@ export default function MarketPicker({ options = [], country }) {
   const pathname = usePathname() || "/";
   if (options.length < 2) return null;
   return (
-    <form action="/api/market" method="get" data-part="market-picker" className="flex flex-wrap items-center gap-2 text-xs text-sf-text-subtle">
+    <form action="/api/market" method="get" data-part="market-picker" className="flex flex-wrap items-center gap-2 text-sm text-sf-text-subtle sm:text-xs">
       <label htmlFor="market-country">Ship to:</label>
       <select
         id="market-country"
         name="country"
         defaultValue={country}
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
-        className="rounded-sf-xs border border-sf-border bg-sf-surface px-2 py-1 text-sf-text"
+        className="sf-field min-h-11 rounded-sf-xs border border-sf-border bg-sf-surface px-2 py-1 text-sf-text sm:min-h-8 sm:text-xs"
       >
         {options.map((o) => (
           <option key={o.country} value={o.country}>
@@ -29,7 +29,7 @@ export default function MarketPicker({ options = [], country }) {
       </select>
       <input type="hidden" name="return" value={pathname} />
       <noscript>
-        <button type="submit" className="underline">
+        <button type="submit" className="sf-focus sf-tap underline">
           Change
         </button>
       </noscript>

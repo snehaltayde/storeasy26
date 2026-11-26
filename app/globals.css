@@ -356,3 +356,39 @@ body {
     outline-offset: 2px;
   }
 }
+
+/* Phase 8 design sweep: storefront form fields and small text buttons.
+   sf-field: 16px and 44px high on phones (iOS doesn't zoom), 14px and 40px
+   from sm; the shared focus ring plus a darker border. sf-tap: a text button
+   that is 44px high on phones and flows with its line from sm. */
+@utility sf-field {
+  min-height: 2.75rem;
+  font-size: 1rem;
+  &:focus-visible {
+    outline: 2px solid var(--sf-accent-strong);
+    outline-offset: 2px;
+    border-color: var(--sf-border-hover);
+  }
+  @media (min-width: 40rem) {
+    min-height: 2.5rem;
+    font-size: 0.875rem;
+  }
+}
+@utility sf-tap {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  &:focus-visible {
+    outline: 2px solid var(--sf-accent-strong);
+    outline-offset: 2px;
+  }
+  @media (min-width: 40rem) {
+    min-height: 0;
+  }
+}
+@utility sf-focus-within {
+  &:focus-within {
+    outline: 2px solid var(--sf-accent-strong);
+    outline-offset: 2px;
+  }
+}

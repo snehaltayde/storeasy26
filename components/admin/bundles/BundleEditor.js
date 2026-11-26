@@ -255,7 +255,7 @@ export function BundleEditor({ initial = null, initialCheck = null, currency, ti
           <CardContent className="space-y-2" data-bundle-window>
             <ScheduleField startsAt={when.startsAt} endsAt={when.endsAt} tz={timezone} disabled={ro} onChange={(patch) => setWhen((w) => ({ ...w, ...patch }))} />
             {windowBad && (
-              <p className="text-xs text-warning-text" data-bundle-window-reason>
+              <p className="text-sm font-medium text-warning-text" data-bundle-window-reason>
                 The end must be after the start.
               </p>
             )}
