@@ -39,6 +39,8 @@ export const SUPPORT_PROBES = Object.freeze([
   { name: "brand-step", path: "brand-step", method: "GET", keys: ["ok", "brandStep", "palettes", "themes", "current", "themeLayouts", "design", "storeOpen", "canEditDescription", "descriptionMax"], inner: { current: ["themeId", "paletteId", "logo", "description"] }, note: "themes, current.themeId, themeLayouts: Phase 7 line 1, the onboarding theme picker" },
   // Phase 4 line 2: an app's placements (ctx.installId: Trust badges, which test-support-reads installs)
   { name: "apps/[id]/blocks", path: "apps/[id]/blocks", method: "GET", req: (ctx) => ({ params: { id: ctx.installId } }), keys: ["ok", "installStatus", "blocks", "previewPaths"] },
+  // Phase 9 line 4: the Shiprocket webhook key's state (never the key or its hash)
+  { name: "apps/[id]/parcel-key", path: "apps/[id]/parcel-key", method: "GET", req: (ctx) => ({ params: { id: ctx.installId } }), keys: ["ok", "set", "rotatedAt", "address", "addressWarning"] },
   { name: "bundles", path: "bundles", method: "GET", keys: ["ok", "bundles", "currency"] },
   { name: "catalog", path: "catalog", method: "GET", keys: ["ok", "products", "overrides", "collections", "shopify_admin"] },
   // P2-D: Phase 2's catalog views (lines 5 and 6)

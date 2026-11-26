@@ -17,6 +17,7 @@ const STAGE_FILES = [
   // p9: subscriptions
   // p9: whatsapp
   // p9: shiprocket
+  "stage-shiprocket.mjs",
   // p9: ai-copilot
 ];
 for (const file of STAGE_FILES) {

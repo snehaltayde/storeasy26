@@ -62,6 +62,9 @@ export const ADMIN_ROUTES = Object.freeze([
   // Phase 4 line 2: where an app's blocks show (a missing install: the gate, then 404)
   { path: "apps/[id]/blocks", method: "GET", action: "apps.read", probe: { params: { id: "pin_0000000000000000" } } },
   { path: "apps/[id]/blocks", method: "POST", action: "apps.manage", probe: { params: { id: "pin_0000000000000000" }, body: { block: "badges", state: "live" } } },
+  // Phase 9 line 4: Shiprocket's webhook key (a missing install: the gate, then 404)
+  { path: "apps/[id]/parcel-key", method: "GET", action: "apps.read", probe: { params: { id: "pin_0000000000000000" } } },
+  { path: "apps/[id]/parcel-key", method: "POST", action: "apps.manage", probe: { params: { id: "pin_0000000000000000" }, body: { rotate: true } } },
   { path: "audit", method: "GET", action: "audit.read" },
   { path: "automations", method: "GET", action: "settings.read" },
   { path: "automations", method: "POST", action: "settings.write", probe: { body: {} } },

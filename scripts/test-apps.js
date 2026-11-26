@@ -93,7 +93,7 @@ await t("catalog: checkCatalog() is [] with Trust badges (no scopes, up to 4 bad
   eq(tb.scopes.length, 0, "trust badges asks for nothing:");
   eq(tb.settings[0].kind, "list", "badges kind:");
   eq(tb.settings[0].max, 4, "badges max:");
-  eq(CAT.catalog().map((m) => m.id).join(","), "trust-badges,fixture-secrets", "catalog:");
+  eq(CAT.catalog().map((m) => m.id).join(","), "trust-badges,shiprocket,fixture-secrets", "catalog:");
 });
 
 await t("kill switch flag key: ff_plugin-<id> matches lib/platform/flags.js KEY_RE (the copy in catalog.js agrees)", () => {
@@ -173,7 +173,7 @@ await t("empty store: every role reads an empty Installed list and the catalog",
     const r = await call(caller, "apps", "GET");
     eq(r.status, 200, `${caller}:`);
     eq(r.body.installs.length, 0, `${caller} installs:`);
-    eq(r.body.catalog.map((c) => c.id).join(","), "trust-badges,fixture-secrets", `${caller} catalog:`);
+    eq(r.body.catalog.map((c) => c.id).join(","), "trust-badges,shiprocket,fixture-secrets", `${caller} catalog:`);
     ok(r.body.catalog.every((c) => c.available && c.installId === null), `${caller} available`);
   }
   const fx = (await call("owner", "apps", "GET")).body.catalog.find((c) => c.id === "fixture-secrets");
