@@ -59,6 +59,11 @@ const MATRIX = {
   "upsells.write": ["owner", "admin", "staff"],
   "orders.read": ["owner", "admin", "staff", "support"],
   "returns.decide": ["owner", "admin", "staff"],
+  // Phase 9 step 0
+  "reviews.read": ["owner", "admin", "staff", "support"],
+  "reviews.moderate": ["owner", "admin", "staff"],
+  "subscriptions.read": ["owner", "admin", "staff", "support"],
+  "subscriptions.manage": ["owner", "admin", "staff"],
   "orders.push": ["owner", "admin"],
   "orders.cancel": ["owner", "admin"],
   "sync.run": ["owner", "admin"],

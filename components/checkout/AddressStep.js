@@ -109,6 +109,7 @@ export default function AddressStep({ form, valid, onAddress, onContinue, countr
           {fields(false)}
         </>
       )}
+      {/* messaging-consent */}
       <button
         onClick={onContinue}
         disabled={!valid}

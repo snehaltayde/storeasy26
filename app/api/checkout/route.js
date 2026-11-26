@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { CART_COOKIE, getCart, clearCart, shopperCart } from "@/lib/cart";
 import { computeShipping } from "@/lib/shipping";
+import { estimateFor } from "@/lib/delivery/estimate-source";
 import { tenantShippingConfig, currentTenant } from "@/lib/tenant-context";
 import { CONSENT_COOKIE } from "@/lib/track/names";
 import { rateLimitAsync } from "@/lib/rate-limit";
@@ -89,6 +90,15 @@ const marketChargeable = (m) => !m || (RAZORPAY_CURRENCIES.includes(m.currency) 
 const shippingConfigFor = (market) => (market ? marketShipping(market, tenantShippingConfig()) : tenantShippingConfig());
 // PIN-code zones are Indian PIN prefixes: a market prices without them
 const pincodeFor = (market, address) => (market ? null : address?.pincode || null);
+
+// Phase 9: the order's delivery estimate goes through the estimate source (the
+// store's own today). In place, so the key keeps its place; absent stays absent.
+async function applyEstimate(shipping, pin) {
+  const estimate = await estimateFor({ pin, storeEstimate: shipping.estimate ?? null });
+  if (estimate) shipping.estimate = estimate;
+  else delete shipping.estimate;
+  return shipping;
+}
 const setMarketCookie = (res, ctx) => {
   res.cookies.set(MARKET_COOKIE, ctx.country, MARKET_COOKIE_OPTS);
   return res;
@@ -394,6 +404,7 @@ export const POST = tenantHandler(async (request) => {
         pincode: pincodeFor(market, address),
         config: shippingConfig,
       });
+      await applyEstimate(shipping, pincodeFor(market, address));
 
       const terms = termsFor(cart, address, market);
       const dup = await dedupByKey(idempotencyKey, cartId, cart, terms.cod.total);
@@ -474,6 +485,7 @@ export const POST = tenantHandler(async (request) => {
         pincode: pincodeFor(market, address),
         config: shippingConfig,
       });
+      await applyEstimate(shipping, pincodeFor(market, address));
 
       // Phase 8 line 2: the prepaid discount, priced by the server only.
       const terms = termsFor(cart, address, market);

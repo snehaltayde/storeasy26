@@ -568,6 +568,8 @@ export const DRILLS = {
   "mobile-cart": { id: "MOBILE-CART", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/mobile-cart/run.mjs", ...c.headed])) },
   // Phase 8 step 0: the checkout baseline (a cash on delivery order placed), on the roles store
   checkout: { id: "CHECKOUT", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/checkout/run.mjs", ...c.headed])) },
+  // Phase 9 step 0: the first-party plugins (lines 1–5 add stage files), on the roles store
+  plugins: { id: "PLUGINS", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/plugins/run.mjs", ...c.headed])) },
 };
 // Phase 2 line 11 (phase end): every merchant console screen's drill joins the block suite
 export const ALL = ["smoke", "p5", "p6", "agency-gone", "shell", "signup", "connect", "operator-onboarding", "operator-create-store", "dashboard", "orders", "catalog", "offers", "media", "editor", "settings", "team", "growth", "quizzes", "console-styles",
@@ -580,7 +582,9 @@ export const ALL = ["smoke", "p5", "p6", "agency-gone", "shell", "signup", "conn
   // Phase 6
   "studio",
   // Phase 7 (phase end) and Phase 8 step 0
-  "search", "mobile-cart", "checkout"];
+  "search", "mobile-cart", "checkout",
+  // Phase 9 step 0
+  "plugins"];
 
 const git = (root, args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
 

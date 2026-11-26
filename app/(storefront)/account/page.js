@@ -85,6 +85,8 @@ export default async function AccountPage({ searchParams }) {
         )}
       </section>
 
+      {/* account: subscriptions */}
+
       <div className="mt-8">
         <AddressBook initial={addresses} />
       </div>
@@ -92,6 +94,8 @@ export default async function AccountPage({ searchParams }) {
       <section className="mt-8">
         <ProfileForm customer={customer} />
       </section>
+
+      {/* account: messaging */}
     </div>
   );
 }

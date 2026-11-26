@@ -8,6 +8,7 @@ import { smsAvailable } from "@/lib/messaging/sms";
 import { slog } from "@/lib/log";
 import { pincodeAnswer } from "@/lib/pincode/index";
 import { DEFAULT_TIME_ZONE } from "@/lib/delivery-estimate";
+import { estimateFor } from "@/lib/delivery/estimate-source";
 
 // Phase 8 line 1: GET /api/pincode?pin=560001 → the place (bundled India Post
 // dataset, lib/pincode) and THIS store's public delivery facts for it: the
@@ -22,7 +23,8 @@ export const dynamic = "force-dynamic";
 export const GET = storefrontHandler(async (request) => {
   const limited = await rateLimitAsync(request, { name: "pincode", limit: 30 });
   if (limited) return limited;
-  const answer = await pincodeAnswer(new URL(request.url).searchParams.get("pin"), {
+  const pin = new URL(request.url).searchParams.get("pin");
+  const answer = await pincodeAnswer(pin, {
     config: tenantShippingConfig(),
     timeZone: tenantCfg("timezone", null, DEFAULT_TIME_ZONE),
     store: {
@@ -35,5 +37,7 @@ export const GET = storefrontHandler(async (request) => {
   if (!answer.ok) return NextResponse.json({ error: answer.error, code: "BAD_PIN" }, { status: 400 });
   slog("pincode_lookup", { found: answer.found });
   const { ok, ...body } = answer;
+  // Phase 9: the estimate goes through the estimate source (the store's own today); the key keeps its place
+  body.estimate = await estimateFor({ pin: String(pin).trim(), storeEstimate: answer.estimate });
   return NextResponse.json(body, { headers: { "Cache-Control": "no-store" } });
 });

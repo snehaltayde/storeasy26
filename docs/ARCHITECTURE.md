@@ -81,6 +81,10 @@ Merchant roles are per store (`memberships.role`) and nest: owner ⊇ admin ⊇ 
 | offers.write / upsells.write (offers, bundles, cart offer drafts) | allow | allow | allow | deny | deny | via support grant |
 | orders.read | allow | allow | allow | allow | own only (account pages, signed order links) | via support grant |
 | returns.decide | allow | allow | allow | deny | request own only | via support grant |
+| reviews.read (see reviews and invites) | allow | allow | allow | allow | deny | via support grant |
+| reviews.moderate (approve, reject, hide, restore, reply) | allow | allow | allow | deny | deny | via support grant |
+| subscriptions.read (see subscriptions) | allow | allow | allow | allow | deny | via support grant |
+| subscriptions.manage (pause, cancel) | allow | allow | allow | deny | deny | via support grant |
 | orders.push / orders.cancel | allow | allow | deny | deny | deny | via support grant |
 | sync.run | allow | allow | deny | deny | deny | allow |
 | settings.read / settings.write (checkout, payments, secrets, domains view) | allow | allow | deny | deny | deny | allow |

@@ -97,6 +97,26 @@ await t("roleAllows matrix: owner all · admin no team.owner · staff no setting
   eq(roleAllows("nonsense", "offers.read"), false, "unknown role");
 });
 
+// Phase 9: reviews and subscriptions read at support and up, act at staff and up.
+await t("Phase 9 actions: reviews.read/subscriptions.read support+ · reviews.moderate/subscriptions.manage staff+", () => {
+  const { roleAllows, ACTIONS, APP_PERMISSIONS, isWriteAction } = AUTHZ;
+  const want = {
+    "reviews.read": { owner: true, admin: true, staff: true, support: true },
+    "subscriptions.read": { owner: true, admin: true, staff: true, support: true },
+    "reviews.moderate": { owner: true, admin: true, staff: true, support: false },
+    "subscriptions.manage": { owner: true, admin: true, staff: true, support: false },
+  };
+  for (const [action, roles] of Object.entries(want)) {
+    ok(ACTIONS.includes(action), `ACTIONS has ${action}`);
+    for (const [role, allowed] of Object.entries(roles)) eq(roleAllows(role, action), allowed, `${role} ${action}`);
+    eq(roleAllows("nonsense", action), false, `unknown role ${action}`);
+    eq(action in APP_PERMISSIONS, false, `${action} not grantable to apps`);
+  }
+  eq(isWriteAction("reviews.moderate"), true, "moderate is a write");
+  eq(isWriteAction("subscriptions.manage"), true, "manage is a write");
+  eq(isWriteAction("reviews.read"), false, "reviews.read is a read");
+});
+
 // --- requireAdmin gating ---------------------------------------------------------
 await t("requireAdmin: owner passes write; support 403 on write but passes read", async () => {
   await withTenant(ZA, async () => {
