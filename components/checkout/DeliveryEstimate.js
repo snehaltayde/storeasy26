@@ -7,7 +7,10 @@ import { deliveryLine, expectedLine } from "@/lib/delivery-estimate";
 // Phase 9 line 4: an estimate with serviceable: false (the store chose
 // Shiprocket's courier estimate and no courier reaches the PIN) says so
 // instead of a date, on the product page and in the checkout. Ordering is
-// not blocked; an order's "expected" line keeps the store's own dates.
+// not blocked. An order saves the estimate its PIN line showed (the checkout
+// runs the same estimate source): the courier's days, or for an unreachable
+// PIN the store's days with serviceable: false, which its "Expected by" line
+// shows as the store's dates.
 export const UNSERVICEABLE = "Couriers don't reach this PIN code yet";
 
 export default function DeliveryEstimate({ estimate, timeZone, from, kind = "delivery", className = "" }) {

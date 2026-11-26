@@ -2,6 +2,6 @@
   "shipment_track": [ { "awb_code": "__AWB__", "courier_name": "Delhivery Surface", "current_status": "IN TRANSIT", "edd": "2026-12-01 18:00:00", "delivered_date": null, "origin": "Pune", "destination": "Bengaluru", "consignee_name": "Ramesh Kumar" } ],
   "shipment_track_activities": [
     { "date": "2026-11-27 18:40:00", "status": "X-DLL2F", "activity": "In Transit - Bag added to trip", "location": "Bhiwandi_Mankoli_HB (Maharashtra)", "sr-status": "18", "sr-status-label": "IN TRANSIT" },
-    { "date": "2026-11-27 10:15:00", "status": "X-PPOM", "activity": "Shipment picked up", "location": "Pune_Hadapsar_P (Maharashtra)", "sr-status": "42", "sr-status-label": "PICKED UP" }
+    { "date": "2026-11-27 10:15:00", "status": "X-PPOM", "activity": "Shipment picked up from Anita Desai", "location": "Pune_Hadapsar_P (Maharashtra)", "sr-status": "42", "sr-status-label": "PICKED UP" }
   ],
   "track_url": "https://shiprocket.co/tracking/__AWB__", "etd": "2026-12-01 18:00:00" } }

@@ -55,6 +55,7 @@ const ok = (cond, label = "") => {
 };
 const started = Date.now();
 const fx = (name) => JSON.parse(readFileSync(join(ROOT, "scripts/fixtures/shiprocket", `${name}.json`), "utf8"));
+const PII = /Ramesh|Kumar|Anita|Desai|Neha|OTP|Consignee|9876|98765|\+91/;
 const withAwb = (name, awb) => JSON.parse(JSON.stringify(fx(name)).replaceAll("__AWB__", awb));
 
 const N = await import("../lib/couriers/normalize.js");
@@ -90,8 +91,14 @@ await t("normalize: tracking keeps time, hub and activity only; names and phone 
   eq(p.deliveredAt, "2026-11-30T08:35:00.000Z", "delivered at:");
   eq(p.etd, "2026-12-01T12:30:00.000Z", "etd:");
   eq(p.scans.length, 5, "scans:");
-  eq(p.scans.at(-1).activity, "Delivered", "the name and number after 'Delivered to' are gone:");
-  ok(!/Ramesh|9876|98765|\+91/.test(JSON.stringify(p)), `no name or phone: ${JSON.stringify(p.scans)}`);
+  eq(p.scans.at(-1).activity, "Delivered", "Shiprocket's label, not the courier's words:");
+  eq(JSON.stringify(p.scans.map((x) => x.activity)), JSON.stringify(["Picked up", "In transit", "Reached at destination hub", "Out for delivery", "Delivered"]), "every scan is a status label:");
+  ok(!PII.test(JSON.stringify(p)), `no name, phone or OTP note: ${JSON.stringify(p.scans)}`);
+  // the courier's free text never survives, whatever it says
+  const raw = withAwb("track-in-transit", "AWBX1009");
+  raw.tracking_data.shipment_track_activities = ["Consignee Ramesh Kumar not available", "Shipment picked up from Anita Desai", "OTP verified by Neha"].map((activity, i) => ({ date: `2026-11-2${i + 1} 10:00:00`, activity, location: "Pune_Hub" }));
+  const q = N.parseTrack(raw);
+  ok(q.scans.length === 3 && !PII.test(JSON.stringify(q)), `no names from free text: ${JSON.stringify(q.scans)}`);
   ok(p.scans.every((s) => Object.keys(s).join(",") === "at,hub,activity"), "scan keys");
   ok(p.scans[0].at < p.scans.at(-1).at, "oldest first");
   const many = withAwb("track-in-transit", "AWBX1002");
@@ -160,12 +167,12 @@ const inB = (fn) => b.run(fn);
 const MERCHANT = ["owner", "admin", "staff", "support"];
 
 let orderN = 0;
-const PII = { email: "parcelbuyer@example.test", phone: "9876512345", name: "Parcelname Buyer", address_line1: "12 Parceladdr Road", city: "Pune", pincode: "411001" };
+const BUYER = { email: "parcelbuyer@example.test", phone: "9876512345", name: "Parcelname Buyer", address_line1: "12 Parceladdr Road", city: "Pune", pincode: "411001" };
 async function makeOrder(run, { awb = null, estimate = { minDays: 2, maxDays: 4 } } = {}) {
   const id = `BL-PARCEL${String(++orderN).padStart(4, "0")}`;
   const now = "2026-11-26T05:00:00.000Z";
   await run(async () => {
-    await db.insertInto("orders").values({ id, ...PII, state: "MH", country: "IN", subtotal: 500, discount_total: 0, shipping_total: 0, total: 500, currency: "INR", payment_method: "cod", payment_status: "cod", status: "synced", snapshot: JSON.stringify({ shipping: { estimate } }), created_at: now, updated_at: now }).execute();
+    await db.insertInto("orders").values({ id, ...BUYER, state: "MH", country: "IN", subtotal: 500, discount_total: 0, shipping_total: 0, total: 500, currency: "INR", payment_method: "cod", payment_status: "cod", status: "synced", snapshot: JSON.stringify({ shipping: { estimate } }), created_at: now, updated_at: now }).execute();
     if (awb) await db.insertInto("order_fulfillments").values({ id: `ful_${id}`, order_id: id, status: "SUCCESS", tracking_company: "Delhivery", tracking_number: awb, tracking_url: null, updated_at: now }).execute();
   });
   return id;
@@ -410,6 +417,11 @@ await t("webhook: delivered (per Shiprocket) emits order.delivery_updated once, 
   const events = await inA(() => db.selectFrom("plugin_events").selectAll().where("topic", "=", "order.delivery_updated").execute());
   eq(events.length, 1, "one event:");
   eq(events[0].idempotency_key, `delivery:${awb}:delivered`, "key:");
+  eq(events[0].resource, `order:${order}`, "resource, as emitOrderEvent:");
+  const payload = JSON.parse(events[0].payload);
+  eq(payload.order.id, order, "data.order.id (line 3 reads it):");
+  eq(JSON.stringify(Object.keys(payload)), '["order","delivery"]', "data keys:");
+  eq(JSON.stringify(Object.keys(payload.delivery)), '["awb","status","at"]', "delivery keys:");
   ok(!/Parcel|parcelbuyer|9876512345/.test(events[0].payload), "no PII in the event");
   const job = await getJobByKey(`courier_refetch:${a.id}:${awb}:${(await (await import("../lib/platform/sessions.js")).sha256Hex(`${awb}|DELIVERED|2026-11-30 14:05:00`)).slice(0, 16)}`);
   ok(job, "one courier_refetch job for that update");
@@ -435,6 +447,34 @@ await t("the worker: courier_refetch is a handler; a turned-off install writes n
   eq(await inA(() => SH.trackingForOrder(order)), null, "nothing:");
   eq((await call("owner", "apps/[id]", "POST", { host: hostA, params: { id: installId }, body: { enable: true } })).status, 200, "on:");
   eq((await hook(withAwb("webhook-delivered", awb), { key: null })).status, 401, "still needs the key:");
+});
+
+await t("event contract: deliveryEvent is emitOrderEvent's shape (resource order:<id>, data.order.id, data.delivery)", () => {
+  const e = TR.deliveryEvent({ orderId: "BL-1", awb: "AWB1234", status: "delivered", at: "2026-11-30T09:00:00.000Z" });
+  eq(JSON.stringify(e), JSON.stringify({ resource: "order:BL-1", key: "delivery:AWB1234:delivered", data: { order: { id: "BL-1" }, delivery: { awb: "AWB1234", status: "delivered", at: "2026-11-30T09:00:00.000Z" } } }), "shape:");
+});
+
+await t("event retry: the emit fails once after the write; the retry (same status) still emits, once", async () => {
+  const awb = "AWBPRC0005";
+  const order = await makeOrder(inA, { awb });
+  const parsed = N.parseTrack(withAwb("track-delivered", awb));
+  await inA(async () => {
+    const { sql } = await import("kysely");
+    await sql`CREATE TRIGGER parcel_emit_fail BEFORE INSERT ON plugin_events BEGIN SELECT RAISE(FAIL, 'emit down'); END`.execute(db);
+    let threw = false;
+    try {
+      await TR.applyTracking(awb, parsed, {});
+    } catch {
+      threw = true;
+    }
+    ok(threw, "the first emit failed");
+    eq((await SH.trackingForOrder(order))?.status, "delivered", "the write landed:");
+    await sql`DROP TRIGGER parcel_emit_fail`.execute(db);
+    await TR.applyTracking(awb, parsed, {});
+    await TR.applyTracking(awb, parsed, {});
+    const rows = await db.selectFrom("plugin_events").select("id").where("idempotency_key", "=", `delivery:${awb}:delivered`).execute();
+    eq(rows.length, 1, "one event after the retry:");
+  });
 });
 
 // --- the sweep ---------------------------------------------------------------------
@@ -464,6 +504,51 @@ await t("sweep: registered at BUILT_IN; polls new fulfilments and parcels not fe
   });
 });
 
+await t("sweep: an AWB Shiprocket doesn't know gets a hidden placeholder and moves out of the due list; a failed login stops the run", async () => {
+  const T = Date.parse("2026-12-05T00:00:00.000Z");
+  const order = await makeOrder(inA, { awb: "AWBMISS001" });
+  const asked = [];
+  SR.setCourierProvider({ name: "miss", login: stub.login, serviceability: stub.serviceability, track: async (q) => (asked.push(q.awb), { ok: false, status: 404, json: null }) });
+  try {
+    await inA(async () => {
+      const row = await db.selectFrom("plugin_installs").selectAll().where("id", "=", installId).executeTakeFirst();
+      const { decryptJson } = await import("../lib/platform/crypto.js");
+      const install = { id: installId, pluginId: "shiprocket", settings: JSON.parse(row.settings) };
+      const secrets = async () => decryptJson(row.secrets_enc);
+      ok((await TR.dueShipments({ now: T })).some((d) => d.awb === "AWBMISS001"), "due before");
+      await SW.shiprocketSweep({ install, now: T, secrets });
+      ok(asked.includes("AWBMISS001"), "asked once");
+      ok(!(await TR.dueShipments({ now: T + 60_000 })).some((d) => d.awb === "AWBMISS001"), "not due again in the next run");
+      ok((await TR.dueShipments({ now: T + 5 * 3_600_000 })).some((d) => d.awb === "AWBMISS001"), "due again after 4 h");
+      eq(await SH.trackingForOrder(order), null, "the placeholder is never shown:");
+      // a refused login: one login attempt, no parcel asked, the run stops
+      let logins = 0;
+      SR.setCourierProvider({ name: "nologin", login: async () => (logins++, { ok: false, status: 401, json: null }), serviceability: stub.serviceability, track: async (q) => (asked.push(q.awb), stub.track(q)) });
+      await db.deleteFrom("courier_auth").execute();
+      asked.length = 0;
+      const r = await SW.shiprocketSweep({ install, now: T + 5 * 3_600_000, secrets });
+      eq(r.stopped, "login", "stopped:");
+      eq(logins, 1, "one login attempt:");
+      eq(asked.length, 0, "no parcel asked:");
+    });
+  } finally {
+    SR.setCourierProvider(stub);
+  }
+});
+
+await t("caches: saving settings forgets the API token; a new pickup PIN forgets the PIN answers; uninstall forgets both", async () => {
+  const count = (table) => inA(async () => (await db.selectFrom(table).select(db.fn.countAll().as("n")).executeTakeFirst()).n);
+  await inA(() => SR.serviceability("560099", {}, { settings: { pickup_pin: "411001" }, creds: { email: "api-user@example.test", api_password: "p" } }));
+  ok(Number(await count("courier_auth")) === 1 && Number(await count("courier_pin_cache")) > 0, "both cached");
+  eq((await setSettings(installId, { estimate_source: "shiprocket" })).status, 200, "saved, same PIN:");
+  eq(Number(await count("courier_auth")), 0, "token forgotten:");
+  ok(Number(await count("courier_pin_cache")) > 0, "PIN answers kept (same pickup PIN)");
+  eq((await setSettings(installId, { estimate_source: "shiprocket", pickup_pin: "560001" })).status, 200, "new pickup PIN:");
+  eq(Number(await count("courier_pin_cache")), 0, "PIN answers forgotten:");
+  await inA(() => SR.serviceability("560099", {}, { settings: { pickup_pin: "560001" }, creds: { email: "api-user@example.test", api_password: "p" } }));
+  await setSettings(installId, { estimate_source: "shiprocket" }); // back to 411001
+});
+
 // --- the order page block ------------------------------------------------------------
 await t("block: Tracking (tracking_timeline in storefront.order.status) starts Off; its props pass the primitive's checks, empty included", async () => {
   const m = CAT.pluginById("shiprocket");
@@ -482,7 +567,7 @@ await t("block: Tracking (tracking_timeline in storefront.order.status) starts O
   eq(v.props.expected, "Delivered Mon 30 Nov", "when:");
   eq(v.props.steps[0].activity, "Delivered", "newest first:");
   eq(v.props.awb, "AWBPRC0020", "awb:");
-  ok(!/Ramesh|9876|Parcelname/.test(JSON.stringify(v.props)), "no names or phones");
+  ok(!PII.test(JSON.stringify(v.props)) && !/Parcelname/.test(JSON.stringify(v.props)), "no names, phones or OTP notes");
 });
 
 await t("block: expected by the courier's ETD once shipped; the order's own estimate before pickup", async () => {
@@ -511,9 +596,19 @@ await t("console: the shipment card's data (orders.read) carries no customer det
   const order = await makeOrder(inA, { awb: "AWBPRC0040" });
   await inA(() => TR.applyTracking("AWBPRC0040", N.parseTrack(withAwb("track-delivered", "AWBPRC0040")), {}));
   const s = await inA(() => SH.trackingForOrder(order));
-  ok(!/Ramesh|9876|Parcelname|parcelbuyer|Parceladdr/.test(JSON.stringify(s)), "no PII");
+  ok(!PII.test(JSON.stringify(s)) && !/Parcelname|parcelbuyer|Parceladdr/.test(JSON.stringify(s)), "no PII");
   const page = readFileSync(join(ROOT, "app/(console)/admin/(authed)/orders/[id]/page.js"), "utf8");
   ok(/roleAllows\(actor\.role, "orders\.read"\)/.test(page) && /trackingForOrder\(id\)/.test(page) && /<ShipmentCard /.test(page), "the order view (orders.read) renders it");
+});
+
+await t("caches: uninstalling Shiprocket forgets the API token and the PIN answers", async () => {
+  const bInstall = (await call("owner-b", "apps", "GET", { host: hostB })).body.installs.find((i) => i.pluginId === "shiprocket");
+  await inB(() => SR.serviceability("560098", {}, { settings: { pickup_pin: "411001" }, creds: { email: "api-user@example.test", api_password: "p" } }));
+  const n = (table) => inB(async () => Number((await db.selectFrom(table).select(db.fn.countAll().as("n")).executeTakeFirst()).n));
+  ok((await n("courier_auth")) === 1 && (await n("courier_pin_cache")) === 1, "store B cached both");
+  eq((await call("owner-b", "apps/[id]", "POST", { host: hostB, params: { id: bInstall.id }, body: { uninstall: true } })).status, 200, "uninstalled:");
+  eq(await n("courier_auth"), 0, "token gone:");
+  eq(await n("courier_pin_cache"), 0, "PIN answers gone:");
 });
 
 // --- the import walk -------------------------------------------------------------------
