@@ -233,6 +233,30 @@ await t("redactCustomer matches by phone digits too", async () => {
   eq(r.orders, 1, "phone-matched");
 });
 
+await t("P8-C redactCustomer scrubs recipient and body on every notification to the email or the phone's E.164, no one else's", async () => {
+  const at = new Date().toISOString();
+  const row = (id, type, recipient, body) => ({ id, type, recipient, subject: "s", body, status: "sent", error: null, provider_id: "stub", consent_class: "transactional", consent_ref: null, idempotency_key: null, created_at: at, sent_at: at });
+  await inT(() =>
+    db
+      .insertInto("notifications")
+      .values([
+        row("ntf_p8c_email", "cod_otp", "Ntf.Gone@Example.com", "Your cash on delivery code (removed after sending)."),
+        row("ntf_p8c_order", "order_confirmation", "ntf.gone@example.com", "Thanks Ntf Gone, order BL-1 ships to 1 Secret St"),
+        row("ntf_p8c_sms", "cod_otp", "+919822233344", "123456 is your code"),
+        row("ntf_p8c_keep", "order_confirmation", "someone@example.com", "Thanks Someone"),
+      ])
+      .execute(),
+  );
+  const r = await inT(() => P.redactCustomer({ email: "ntf.gone@example.com", phone: "+91-98222-33344" }));
+  eq(r.notifications, 3, "three rows scrubbed");
+  const rows = await inT(() => db.selectFrom("notifications").select(["id", "recipient", "body"]).where("id", "like", "ntf_p8c_%").orderBy("id").execute());
+  for (const n of rows.filter((x) => x.id !== "ntf_p8c_keep")) {
+    ok(!/gone|9822233344|123456|Secret/i.test(`${n.recipient} ${n.body}`), `${n.id} still holds PII: ${n.recipient} / ${n.body}`);
+  }
+  const keep = rows.find((x) => x.id === "ntf_p8c_keep");
+  eq(`${keep.recipient}|${keep.body}`, "someone@example.com|Thanks Someone", "another customer's row untouched:");
+});
+
 // Phase 8 line 3: saved addresses are account data; redaction deletes them.
 await t("redactCustomer deletes the account's saved addresses (a real delete), and no one else's", async () => {
   const now = new Date().toISOString();

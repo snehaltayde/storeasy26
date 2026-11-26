@@ -288,7 +288,12 @@ const otpRows = (cartId) => inT(() => db.selectFrom("cod_otps").selectAll().wher
 // lets the next send past the 30 s cooldown, as if time passed
 const ageSends = (cartId, ms = 31_000) => inT(() => db.updateTable("cod_otps").set({ last_sent_at: new Date(Date.now() - ms).toISOString() }).where("cart_id", "=", cartId).execute());
 // as if an hour passed: earlier tests' sends no longer count toward the phone cap
-const anHourLater = () => inT(() => db.updateTable("cod_otps").set({ last_sent_at: new Date(Date.now() - 2 * 3600_000).toISOString() }).execute());
+// (and toward the email cap, which counts code emails in notifications)
+const anHourLater = () =>
+  inT(async () => {
+    await db.updateTable("cod_otps").set({ last_sent_at: new Date(Date.now() - 2 * 3600_000).toISOString() }).execute();
+    await db.updateTable("notifications").set({ created_at: new Date(Date.now() - 2 * 3600_000).toISOString() }).where("type", "=", "cod_otp").execute();
+  });
 async function sendFor(cartId, k, opts = {}) {
   const q = await quoteOf(cartId, opts);
   return post(cartId, { action: "cod_otp_send", idempotencyKey: k, expectedTotal: q.cod.total, expectedShipping: q.cod.shipping }, opts);
@@ -429,17 +434,16 @@ await t("a capped phone's challenge can't be verified with any code; resends nev
     const k = key();
     const sent = await sendFor(cart, k, opts);
     const code = codeIn(await lastSms());
-    for (let i = 0; i < 4; i++) answers.push((await verify(cart, k, sent.body.challengeId, bad(code), opts)).body.code);
+    for (let i = 0; i < 3; i++) answers.push((await verify(cart, k, sent.body.challengeId, bad(code), opts)).body.code);
     right.push({ cart, k, id: sent.body.challengeId, code });
   }
-  const guessed = 2 + answers.filter((a) => a === "COD_OTP_WRONG").length;
-  ok(guessed <= OTP.PHONE_TRIES.limit, `${guessed} guesses were checked for one phone in an hour`);
-  eq(answers.at(-1), "COD_OTP_LOCKED", "past the cap:");
+  ok(answers.every((a) => a === "COD_OTP_WRONG"), `every wrong guess answers as a wrong code: ${answers}`);
+  // 11 tries this hour (over 10): the right code, a 4th try on its challenge, fails, in the plain wrong-code words
   const last = right.at(-1);
   const locked = await verify(last.cart, last.k, last.id, last.code, opts);
-  eq([locked.body.code, locked.body.error], ["COD_OTP_LOCKED", PT.COD_OTP_MESSAGES.phoneLocked], "the right code past the cap:");
-  eq(PT.COD_OTP_MESSAGES.phoneLocked, "We can't send a code to this number right now. You can pay online instead.", "the words say nothing about earlier tries:");
-  ok(!/recent|already|before|tried/i.test(PT.COD_OTP_MESSAGES.phoneLocked), "the lock-out words hint at earlier use");
+  eq([locked.status, locked.body.code, locked.body.error], [409, "COD_OTP_WRONG", PT.COD_OTP_MESSAGES.wrong], "the right code past the cap:");
+  ok(!("phoneLocked" in PT.COD_OTP_MESSAGES), "a separate lock-out sentence still exists");
+  eq((await otpRows(last.cart))[0].verified_at, null, "the locked challenge stayed unverified:");
   // and a capped phone (sends over 5) never verifies, whatever the code
   await anHourLater(); // a new hour: 5 sends reach the phone, the 6th is capped
   let lastCode = null;
@@ -454,6 +458,66 @@ await t("a capped phone's challenge can't be verified with any code; resends nev
     const r = await verify(capCart, capKey, capped.body.challengeId, guess, opts);
     ok(r.body.code === "COD_OTP_WRONG" || r.body.code === "COD_OTP_LOCKED", `a capped challenge verified with ${guess}`);
   }
+});
+
+await t("P8-B: email challenges' tries never lock the phone; an SMS lock answers like a first wrong try", async () => {
+  await anHourLater();
+  const phone = "9000044444";
+  const opts = { contact: { ...CONTACT, phone, email: "p8b-lock@example.test" } };
+  const bad = (c) => (c === "000000" ? "111111" : "000000");
+  // 12 wrong email-code guesses for one phone, across 3 challenges (the old lock was 10 per phone)
+  await saveConfig(BASE_SHIPPING, { cod: { otp: "always", otpChannel: "email" } });
+  for (let n = 0; n < 3; n++) {
+    const cart = await freshCart();
+    const k = key();
+    const sent = await sendFor(cart, k, opts);
+    const code = codeIn(await lastSms());
+    for (let i = 0; i < 4; i++) eq((await verify(cart, k, sent.body.challengeId, bad(code), opts)).body.code, "COD_OTP_WRONG", `email guess ${n}.${i}:`);
+  }
+  // the phone's SMS code still verifies: email guesses don't count toward its lock
+  await saveConfig(BASE_SHIPPING, OTP_ALWAYS);
+  const cart = await freshCart();
+  const k = key();
+  const sent = await sendFor(cart, k, opts);
+  eq((await verify(cart, k, sent.body.challengeId, codeIn(await lastSms()), opts)).status, 200, "the SMS code verifies after 12 email guesses:");
+  // a fresh phone's first wrong try reads exactly like a locked phone's right try
+  const freshCart_ = await freshCart();
+  const fk = key();
+  const fs = await sendFor(freshCart_, fk, { contact: { ...CONTACT, phone: "9000055555" } });
+  const first = await verify(freshCart_, fk, fs.body.challengeId, bad(codeIn(await lastSms())), { contact: { ...CONTACT, phone: "9000055555" } });
+  eq([first.status, first.body.code, first.body.error], [409, "COD_OTP_WRONG", PT.COD_OTP_MESSAGES.wrong], "a first wrong try:");
+});
+
+await t("P8-A: 5 code emails per address per hour; the 6th answers like any send, sends nothing and can't verify", async () => {
+  await anHourLater();
+  await saveConfig(BASE_SHIPPING, { cod: { otp: "always", otpChannel: "email" } });
+  const victim = "p8a-victim@example.test";
+  const toVictim = () => inT(() => db.selectFrom("notifications").select("id").where("type", "=", "cod_otp").where("recipient", "in", [victim, "P8A-Victim@Example.test"]).execute());
+  // new carts and new phones each time: only the address cap can stop these
+  let lastCode = null;
+  for (let i = 0; i < 5; i++) {
+    eq((await sendFor(await freshCart(), key(), { contact: { ...CONTACT, phone: `90000600${i}0`, email: victim } })).status, 200, `send ${i + 1}:`);
+    lastCode = codeIn(await lastSms());
+  }
+  eq((await toVictim()).length, 5, "five code emails reached the address:");
+  const capCart = await freshCart();
+  const capKey = key();
+  const capOpts = { contact: { ...CONTACT, phone: "9000060090", email: "P8A-Victim@Example.test" } };
+  const capped = await sendFor(capCart, capKey, capOpts);
+  eq((await toVictim()).length, 5, "no 6th email (another spelling of the address):");
+  const fresh = await sendFor(await freshCart(), key(), { contact: { ...CONTACT, phone: "9000060091", email: "p8a-other@example.test" } });
+  const shape = (r) => ({ status: r.status, ...r.body, challengeId: typeof r.body.challengeId, sentTo: r.body.sentTo.replace(/^.•••@.*$/, "x•••@") });
+  eq(shape(capped), shape(fresh), "capped address vs fresh address:");
+  const row = await inT(() => db.selectFrom("cod_otps").selectAll().where("id", "=", capped.body.challengeId).executeTakeFirst());
+  ok(/^capped:/.test(row.code_hash), `a capped address's challenge holds a matchable hash: ${row.code_hash}`);
+  for (const guess of [lastCode, "000000"]) {
+    const r = await verify(capCart, capKey, capped.body.challengeId, guess, capOpts);
+    eq(r.body.code, "COD_OTP_WRONG", `the capped challenge with ${guess}:`);
+  }
+  // an hour later the address gets codes again
+  await anHourLater();
+  await sendFor(await freshCart(), key(), { contact: { ...CONTACT, phone: "9000060092", email: victim } });
+  eq((await toVictim()).length, 6, "after an hour:");
 });
 
 await t("10 sends per IP per 15 minutes, its own sentence", async () => {

@@ -3,6 +3,13 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-26 Phase 8 audit fixes P8-A, P8-B, P8-C (on the owner's behalf)
+
+- **P8-A, email cap counted from `notifications`, no migration:** `sendCodOtp` caps email-channel sends at 5 per recipient address per hour (`EMAIL_SENDS`), counting `notifications` rows of type `cod_otp` whose `lower(trim(recipient))` is the address, since an hour ago (the `type` prefix of `idx_notifications_type_status`). Sound after redaction: `redactSentCodes` only rewrites `body`, never `recipient`. A capped send is the phone cap's path (same reply, no message, an `unmatchable()` hash, the same dummy `cod_otps` write). A hashed-email column (0040) was not needed. The one case that resets the count is `redactCustomer` scrubbing that person's rows, at their own request.
+- **P8-B, per-phone try lock counts SMS challenges only:** an email challenge proves only the email, so its tries no longer count toward the phone's 10 tries an hour; the lock is checked only on SMS challenges and answers exactly like a wrong code (`COD_OTP_WRONG` / `M.wrong`, or the per-challenge `M.locked` on that challenge's 5th try, as any wrong code would). The separate `phoneLocked` sentence is removed, so nothing tells a caller the number was tried before.
+- **P8-B accepted risk:** anyone can still make a phone's 6th send in an hour silently unmatchable (the 5-sends-per-phone cap), keeping that shopper from COD for up to an hour. Accepted: the cap is what stops SMS pumping to one number, the reply never says the number is capped, and prepaid checkout still works for that shopper.
+- **P8-C, privacy:** `redactCustomer` sets `recipient = 'redacted'` and replaces `body` on every `notifications` row (any type: order emails, COD codes) whose recipient is the customer's email (case-insensitive) or the phone's E.164. Rows stay (the store's send history); `recipient` is NOT NULL, so a placeholder, not NULL.
+
 ## 2026-11-26 Phase 8 line 4: more than one currency and country (on the owner's behalf)
 
 - **Schema:** migration 0039 adds `orders.market`, `base_currency`, `fx_rate`, `base_subtotal`, `base_discount_total`, `base_shipping_total`, `base_total` (additive, NULL = a base-market order). `createOrder` probes them with `hasColumns` (`ORDER_MARKET_COLUMNS`); a market order on a store without 0039 is refused before anything is stored (`MARKET_UNAVAILABLE`), never stored without its base run. `orders.market` holds the market's id, which is its first country code, fixed at save.
