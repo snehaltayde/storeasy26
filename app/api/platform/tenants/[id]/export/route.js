@@ -23,6 +23,9 @@ export async function POST(request, { params }) {
   const auth = await requireOperator(request, { write: true });
   if (auth instanceof Response) return auth;
   const { id } = await params;
+  // no PLATFORM_SECRET: answer 503 before anything decrypts store secrets (getTenant would throw a 500
+  // whenever its cache had expired, which made test-platform-permissions fail only under full-run load)
+  if (!process.env.PLATFORM_SECRET) return NextResponse.json({ error: "Exports aren't available: PLATFORM_SECRET isn't set on this server." }, { status: 503 });
   if (!(await getTenant(id))) return NextResponse.json({ error: "Not found" }, { status: 404 });
   let token;
   try {
