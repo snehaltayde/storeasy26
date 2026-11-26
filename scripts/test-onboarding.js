@@ -560,12 +560,12 @@ console.log("— 4. the nav and the redirects");
 
 const { NAV, navFor, navItems } = await import("../lib/admin/nav.js");
 
-await t("nav: 'Onboarding' (/admin/onboarding, storefront.read, badge 'onboarding') in Overview for every role; no Setup and no 'Logo and colours'; owner/admin 19 items, staff/support 15 (Bundles, Phase 2 line 4; Quizzes, line 10; Apps, Phase 4 line 1; Themes, Phase 5 line 1)", async () => {
+await t("nav: 'Onboarding' (/admin/onboarding, storefront.read, badge 'onboarding') in Overview for every role; no Setup and no 'Logo and colours'; owner/admin 20 items, staff/support 16 (Bundles, Phase 2 line 4; Quizzes, line 10; Apps, Phase 4 line 1; Themes, Phase 5 line 1; Reviews, Phase 9 line 1)", async () => {
   const item = navItems(NAV).find((i) => i.id === "onboarding");
   eq({ ...item }, { id: "onboarding", label: "Onboarding", href: "/admin/onboarding", page: "onboarding", action: "storefront.read", badgeKey: "onboarding" }, "the item:");
   eq(NAV[0].items.map((i) => i.id), ["dashboard", "analytics", "onboarding"], "Overview:");
   ok(!navItems(NAV).some((i) => ["setup", "start"].includes(i.id) || ["/admin/setup", "/admin/start"].includes(i.href)), "no setup/start");
-  eq(ROLES.map((r) => [r, navItems(navFor(r)).length]), [["owner", 19], ["admin", 19], ["staff", 15], ["support", 15]], "counts:");
+  eq(ROLES.map((r) => [r, navItems(navFor(r)).length]), [["owner", 20], ["admin", 20], ["staff", 16], ["support", 16]], "counts:");
   for (const r of ROLES) ok(navItems(navFor(r)).some((i) => i.id === "onboarding"), `${r} sees Onboarding`);
 });
 

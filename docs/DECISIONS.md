@@ -3,6 +3,22 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-26 Phase 9 line 1: reviews (on the owner's behalf)
+
+- **Schema:** `migrations/tenant/0040_reviews.sql` exactly as planned (`review_invites`, `reviews`, `review_optouts`), additive. No email column: an opt-out is `sha256("review-optout-email|" + email)`, so a lost opt-out list reveals no address.
+- **Permissions:** the queue reads at `reviews.read` (support and up), every write at `reviews.moderate` (staff and up). Support (and an operator under a support grant) gets no email, no order id and no reject reason (`redactReviewForRole`). The shopper routes answer only a valid signed link for this store's own invite rows.
+- **Moderation states:** approve from pending or rejected; reject from pending or approved (internal reason, 200 characters, never shown to the buyer); hide from approved; restore hidden back to approved. Bulk (≤ 50) is Approve and Reject only; Hide, Restore and Reply are one review at a time. A review in another state is skipped and counted, never forced.
+- **Storefront reads go through the effective catalog** (`lib/catalog/effective.js byIds`) for the product's title and picture, so the write page, the order-page links and the email show the founder's published title (`test:effective-read`'s guard).
+- **Links:** `/reviews/write` and `/reviews/optout` added to the storefront href allowlist (`lib/registry/settings.js STOREFRONT_PATH`), so the Review links block's hrefs pass `isStorefrontHref`. Only those two exact paths, not `/reviews/*`.
+- **The review token never leaves the page:** `/reviews/write` and `/reviews/optout` send referrer policy `origin` (not `no-referrer`, which makes the form post `Origin: null` and the origin check refuses it); the third-party pixels (gtag, Meta) never load on `/reviews/*` (`lib/track/no-pixels.js`, read by `Pixels.js`); `StripToken` removes `?t=` from the address after render (the form keeps it in a hidden field). First-party tracking already scrubs `?t=`. The all-reviews page past its last page is a 404.
+- **Opt-out is a button, not a GET:** the email's link opens a page whose button posts the opt-out, so a mail scanner that follows links changes nothing.
+- **Invite emails never mail the past:** the sweep sends only invites whose `send_after` passed within the last 3 days (`CATCH_UP_DAYS`), so turning emails on doesn't mail every earlier buyer (bulk invites to past buyers are "Later"). Skipped invites (opted out, no email, no link secret) are marked handled (`sent_at`) and stay usable from the order page.
+- **The write page, `POST /api/reviews` and `/products/[handle]/reviews` answer only while Reviews is enabled and not killed** (`reviewsActive`, fail closed); the all-reviews page also needs the Reviews block Live, and is a 404 otherwise.
+- **JSON-LD:** `aggregateRating` comes from `lib/reviews/jsonld.js reviewRating`, which asks `slotBlocks` whether the Stars block is live for this product (enabled, not killed, Live: the slot's own rules, fail closed), then the approved stats; `ratingValue` rounded to 2 decimals. The whole JSON-LD script body now escapes `<` as `\u003c` (it did not before).
+- **Primitives:** `rating_summary`, `review_list`, `link_list` in `lib/plugins/blocks.js`; every prop optional so a block can go Live before any review exists (it then renders nothing). Review text collapses whitespace to single spaces in the block (the primitive's text rule); the all-reviews page keeps line breaks.
+- **Banned copy:** the plugin's own words are scanned with the shopper rules on and `claims: false` ("review" is this plugin's subject, and CLAIMS is the rule for generated copy). No suite scans rendered PDP HTML with `CLAIMS`, so nothing needed scoping (checked first).
+- **Seed data:** not added. The roles and design seeds are shared files outside this line's ownership; the drill sets up its own order, invite and review.
+
 ## 2026-11-26 Phase 9 first-party plugins plan (on the owner's behalf)
 
 - **Schema:** five additive tenant migrations in merge order: 0040 reviews, 0041 shipment tracking, 0042 WhatsApp consents and templates, 0043 AI usage ledger, 0044 subscriptions. No platform migration.

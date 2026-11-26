@@ -67,7 +67,7 @@ const { ADMIN_PAGES } = await import("./support/admin-pages.js");
 // Phase 1 line 3: Setup (admin-only) became Onboarding (every role) and
 // "Logo and colours" moved into onboarding's Brand step. Phase 4 line 1: Apps
 // (apps.read, so every role) opens the Store group.
-const ALL_IDS = ["dashboard", "analytics", "onboarding", "orders", "catalog", "quizzes", "editor", "media", "releases", "offers", "bundles", "experiments", "insights", "automations", "apps", "themes", "integrations", "billing", "settings"];
+const ALL_IDS = ["dashboard", "analytics", "onboarding", "orders", "reviews", "catalog", "quizzes", "editor", "media", "releases", "offers", "bundles", "experiments", "insights", "automations", "apps", "themes", "integrations", "billing", "settings"];
 const READ_IDS = ALL_IDS.filter((id) => !["automations", "integrations", "billing", "settings"].includes(id));
 const EXPECTED = { owner: ALL_IDS, admin: ALL_IDS, staff: READ_IDS, support: READ_IDS };
 const ids = (groups) => Nav.navItems(groups).map((i) => i.id);
@@ -87,7 +87,7 @@ await t("every nav action is a known action and a read; every href has a page ro
   eq(Nav.NAV.map((g) => g.label), ["Overview", "Orders", "Catalog", "Storefront", "Growth", "Store"], "groups:");
 });
 
-await t("for each role, every visible item passes roleAllows on its nav and page action; exact sets and order (19 / 19 / 15 / 15)", () => {
+await t("for each role, every visible item passes roleAllows on its nav and page action; exact sets and order (20 / 20 / 16 / 16; Phase 9 line 1 adds Reviews)", () => {
   for (const role of ROLES) {
     const groups = Nav.navFor(role);
     eq(ids(groups), EXPECTED[role], `${role}:`);
@@ -102,7 +102,7 @@ await t("for each role, every visible item passes roleAllows on its nav and page
   eq(Nav.navFor("support").at(-1).items.map((i) => i.id), ["apps", "themes"], "support's Store group:");
   eq(ids(Nav.navFor("nobody")), [], "an unknown role sees nothing:");
   eq(Nav.NAV.flatMap((g) => g.items).find((i) => i.id === "onboarding").action, "storefront.read", "Onboarding's nav action is its page's (every role):");
-  eq(ROLES.map((r) => Nav.navItems(Nav.navFor(r)).length), [19, 19, 15, 15], "the counts:");
+  eq(ROLES.map((r) => Nav.navItems(Nav.navFor(r)).length), [20, 20, 16, 16], "the counts:");
 });
 
 await t("activeItem: longest path prefix at a '/', never a partial segment", () => {

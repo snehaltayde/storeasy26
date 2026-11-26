@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
+import { pixelsAllowed } from "@/lib/track/no-pixels";
 import { readConsentCookie, parseConsent } from "@/lib/track/names";
 
 function loadGtag(id) {
@@ -39,7 +41,10 @@ function loadFbq(id) {
 export default function Pixels({ ga4Id = "", metaPixelId = "" }) {
   const loadedGa = useRef(false);
   const loadedMeta = useRef(false);
+  // Phase 9 line 1: never on a page whose address carries a signed token (/reviews/*)
+  const allowed = pixelsAllowed(usePathname());
   useEffect(() => {
+    if (!allowed) return undefined;
     const maybeLoad = () => {
       // S33 (SF24): PER-PURPOSE loading — analytics consent gates gtag,
       // marketing consent gates the Meta pixel. Withdrawal reloads the page
@@ -57,6 +62,6 @@ export default function Pixels({ ga4Id = "", metaPixelId = "" }) {
     maybeLoad();
     window.addEventListener("consent-granted", maybeLoad);
     return () => window.removeEventListener("consent-granted", maybeLoad);
-  }, [ga4Id, metaPixelId]);
+  }, [ga4Id, metaPixelId, allowed]);
   return null;
 }

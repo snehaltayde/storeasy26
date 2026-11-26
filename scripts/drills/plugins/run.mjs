@@ -14,6 +14,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const STAGE_FILES = [
   "stage-baseline.mjs",
   // p9: reviews
+  "stage-reviews.mjs",
   // p9: subscriptions
   // p9: whatsapp
   // p9: shiprocket

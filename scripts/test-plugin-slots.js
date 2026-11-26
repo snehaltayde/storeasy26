@@ -82,7 +82,7 @@ await t("slots: the five Phase 4 slots, each with a page, a label and its contex
 });
 
 await t("primitives: badge_row and notice; Trust badges' icons are all block icons", () => {
-  eq(BL.PRIMITIVE_IDS.join(","), "badge_row,notice", "primitives:");
+  eq(BL.PRIMITIVE_IDS.join(","), "badge_row,notice,rating_summary,review_list,link_list", "primitives (Phase 9 line 1 adds the Reviews three):");
   ok(BADGE_ICONS.every((i) => BL.BLOCK_ICONS.includes(i)), "icons");
 });
 

@@ -148,6 +148,9 @@ export const ADMIN_ROUTES = Object.freeze([
     probe: { body: { action: v } },
   })),
   { path: "returns", method: "GET", action: "orders.read" },
+  // Phase 9 line 1: the review queue (support reads redacted; staff and up moderate)
+  { path: "reviews", method: "GET", action: "reviews.read" },
+  { path: "reviews", method: "POST", action: "reviews.moderate", probe: { body: { action: "approve", ids: ["rev_missing"] } } },
   { path: "returns", method: "POST", action: "returns.decide", probe: { body: { id: "ret_missing", action: "approve" } } },
   { path: "settings", method: "GET", action: "settings.read" },
   { path: "settings", method: "PUT", action: "settings.write", probe: { body: { bogus_setting: true } } },
