@@ -75,6 +75,7 @@ export default function CartDrawer() {
     currency,
     changes,
     heldCart,
+    notice,
     couponStatus,
     appliedOffers,
     gifts,
@@ -204,6 +205,11 @@ export default function CartDrawer() {
             </ul>
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-sf-text-subtle">
+              {notice && (
+                <p data-cart-notice role="status" className="text-xs text-sf-text-body">
+                  {notice}
+                </p>
+              )}
               <p className="font-medium text-sf-text-body">Your cart is empty</p>
               <p className="text-sm">Add something you like and it’ll show up here.</p>
             </div>
@@ -211,6 +217,11 @@ export default function CartDrawer() {
         ) : (
           <ul className="flex-1 divide-y divide-sf-border-soft overflow-y-auto px-5">
             {/* Phase 9 line 2: the shopper's own cart waits behind a renewal */}
+            {notice && (
+              <li data-cart-notice role="status" className="py-3 text-xs text-sf-text-body">
+                {notice}
+              </li>
+            )}
             {heldCart && (
               <li data-held-cart className="py-3 text-xs text-sf-text-subtle">
                 Your other items are saved; they come back after this delivery.

@@ -13,6 +13,7 @@ import {
   removeItem,
   setCoupon,
   clearCart,
+  clearCartNotice,
 } from "@/lib/cart";
 import { productSubscribeOffer } from "@/lib/subscriptions/pricing";
 import { HELD_CART_COOKIE, CART_COOKIE_OPTS } from "@/lib/subscriptions/held-cart";
@@ -34,6 +35,11 @@ async function withHeld(request, id, cart) {
   if (cart.renewal && cart.items.length) return { id, cart: { ...cart, heldCart: true }, restored: false };
   return { id: held, cart: await cartFor(request)(held), restored: true };
 }
+// the note is shown with this answer, so it is cleared (once)
+const shown = async (cart) => {
+  if (cart?.notice && cart.id) await clearCartNotice(cart.id);
+  return cart;
+};
 const heldCookies = (res, restored, id) => {
   if (!restored) return res;
   res.cookies.set(CART_COOKIE, id, CART_COOKIE_OPTS);
@@ -57,7 +63,7 @@ export const GET = storefrontHandler(async (request) => {
   if (product != null) return NextResponse.json({ offer: await productSubscribeOffer(product.slice(0, 200), { market: requestMarket(request).market }) });
   const id = request.cookies.get(CART_COOKIE)?.value;
   const h = await withHeld(request, id, await cartFor(request)(id));
-  return heldCookies(NextResponse.json(h.cart), h.restored, h.id);
+  return heldCookies(NextResponse.json(await shown(h.cart)), h.restored, h.id);
 });
 
 export const POST = storefrontHandler(async (request) => {
@@ -108,5 +114,5 @@ export const POST = storefrontHandler(async (request) => {
   }
 
   const h = await withHeld(request, id, await getCart(id));
-  return heldCookies(respond(h.cart), h.restored, h.id);
+  return heldCookies(respond(await shown(h.cart)), h.restored, h.id);
 });

@@ -149,6 +149,14 @@ await C.migratePlatform(await readFile(join(ROOT, "lib/platform/schema.sql"), "u
 await runMigrations(C.platformDb(), await loadMigrations("platform"), {});
 await saveA();
 await C.upsertTenant({ id: "subb", name: "Subs B", domains: [HOST_B], dbUrl: "file:.test-sub-b.db", secrets: { order_link_secret: "b" }, config: { country: "IN", currency: "INR", shipping_config: BASE_SHIPPING } });
+// the store's owner (no support address is set: the late-payment email goes to them)
+{
+  const I = await import("../lib/platform/identity.js");
+  const owner = await I.createUser({ email: "owner@suba.test", password: "owner-pass-suba-1" });
+  await I.addMembership(owner.id, "suba", "owner");
+  const S = await import("../lib/platform/sessions.js");
+  globalThis.__subOwnerSession = (await S.createSession({ userId: owner.id, kind: "merchant", ttlMs: 60 * 60_000 })).token;
+}
 const inA = async (fn) => withTenant(await C.getTenant("suba"), fn);
 const inB = async (fn) => withTenant(await C.getTenant("subb"), fn);
 
@@ -284,7 +292,7 @@ async function account(method, { who = null, body, query = "", host = HOST_A, ca
   return { status: res.status, body: await res.json(), cartId: setCookie.map((c) => c.match(new RegExp(`^${CART_COOKIE}=([^;]*)`))?.[1]).find(Boolean) || null, held: setCookie.map((c) => c.match(/^cart_held=([^;]*)/)?.[1]).find(Boolean) || null };
 }
 async function adminCall(method, { body, query = "" } = {}) {
-  const tokenValue = await adminSessionTokenFor("suba", ADMIN_PW);
+  const tokenValue = globalThis.__subOwnerSession; // the owner's console session
   const headers = { host: HOST_A, "content-type": "application/json", cookie: `_admin=${tokenValue}`, origin: `https://${HOST_A}` };
   const res = await adminSubs[method](new NextRequest(`https://${HOST_A}/api/admin/subscriptions${query}`, { method, headers, body: method === "GET" ? undefined : JSON.stringify(body ?? {}) }));
   return { status: res.status, body: await res.json() };
@@ -292,7 +300,10 @@ async function adminCall(method, { body, query = "" } = {}) {
 
 const razorpayCalls = [];
 const rzStatus = new Map(); // Razorpay order id → its status at Razorpay (default "created")
+const rzPayments = new Map(); // Razorpay order id → its payments [{ id, status }]
 globalThis.fetch = async (url, init) => {
+  const pays = /^https:\/\/api\.razorpay\.com\/v1\/orders\/([^/?]+)\/payments$/.exec(String(url));
+  if (pays) return new Response(JSON.stringify({ entity: "collection", items: rzPayments.get(decodeURIComponent(pays[1])) ?? [] }), { status: 200 });
   const read = /^https:\/\/api\.razorpay\.com\/v1\/orders\/([^/?]+)$/.exec(String(url));
   if (read && (init?.method ?? "GET") === "GET") return new Response(JSON.stringify({ id: decodeURIComponent(read[1]), status: rzStatus.get(decodeURIComponent(read[1])) ?? "created" }), { status: 200 });
   if (String(url).startsWith("https://api.razorpay.com/")) {
@@ -704,6 +715,19 @@ await t("an abandoned online payment doesn't lock the delivery: COD afterwards i
   NOW = START;
 });
 
+await t("a failed online attempt (attempted, every payment failed) doesn't lock the delivery: COD is placed", async () => {
+  const { who, s } = await dueSub("2007");
+  const cart = (await account("POST", { who, body: { action: "pay", id: s.id } })).cartId;
+  const q = (await postCheckout(cart, { action: "quote" }, { who })).body.quote;
+  const rz = await postCheckout(cart, { action: "razorpay_create", idempotencyKey: key(), expectedTotal: q.prepaid.total, expectedShipping: q.prepaid.shipping }, { who });
+  rzStatus.set(rz.body.razorpayOrderId, "attempted");
+  rzPayments.set(rz.body.razorpayOrderId, [{ id: "pay_d1", status: "failed" }, { id: "pay_d2", status: "failed" }]);
+  const cod = await postCheckout(cart, { action: "cod", idempotencyKey: key(), expectedTotal: q.cod.total, expectedShipping: q.cod.shipping }, { who, drain: true });
+  eq(cod.status, 200, `cod after a declined card ${JSON.stringify(cod.body).slice(0, 160)}`);
+  eq((await orderRow(rz.body.orderId)).status, "cancelled", "the failed attempt is replaced");
+  NOW = START;
+});
+
 await t("an abandoned online payment, then the price changes: a new online attempt is minted at the new price", async () => {
   const { who, s } = await dueSub("2008");
   const cart = (await account("POST", { who, body: { action: "pay", id: s.id } })).cartId;
@@ -785,6 +809,8 @@ await t("a renewal cart left open after Skip: the place is refused (409 RENEWAL_
   eq([marker.subscription_id, marker.subscription_cycle], [null, null], "the marker cleared");
   const c = await cartGet(cart);
   eq([c.items.length, c.renewal ?? null, c.renewalStale ?? false], [0, null, false], "an ordinary, empty cart");
+  eq(c.notice, "That delivery changed, so it was removed from your cart.", "the drawer says why, once");
+  eq((await cartGet(cart)).notice ?? null, null, "the note is cleared once shown");
   // Subscribe on the product page into the same cart: a subscription line, and checkout works
   const add = await cartPost(cart, { action: "add", variantId: vid("2008"), quantity: 1, subscriptionInterval: 30 });
   eq(add.body.items.map((i) => [num(i.variantId), i.subscription?.active, i.subscription?.renewal ?? false]), [["2008", true, false]], "subscribed as a sign-up");
@@ -807,6 +833,11 @@ await t("never paid twice: an online attempt Razorpay shows as attempted or paid
     eq([cod.status, cod.body.code, cod.body.error], [409, "RENEWAL_PAYMENT_PENDING", "Your online payment for this delivery is still going through. Check back in a few minutes."], status);
     eq((await orderRow(rz.body.orderId)).status, "pending_payment", `${status}: the online attempt stands`);
   }
+  // attempted with one payment authorized: still refused
+  rzStatus.set(rz.body.razorpayOrderId, "attempted");
+  rzPayments.set(rz.body.razorpayOrderId, [{ id: "pay_f1", status: "failed" }, { id: "pay_a1", status: "authorized" }]);
+  const held = await postCheckout(cart, { action: "cod", idempotencyKey: key(), expectedTotal: q.cod.total, expectedShipping: q.cod.shipping }, { who });
+  eq([held.status, held.body.code], [409, "RENEWAL_PAYMENT_PENDING"], "attempted, a payment authorized");
   // Razorpay still shows it created: COD replaces it; then a capture lands on the cancelled order anyway
   rzStatus.set(rz.body.razorpayOrderId, "created");
   const cod = await postCheckout(cart, { action: "cod", idempotencyKey: key(), expectedTotal: q.cod.total, expectedShipping: q.cod.shipping }, { who, drain: true });
@@ -824,6 +855,10 @@ await t("never paid twice: an online attempt Razorpay shows as attempted or paid
   eq(events.map((m) => m.late_payment), ["pay_late1"], "one flag, once");
   const mails = (await notes("payment_on_replaced_order")).filter((n) => n.subject.includes(rz.body.orderId));
   eq(mails.length, 1, "one email to the founder");
+  eq(mails[0].recipient, "owner@suba.test", "no support address: the owner gets it");
+  // two deliveries of the same capture at once: one flag
+  await Promise.all([1, 2, 3].map(() => inA(() => markOrderPaid(rz.body.orderId, { razorpayPaymentId: "pay_late2", source: "webhook" })).catch(() => {})));
+  eq((await inA(() => db.selectFrom("order_events").select(["meta"]).where("order_id", "=", rz.body.orderId).execute())).filter((e) => (e.meta || "").includes('"late_payment":"pay_late2"')).length, 1, "a race writes one flag");
   ok(mails[0].body.startsWith("A payment arrived for a replaced order; refund it.") && mails[0].body.includes("pay_late1"), mails[0].body);
   const { LatePaymentBanner } = await import("../components/admin/orders/LatePaymentBanner.js").catch(() => ({}));
   if (LatePaymentBanner) {

@@ -49,3 +49,5 @@ ALTER TABLE cart_items ADD COLUMN renewal INTEGER;
 -- a renewal cart: built by "Pay for this delivery" for one subscription's cycle
 ALTER TABLE carts ADD COLUMN subscription_id TEXT;
 ALTER TABLE carts ADD COLUMN subscription_cycle INTEGER;
+-- a one-time note for the drawer ("renewal_removed": that delivery's line went), cleared once shown
+ALTER TABLE carts ADD COLUMN notice TEXT;
