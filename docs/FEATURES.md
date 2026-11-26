@@ -95,7 +95,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - [x] A shopper can enter a pincode and get their address filled and a delivery estimate
 - [x] A shopper choosing COD is offered a prepaid nudge, and COD orders can require an OTP
 - [x] A signed-in shopper can save addresses and pick one at checkout
-- [ ] A founder can sell in more than one currency and country
+- [x] A founder can sell in more than one currency and country
 - [x] A founder can schedule a bundle and an offer for a collection
 
 ## Phase 9: first-party plugins (roadmap Phase 6)
