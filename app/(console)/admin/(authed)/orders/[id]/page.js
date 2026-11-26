@@ -78,7 +78,7 @@ export default async function AdminOrderDetail({ params }) {
       />
 
       {/* Phase 9 line 2: money captured for a replaced (cancelled) order */}
-      <LatePaymentBanner events={rawOrder.events} />
+      <LatePaymentBanner events={order.events} />
 
       {order.sync_error && order.status === ORDER_STATUS.SYNC_FAILED && (
         <div role="status" className="mb-4 rounded-card border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">

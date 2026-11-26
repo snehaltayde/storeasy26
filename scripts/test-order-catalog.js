@@ -284,6 +284,7 @@ async function renderOrderPage(orderId, { role = "owner", src = linesSrc } = {})
     "@/components/admin/orders/OrderActions": { OrderActions: () => null },
     "@/components/admin/orders/OrderLines": lines,
     "@/components/admin/orders/OrderTimeline": { OrderTimeline: () => null },
+    "@/components/admin/orders/LatePaymentBanner": { LatePaymentBanner: () => null }, // Phase 9 line 2
     "@/components/admin/settings/NoAccess": { NoAccess: () => null },
   });
   return renderToStaticMarkup(await page.default({ params: Promise.resolve({ id: orderId }) }));
