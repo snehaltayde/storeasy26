@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { e164 } from "@/lib/checkout/phone";
-import { CONSENT_WORDING, PURPOSES } from "@/lib/messaging/wording";
+import { CONSENT_WORDING, PURPOSES, consentBoxes } from "@/lib/messaging/wording";
 
 // Phase 9 line 3: the two WhatsApp opt-ins at checkout, both unticked until
 // the shopper ticks them. They start from what this cart already holds (GET
@@ -12,8 +12,9 @@ import { CONSENT_WORDING, PURPOSES } from "@/lib/messaging/wording";
 // typed while a consent is live, the server is told (sync), and a consent for
 // any other number is withdrawn, so a consent never covers a number the
 // shopper didn't tick it for (after a reload too).
-// If a save or a sync fails, the boxes show what is stored (read again), with
-// the number it covers, never the state that was attempted.
+// Until the typed number is matched (empty after a reload, being typed, or a
+// failed save or sync), the boxes show what is stored, with the number it
+// covers (lib/messaging/wording.js consentBoxes), never an attempted state.
 //   phone, country: the address form's values
 const post = async (body) => {
   const res = await fetch("/api/messaging/consent", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -79,6 +80,7 @@ export default function WhatsAppConsent({ phone, country = "IN" }) {
     }
   }
 
+  const view = consentBoxes({ live, number, syncedFor, stale });
   return (
     <fieldset className="mt-4 space-y-2" data-wa="consent">
       <legend className="sr-only">WhatsApp messages</legend>
@@ -89,15 +91,19 @@ export default function WhatsAppConsent({ phone, country = "IN" }) {
             name={`wa-${p}`}
             data-wa-consent={p}
             className="sf-focus mt-0.5 size-4"
-            checked={Boolean(live[p] && ((number && syncedFor === number) || stale))}
-            disabled={!number}
+            checked={view.boxes[p].checked}
+            disabled={view.boxes[p].disabled}
             onChange={(e) => save(p, e.target.checked)}
           />
           <span>{CONSENT_WORDING[p].text}</span>
         </label>
       ))}
-      {stale && live.phone && (live.updates || live.marketing) && <p className="text-xs text-sf-text-faint">Saved for {live.phone}.</p>}
-      {!number && <p className="text-xs text-sf-text-faint">Add your phone number above to choose WhatsApp messages.</p>}
+      {view.savedFor && (
+        <p className="text-xs text-sf-text-faint" data-wa-saved-for>
+          Saved for {view.savedFor}.
+        </p>
+      )}
+      {view.needPhone && <p className="text-xs text-sf-text-faint">Add your phone number above to choose WhatsApp messages.</p>}
       {error && (
         <p role="alert" className="text-xs text-sf-danger">
           {error}

@@ -308,6 +308,21 @@ await t("consent route: syncs have their own allowance (60 per 10 minutes), apar
   }
 });
 
+await t("checkout boxes: after a reload (phone empty) and before a sync they show the stored consent and its number", async () => {
+  const { consentBoxes } = await import("../lib/messaging/wording.js");
+  const stored = { updates: true, marketing: false, phone: "+91 ••••••4321" };
+  const reload = consentBoxes({ live: stored, number: "", syncedFor: null });
+  same(reload, { boxes: { updates: { checked: true, disabled: false }, marketing: { checked: false, disabled: true } }, savedFor: "+91 ••••••4321", needPhone: false }, "reload, empty phone:");
+  const typing = consentBoxes({ live: stored, number: "+919876504321", syncedFor: null });
+  eq(typing.boxes.updates.checked, true, "typed, not yet synced: stored:");
+  eq(typing.savedFor, "+91 ••••••4321", "…with its number:");
+  const synced = consentBoxes({ live: stored, number: "+919876504321", syncedFor: "+919876504321" });
+  same([synced.boxes.updates.checked, synced.savedFor], [true, null], "synced: no note:");
+  const failed = consentBoxes({ live: stored, number: "+919876504321", syncedFor: "+919876504321", stale: true });
+  eq(failed.savedFor, "+91 ••••••4321", "a failed sync: the note:");
+  same(consentBoxes({ live: { updates: false, marketing: false, phone: null }, number: "" }), { boxes: { updates: { checked: false, disabled: true }, marketing: { checked: false, disabled: true } }, savedFor: null, needPhone: true }, "nothing stored:");
+});
+
 await t("consent route: 10 per 10 minutes", async () => {
   process.env.RATE_LIMIT_DISABLED = "0"; // the harness turns limits off
   let last;
