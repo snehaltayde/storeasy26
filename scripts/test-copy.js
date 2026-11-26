@@ -1395,7 +1395,7 @@ await t("PIN code and delivery copy (Phase 8 line 1) is shopper language", async
 });
 
 await t("cart API: a failed change leaves no error text in the response", async () => {
-  const route = await loadRoute("cart", { "@/lib/cart": cartLib, "@/lib/subscriptions/pricing": await import("../lib/subscriptions/pricing.js") });
+  const route = await loadRoute("cart", { "@/lib/cart": cartLib, "@/lib/subscriptions/pricing": await import("../lib/subscriptions/pricing.js"), "@/lib/subscriptions/held-cart": await import("../lib/subscriptions/held-cart.js") });
   const cartId = await inOwn(async () => {
     const id = `cart-${Math.random()}`;
     await createCart(id);

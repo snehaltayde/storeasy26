@@ -35,7 +35,9 @@ import { baseFigures } from "@/lib/checkout/market-order";
 import { customerFromToken, CUSTOMER_COOKIE } from "@/lib/customers";
 import { subscriptionSettings } from "@/lib/subscriptions/pricing";
 import { renewalKey, RENEWAL_KEY_PREFIX, subscriptionById } from "@/lib/subscriptions/store";
-import { renewalProblem } from "@/lib/subscriptions/renewal";
+import { renewalProblem, unpaidRenewalAttempt, supersedeRenewalAttempt } from "@/lib/subscriptions/renewal";
+import { HELD_CART_COOKIE, restoreHeldCart } from "@/lib/subscriptions/held-cart";
+import { db } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -221,7 +223,10 @@ const subscriptionOutsideBase = () =>
     { status: 409 },
   );
 const renewalChanged = (problem) => NextResponse.json({ ok: false, code: "RENEWAL_CHANGED", error: problem }, { status: 409 });
+const STALE_RENEWAL = "This delivery changed: it was skipped, paid for, paused or swapped. Nothing was charged. Open your account to see your next delivery.";
 async function subscriptionGate(request, cart, market) {
+  // a renewal cart whose delivery no longer stands is never placed (lib/cart.js)
+  if (cart?.renewalStale) return { response: renewalChanged(STALE_RENEWAL) };
   if (!cart?.hasSubscription && !cart?.renewal) return { customerId: null };
   const customer = await customerFromToken(request.cookies.get(CUSTOMER_COOKIE)?.value);
   if (!customer) return { response: signInToSubscribe() };
@@ -449,14 +454,19 @@ export const POST = tenantHandler(async (request) => {
 
       const terms = termsFor(cart, address, market);
       const key = orderKey(cart, idempotencyKey);
-      const dup = await dedupByKey(key, cartId, cart, terms.cod.total);
+      // Phase 9 line 2 review: an unpaid online attempt for this delivery is
+      // replaced (just before placing), never answered as a placed COD order
+      const staleAttempt = cart.renewal ? await unpaidRenewalAttempt(key, { cartId, method: "cod", total: terms.cod.total, sameAmount }) : null;
+      const dup = staleAttempt ? null : await dedupByKey(key, cartId, cart, terms.cod.total);
       if (dup instanceof NextResponse) return dup;
+      // an online attempt under this key is not a COD order: no effects, no "placed"
+      if (dup && dup.payment_method !== "cod") return conflictResponse();
       if (dup) {
         // Finish what the first request started: it may have died before
         // scheduling its after() work, or before its cart clear landed.
         scheduleCodEffects(request, dup);
         if (cart.items.length) await clearPlacedCart(cartId, dup.id);
-        return await codResponse(dup, true);
+        return restoreHeldCart(request, await codResponse(dup, true), cart);
       }
 
       if (!cartId) return NextResponse.json({ error: "No cart session" }, { status: 400 });
@@ -482,6 +492,7 @@ export const POST = tenantHandler(async (request) => {
         }
       }
 
+      if (staleAttempt && !(await supersedeRenewalAttempt(staleAttempt, key))) return conflictResponse();
       const order = await createOrder({
         cartId,
         cart,
@@ -501,13 +512,15 @@ export const POST = tenantHandler(async (request) => {
         total: order.total,
         cart_id: cartId,
       });
+      // lost a same-key race to an online attempt: not a COD order
+      if (order.deduped && order.paymentMethod !== "cod") return conflictResponse();
       // `recovered`: the insert's response was lost but it may be ours, so this
       // request still owes the follow-up work.
       if (!order.deduped || order.recovered) {
         scheduleCodEffects(request, order);
         await clearPlacedCart(cartId, order.id);
       }
-      return await codResponse(order, order.deduped);
+      return restoreHeldCart(request, await codResponse(order, order.deduped), cart);
     }
 
     if (action === "razorpay_create") {
@@ -538,8 +551,12 @@ export const POST = tenantHandler(async (request) => {
       // Dedup BEFORE creating a Razorpay order, so a retry reopens the SAME
       // payment instead of minting a parallel one.
       const key = orderKey(cart, idempotencyKey);
-      const dup = await dedupByKey(key, cartId, cart, terms.prepaid.total);
+      // Phase 9 line 2 review: an unpaid online attempt for another amount (or
+      // another cart) is replaced just before this one is minted
+      const staleAttempt = cart.renewal ? await unpaidRenewalAttempt(key, { cartId, method: "razorpay", total: terms.prepaid.total, sameAmount }) : null;
+      const dup = staleAttempt ? null : await dedupByKey(key, cartId, cart, terms.prepaid.total);
       if (dup instanceof NextResponse) return dup;
+      if (dup && dup.payment_method !== "razorpay") return conflictResponse();
       if (dup) return await razorpayResponse(dup, dup.razorpay_order_id, true);
 
       if (!cartId) return NextResponse.json({ error: "No cart session" }, { status: 400 });
@@ -559,6 +576,7 @@ export const POST = tenantHandler(async (request) => {
       // Phase 8 line 4: minted in the market's currency, in its minor units
       // (lib/money.js toMinor: USD cents, JPY whole yen).
       const currency = cart.currency || "INR";
+      if (staleAttempt && !(await supersedeRenewalAttempt(staleAttempt, key))) return conflictResponse();
       const rzOrder = await createRazorpayOrder({
         amountPaise: toMinor(terms.prepaid.total, currency),
         receipt: `cart_${cartId.slice(0, 12)}`,
@@ -587,6 +605,7 @@ export const POST = tenantHandler(async (request) => {
       });
       // Lost a same-key insert race: answer with the winner's Razorpay order
       // (this request's rzOrder is an orphan — never paid, expires unused).
+      if (order.deduped && order.paymentMethod !== "razorpay") return conflictResponse();
       if (order.deduped) return await razorpayResponse(order, order.razorpayOrderId, true);
       return await razorpayResponse(order, rzOrder.id);
     }
@@ -595,7 +614,13 @@ export const POST = tenantHandler(async (request) => {
       const expUnit = conversionUnit(request); // PV-08: none from the founder's browser
       const result = await verifyBrowserPayment(body, { expUnit });
       if (result.settled) after(() => runOrderEffects(body.orderId, { expUnit }));
-      return NextResponse.json(result.body, { status: result.status });
+      const res = NextResponse.json(result.body, { status: result.status });
+      // Phase 9 line 2: a paid renewal gives the shopper's own cart back
+      if (result.settled && request.cookies.get(HELD_CART_COOKIE)?.value && cartId) {
+        const paid = await db.selectFrom("orders").select(["cart_id"]).where("id", "=", String(body.orderId)).executeTakeFirst();
+        if (paid?.cart_id === cartId) return restoreHeldCart(request, res, { renewal: true });
+      }
+      return res;
     }
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });

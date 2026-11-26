@@ -74,6 +74,7 @@ export default function CartDrawer() {
     count,
     currency,
     changes,
+    heldCart,
     couponStatus,
     appliedOffers,
     gifts,
@@ -209,6 +210,12 @@ export default function CartDrawer() {
           )
         ) : (
           <ul className="flex-1 divide-y divide-sf-border-soft overflow-y-auto px-5">
+            {/* Phase 9 line 2: the shopper's own cart waits behind a renewal */}
+            {heldCart && (
+              <li data-held-cart className="py-3 text-xs text-sf-text-subtle">
+                Your other items are saved; they come back after this delivery.
+              </li>
+            )}
             {items.map((it) => (
               <li key={it.variantId} className="flex gap-3 py-4">
                 <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-sf-small bg-sf-surface-sunken">
@@ -226,7 +233,9 @@ export default function CartDrawer() {
                     <p data-line-subscription={it.subscription.active ? "on" : "off"} className="text-xs text-sf-text-subtle">
                       {it.subscription.active
                         ? `Every ${it.subscription.interval} days${it.subscription.percent ? (it.subscription.applied ? ` · ${it.subscription.percent}% off` : " · your code replaces the subscriber discount") : ""}`
-                        : "Subscription not available: one-time price"}
+                        : it.subscription.limit
+                          ? `Subscriptions are up to ${it.subscription.limit} per delivery: one-time price`
+                          : "Subscription not available: one-time price"}
                     </p>
                   )}
                   {tierNudge?.variantId === it.variantId && (

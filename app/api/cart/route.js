@@ -15,6 +15,7 @@ import {
   clearCart,
 } from "@/lib/cart";
 import { productSubscribeOffer } from "@/lib/subscriptions/pricing";
+import { HELD_CART_COOKIE, CART_COOKIE_OPTS } from "@/lib/subscriptions/held-cart";
 
 export const runtime = "edge";
 
@@ -22,6 +23,23 @@ export const runtime = "edge";
 // is the shopper's projection: Shopify's title and the SKU stay on the server.
 // Phase 8 line 4: priced in this request's market (the presentment run).
 const cartFor = (request) => async (id) => shopperCart(await fullCart(id || null, { market: requestMarket(request).market }));
+
+// Phase 9 line 2 review: while a renewal cart holds the drawer, the shopper's
+// own cart waits in HELD_CART_COOKIE ("heldCart" tells the drawer). Once the
+// renewal no longer stands (placed, skipped, cancelled, moved on) or the
+// shopper empties it, the held cart comes back: answered and cookied here.
+async function withHeld(request, id, cart) {
+  const held = request.cookies.get(HELD_CART_COOKIE)?.value;
+  if (!held || held === id) return { id, cart, restored: false };
+  if (cart.renewal && cart.items.length) return { id, cart: { ...cart, heldCart: true }, restored: false };
+  return { id: held, cart: await cartFor(request)(held), restored: true };
+}
+const heldCookies = (res, restored, id) => {
+  if (!restored) return res;
+  res.cookies.set(CART_COOKIE, id, CART_COOKIE_OPTS);
+  res.cookies.set(HELD_CART_COOKIE, "", { ...CART_COOKIE_OPTS, maxAge: 0 });
+  return res;
+};
 export const dynamic = "force-dynamic";
 
 const COOKIE_OPTS = {
@@ -38,8 +56,8 @@ export const GET = storefrontHandler(async (request) => {
   const product = new URL(request.url).searchParams.get("subscribe");
   if (product != null) return NextResponse.json({ offer: await productSubscribeOffer(product.slice(0, 200), { market: requestMarket(request).market }) });
   const id = request.cookies.get(CART_COOKIE)?.value;
-  const cart = await cartFor(request)(id);
-  return NextResponse.json(cart);
+  const h = await withHeld(request, id, await cartFor(request)(id));
+  return heldCookies(NextResponse.json(h.cart), h.restored, h.id);
 });
 
 export const POST = storefrontHandler(async (request) => {
@@ -89,5 +107,6 @@ export const POST = storefrontHandler(async (request) => {
     return respond(await getCart(id), 400);
   }
 
-  return respond(await getCart(id));
+  const h = await withHeld(request, id, await getCart(id));
+  return heldCookies(respond(h.cart), h.restored, h.id);
 });

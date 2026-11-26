@@ -109,6 +109,7 @@ export function CartProvider({ children, initialCart }) {
     grandTotal: cart.grandTotal ?? cart.total ?? cart.subtotal,
     couponStatus: cart.couponStatus || null,
     changes: cart.changes || [], // S32 (SF06): price/availability change notices
+    heldCart: Boolean(cart.heldCart), // Phase 9 line 2: the shopper's own cart waits behind a renewal
     // Phase 7 line 3: the server's nudges (lib/offers/progress.js), shown as sent; never posted back
     progress: cart.progress || EMPTY.progress,
     open,

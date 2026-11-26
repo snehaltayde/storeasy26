@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   paused_until TEXT,                   -- NULL = paused until resumed
   cycle INTEGER NOT NULL DEFAULT 1,    -- the next delivery's cycle number
   missed_in_row INTEGER NOT NULL DEFAULT 0,
+  swap_variant_id TEXT,                -- a swap asked for while a delivery was due: applies from the next cycle
+  swap_product_id TEXT,
   origin_order_id TEXT NOT NULL,
   origin_line TEXT NOT NULL,           -- the origin order's variant id
   cancelled_at TEXT,

@@ -27,7 +27,7 @@
 //      the existing 409.
 //   pnpm test:subscriptions
 import { readFile, rm } from "node:fs/promises";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { createRequire, registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
@@ -253,19 +253,19 @@ async function drainAfter() {
   globalThis.__subAfter = [];
   for (const fn of q) await Promise.resolve(fn()).catch(() => {});
 }
-async function postCheckout(cartId, body, { who = null, country = null, address = ADDR, host = HOST_A, contact = CONTACT, drain = false } = {}) {
+async function postCheckout(cartId, body, { who = null, country = null, address = ADDR, host = HOST_A, contact = CONTACT, drain = false, held = null } = {}) {
   const headers = { host, "content-type": "application/json", "x-forwarded-for": "10.0.0.9" };
-  const cookie = cookieOf(jarFor({ cartId, who, country }));
+  const cookie = cookieOf({ ...jarFor({ cartId, who, country }), cart_held: held });
   if (cookie) headers.cookie = cookie;
   const req = new NextRequest(`https://${host}/api/checkout`, { method: "POST", headers, body: JSON.stringify({ contact, address, ...body }) });
   const res = await checkout.POST(req);
   if (drain) await drainAfter();
   else globalThis.__subAfter = [];
-  return { status: res.status, body: await res.json() };
+  return { status: res.status, body: await res.json(), setCookie: (res.headers.getSetCookie?.() || []).join("; ") };
 }
-async function cartGet(cartId, { query = "", host = HOST_A } = {}) {
+async function cartGet(cartId, { query = "", host = HOST_A, held = null } = {}) {
   const headers = { host };
-  if (cartId) headers.cookie = `${CART_COOKIE}=${cartId}`;
+  if (cartId) headers.cookie = `${CART_COOKIE}=${cartId}${held ? `; cart_held=${held}` : ""}`;
   const res = await cartRoute.GET(new NextRequest(`https://${host}/api/cart${query}`, { method: "GET", headers }));
   return res.json();
 }
@@ -275,12 +275,13 @@ async function cartPost(cartId, body, { host = HOST_A } = {}) {
   const res = await cartRoute.POST(new NextRequest(`https://${host}/api/cart`, { method: "POST", headers, body: JSON.stringify(body) }));
   return { status: res.status, body: await res.json() };
 }
-async function account(method, { who = null, body, query = "", host = HOST_A } = {}) {
+async function account(method, { who = null, body, query = "", host = HOST_A, cartCookie = null } = {}) {
   const headers = { host, "content-type": "application/json" };
-  if (who) headers.cookie = `_customer=${who.token}`;
+  const jar = [who ? `_customer=${who.token}` : null, cartCookie ? `${CART_COOKIE}=${cartCookie}` : null].filter(Boolean).join("; ");
+  if (jar) headers.cookie = jar;
   const res = await accountSubs[method](new NextRequest(`https://${host}/api/account/subscriptions${query}`, { method, headers, body: method === "GET" ? undefined : JSON.stringify(body ?? {}) }));
   const setCookie = res.headers.getSetCookie?.() || [];
-  return { status: res.status, body: await res.json(), cartId: setCookie.map((c) => c.match(new RegExp(`^${CART_COOKIE}=([^;]*)`))?.[1]).find(Boolean) || null };
+  return { status: res.status, body: await res.json(), cartId: setCookie.map((c) => c.match(new RegExp(`^${CART_COOKIE}=([^;]*)`))?.[1]).find(Boolean) || null, held: setCookie.map((c) => c.match(/^cart_held=([^;]*)/)?.[1]).find(Boolean) || null };
 }
 async function adminCall(method, { body, query = "" } = {}) {
   const tokenValue = await adminSessionTokenFor("suba", ADMIN_PW);
@@ -650,11 +651,15 @@ await t("sweep: not paid within the grace days → missed, the next scheduled; t
   await placeCod(await freshCart([["2007", 1, 14]]), who);
   let s = (await subsOf(who))[0];
   const due1 = s.next_due_at;
+  await runSweep(Date.parse(due1) - 2 * DAY); // the reminder: the grace runs from here
+  await runSweep(Date.parse(due1) + 4 * DAY); // 6 days after the reminder: not yet
+  eq((await subRow(s.id)).missed_in_row, 0, "inside the grace after the reminder");
   await runSweep(Date.parse(due1) + 8 * DAY);
   s = await subRow(s.id);
   eq([s.status, s.cycle, s.missed_in_row, s.next_due_at], ["active", 3, 1, new Date(Date.parse(due1) + 14 * DAY).toISOString()], "first miss");
   await runSweep(Date.parse(due1) + 8 * DAY); // the same window again
   eq((await subRow(s.id)).cycle, 3, "the same window twice");
+  await runSweep(Date.parse(s.next_due_at) - 2 * DAY);
   await runSweep(Date.parse(s.next_due_at) + 8 * DAY);
   s = await subRow(s.id);
   eq([s.status, s.missed_in_row, s.paused_until], ["paused", 2, null], "second miss pauses");
@@ -665,6 +670,156 @@ await t("sweep: not paid within the grace days → missed, the next scheduled; t
   await inA(() => db.updateTable("subscriptions").set({ paused_until: new Date(NOW + DAY).toISOString() }).where("id", "=", s.id).execute());
   const out = await runSweep(NOW + 2 * DAY);
   ok(out.resumed >= 1 && (await subRow(s.id)).status === "active", "resumed");
+});
+
+// ---- 4b. review fixes ------------------------------------------------------------------------
+console.log("— review fixes");
+
+const SIGN = (o, p) => createHmac("sha256", "sub-key-secret").update(`${o}|${p}`).digest("hex");
+async function dueSub(v = "2005", interval = 30) {
+  const who = await shopper();
+  await placeCod(await freshCart([[v, 1, interval]]), who);
+  const s = (await subsOf(who))[0];
+  NOW = Date.parse(s.next_due_at) - DAY;
+  return { who, s };
+}
+const cycleOrders = (s) => inA(() => db.selectFrom("orders").select(["id", "status", "payment_method", "idempotency_key"]).where("idempotency_key", "like", `${ST.renewalKey(s.id, s.cycle)}%`).execute());
+
+await t("an abandoned online payment doesn't lock the delivery: COD afterwards is placed, the unpaid attempt cancelled; never answered as a COD order", async () => {
+  const { who, s } = await dueSub();
+  const cart = (await account("POST", { who, body: { action: "pay", id: s.id } })).cartId;
+  const q = (await postCheckout(cart, { action: "quote" }, { who })).body.quote;
+  const rz = await postCheckout(cart, { action: "razorpay_create", idempotencyKey: key(), expectedTotal: q.prepaid.total, expectedShipping: q.prepaid.shipping }, { who });
+  eq(rz.status, 200, "online attempt");
+  const cod = await postCheckout(cart, { action: "cod", idempotencyKey: key(), expectedTotal: q.cod.total, expectedShipping: q.cod.shipping }, { who, drain: true });
+  eq(cod.status, 200, `cod after an abandoned online attempt ${JSON.stringify(cod.body).slice(0, 160)}`);
+  ok(cod.body.orderId !== rz.body.orderId, "the COD answer is the online attempt");
+  const rows = await cycleOrders(s);
+  eq(rows.filter((r) => r.status !== "cancelled").map((r) => [r.payment_method, r.idempotency_key]), [["cod", ST.renewalKey(s.id, s.cycle)]], "one live order for the cycle");
+  eq(rows.find((r) => r.id === rz.body.orderId).status, "cancelled", "the unpaid attempt is cancelled");
+  eq((await subRow(s.id)).cycle, s.cycle + 1, "the COD renewal moved the subscription on");
+  NOW = START;
+});
+
+await t("an abandoned online payment, then the price changes: a new online attempt is minted at the new price", async () => {
+  const { who, s } = await dueSub("2008");
+  const cart = (await account("POST", { who, body: { action: "pay", id: s.id } })).cartId;
+  const q = (await postCheckout(cart, { action: "quote" }, { who })).body.quote;
+  const rz = await postCheckout(cart, { action: "razorpay_create", idempotencyKey: key(), expectedTotal: q.prepaid.total, expectedShipping: q.prepaid.shipping }, { who });
+  eq(rz.status, 200, "first attempt");
+  const v = num(s.variant_id);
+  const old = price[v];
+  price[v] = old + 250;
+  await inA(() => db.updateTable("variants").set({ price: price[v] }).where("id", "=", s.variant_id).execute());
+  const q2 = (await postCheckout(cart, { action: "quote" }, { who })).body.quote;
+  ok(q2.prepaid.total > q.prepaid.total, "the price moved");
+  const before = razorpayCalls.length;
+  const rz2 = await postCheckout(cart, { action: "razorpay_create", idempotencyKey: key(), expectedTotal: q2.prepaid.total, expectedShipping: q2.prepaid.shipping }, { who });
+  eq(rz2.status, 200, `second attempt ${JSON.stringify(rz2.body).slice(0, 160)}`);
+  eq(razorpayCalls[before]?.amount, toMinor(q2.prepaid.total, "INR"), "minted at the new price");
+  const rows = await cycleOrders(s);
+  eq(rows.filter((r) => r.status !== "cancelled").map((r) => r.id), [rz2.body.orderId], "one live order for the cycle");
+  // the same attempt again reopens the same payment
+  const again = await postCheckout(cart, { action: "razorpay_create", idempotencyKey: key(), expectedTotal: q2.prepaid.total, expectedShipping: q2.prepaid.shipping }, { who });
+  eq([again.status, again.body.orderId, again.body.deduped], [200, rz2.body.orderId, true], "the same attempt reopens");
+  price[v] = old;
+  await inA(() => db.updateTable("variants").set({ price: old }).where("id", "=", s.variant_id).execute());
+  NOW = START;
+});
+
+await t("a renewal paid through Razorpay verify: settled, the cycle linked, the shopper's own cart back", async () => {
+  const { who, s } = await dueSub("2001", 14);
+  const own = await freshCart([["2004", 2]]);
+  const pay = await account("POST", { who, body: { action: "pay", id: s.id }, cartCookie: own });
+  ok(pay.held === own, `the own cart is held (${pay.held})`);
+  const drawer = await cartGet(pay.cartId, { held: own });
+  eq(drawer.heldCart, true, "the drawer says the other items are saved");
+  const q = (await postCheckout(pay.cartId, { action: "quote" }, { who })).body.quote;
+  const rz = await postCheckout(pay.cartId, { action: "razorpay_create", idempotencyKey: key(), expectedTotal: q.prepaid.total, expectedShipping: q.prepaid.shipping }, { who });
+  eq(rz.status, 200, "minted");
+  const rzId = rz.body.razorpayOrderId;
+  const v = await postCheckout(pay.cartId, { action: "razorpay_verify", orderId: rz.body.orderId, razorpay_order_id: rzId, razorpay_payment_id: "pay_sub1", razorpay_signature: SIGN(rzId, "pay_sub1") }, { who, held: own, drain: true });
+  eq(v.status, 200, `verify ${JSON.stringify(v.body)}`);
+  ok(v.setCookie.includes(`${CART_COOKIE}=${own}`), `the own cart comes back: ${v.setCookie}`);
+  eq((await orderRow(rz.body.orderId)).status === "pending_payment", false, "paid");
+  const after = await subRow(s.id);
+  eq(after.cycle, s.cycle + 1, "moved on by the verified payment's effects");
+  const cyc = await inA(() => db.selectFrom("subscription_cycles").selectAll().where("subscription_id", "=", s.id).where("cycle", "=", s.cycle).executeTakeFirst());
+  eq(cyc.order_id, rz.body.orderId, "the cycle names the order");
+  // the own cart is untouched
+  eq((await cartGet(own)).items.map((i) => [num(i.variantId), i.quantity]), [["2004", 2]], "own cart");
+  NOW = START;
+});
+
+await t("COD renewal: the shopper's own cart comes back with the answer; an abandoned (stale) renewal cart gives it back on the next cart read", async () => {
+  const { who, s } = await dueSub("2007");
+  const own = await freshCart([["2006", 1]]);
+  const pay = await account("POST", { who, body: { action: "pay", id: s.id }, cartCookie: own });
+  const q = (await postCheckout(pay.cartId, { action: "quote" }, { who })).body.quote;
+  const cod = await postCheckout(pay.cartId, { action: "cod", idempotencyKey: key(), expectedTotal: q.cod.total, expectedShipping: q.cod.shipping }, { who, held: own, drain: true });
+  eq(cod.status, 200, "cod");
+  ok(cod.setCookie.includes(`${CART_COOKIE}=${own}`) && /cart_held=;/.test(cod.setCookie), `restored: ${cod.setCookie}`);
+  // abandoned: Pay, then Skip in another tab; the next cart read gives the own cart back
+  NOW = Date.parse((await subRow(s.id)).next_due_at) - DAY;
+  const pay2 = await account("POST", { who, body: { action: "pay", id: s.id }, cartCookie: own });
+  await account("POST", { who, body: { action: "skip", id: s.id } });
+  const res = await cartRoute.GET(new NextRequest(`https://${HOST_A}/api/cart`, { headers: { host: HOST_A, cookie: `${CART_COOKIE}=${pay2.cartId}; cart_held=${own}` } }));
+  const body = await res.json();
+  eq(body.id, own, "the own cart answers");
+  ok((res.headers.getSetCookie?.() || []).some((c) => c.startsWith(`${CART_COOKIE}=${own}`)), "and is cookied back");
+  NOW = START;
+});
+
+await t("a renewal cart left open after Skip is priced one-time and refused (409 RENEWAL_CHANGED); no second subscription", async () => {
+  const { who, s } = await dueSub("2002");
+  const cart = (await account("POST", { who, body: { action: "pay", id: s.id } })).cartId;
+  eq((await account("POST", { who, body: { action: "skip", id: s.id } })).status, 200, "skip in another tab");
+  const c = await cartGet(cart);
+  eq([c.renewal ?? null, c.renewalStale, c.items[0].subscription ?? null, c.items[0].discount, c.hasSubscription ?? false], [null, true, null, 0, false], "stale cart");
+  const q = (await postCheckout(cart, { action: "quote" }, { who })).body.quote;
+  for (const action of ["cod", "razorpay_create"]) {
+    const r = await postCheckout(cart, { action, idempotencyKey: key(), expectedTotal: action === "cod" ? q.cod.total : q.prepaid.total, expectedShipping: action === "cod" ? q.cod.shipping : q.prepaid.shipping }, { who, drain: true });
+    eq([r.status, r.body.code], [409, "RENEWAL_CHANGED"], action);
+    ok(/skipped, paid for, paused or swapped/.test(r.body.error), r.body.error);
+  }
+  eq((await subsOf(who)).length, 1, "a second subscription");
+  NOW = START;
+});
+
+await t("swap while a delivery is due applies from the next cycle; the due delivery keeps its variant", async () => {
+  await setPlugin(inA, SETTINGS);
+  const { who, s } = await dueSub("2008");
+  eq((await account("POST", { who, body: { action: "swap", id: s.id, variantId: vid("2018") } })).status, 200, "swap");
+  let row = await subRow(s.id);
+  eq([num(row.variant_id), num(row.swap_variant_id)], ["2008", "2018"], "pending");
+  eq((await account("POST", { who, body: { action: "skip", id: s.id } })).status, 200, "skip the due one");
+  row = await subRow(s.id);
+  eq([num(row.variant_id), row.swap_variant_id], ["2018", null], "applied from the next cycle");
+  NOW = START;
+});
+
+await t("the plugin off longer than the grace, then on: the unreminded delivery is skipped forward, not missed; a reminder follows", async () => {
+  const who = await shopper();
+  await placeCod(await freshCart([["2002", 1, 14]]), who);
+  const s = (await subsOf(who))[0];
+  const back = Date.parse(s.next_due_at) + 20 * DAY;
+  const a = await runSweep(back);
+  await runSweep(back + 10 * 60_000);
+  const after = await subRow(s.id);
+  eq([after.status, after.missed_in_row, after.cycle], ["active", 0, s.cycle + 1], `no miss ${JSON.stringify(a)}`);
+  ok(a.skipped >= 1, "skipped forward");
+  ok((await notes("subscription_reminder")).some((n) => n.recipient === who.email), "reminded for the next one");
+});
+
+await t("quantity over 10 never signs up (one-time price, the drawer says why); the console names any subscription, not only the newest 200", async () => {
+  const who = await shopper();
+  const c = await freshCart([["2005", 25, 30]]);
+  const line = (await cartGet(c)).items[0];
+  eq([line.subscription.active, line.subscription.limit, line.discount], [false, 10, 0], "over the limit");
+  await placeCod(c, who);
+  eq((await subsOf(who)).length, 0, "no subscription");
+  const oldest = await inA(() => db.selectFrom("subscriptions").select(["id"]).orderBy("created_at", "asc").executeTakeFirst());
+  ok(oldest && (await inA(() => consoleDetail(oldest.id, { role: "staff" })))?.id === oldest.id, "detail of the oldest");
 });
 
 // ---- 5. console, privacy, export ------------------------------------------------------------
@@ -725,6 +880,7 @@ const PAYMENTS = [null, { prepaid: { kind: "percent", value: 5, max: 150 } }, { 
 await t("1,000 random carts mixing subscribed and one-time lines × live offers × random percents × shipping and COD configs", async () => {
   const buyer = await shopper();
   let subscribedLines = 0;
+  let viaRoute = 0;
   let cods = 0;
   let pushes = 0;
   for (let i = 0; i < 1000; i++) {
@@ -737,7 +893,15 @@ await t("1,000 random carts mixing subscribed and one-time lines × live offers 
     const chosen = [...new Set(Array.from({ length: int(1, 4) }, () => pick(VARIANTS)[0]))];
     const lines = chosen.map((v) => [v, int(1, 4), rnd() < 0.5 ? pick([14, 30, 45, 60, 90]) : null]);
     const coupon = pick([null, null, null, "SAVE7", "FLAT300", "SOLO10"]);
-    const cartId = await freshCart(lines, coupon);
+    let cartId;
+    if (i % 10 === 3) {
+      // the product page's add-to-cart: through /api/cart, the interval the only subscription field sent
+      const first = await cartPost(null, { action: "add", variantId: vid(lines[0][0]), quantity: lines[0][1], ...(lines[0][2] ? { subscriptionInterval: lines[0][2] } : {}) });
+      cartId = first.body.id;
+      for (const [v, q, interval] of lines.slice(1)) await cartPost(cartId, { action: "add", variantId: vid(v), quantity: q, ...(interval ? { subscriptionInterval: interval } : {}) });
+      if (coupon) await cartPost(cartId, { action: "setCoupon", coupon });
+      viaRoute++;
+    } else cartId = await freshCart(lines, coupon);
     const where = `cart ${i} ${JSON.stringify(lines)} ${coupon || ""} ${settingsNow.discount_percent}%`;
     const drawer = await cartGet(cartId);
     for (const it of drawer.items) {
@@ -784,6 +948,7 @@ await t("1,000 random carts mixing subscribed and one-time lines × live offers 
   }
   ok(subscribedLines > 600, `only ${subscribedLines} subscribed lines`);
   ok(cods > 100, `only ${cods} COD orders`);
+  ok(viaRoute >= 100, `only ${viaRoute} carts through /api/cart`);
   console.log(`    (${subscribedLines} subscribed lines, ${cods} COD orders)`);
 });
 
@@ -847,6 +1012,18 @@ await t("300 random renewal histories (skip, swap, pause/resume, change, price c
       const r = await postCheckout(pay.cartId, { action: method === "prepaid" ? "razorpay_create" : "cod", idempotencyKey: key(), expectedTotal: q[method].total, expectedShipping: q[method].shipping }, { who });
       eq([r.status, r.body.code], [409, "PRICE_CHANGED"], `${where}: price change`);
       conflicts++;
+      // the shopper reads the new total and presses again: the figures follow
+      const fresh = (await account("GET", { who })).body.subscriptions[0];
+      const q2 = r.body.quote;
+      eq(toMinor(q2[method].total, "INR"), toMinor(fresh.next.amount, "INR"), `${where}: the new total is the account's new figure`);
+      const r2 = await postCheckout(pay.cartId, { action: method === "prepaid" ? "razorpay_create" : "cod", idempotencyKey: key(), expectedTotal: q2[method].total, expectedShipping: q2[method].shipping }, { who });
+      eq(r2.status, 200, `${where}: retry after the 409 ${JSON.stringify(r2.body).slice(0, 160)}`);
+      const o2 = await orderRow(r2.body.orderId);
+      eq(toMinor(o2.total, "INR"), toMinor(fresh.next.amount, "INR"), `${where}: retried order total`);
+      if (method === "prepaid") await inA(() => db.updateTable("orders").set({ status: "paid", payment_status: "paid", paid_at: new Date().toISOString() }).where("id", "=", o2.id).execute());
+      await inA(() => ST.createSubscriptionsFor(o2.id));
+      eq((await subRow(s.id)).cycle, s.cycle + 1, `${where}: cycle moved after the retry`);
+      renewed++;
       continue;
     }
     const before = razorpayCalls.length;

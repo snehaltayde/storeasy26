@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { customerFromToken, CUSTOMER_COOKIE } from "@/lib/customers";
 import { CART_COOKIE } from "@/lib/cart";
+import { HELD_CART_COOKIE } from "@/lib/subscriptions/held-cart";
 import { rateLimitAsync } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
@@ -112,6 +113,13 @@ export const POST = tenantHandler(async (request) => {
       slog("subscription_pay_started", { subscription: sub.id, cycle: Number(sub.cycle) });
       const res = NextResponse.json({ ok: true, redirect: "/checkout" });
       res.cookies.set(CART_COOKIE, cartId, CART_COOKIE_OPTS);
+      // the shopper's own cart waits in a second cookie (lib/subscriptions/held-cart.js);
+      // a cart already held (a second renewal in a row) stays the one held
+      const current = request.cookies.get(CART_COOKIE)?.value;
+      if (current && current !== cartId && !request.cookies.get(HELD_CART_COOKIE)?.value) {
+        const own = await db.selectFrom("carts").select(["subscription_id"]).where("id", "=", current).executeTakeFirst();
+        if (own && !own.subscription_id) res.cookies.set(HELD_CART_COOKIE, current, CART_COOKIE_OPTS);
+      }
       return res;
     }
     const sub = await shopperAction(customer.id, String(body.action || ""), id, {
