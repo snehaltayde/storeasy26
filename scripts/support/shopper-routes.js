@@ -71,7 +71,7 @@ export const SHOPPER_ROUTES = Object.freeze([
   { path: "health", methods: ["GET"], class: "job", suite: null },
   ...["me", "products", "products/[handle]", "collections", "offers", "orders", "orders/[id]"].map((p) => ({ path: `apps/v1/${p}`, methods: ["GET"], class: "app-token", suite: "test-app-tokens.js" })),
   // Phase 9 line 3: WhatsApp consent, opt-out and Meta's webhook
-  { path: "messaging/consent", methods: ["POST"], class: "shopper", suite: "test-whatsapp.js", note: "bound to the cart cookie (and the _customer cookie); never an id in the body" },
+  { path: "messaging/consent", methods: ["GET", "POST"], class: "shopper", suite: "test-whatsapp.js", note: "bound to the cart cookie (and the _customer cookie); never an id in the body" },
   { path: "account/messaging", methods: ["GET", "POST"], class: "shopper", suite: "test-whatsapp.js", note: "the signed-in shopper's own consents; signed out → 401" },
   { path: "messaging/stop", methods: ["POST"], class: "token", suite: "test-whatsapp.js", note: "the signed stop token (a consent id, no PII)" },
   { path: "whatsapp/webhook", methods: ["GET", "POST"], class: "webhook", suite: "test-whatsapp.js", note: "X-Hub-Signature-256 over the raw body with the app secret; GET is Meta's verify challenge" },

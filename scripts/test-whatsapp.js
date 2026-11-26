@@ -279,6 +279,23 @@ await t("consent route: no cart cookie → 400; a tick records the exact words, 
   eq((await a.run(() => db.selectFrom("messaging_consents").select("id").where("cart_id", "=", "cart_route_1").where("revoked_at", "is", null).execute())).length, 0, "nothing live:");
 });
 
+await t("consent route: GET shows this cart's live boxes (phone masked; nothing without a cart); sync withdraws another number's consent", async () => {
+  const jar = { [CART_COOKIE]: "cart_route_2" };
+  same((await hit("consent", "GET")).body, { ok: true, updates: false, marketing: false, phone: null }, "no cart:");
+  await hit("consent", "POST", { cookies: jar, body: { purpose: "updates", granted: true, phone: "9876500701" } });
+  await hit("consent", "POST", { cookies: jar, body: { purpose: "marketing", granted: true, phone: "9876500701" } });
+  const g = await hit("consent", "GET", { cookies: jar });
+  same({ u: g.body.updates, m: g.body.marketing }, { u: true, m: true }, "after a reload:");
+  ok(g.body.phone.endsWith("0701") && !g.text.includes("9876500701"), `masked: ${g.text}`);
+  eq((await hit("consent", "GET", { cookies: { [CART_COOKIE]: "cart_route_other" } })).body.updates, false, "another cart sees nothing:");
+  const same1 = await hit("consent", "POST", { cookies: jar, body: { sync: true, phone: "98765 00701" } });
+  same({ u: same1.body.updates, m: same1.body.marketing }, { u: true, m: true }, "same number keeps both:");
+  const moved = await hit("consent", "POST", { cookies: jar, body: { sync: true, phone: "9876500702" } });
+  same({ u: moved.body.updates, m: moved.body.marketing }, { u: false, m: false }, "a new number withdraws both:");
+  const vias = await a.run(() => db.selectFrom("messaging_consents").select("revoked_via").where("cart_id", "=", "cart_route_2").execute());
+  ok(vias.length === 2 && vias.every((v) => v.revoked_via === "phone_changed"), JSON.stringify(vias));
+});
+
 await t("consent route: 10 per 10 minutes", async () => {
   process.env.RATE_LIMIT_DISABLED = "0"; // the harness turns limits off
   let last;
@@ -351,6 +368,12 @@ await t("cart restore: a valid token puts that cart in the cookie and opens chec
   ok(String(x.headers.get("location")).endsWith("/") && !x.headers.get("set-cookie"), "bad token: home, no cookie");
   const onB = await hit("restore", "GET", { host: HOST_B, path: `/cart/r/${tok}`, params: { token: tok } });
   ok(!onB.headers.get("set-cookie"), "A's token does nothing on B");
+  // a revoked consent, or a cart that became an order: the link just opens the store
+  const tok2 = await a.run(async () => C.cartToken((await C.grantConsent({ purpose: "marketing", phone: "9876500401", cartId: "cart_restore_rev", source: "checkout" })).id));
+  await a.run(() => C.revokeConsent({ purpose: "marketing", cartId: "cart_restore_rev", via: "checkout" }));
+  ok(!(await hit("restore", "GET", { path: `/cart/r/${tok2}`, params: { token: tok2 } })).headers.get("set-cookie"), "revoked: no cookie");
+  await a.run(() => db.insertInto("orders").values({ id: "BL-WRESTORE", idempotency_key: "idem_wrestore", cart_id: "cart_restore", phone: "9876500400", total: 1, currency: "INR", status: "paid", created_at: isoAt(DAY), updated_at: isoAt(DAY) }).execute());
+  ok(!(await hit("restore", "GET", { path: `/cart/r/${tok}`, params: { token: tok } })).headers.get("set-cookie"), "ordered: no cookie");
 });
 
 // --- 6. the webhook -------------------------------------------------------------------
@@ -375,6 +398,8 @@ await t("webhook: GET verify challenge (token match only); POST unsigned or tamp
   eq((await hit("webhook", "POST", { raw, headers: { "x-hub-signature-256": sig.replace(/.$/, "0") } })).status, 401, "wrong signature:");
   eq((await hit("webhook", "POST", { raw, headers: { "x-hub-signature-256": sig }, host: HOST_B })).status, 401, "A's signature on B (no app secret there):");
   eq((await a.run(() => C.consentById(id)))?.revoked_at ?? null, null, "still live:");
+  const big = JSON.stringify({ pad: "x".repeat(260 * 1024) });
+  eq((await hit("webhook", "POST", { raw: big, headers: { "x-hub-signature-256": await W.hubSignature(APP_SECRET, big) } })).status, 413, "a body over 256 KB, even signed:");
   const okd = await hit("webhook", "POST", { raw, headers: { "x-hub-signature-256": sig } });
   eq(okd.status, 200, okd.text);
   eq((await a.run(() => C.consentById(id)))?.revoked_via, "whatsapp_stop", "revoked by STOP:");
@@ -413,6 +438,8 @@ async function seedOrder(kind) {
     if (kind === "other_cart") await grant("updates", { cartId: `cart_elsewhere${n}` });
     if (kind === "other_phone") await grant("updates", { phone: phoneOf(900 + n) });
     if (kind === "customer_bound") await grant("updates", { cartId: null, customerId: customer });
+    // an account's consent for this phone, but the order is a guest's (no customer, another cart)
+    if (kind === "customer_vs_guest") await grant("updates", { cartId: null, customerId: `cus_other${n}` });
   });
   if (kind === "store_b") await b.run(() => C.grantConsent({ purpose: "updates", phone, cartId: cart, source: "checkout", now: DAY - HOUR }));
   if (["updates", "both", "customer_bound"].includes(kind)) expected.add(`whatsapp_order_confirmed|${e164(phone)}|wa:order_confirmed:${orderId}`);
@@ -428,7 +455,9 @@ async function seedCart(kind) {
     await db.insertInto("carts").values({ id: cart, coupon_code: null, created_at: isoAt(idle), updated_at: isoAt(idle) }).execute();
     if (kind !== "empty") await db.insertInto("cart_items").values({ cart_id: cart, variant_id: varGid, product_id: prodGid, quantity: 1, added_at: isoAt(idle) }).execute();
     const grant = (purpose, over = {}) => C.grantConsent({ purpose, phone, cartId: cart, source: "checkout", now: idle - 60_000, ...over });
-    if (["marketing", "fresh", "empty", "ordered", "cap", "shared_phone"].includes(kind)) await grant("marketing");
+    if (["marketing", "fresh", "empty", "ordered", "cap", "shared_phone", "unproven"].includes(kind)) await grant("marketing");
+    // marketing goes only to a number on a placed order here: every case but "unproven" has one (another cart)
+    if (kind !== "unproven") await db.insertInto("orders").values({ id: `BL-WP${String(n).padStart(6, "0")}`, idempotency_key: `idem_wp_${n}`, cart_id: `cart_proof${n}`, email: `p${n}@wa.test`, phone, name: "Proof", total: 1, currency: "INR", status: "paid", created_at: isoAt(DAY - 30 * 86_400_000), updated_at: isoAt(DAY - 30 * 86_400_000) }).onConflict((oc) => oc.doNothing()).execute();
     if (kind === "updates_only") await grant("updates");
     if (kind === "revoked") {
       await grant("marketing");
@@ -445,8 +474,8 @@ async function seedCart(kind) {
   return { cart, kind };
 }
 
-const ORDER_CASES = ["none", "updates", "both", "marketing_only", "revoked", "other_cart", "other_phone", "customer_bound", "store_b"];
-const CART_CASES = ["none", "updates_only", "marketing", "revoked", "ordered", "fresh", "empty", "shared_phone"];
+const ORDER_CASES = ["none", "updates", "both", "marketing_only", "revoked", "other_cart", "other_phone", "customer_bound", "customer_vs_guest", "store_b"];
+const CART_CASES = ["none", "updates_only", "marketing", "revoked", "ordered", "fresh", "empty", "shared_phone", "unproven"];
 const orders = [];
 for (let i = 0; i < 4; i++) for (const k of ORDER_CASES) orders.push(await seedOrder(k));
 const carts = [];
@@ -454,6 +483,24 @@ for (let i = 0; i < 3; i++) for (const k of CART_CASES) carts.push(await seedCar
 // the cap case: two carts, one phone → the first reminder only (1 a day per phone)
 const capCarts = [await seedCart("cap"), await seedCart("cap")];
 expected.add(`whatsapp_cart_reminder|${e164(phoneOf(7777))}|wa:cart_reminder:${capCarts[0].cart}`);
+
+// the email-only erase: a guest's marketing consent on cart X; their order came
+// from cart Y under email E with the same phone; the erase names only E
+const ERASE_PHONE = phoneOf(8888);
+const ERASE_EMAIL = "guest-erase@wa.test";
+await a.run(async () => {
+  const idle = DAY - 3 * HOUR;
+  await db.insertInto("carts").values({ id: "cart_erase_x", coupon_code: null, created_at: isoAt(idle), updated_at: isoAt(idle) }).execute();
+  await db.insertInto("cart_items").values({ cart_id: "cart_erase_x", variant_id: varGid, product_id: prodGid, quantity: 1, added_at: isoAt(idle) }).execute();
+  await C.grantConsent({ purpose: "marketing", phone: ERASE_PHONE, cartId: "cart_erase_x", source: "checkout", now: idle - 60_000 });
+  await C.grantConsent({ purpose: "updates", phone: ERASE_PHONE, cartId: "cart_erase_y", source: "checkout", now: idle - 60_000 });
+  await db.insertInto("orders").values({ id: "BL-WERASE01", idempotency_key: "idem_werase", cart_id: "cart_erase_y", email: ERASE_EMAIL, phone: ERASE_PHONE, name: "Guest", total: 1, currency: "INR", status: "paid", created_at: isoAt(DAY - 86_400_000), updated_at: isoAt(DAY - 86_400_000) }).execute();
+});
+await t("nobody else: an email-only erase deletes a guest's consents bound to their carts and phone", async () => {
+  await a.run(() => redactCustomer({ email: ERASE_EMAIL }));
+  const left = await a.run(() => db.selectFrom("messaging_consents").select("id").where((eb) => eb.or([eb("phone_e164", "=", e164(ERASE_PHONE)), eb("cart_id", "in", ["cart_erase_x", "cart_erase_y"])])).execute());
+  eq(left.length, 0, "no consent left for that phone or those carts:");
+});
 
 const stubRows = (t) => t.run(() => db.selectFrom("notifications").select(["type", "recipient", "idempotency_key", "consent_ref", "consent_class", "status"]).where("provider_id", "=", "whatsapp-stub").where("idempotency_key", "like", "wa:%").where("idempotency_key", "not like", "wa:order_confirmed:sup%").execute());
 const asSet = (rows) => new Set(rows.map((r) => `${r.type}|${r.recipient}|${r.idempotency_key}`));
@@ -571,6 +618,62 @@ await t("an edited template stops sending until approved again", async () => {
   await approveAll();
   await run();
   eq((await stubRows(a)).filter((r) => r.idempotency_key === `wa:order_confirmed:${id}`).length, 1, "approved: one:");
+});
+
+await t("nobody else: a consent revoked between the sweep's query and its send sends nothing", async () => {
+  const idle = DAY + 10 * 86_400_000 - 3 * HOUR;
+  const T = DAY + 10 * 86_400_000;
+  const mk = async (id, phone, at) => {
+    await db.insertInto("carts").values({ id, coupon_code: null, created_at: isoAt(at), updated_at: isoAt(at) }).execute();
+    await db.insertInto("cart_items").values({ cart_id: id, variant_id: varGid, product_id: prodGid, quantity: 1, added_at: isoAt(at) }).execute();
+    await db.insertInto("orders").values({ id: `BL-WR${id.slice(-2)}`, idempotency_key: `idem_wr_${id}`, cart_id: `${id}_proof`, email: null, phone, name: "R", total: 1, currency: "INR", status: "paid", created_at: isoAt(at), updated_at: isoAt(at) }).execute();
+    return C.grantConsent({ purpose: "marketing", phone, cartId: id, source: "checkout", now: at - 60_000 });
+  };
+  const { sweepCarts } = await import("../lib/plugins/first-party/whatsapp/sweep.js");
+  const out = await a.run(async () => {
+    await mk("cart_race_01", "9811100001", idle - HOUR); // older: sent first
+    const second = await mk("cart_race_02", "9811100002", idle);
+    let revoked = false;
+    const log = (evt) => {
+      // right after the first send, the second shopper says STOP
+      if (evt === "wa_sent" && !revoked) {
+        revoked = true;
+        return C.revokeById(second.id, "whatsapp_stop");
+      }
+    };
+    const logged = [];
+    const r = await sweepCarts({ install: { id: waA.id, settings: {} }, now: T, secrets: async () => ({}), fetch: async () => ({ ok: false }), log: async (e, f) => (logged.push([e, f?.reason]), await log(e)) });
+    return { r, logged };
+  });
+  eq(out.r.due >= 2, true, `both were due: ${JSON.stringify(out.r)}`);
+  const sent = await a.run(() => db.selectFrom("notifications").select("idempotency_key").where("idempotency_key", "in", ["wa:cart_reminder:cart_race_01", "wa:cart_reminder:cart_race_02"]).execute());
+  same(sent.map((x) => x.idempotency_key), ["wa:cart_reminder:cart_race_01"], "only the first:");
+  ok(out.logged.some(([e, why]) => e === "wa_skipped" && why === "no_consent"), "the second skipped: no consent");
+});
+
+await t("caps race: parallel marketing sends to one phone write one row (the count is inside the insert)", async () => {
+  await a.run(async () => {
+    const to = "+919800077777";
+    const tpl = { kind: "cart_reminder", status: "approved", body: "x {link} {stop}" };
+    const T = DAY + 40 * 86_400_000;
+    const rs = await Promise.all(Array.from({ length: 6 }, (_, i) => W.sendWhatsApp({ to, template: tpl, vars: {}, consentClass: "marketing", consentRef: "mc_race", idempotencyKey: `race:${i}`, provider: W.stub, now: T })));
+    eq(rs.filter((r) => r.id && !r.failed).length, 1, "one sent:");
+    eq(rs.filter((r) => r.capped).length, 5, "five capped:");
+    eq(Number((await db.selectFrom("notifications").select(db.fn.countAll().as("n")).where("idempotency_key", "like", "race:%").executeTakeFirst()).n), 1, "one row:");
+    // the store's cap holds the same way
+    const rs2 = await Promise.all(Array.from({ length: 4 }, (_, i) => W.sendWhatsApp({ to: `+91980007000${i}`, template: tpl, vars: {}, consentClass: "marketing", consentRef: "mc_race", idempotencyKey: `race2:${i}`, provider: W.stub, now: T + 3 * 86_400_000, dailyCap: 2 })));
+    eq(rs2.filter((r) => r.id).length, 2, "the store's cap of 2:");
+    await db.deleteFrom("notifications").where((eb) => eb.or([eb("idempotency_key", "like", "race:%"), eb("idempotency_key", "like", "race2:%")])).execute();
+  });
+});
+
+await t("contract: order.delivery_updated is read only as { order: { id }, delivery: { awb, status, at } }", async () => {
+  const id = await seedOrder("updates");
+  const run = (data) => a.run(() => HANDLERS["order.delivery_updated"]({ event: { data }, install: { id: waA.id, settings: {} }, secrets: async () => ({}), fetch: async () => ({ ok: false }), log: () => {} }));
+  for (const bad of [{ order: { id }, status: "delivered" }, { order_id: id, delivery: { status: "delivered" } }, { order: { id }, delivery: "delivered" }, { order: { id: 7 }, delivery: { status: "delivered" } }]) await run(bad);
+  eq((await stubRows(a)).filter((r) => r.idempotency_key === `wa:order_delivered:${id}`).length, 0, "other shapes dropped:");
+  await run({ order: { id }, delivery: { awb: "AWB1", status: "delivered", at: isoAt(DAY) } });
+  eq((await stubRows(a)).filter((r) => r.idempotency_key === `wa:order_delivered:${id}`).length, 1, "the contract shape sends:");
 });
 
 // --- 8. caps and quiet hours on a pinned clock ------------------------------------------

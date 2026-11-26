@@ -15,6 +15,7 @@ import { STOP_WORDS, hubSignature } from "@/lib/messaging/whatsapp";
 //        or wrong signature, or no app secret → 401 and nothing changes.
 //        An inbound text of STOP (or UNSUBSCRIBE) revokes every WhatsApp
 //        consent for that number. Everything else is acknowledged and ignored.
+//        A body over 256 KB → 413, before any signature work.
 // Meta's docs (Webhooks, "Create a webhook endpoint"), read 2026-11-26.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,8 +39,14 @@ export const GET = tenantHandler(async (request) => {
   return new NextResponse(String(q.get("hub.challenge") ?? "").slice(0, 200), { status: 200, headers: { "content-type": "text/plain" } });
 });
 
+// Meta's notification bodies are small; anything bigger is refused before the HMAC
+const MAX_BODY_BYTES = 256 * 1024;
+const tooBig = () => NextResponse.json({ error: "body too large" }, { status: 413 });
+
 export const POST = tenantHandler(async (request) => {
+  if (Number(request.headers.get("content-length") || 0) > MAX_BODY_BYTES) return tooBig();
   const raw = await request.text();
+  if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES) return tooBig();
   const given = String(request.headers.get("x-hub-signature-256") ?? "");
   const { app_secret: appSecret } = await installSecrets();
   if (!appSecret || !given || !timingSafeEqual(await hubSignature(String(appSecret), raw), given)) {

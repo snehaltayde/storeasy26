@@ -5,14 +5,17 @@
 //      templates on the WhatsApp card.
 //   2. Shopper 1 ticks both WhatsApp boxes at checkout and places a COD
 //      order → one order_confirmed row for that phone, after the job tick.
-//   3. Shopper 2 ticks only the marketing box and leaves; shopper 3 ticks
-//      nothing and leaves. Their carts are backdated 3 hours, the store's time
+//   3. Shopper 1 comes back on a new cart, ticks only the marketing box and
+//      leaves (a number on a placed order, so offers may go to it); shopper 2
+//      (a new number, never ordered) does the same; shopper 3 ticks nothing
+//      and leaves. Their carts are backdated 3 hours, the store's time
 //      zone is pinned to one where it is midday now (so quiet hours can't
 //      hold the run), and one plugin_sweep job is queued. The sweep sends one
-//      cart_reminder to shopper 2 and nothing to shopper 3.
+//      cart_reminder to shopper 1's new cart and nothing to shopper 2 (the
+//      number was never on an order) or shopper 3.
 //   4. The reminder's cart link, opened in a fresh browser, restores that cart
 //      at checkout; its stop link opens the stop page and Stop messages
-//      revokes shopper 2's consent.
+//      revokes that number's consents.
 // The time zone is put back at the end.
 import { createClient } from "@libsql/client";
 import { harnessPorts } from "../../design-harness.js";
@@ -117,25 +120,27 @@ stage("whatsapp", async (drill) => {
     drill.check(confirmed.provider_id === "whatsapp-stub" && confirmed.consent_class === "transactional" && /\/m\/stop\?t=/.test(confirmed.body), "shopper 1: one order_confirmed row (stub, transactional, a stop link)", confirmed.body);
     await one.page.context().close();
 
-    // 3. shopper 2 (marketing only) and shopper 3 (nothing) leave their carts
+    // 3. shopper 1 again (marketing only), a new number (marketing only), and one with no ticks
+    const back = await atCheckout(drill, item, PHONES.buyer, ["marketing"]);
+    await drill.shoot(back.page, "whatsapp-consent");
+    await back.page.context().close();
     const two = await atCheckout(drill, item, PHONES.browser, ["marketing"]);
-    await drill.shoot(two.page, "whatsapp-consent");
     await two.page.context().close();
     const three = await atCheckout(drill, item, PHONES.silent, []);
     await three.page.context().close();
-    drill.check(Boolean(two.cart && three.cart), "both shoppers have a cart", [two.cart, three.cart]);
+    drill.check(Boolean(back.cart && two.cart && three.cart), "the three carts exist", [back.cart, two.cart, three.cart]);
     const ago = new Date(Date.now() - 3 * 3_600_000).toISOString();
     await rolesSql([
-      { sql: "UPDATE carts SET updated_at = ? WHERE id IN (?, ?)", args: [ago, two.cart, three.cart] },
-      { sql: "UPDATE messaging_consents SET granted_at = ? WHERE cart_id = ?", args: [ago, two.cart] },
+      { sql: "UPDATE carts SET updated_at = ? WHERE id IN (?, ?, ?)", args: [ago, back.cart, two.cart, three.cart] },
+      { sql: "UPDATE messaging_consents SET granted_at = ? WHERE cart_id IN (?, ?)", args: [ago, back.cart, two.cart] },
     ]);
     const now = new Date().toISOString();
     await platformSql([{ sql: "INSERT INTO jobs (id, type, tenant_id, payload, idempotency_key, status, attempts, max_attempts, run_after, created_at, updated_at) VALUES (?, 'plugin_sweep', NULL, '{}', ?, 'pending', 0, 1, ?, ?, ?)", args: [`job_wadrill${Date.now().toString(16).slice(-8)}`, `plugin_sweep:drill-wa-${Date.now()}`, now, now, now] }]);
-    const reminder = await until(owner, async () => (await rowsTo(PHONES.browser)).find((r) => r.type === "whatsapp_cart_reminder"), "the cart reminder");
-    drill.check(reminder.consent_class === "marketing", "shopper 2: one cart reminder (marketing)", reminder.consent_class);
-    drill.check((await rowsTo(PHONES.browser)).length === 1, "shopper 2: nothing else (no order updates without that tick)");
+    const reminder = await until(owner, async () => (await rowsTo(PHONES.buyer)).find((r) => r.type === "whatsapp_cart_reminder"), "the cart reminder");
+    drill.check(reminder.consent_class === "marketing", "shopper 1's new cart: one cart reminder (marketing)", reminder.consent_class);
+    drill.check(JSON.stringify((await rowsTo(PHONES.buyer)).map((r) => r.type)) === '["whatsapp_order_confirmed","whatsapp_cart_reminder"]', "shopper 1: the order update and one reminder, nothing else (the ordered cart gets none)");
+    drill.check((await rowsTo(PHONES.browser)).length === 0, "shopper 2 (a number never on an order): nothing");
     drill.check((await rowsTo(PHONES.silent)).length === 0, "shopper 3 (no ticks): nothing at all");
-    drill.check((await rowsTo(PHONES.buyer)).every((r) => r.type === "whatsapp_order_confirmed"), "shopper 1: no reminder (the cart became an order)");
 
     // 4. the cart link restores the cart; the stop link revokes
     const cartPath = /\/cart\/r\/\S+/.exec(reminder.body)?.[0];
@@ -150,8 +155,8 @@ stage("whatsapp", async (drill) => {
     await fresh.locator('[data-wa-stop="confirm"]').click();
     await fresh.locator('[data-wa-stop="done"]').waitFor();
     await drill.shoot(fresh, "whatsapp-stopped");
-    const [live] = await rolesSql([{ sql: "SELECT count(*) AS n FROM messaging_consents WHERE phone_e164 = ? AND revoked_at IS NULL", args: [e164(PHONES.browser)] }]);
-    drill.check(Number(live[0].n) === 0, "Stop messages revokes shopper 2's consent", live[0]);
+    const [live] = await rolesSql([{ sql: "SELECT count(*) AS n FROM messaging_consents WHERE phone_e164 = ? AND revoked_at IS NULL", args: [e164(PHONES.buyer)] }]);
+    drill.check(Number(live[0].n) === 0, "Stop messages revokes every consent for that number", live[0]);
     await fresh.context().close();
   } finally {
     await platformSql([before == null ? { sql: "UPDATE tenants SET config = json_remove(config, '$.merchant_timezone') WHERE id = ?", args: [tenant.id] } : { sql: "UPDATE tenants SET config = json_set(config, '$.merchant_timezone', ?) WHERE id = ?", args: [before, tenant.id] }]);
