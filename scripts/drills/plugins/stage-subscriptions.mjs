@@ -162,7 +162,9 @@ stage("subscriptions", async (drill) => {
   // signed out, the subscriptions API reads nothing
   const anon = await shopper(drill);
   await anon.goto(`${ORIGIN}/`, { waitUntil: "load" });
-  const out = await json(anon, "/api/account/subscriptions");
+  // (the context's own request, not the page's fetch: a 401 there is the expected answer, not a console error)
+  const res = await anon.context().request.get(`${ORIGIN}/api/account/subscriptions`);
+  const out = { status: res.status(), json: await res.json().catch(() => null) };
   drill.check(out.status === 401 && JSON.stringify(Object.keys(out.json || {})) === '["error"]', "signed out: 401 with no data", out);
   await anon.context().close();
 });

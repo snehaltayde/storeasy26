@@ -5,6 +5,7 @@ import { rateLimitAsync } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
 import { db } from "@/lib/db";
+import { readEffective, effectiveExpr, LIVE_TABLE } from "@/lib/catalog/effective";
 import { subscriptionSettings, eligibleFor, subscribedUnitPrice, QUANTITY_MAX } from "@/lib/subscriptions/pricing";
 import { subscriptionsOf, ownSubscription } from "@/lib/subscriptions/store";
 import { renewalFigure, payableNow, startRenewalCart } from "@/lib/subscriptions/renewal";
@@ -57,14 +58,18 @@ export const GET = tenantHandler(async (request) => {
     const sub = await ownSubscription(customer.id, swapId);
     if (!sub) return NextResponse.json(NOT_FOUND, { status: 404 });
     if (!settings) return NextResponse.json({ ok: true, options: [] });
-    const rows = await db
-      .selectFrom("variants as v")
-      .innerJoin("products as p", "p.id", "v.product_id")
-      .select(["v.id", "v.title as variant_title", "v.price", "p.id as product_id", "p.title as product_title", "p.tags"])
-      .where("v.available", "=", 1)
-      .orderBy("p.title", "asc")
-      .limit(400)
-      .execute();
+    // the products as shoppers see them (the founder's published titles)
+    const rows = await readEffective((live) => {
+      let q = db.selectFrom("variants as v").innerJoin("products as p", "p.id", "v.product_id");
+      if (live) q = q.leftJoin(`${LIVE_TABLE} as c`, "c.product_id", "p.id");
+      return q
+        .select(["v.id", "v.title as variant_title", "v.price", "p.id as product_id", "p.tags"])
+        .select(effectiveExpr("title", live).as("product_title"))
+        .where("v.available", "=", 1)
+        .orderBy("product_title", "asc")
+        .limit(400)
+        .execute();
+    });
     const options = rows
       .filter((r) => {
         let tags = [];

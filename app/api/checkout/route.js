@@ -210,26 +210,26 @@ const reservedKey = (key) => typeof key === "string" && key.startsWith(RENEWAL_K
 // Phase 9 line 2: a cart with a subscribed line (or a renewal) needs a
 // signed-in shopper and the base market; a renewal must still be this
 // shopper's, payable, and hold exactly its line. → { customerId } or { response }
+const signInToSubscribe = () => NextResponse.json({ ok: false, code: "SIGN_IN_TO_SUBSCRIBE", error: "Sign in to subscribe", signIn: "/account?return=%2Fcheckout" }, { status: 401 });
+const subscriptionOutsideBase = () =>
+  NextResponse.json(
+    {
+      ok: false,
+      code: "SUBSCRIPTION_BASE_MARKET",
+      error: `Subscriptions are only available for delivery in ${countryName(baseCountry(storeConfig()))}. Remove the subscription from your cart, or change the country.`,
+    },
+    { status: 409 },
+  );
+const renewalChanged = (problem) => NextResponse.json({ ok: false, code: "RENEWAL_CHANGED", error: problem }, { status: 409 });
 async function subscriptionGate(request, cart, market) {
   if (!cart?.hasSubscription && !cart?.renewal) return { customerId: null };
   const customer = await customerFromToken(request.cookies.get(CUSTOMER_COOKIE)?.value);
-  if (!customer)
-    return { response: NextResponse.json({ ok: false, code: "SIGN_IN_TO_SUBSCRIBE", error: "Sign in to subscribe", signIn: "/account?return=%2Fcheckout" }, { status: 401 }) };
-  if (market)
-    return {
-      response: NextResponse.json(
-        {
-          ok: false,
-          code: "SUBSCRIPTION_BASE_MARKET",
-          error: `Subscriptions are only available for delivery in ${countryName(baseCountry(storeConfig()))}. Remove the subscription from your cart, or change the country.`,
-        },
-        { status: 409 },
-      ),
-    };
+  if (!customer) return { response: signInToSubscribe() };
+  if (market) return { response: subscriptionOutsideBase() };
   if (cart.renewal) {
     const sub = await subscriptionById(cart.renewal.subscriptionId);
     const problem = renewalProblem(cart, sub, customer.id, await subscriptionSettings());
-    if (problem) return { response: NextResponse.json({ ok: false, code: "RENEWAL_CHANGED", error: problem }, { status: 409 }) };
+    if (problem) return { response: renewalChanged(problem) };
   }
   return { customerId: customer.id };
 }

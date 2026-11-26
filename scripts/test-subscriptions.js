@@ -374,13 +374,13 @@ await t("cart: subscribing stores the interval and prices the line; not eligible
   const it = (v) => cart.items.find((i) => i.variantId === vid(v));
   eq(it("2005").subscription, { interval: 30, percent: 10, active: true, applied: true }, "subscribed line");
   eq(it("2005").discount, Math.round(4999 * 0.1) * 2, "line discount");
-  eq(it("2004").subscription, null, "not eligible → one-time");
-  eq(it("2008").subscription, null, "an interval not offered → one-time");
+  eq(it("2004").subscription ?? null, null, "not eligible → one-time");
+  eq(it("2008").subscription ?? null, null, "an interval not offered → one-time");
   ok(cart.hasSubscription, "hasSubscription");
   // the same variant added one-time: one-time
   await inA(() => addItem(c, vid("2005"), 1));
   const again = await cartGet(c);
-  eq(again.items.find((i) => i.variantId === vid("2005")).subscription, null, "latest choice");
+  eq(again.items.find((i) => i.variantId === vid("2005")).subscription ?? null, null, "latest choice");
   eq(again.items.find((i) => i.variantId === vid("2005")).quantity, 3, "quantity merged");
   // a market cart stores none
   const m = `sub-cart-${++carts}`;
