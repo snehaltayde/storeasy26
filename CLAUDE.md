@@ -38,6 +38,7 @@ A new feature's files go in: a migration in `migrations/tenant/` (or `platform/`
 - **Drafts only:** generators and AI write drafts; only a founder's Publish puts content live. Legal text is never auto-published.
 - **Tests wiring:** every `scripts/test-*.js` has a `test:*` script in `package.json`; every new API route is tracked by git before `test:security` runs.
 - **Dependencies:** no new dependency without a stated reason in `docs/DECISIONS.md`.
+- **Changelog:** every change that reaches `main` adds a line to `CHANGELOG.md` (WooCommerce style: `* Add|Fix|Tweak|Update|Dev|Security - …`) under a new or open version, and `package.json` `version` matches the top entry. A release with an Add bumps MINOR; fixes and tweaks alone bump PATCH.
 - **Hands off:** never modify `docs/CMS_CLAUDE_DIRECTION_BRIEF.md`, `docs/CMS_ENTERPRISE_AUDIT_2026-10-29.md` or `docs/CMS_SESSION_HANDOFF.md`.
 
 ## Commands
