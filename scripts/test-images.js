@@ -8,7 +8,7 @@
 //      react-dom/server and the real next/image. A library photo must come out
 //      as its own /api/media url, never as /_next/image?url=/api/media/…
 //      (which answers 400: the optimizer's request has no Host). A Shopify
-//      photo must still go through /_next/image.
+//      photo goes to Shopify's CDN with ?width= (shopifyLoader), not /_next/image.
 // None of this is a browser. The browser proof is in docs/cms-reviews/P1-IMAGES.md.
 //   pnpm test:images
 import { readFile, readdir } from "node:fs/promises";
@@ -196,10 +196,11 @@ await t("StoreImage: a library photo is its own url, with no srcset to the optim
   ok(!/srcset=/i.test(h), "no srcset for an unoptimized photo");
 });
 
-await t("StoreImage: a Shopify photo still goes through the optimizer", () => {
+await t("StoreImage: a Shopify photo is resized by Shopify's CDN (?width=), never /_next/image", () => {
   const h = html(StoreImage, { src: SHOP, alt: "", fill: true, sizes: "48px" });
-  ok(srcs(h)[0].startsWith("/_next/image?url=https%3A%2F%2Fcdn.shopify.com"), `src was ${srcs(h)[0]}`);
-  ok(/srcset=/i.test(h), "srcset kept");
+  ok(srcs(h)[0].startsWith(`${SHOP}?width=`), `src was ${srcs(h)[0]}`);
+  ok(!/_next\/image/.test(h), `rendered ${h}`);
+  ok(/srcset=/i.test(h) && /width=\d+ \d+w/.test(h.replace(/&amp;/g, "&")), "srcset with Shopify widths kept");
 });
 
 await t("StoreImage: an explicit unoptimized still wins", () => {
@@ -215,9 +216,9 @@ await t("product page gallery: library photos (main and thumbnails) render as /a
   ok(s.includes(LIB) && s.includes(LIB2), `srcs ${s.join(" | ")}`);
 });
 
-await t("product page gallery: Shopify photos still go through the optimizer", () => {
+await t("product page gallery: Shopify photos are resized by Shopify's CDN", () => {
   const h = html(ProductGallery, { title: "Whey", images: [{ url: SHOP, alt: "" }] });
-  ok(srcs(h).every((s) => s.startsWith("/_next/image?url=https%3A%2F%2Fcdn.shopify.com")), srcs(h).join(" | "));
+  ok(srcs(h).every((s) => s.startsWith(`${SHOP}?width=`)), srcs(h).join(" | "));
 });
 
 await t("product card and collection card: library photos render as /api/media urls", () => {

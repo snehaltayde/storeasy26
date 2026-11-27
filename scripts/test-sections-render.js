@@ -399,7 +399,7 @@ await t("a v4 home with a hero image renders the image and its alt through Store
   ok(/data-hero-image=""/.test(hero), "the image frame is missing");
   // a Shopify photo still goes through the optimizer
   const shop = view(sec("hero", "sec_h2", { ...HERO_SETTINGS, image: { media: "https://cdn.shopify.com/s/files/1/0001/hero.jpg", alt: "Shop photo" } }), {}, { surface: "home" });
-  ok(attr(imgs(shop)[0], "src").startsWith("/_next/image?url=https%3A%2F%2Fcdn.shopify.com"), `shopify src: ${imgs(shop)[0]}`);
+  ok(/^https:\/\/cdn\.shopify\.com\/.*[?&]width=\d+$/.test(attr(imgs(shop)[0], "src")), `shopify src (Shopify CDN with ?width=): ${imgs(shop)[0]}`);
 });
 
 await t("without an image, the hero's markup equals the legacy hero's (a6d028e drafts, same words and counts)", () => {
@@ -508,7 +508,7 @@ await t("a hero image off the Shopify CDN (any https photo, or a '/' path) publi
     }
     // the Shopify CDN still goes through the optimizer
     const shop = view(sec("hero", "sec_h2", { ...HERO_SETTINGS, image: { media: "https://cdn.shopify.com/s/files/1/0001/hero.jpg", alt: "" } }), {}, { surface: "home" });
-    ok(attr(imgs(shop)[0], "src").startsWith("/_next/image?url=https%3A%2F%2Fcdn.shopify.com"), `shopify src: ${imgs(shop)[0]}`);
+    ok(/^https:\/\/cdn\.shopify\.com\/.*[?&]width=\d+$/.test(attr(imgs(shop)[0], "src")), `shopify src (Shopify CDN with ?width=): ${imgs(shop)[0]}`);
   } finally {
     if (env === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = env;

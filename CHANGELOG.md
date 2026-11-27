@@ -4,6 +4,12 @@ Format (as WooCommerce does): newest version first. Each line starts with one ta
 Add (new feature), Fix (bug fix), Tweak (change to existing behaviour), Update (pricing, content, dependencies), Dev (developer or ops change), Security.
 Versions: MAJOR.MINOR.PATCH. A release with an Add is a MINOR bump; fixes and tweaks alone are a PATCH bump.
 
+= 1.0.2 - 2026-11-27 =
+
+* Fix - Storefront: product photos are now resized by Shopify's own image CDN instead of Vercel's on-the-fly image resizer, which re-processed the full original on every cache miss (1–4 s on a collection page). This also stops spending Vercel image-optimisation quota.
+* Fix - Storefront: the first product photos on a page (marked priority) show as soon as they load, instead of staying invisible until the page's JavaScript started.
+* Dev - Removed the retired Typesense search settings from production (search uses the built-in database search).
+
 = 1.0.1 - 2026-11-27 =
 
 * Fix - Storefront: product images sometimes failed to load. The offline helper (service worker) was blocked from fetching Shopify CDN images, and crashed when it had no saved copy.

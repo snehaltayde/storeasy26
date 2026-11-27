@@ -14,7 +14,7 @@ export default function FadeImage({ className = "", onLoad, ...props }) {
         setLoaded(true);
         onLoad?.(e);
       }}
-      className={`${className} transition duration-500 ${loaded ? "opacity-100" : "opacity-0"}`}
+      className={`${className} transition duration-500 ${loaded || props.priority ? "opacity-100" : "opacity-0"}`}
     />
   );
 }
