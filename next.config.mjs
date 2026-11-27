@@ -22,7 +22,7 @@ const CONTENT_SECURITY_POLICY = [
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
   `img-src ${cspImgSources}`,
-  "connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com https://www.google-analytics.com https://region1.google-analytics.com https://graph.facebook.com https://*.a1.typesense.net",
+  "connect-src 'self' https://cdn.shopify.com https://api.razorpay.com https://lumberjack.razorpay.com https://www.google-analytics.com https://region1.google-analytics.com https://graph.facebook.com https://*.a1.typesense.net",
   "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com",
   "frame-ancestors 'self'",
   "object-src 'none'",

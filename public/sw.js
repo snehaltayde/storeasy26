@@ -1,7 +1,7 @@
 /* Storeasy PWA service worker — app-shell + runtime caching (S36: per-tenant
    branded /offline + /manifest.webmanifest are DYNAMIC routes precached at
    install, so each tenant origin caches its own branding). */
-const VERSION = "v2";
+const VERSION = "v3";
 const STATIC_CACHE = `storeasy-static-${VERSION}`;
 const RUNTIME_CACHE = `storeasy-runtime-${VERSION}`;
 const PRECACHE = ["/offline", "/manifest.webmanifest", "/icons/icon-192.png"];
@@ -57,7 +57,7 @@ self.addEventListener("fetch", (event) => {
             if (res && res.status === 200) cache.put(request, res.clone());
             return res;
           })
-          .catch(() => cached);
+          .catch(() => cached || Response.error());
         return cached || network;
       }),
     );
